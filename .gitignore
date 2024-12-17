@@ -1,5 +1,14 @@
 # See https://docs.github.com/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
 
+#ignore public folder
+public
+
+# Ignore images
+*.png
+*.gif
+*.jpg
+*.jpeg
+*.ico
 # Compiled output
 /dist
 /tmp
