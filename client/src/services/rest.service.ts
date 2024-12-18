@@ -8,6 +8,8 @@ export class RestService {
   constructor(private http: HttpClient) {}
 
   getHello() {
-    return this.http.get('http://localhost:8080/hello');
+    return this.http.get('http://localhost:8080/hello', {
+      responseType: 'text',
+    });
   }
 }
