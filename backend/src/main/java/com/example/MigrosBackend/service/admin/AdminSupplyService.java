@@ -1,4 +1,4 @@
-package com.example.MigrosBackend.service;
+package com.example.MigrosBackend.service.admin;
 
 import com.example.MigrosBackend.dto.ItemDto;
 import com.example.MigrosBackend.entity.CategoryEntity;

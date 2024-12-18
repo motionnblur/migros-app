@@ -1,4 +1,4 @@
-package com.example.MigrosBackend.service;
+package com.example.MigrosBackend.service.user;
 
 import com.example.MigrosBackend.entity.CategoryEntity;
 import com.example.MigrosBackend.repository.CategoryEntityRepository;
