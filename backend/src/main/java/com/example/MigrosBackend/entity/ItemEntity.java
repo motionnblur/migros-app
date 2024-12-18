@@ -18,4 +18,8 @@ public class ItemEntity {
     private int itemCount;
     private float itemPrice;
     private float discount;
+
+    @ManyToOne
+    @JoinColumn(name = "category_entity_id", referencedColumnName = "category_entity_id")
+    private CategoryEntity categoryEntity;
 }

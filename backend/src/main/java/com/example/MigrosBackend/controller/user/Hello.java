@@ -1,4 +1,4 @@
-package com.example.MigrosBackend.controller;
+package com.example.MigrosBackend.controller.user;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
