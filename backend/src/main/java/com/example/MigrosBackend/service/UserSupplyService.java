@@ -12,7 +12,7 @@ public class UserSupplyService {
     @Autowired
     private CategoryEntityRepository categoryEntityRepository;
 
-    public List<CategoryEntity> getCategories() {
-        return categoryEntityRepository.findAll();
+    public List<String> getAllCategoryNames() {
+        return categoryEntityRepository.findAll().stream().map(CategoryEntity::getCategoryName).toList();
     }
 }

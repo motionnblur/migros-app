@@ -1,6 +1,5 @@
 package com.example.MigrosBackend.controller.user;
 
-import com.example.MigrosBackend.entity.CategoryEntity;
 import com.example.MigrosBackend.service.UserSupplyService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,8 +14,8 @@ public class UserSupplyController {
     @Autowired
     private UserSupplyService userSupplyService;
 
-    @GetMapping("getCategories")
-    public List<CategoryEntity> getCategories() {
-        return userSupplyService.getCategories();
+    @GetMapping("getAllCategoryNames")
+    public List<String> getAllCategoryNames() {
+        return userSupplyService.getAllCategoryNames();
     }
 }
