@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { DiscoverComponent } from '../../components/discover-area/parent/discover-area.component';
+import { DiscoverComponent } from '../components/discover-area/parent/discover-area.component';
 
 @Component({
   selector: 'app-root',

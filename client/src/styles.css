@@ -4,3 +4,27 @@ html, body {
     width: 100%;
     height: 100%;
 }
+.flex {
+    display: flex;
+}
+.center-width {
+    justify-content: center;
+}
+.width-66 {
+    width: 66%;
+}
+.height-100 {
+    height: 100%;
+}
+.line-top {
+    border-top: 1px solid rgb(221, 221, 221);
+}
+.line-bottom {
+    border-bottom: 1px solid rgb(221, 221, 221);
+}
+.line-top-bold {
+    border-top: 2px solid rgb(221, 221, 221);
+}
+.line-bottom-bold {
+    border-bottom: 2px solid rgb(221, 221, 221);
+}
