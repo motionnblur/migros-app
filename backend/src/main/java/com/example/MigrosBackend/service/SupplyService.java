@@ -16,6 +16,9 @@ public class SupplyService {
     private ItemEntityRepository itemEntityRepository;
 
     public void addCategory(String categoryName) throws Exception {
+        CategoryEntity ce = categoryEntityRepository.findByCategoryName(categoryName);
+        if(ce != null) throw new Exception("Same category with that name: "+categoryName+" already exists.");
+
         CategoryEntity categoryEntity = new CategoryEntity();
         categoryEntity.setCategoryName(categoryName);
 
@@ -23,7 +26,7 @@ public class SupplyService {
     }
     public void addItem(ItemDto itemDto) throws Exception {
         CategoryEntity categoryEntity = categoryEntityRepository.findByCategoryName(itemDto.getCategoryName());
-        if(categoryEntity == null) throw new Exception("Category: " +itemDto.getCategoryName()+ " could not be found");
+        if(categoryEntity == null) throw new Exception("Category with that name: " +itemDto.getCategoryName()+ " could not be found.");
 
         ItemEntity itemEntity = new ItemEntity();
         itemEntity.setItemName(itemDto.getItemName());
