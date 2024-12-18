@@ -5,10 +5,10 @@
 .header {
     width: 100%;
     height: 196px;
-    background-color: antiquewhite;
+    background-color: white
 }
 .content {
-    background-color: aliceblue;
+    background-color: white;
     width: 100%;
     height: 6064px;
     display: flex;
