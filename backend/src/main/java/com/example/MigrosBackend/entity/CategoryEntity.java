@@ -19,6 +19,6 @@ public class CategoryEntity {
     private String categoryName;
 
     @OneToMany(cascade = CascadeType.ALL)
-    @JoinColumn(name = "category_entity_id", referencedColumnName = "todo_entity_id")
+    @JoinColumn(name = "category_entity_id", referencedColumnName = "category_entity_id")
     private List<ItemEntity> itemEntities;
 }
