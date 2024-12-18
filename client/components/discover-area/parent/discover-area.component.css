@@ -1,0 +1,9 @@
+.discover {
+    height: 558px;
+    width: 1272px;
+    display: flex;
+    justify-content: start;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}

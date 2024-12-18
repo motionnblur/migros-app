@@ -1,0 +1,24 @@
+.category-button {
+    width: 144px;
+    height: 180px;
+    display: flex;
+    flex-direction: column;
+}
+.category-button__image {
+    width: 143px;
+    height: 135px;
+    border: 1px solid gainsboro;
+    border-radius: 5%;
+    cursor: pointer;
+    object-fit: contain;
+}
+.category-button__title {
+    margin-top: 5px;
+    height: auto;
+    font-size: 14px;
+    font-weight: 600;
+    color: black;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
