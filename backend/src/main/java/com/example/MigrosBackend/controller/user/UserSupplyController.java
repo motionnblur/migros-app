@@ -34,4 +34,9 @@ public class UserSupplyController {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
     }
+
+    @GetMapping("getItemImageNames")
+    public List<String> getItemImageNames(@RequestParam Long itemId) {
+        return userSupplyService.getItemImageNames(itemId);
+    }
 }

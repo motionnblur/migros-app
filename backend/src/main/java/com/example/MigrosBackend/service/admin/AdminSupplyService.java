@@ -3,8 +3,10 @@ package com.example.MigrosBackend.service.admin;
 import com.example.MigrosBackend.dto.ItemDto;
 import com.example.MigrosBackend.entity.CategoryEntity;
 import com.example.MigrosBackend.entity.ItemEntity;
+import com.example.MigrosBackend.entity.ItemImageEntity;
 import com.example.MigrosBackend.repository.CategoryEntityRepository;
 import com.example.MigrosBackend.repository.ItemEntityRepository;
+import com.example.MigrosBackend.repository.ItemImageEntityRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -14,6 +16,8 @@ public class AdminSupplyService {
     private CategoryEntityRepository categoryEntityRepository;
     @Autowired
     private ItemEntityRepository itemEntityRepository;
+    @Autowired
+    private ItemImageEntityRepository itemImageEntityRepository;
 
     public void addCategory(String categoryName) throws Exception {
         CategoryEntity ce = categoryEntityRepository.findByCategoryName(categoryName);
@@ -36,5 +40,12 @@ public class AdminSupplyService {
         itemEntity.setCategoryEntity(categoryEntity);
 
         itemEntityRepository.save(itemEntity);
+
+        for(String imageName : itemDto.getItemImageNames()) {
+            ItemImageEntity itemImageEntity = new ItemImageEntity();
+            itemImageEntity.setImageName(imageName);
+            itemImageEntity.setItemEntity(itemEntity);
+            itemImageEntityRepository.save(itemImageEntity);
+        }
     }
 }

@@ -3,8 +3,10 @@ package com.example.MigrosBackend.service.user;
 import com.example.MigrosBackend.dto.ItemDto;
 import com.example.MigrosBackend.entity.CategoryEntity;
 import com.example.MigrosBackend.entity.ItemEntity;
+import com.example.MigrosBackend.entity.ItemImageEntity;
 import com.example.MigrosBackend.repository.CategoryEntityRepository;
 import com.example.MigrosBackend.repository.ItemEntityRepository;
+import com.example.MigrosBackend.repository.ItemImageEntityRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -21,6 +23,8 @@ public class UserSupplyService {
     private CategoryEntityRepository categoryEntityRepository;
     @Autowired
     private ItemEntityRepository itemEntityRepository;
+    @Autowired
+    private ItemImageEntityRepository itemImageEntityRepository;
 
     public List<String> getAllCategoryNames() {
         return categoryEntityRepository.findAll().stream().map(CategoryEntity::getCategoryName).toList();
@@ -44,5 +48,9 @@ public class UserSupplyService {
             itemDto.setCategoryName(itemEntity.getCategoryEntity().getCategoryName());
             return itemDto;
         }).collect(Collectors.toList());
+    }
+    public List<String> getItemImageNames(Long itemId) {
+        List<ItemImageEntity> itemImageEntity = itemImageEntityRepository.findByItemEntityId(itemId);
+        return itemImageEntity.stream().map(ItemImageEntity::getImageName).toList();
     }
 }
