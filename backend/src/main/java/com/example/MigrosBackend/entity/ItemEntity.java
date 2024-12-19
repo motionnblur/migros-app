@@ -1,5 +1,6 @@
 package com.example.MigrosBackend.entity;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -21,5 +22,6 @@ public class ItemEntity {
 
     @ManyToOne
     @JoinColumn(name = "category_entity_id", referencedColumnName = "category_entity_id")
+    @JsonManagedReference
     private CategoryEntity categoryEntity;
 }

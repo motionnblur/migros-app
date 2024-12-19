@@ -1,5 +1,6 @@
 package com.example.MigrosBackend.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -20,5 +21,6 @@ public class CategoryEntity {
 
     @OneToMany(cascade = CascadeType.ALL)
     @JoinColumn(name = "category_entity_id", referencedColumnName = "category_entity_id")
+    @JsonIgnore
     private List<ItemEntity> itemEntities;
 }
