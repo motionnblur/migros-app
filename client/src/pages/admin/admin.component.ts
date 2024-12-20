@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 import { AdminLoginComponent } from './components/admin-login/admin-login.component';
 import { CommonModule } from '@angular/common';
 import { AdminSignupComponent } from './components/admin-signup/admin-signup.component';
+import { AdminService } from './services/admin.service';
 
 @Component({
   selector: 'app-admin',
@@ -16,7 +17,13 @@ import { AdminSignupComponent } from './components/admin-signup/admin-signup.com
 })
 export class AdminComponent {
   isOnLogin = false;
+  constructor(private adminService: AdminService) {
+    this.adminService.setAdminComponent(this);
+  }
   hasLoginPhaseStarted() {
     return this.isOnLogin;
+  }
+  setLoginPhase() {
+    this.isOnLogin = true;
   }
 }

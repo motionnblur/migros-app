@@ -1,4 +1,5 @@
 import { Component } from '@angular/core';
+import { AdminService } from '../../services/admin.service';
 
 @Component({
   selector: 'app-admin-login',
@@ -8,7 +9,11 @@ import { Component } from '@angular/core';
 })
 export class AdminLoginComponent {
   passwordVisible: boolean = false;
+  constructor(private adminService: AdminService) {}
   showPassword() {
     this.passwordVisible = !this.passwordVisible;
+  }
+  setLoginPhase() {
+    this.adminService.getAdminComponent().setLoginPhase();
   }
 }
