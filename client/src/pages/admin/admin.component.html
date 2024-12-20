@@ -1,32 +1,3 @@
 <div class="admin-page-main">
-  <div class="admin-page__content">
-    <div class="admin-page__title">
-      <img class="admin-page__logo" src="migroslogo.png" />
-      <div class="admin-page__title__text">Login</div>
-    </div>
-    <div class="admin-page__body">
-      <div class="admin-page__mail">
-        <div class="admin-page__text">Username</div>
-        <input class="admin-page__input" type="text" />
-      </div>
-      <div class="admin-page__pass">
-        <div class="admin-page__text">Password</div>
-        <div class="admin-page__pass_body">
-          <input
-            class="admin-page__pass_input"
-            [type]="passwordVisible ? 'text' : 'password'"
-          />
-          <img
-            class="admin-page__password_show"
-            src="eye.png"
-            (click)="showPassword()"
-          />
-        </div>
-      </div>
-      <div class="admin-page__forgot">Forgot Password?</div>
-    </div>
-    <div class="admin-page__footer">
-      <div class="admin-page__button">Login</div>
-    </div>
-  </div>
+  <app-admin-login />
 </div>
