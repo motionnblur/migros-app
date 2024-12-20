@@ -1,8 +1,10 @@
 .item-page {
-    width: 1000px;
-    height: 2000px;
-    display: flex;
-    justify-content: flex-start;
-    flex-wrap: wrap;
-    background-color: aliceblue;
+  width: 1000px;
+  height: 2000px;
+  display: flex;
+  flex-wrap: wrap;
+  background-color: aliceblue;
+  gap: 10px;
+  flex-direction: row;
+  align-content: flex-start;
 }

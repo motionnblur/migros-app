@@ -1,5 +1,7 @@
-<div class="item-page">
-  <div class="padding-10">
-    <app-item-preview [itemTitle]="'iPhone 14 Pro'" [itemPrice]="10000" />
-  </div>
+<div class="item-page padding-10">
+  <app-item-preview
+    *ngFor="let item of items"
+    [itemTitle]="item.title"
+    [itemPrice]="item.price"
+  />
 </div>
