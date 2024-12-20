@@ -12,9 +12,13 @@ export class RestService {
       responseType: 'text',
     });
   }
-  getItemPageData() {
-    return this.http.get(`http://localhost:8080/user/supply/getItemPageData`, {
-      responseType: 'json',
-    });
+  getItemPageData(categoryId: number, page: number, itemRange: number) {
+    return this.http.get(
+      `http://localhost:8080/user/supply/getItemsFromCategory`,
+      {
+        params: { categoryId, page, itemRange },
+        responseType: 'json',
+      }
+    );
   }
 }

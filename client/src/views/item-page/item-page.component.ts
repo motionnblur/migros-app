@@ -12,8 +12,8 @@ export class ItemPageComponent implements OnInit {
   @Input() itemId!: number;
 
   ngOnInit(): void {
-    this.restService.getItemPageData().subscribe((data) => {
-      console.log('data');
+    this.restService.getItemPageData(1, 0, 10).subscribe((data) => {
+      console.log(data);
     });
   }
 }
