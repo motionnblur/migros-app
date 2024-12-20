@@ -1,7 +1,8 @@
 <div class="main-page">
   <div class="header line-bottom"></div>
   <div class="content">
-    <app-discover />
+    <app-discover *ngIf="!hasItemPageOpened()" />
+    <app-item-page *ngIf="hasItemPageOpened()" />
   </div>
   <div class="footer">
     <div class="footer_1 line-top">
