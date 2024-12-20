@@ -13,4 +13,7 @@ export class AdminSignupComponent {
   showPassword() {
     this.passwordVisible = !this.passwordVisible;
   }
+  setLoginPhase() {
+    this.adminService.setLoginPhase(false);
+  }
 }

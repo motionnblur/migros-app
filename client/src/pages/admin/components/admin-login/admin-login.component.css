@@ -54,7 +54,7 @@
 }
 .admin-page__button__signup {
   cursor: pointer;
-  font-weight: 600;
+  font-size: small;
 }
 .admin-page__mail {
   width: 100%;

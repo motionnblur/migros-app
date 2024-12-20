@@ -1,17 +1,17 @@
 import { Injectable } from '@angular/core';
-import { AdminComponent } from '../admin.component';
+import { Observable, Subject } from 'rxjs';
 
 @Injectable({
   providedIn: 'root',
 })
 export class AdminService {
-  private adminComponent!: AdminComponent;
+  private loginPhaseStatus = new Subject<boolean>();
 
-  setAdminComponent(adminComponent: AdminComponent) {
-    this.adminComponent = adminComponent;
+  getLoginPhaseStatus(): Observable<boolean> {
+    return this.loginPhaseStatus.asObservable();
   }
 
-  getAdminComponent(): AdminComponent {
-    return this.adminComponent;
+  setLoginPhase(status: boolean): void {
+    this.loginPhaseStatus.next(status);
   }
 }

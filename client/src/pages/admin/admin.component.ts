@@ -16,14 +16,17 @@ import { AdminService } from './services/admin.service';
   styleUrl: './admin.component.css',
 })
 export class AdminComponent {
-  isOnLogin = false;
-  constructor(private adminService: AdminService) {
-    this.adminService.setAdminComponent(this);
+  isLoginPhaseActive = false;
+
+  constructor(private adminService: AdminService) {}
+
+  ngOnInit(): void {
+    this.adminService.getLoginPhaseStatus().subscribe((status) => {
+      this.isLoginPhaseActive = status;
+    });
   }
-  hasLoginPhaseStarted() {
-    return this.isOnLogin;
-  }
-  setLoginPhase() {
-    this.isOnLogin = true;
+
+  setLoginPhase(): void {
+    this.adminService.setLoginPhase(true);
   }
 }

@@ -14,6 +14,6 @@ export class AdminLoginComponent {
     this.passwordVisible = !this.passwordVisible;
   }
   setLoginPhase() {
-    this.adminService.getAdminComponent().setLoginPhase();
+    this.adminService.setLoginPhase(true);
   }
 }
