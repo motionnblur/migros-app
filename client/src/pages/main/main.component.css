@@ -1,0 +1,53 @@
+.main-page {
+  width: 100%;
+  height: 100%;
+}
+.header {
+  width: 100%;
+  height: 196px;
+  background-color: white;
+}
+.content {
+  background-color: white;
+  width: 100%;
+  height: 6064px;
+  display: flex;
+  justify-content: center;
+}
+.footer {
+  width: 100%;
+  height: 796px;
+  background-color: bisque;
+  display: flex;
+  flex-direction: column;
+}
+.footer_1 {
+  width: 100%;
+  height: 686px;
+  background-color: white;
+  display: flex;
+  justify-content: center;
+}
+.footer_2 {
+  width: 100%;
+  height: auto;
+  background-color: white;
+  flex: auto;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+}
+#footer_2 {
+  justify-content: space-between;
+  align-items: center;
+}
+#migros-footer_2 {
+  width: 427px;
+  height: 46px;
+  display: flex;
+}
+#migros-footer_main {
+  width: 1272px;
+  height: 648px;
+}

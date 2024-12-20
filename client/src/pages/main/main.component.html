@@ -1,0 +1,20 @@
+<div class="main-page">
+  <div class="header line-bottom"></div>
+  <div class="content">
+    <app-discover *ngIf="!hasItemPageOpened()" />
+    <app-item-page *ngIf="hasItemPageOpened()" />
+  </div>
+  <div class="footer">
+    <div class="footer_1 line-top">
+      <div class="flex center-width width-66 height-100">
+        <img id="migros-footer_main" src="footer/migros-footer-main.png" />
+      </div>
+    </div>
+    <div class="footer_2 line-top-bold">
+      <div id="footer_2" class="flex center-width width-66">
+        <img id="migros-footer_1" src="footer/migros-footer.png" alt="" />
+        <img id="migros-footer_2" src="footer/migros-footer2.png" alt="" />
+      </div>
+    </div>
+  </div>
+</div>
