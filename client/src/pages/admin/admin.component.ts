@@ -4,8 +4,11 @@ import { Component } from '@angular/core';
   selector: 'app-admin',
   imports: [],
   templateUrl: './admin.component.html',
-  styleUrl: './admin.component.css'
+  styleUrl: './admin.component.css',
 })
 export class AdminComponent {
-
+  passwordVisible: boolean = false;
+  showPassword() {
+    this.passwordVisible = !this.passwordVisible;
+  }
 }
