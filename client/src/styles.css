@@ -28,3 +28,33 @@ html, body {
 .line-bottom-bold {
     border-bottom: 2px solid rgb(221, 221, 221);
 }
+.padding-5 {
+    padding: 5px;
+    width: 100%;
+    height: 100%;
+}
+.padding-10 {
+    padding: 10px;
+    width: 100%;
+    height: 100%;
+}
+.padding-15 {
+    padding: 15px;
+    width: 100%;
+    height: 100%;
+}
+.padding-20 {
+    padding: 20px;
+    width: 100%;
+    height: 100%;
+}
+.padding-25 {
+    padding: 25px;
+    width: 100%;
+    height: 100%;
+}
+.padding-30 {
+    padding: 30px;
+    width: 100%;
+    height: 100%;
+}

@@ -1,0 +1,8 @@
+.item-page {
+    width: 1000px;
+    height: 2000px;
+    display: flex;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    background-color: aliceblue;
+}
