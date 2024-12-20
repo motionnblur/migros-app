@@ -2,7 +2,7 @@ import { Component, Input, OnInit } from '@angular/core';
 import { RestService } from '../../services/rest/rest.service';
 import { ItemPreviewComponent } from '../item-preview/item-preview.component';
 import { NgFor } from '@angular/common';
-import { itemDataI } from '../../interfaces/itemDataI';
+import { IItemPreview } from '../../interfaces/IItemPreview';
 
 @Component({
   selector: 'app-item-page',
@@ -11,16 +11,17 @@ import { itemDataI } from '../../interfaces/itemDataI';
   styleUrl: './item-page.component.css',
 })
 export class ItemPageComponent implements OnInit {
-  items: itemDataI[] = [];
+  items: IItemPreview[] = [];
 
   constructor(public restService: RestService) {}
 
   ngOnInit(): void {
     this.restService.getItemPageData(1, 0, 10).subscribe((data: any) => {
       data.forEach((item: any) => {
-        const itemData: itemDataI = {
-          title: item.itemName,
-          price: item.itemPrice,
+        const itemData: IItemPreview = {
+          itemImageName: item.itemImageName,
+          itemTitle: item.itemTitle,
+          itemPrice: item.itemPrice,
         };
         this.items.push(itemData);
       });

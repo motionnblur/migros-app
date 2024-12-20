@@ -1,10 +1,8 @@
 package com.example.MigrosBackend.controller.user;
 
-import com.example.MigrosBackend.dto.ItemDto;
-import com.example.MigrosBackend.entity.ItemEntity;
+import com.example.MigrosBackend.dto.ItemPreviewDto;
 import com.example.MigrosBackend.service.user.UserSupplyService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,7 +26,7 @@ public class UserSupplyController {
     @GetMapping("getItemsFromCategory")
     public ResponseEntity<?> getItemsFromCategory(@RequestParam Long categoryId, @RequestParam int page, @RequestParam int itemRange) {
         try {
-            List<ItemDto> itemIDs = userSupplyService.getItemsFromCategory(categoryId, page, itemRange);
+            List<ItemPreviewDto> itemIDs = userSupplyService.getItemsFromCategory(categoryId, page, itemRange);
             return ResponseEntity.ok(itemIDs);
         } catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);

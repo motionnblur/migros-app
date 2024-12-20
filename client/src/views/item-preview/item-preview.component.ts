@@ -7,6 +7,7 @@ import { Component, Input, input } from '@angular/core';
   styleUrl: './item-preview.component.css',
 })
 export class ItemPreviewComponent {
+  @Input() itemImageName!: string;
   @Input() itemTitle!: string;
   @Input() itemPrice!: number;
 

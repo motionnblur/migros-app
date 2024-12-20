@@ -1,5 +1,6 @@
 package com.example.MigrosBackend.service.user;
 
+import com.example.MigrosBackend.dto.ItemPreviewDto;
 import com.example.MigrosBackend.dto.ItemDto;
 import com.example.MigrosBackend.entity.CategoryEntity;
 import com.example.MigrosBackend.entity.ItemEntity;
@@ -11,7 +12,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -30,7 +30,7 @@ public class UserSupplyService {
         return categoryEntityRepository.findAll().stream().map(CategoryEntity::getCategoryName).toList();
     }
 
-    public List<ItemDto> getItemsFromCategory(Long categoryId, int page, int itemRange) throws Exception {
+    public List<ItemPreviewDto> getItemsFromCategory(Long categoryId, int page, int itemRange) throws Exception {
         boolean b = categoryEntityRepository.existsById(categoryId);
         if(!b) throw new Exception("Category with that ID: " +categoryId+ " could not be found.");
 
@@ -40,12 +40,10 @@ public class UserSupplyService {
         Page<ItemEntity> entities =  itemEntityRepository.findByCategoryEntityId(categoryId, pageable);
 
         return entities.stream().map(itemEntity -> {
-            ItemDto itemDto = new ItemDto();
-            itemDto.setItemName(itemEntity.getItemName());
-            itemDto.setItemCount(itemEntity.getItemCount());
+            ItemPreviewDto itemDto = new ItemPreviewDto();
+            itemDto.setItemImageName(itemEntity.getItemImageEntities().get(0).getImageName());
+            itemDto.setItemTitle(itemEntity.getItemName());
             itemDto.setItemPrice(itemEntity.getItemPrice());
-            itemDto.setDiscount(itemEntity.getDiscount());
-            itemDto.setCategoryName(itemEntity.getCategoryEntity().getCategoryName());
             return itemDto;
         }).collect(Collectors.toList());
     }
