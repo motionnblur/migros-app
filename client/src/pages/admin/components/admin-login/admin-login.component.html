@@ -6,7 +6,7 @@
   <div class="admin-page__body">
     <div class="admin-page__mail">
       <div class="admin-page__text">Username</div>
-      <input class="admin-page__input" type="text" />
+      <input class="admin-page__input" type="text" [(ngModel)]="adminName" />
     </div>
     <div class="admin-page__pass">
       <div class="admin-page__text">Password</div>
@@ -14,6 +14,7 @@
         <input
           class="admin-page__pass_input"
           [type]="passwordVisible ? 'text' : 'password'"
+          [(ngModel)]="adminPassword"
         />
         <div class="admin-page__password_show">
           <img
@@ -27,7 +28,9 @@
     <div class="admin-page__forgot">Forgot Password?</div>
   </div>
   <div class="admin-page__footer">
-    <div class="admin-page__button">Login</div>
+    <div class="admin-page__button" (click)="login(adminName, adminPassword)">
+      Login
+    </div>
     <div class="admin-page__button__signup" (click)="setLoginPhase()">
       Sign up
     </div>

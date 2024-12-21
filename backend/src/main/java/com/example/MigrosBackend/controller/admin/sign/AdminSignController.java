@@ -1,6 +1,6 @@
 package com.example.MigrosBackend.controller.admin.sign;
 
-import com.example.MigrosBackend.dto.admin.sign.AdminSignupDto;
+import com.example.MigrosBackend.dto.admin.sign.AdminSignDto;
 import com.example.MigrosBackend.service.admin.sign.AdminSignupService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -11,19 +11,28 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("admin/signup")
-public class AdminSignupController {
+@RequestMapping("admin")
+public class AdminSignController {
     private final AdminSignupService adminSupplyService;
 
     @Autowired
-    public AdminSignupController(AdminSignupService adminSignupService) {
+    public AdminSignController(AdminSignupService adminSignupService) {
         this.adminSupplyService = adminSignupService;
     }
 
-    @PostMapping
-    private ResponseEntity<?> addItem(@RequestBody AdminSignupDto adminSignupDto) throws Exception {
+    @PostMapping("signup")
+    private ResponseEntity<?> addItem(@RequestBody AdminSignDto adminSignDto) throws Exception {
         try{
-            adminSupplyService.signup(adminSignupDto);
+            adminSupplyService.signup(adminSignDto);
+            return new ResponseEntity<>(HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+    @PostMapping("login")
+    private ResponseEntity<?> login(@RequestBody AdminSignDto adminSignDto) throws Exception {
+        try{
+            adminSupplyService.login(adminSignDto);
             return new ResponseEntity<>(HttpStatus.OK);
         } catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
