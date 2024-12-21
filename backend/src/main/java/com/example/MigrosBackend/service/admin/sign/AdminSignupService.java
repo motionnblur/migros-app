@@ -1,6 +1,6 @@
-package com.example.MigrosBackend.service.admin;
+package com.example.MigrosBackend.service.admin.sign;
 
-import com.example.MigrosBackend.dto.AdminSignupDto;
+import com.example.MigrosBackend.dto.admin.sign.AdminSignupDto;
 import com.example.MigrosBackend.entity.AdminEntity;
 import com.example.MigrosBackend.repository.AdminEntityRepository;
 import org.springframework.beans.factory.annotation.Autowired;

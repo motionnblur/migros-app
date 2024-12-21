@@ -1,7 +1,7 @@
-package com.example.MigrosBackend.controller.admin;
+package com.example.MigrosBackend.controller.admin.sign;
 
-import com.example.MigrosBackend.dto.AdminSignupDto;
-import com.example.MigrosBackend.service.admin.AdminSignupService;
+import com.example.MigrosBackend.dto.admin.sign.AdminSignupDto;
+import com.example.MigrosBackend.service.admin.sign.AdminSignupService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
