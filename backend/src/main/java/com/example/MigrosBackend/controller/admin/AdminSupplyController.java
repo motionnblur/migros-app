@@ -10,8 +10,12 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("admin/supply")
 public class AdminSupplyController {
+    private final AdminSupplyService adminSupplyService;
+
     @Autowired
-    private AdminSupplyService adminSupplyService;
+    public AdminSupplyController(AdminSupplyService adminSupplyService) {
+        this.adminSupplyService = adminSupplyService;
+    }
 
     @GetMapping("addCategory")
     private ResponseEntity<?> addCategory(@RequestParam String categoryName) throws Exception {

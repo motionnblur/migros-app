@@ -12,12 +12,20 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class AdminSupplyService {
+    private final CategoryEntityRepository categoryEntityRepository;
+    private final ItemEntityRepository itemEntityRepository;
+    private final ItemImageEntityRepository itemImageEntityRepository;
+
     @Autowired
-    private CategoryEntityRepository categoryEntityRepository;
-    @Autowired
-    private ItemEntityRepository itemEntityRepository;
-    @Autowired
-    private ItemImageEntityRepository itemImageEntityRepository;
+    public AdminSupplyService(
+            CategoryEntityRepository categoryEntityRepository,
+            ItemEntityRepository itemEntityRepository,
+            ItemImageEntityRepository itemImageEntityRepository
+    ) {
+        this.categoryEntityRepository = categoryEntityRepository;
+        this.itemEntityRepository = itemEntityRepository;
+        this.itemImageEntityRepository = itemImageEntityRepository;
+    }
 
     public void addCategory(String categoryName) throws Exception {
         CategoryEntity ce = categoryEntityRepository.findByCategoryName(categoryName);

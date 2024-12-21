@@ -19,12 +19,20 @@ import java.util.stream.Collectors;
 
 @Service
 public class UserSupplyService {
+    private final CategoryEntityRepository categoryEntityRepository;
+    private final ItemEntityRepository itemEntityRepository;
+    private final ItemImageEntityRepository itemImageEntityRepository;
+
     @Autowired
-    private CategoryEntityRepository categoryEntityRepository;
-    @Autowired
-    private ItemEntityRepository itemEntityRepository;
-    @Autowired
-    private ItemImageEntityRepository itemImageEntityRepository;
+    public UserSupplyService(
+            CategoryEntityRepository categoryEntityRepository,
+            ItemEntityRepository itemEntityRepository, 
+            ItemImageEntityRepository itemImageEntityRepository
+    ) {
+        this.categoryEntityRepository = categoryEntityRepository;
+        this.itemEntityRepository = itemEntityRepository;
+        this.itemImageEntityRepository = itemImageEntityRepository;
+    }
 
     public List<String> getAllCategoryNames() {
         return categoryEntityRepository.findAll().stream().map(CategoryEntity::getCategoryName).toList();

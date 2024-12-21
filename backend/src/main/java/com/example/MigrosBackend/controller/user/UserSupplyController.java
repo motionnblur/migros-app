@@ -15,8 +15,12 @@ import java.util.List;
 @RestController
 @RequestMapping("user/supply")
 public class UserSupplyController {
+    private final UserSupplyService userSupplyService;
+
     @Autowired
-    private UserSupplyService userSupplyService;
+    public UserSupplyController(UserSupplyService userSupplyService) {
+        this.userSupplyService = userSupplyService;
+    }
 
     @GetMapping("getAllCategoryNames")
     public List<String> getAllCategoryNames() {
