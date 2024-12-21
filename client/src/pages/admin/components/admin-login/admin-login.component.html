@@ -15,11 +15,13 @@
           class="admin-page__pass_input"
           [type]="passwordVisible ? 'text' : 'password'"
         />
-        <img
-          class="admin-page__password_show"
-          src="eye.png"
-          (click)="showPassword()"
-        />
+        <div class="admin-page__password_show">
+          <img
+            class="admin-page__password_show__button"
+            src="eye.png"
+            (click)="showPassword()"
+          />
+        </div>
       </div>
     </div>
     <div class="admin-page__forgot">Forgot Password?</div>
