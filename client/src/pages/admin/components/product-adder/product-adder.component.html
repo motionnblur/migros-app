@@ -1,9 +1,36 @@
 <div class="product-adder-main">
   <div class="product-adder-body__img">Add image</div>
-  <input class="product-adder-body__input" placeholder="Product name" />
-  <input class="product-adder-body__input" placeholder="Price" />
-  <input class="product-adder-body__input" placeholder="Count" />
-  <input class="product-adder-body__input" placeholder="Discount" />
-  <input class="product-adder-body__input" placeholder="Description" />
+  <input
+    class="product-adder-body__input"
+    placeholder="Product name"
+    type="text"
+    [(ngModel)]="productName"
+  />
+  <input
+    class="product-adder-body__input"
+    placeholder="Price"
+    type="number"
+    [(ngModel)]="price"
+    step="0.01"
+  />
+  <input
+    class="product-adder-body__input"
+    placeholder="Count"
+    type="number"
+    [(ngModel)]="count"
+  />
+  <input
+    class="product-adder-body__input"
+    placeholder="Discount"
+    type="number"
+    [(ngModel)]="discount"
+    step="0.01"
+  />
+  <input
+    class="product-adder-body__input"
+    placeholder="Description"
+    type="text"
+    [(ngModel)]="description"
+  />
   <button class="product-adder-body__button">Add</button>
 </div>
