@@ -33,22 +33,27 @@ public class AdminPanelController {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
     }
-    @PostMapping("uploadImage")
-    private ResponseEntity<String> uploadImage(@RequestParam("file") MultipartFile file) {
+    @PostMapping("uploadProduct")
+    private ResponseEntity<String> uploadImage(@RequestParam("productName") String productName,
+                                               @RequestParam("price") double price,
+                                               @RequestParam("count") int count,
+                                               @RequestParam("discount") double discount,
+                                               @RequestParam("description") String description,
+                                               @RequestParam("selectedImage") MultipartFile selectedImage) {
         // Save the file to your desired location
         try {
-            if (!Objects.equals(file.getContentType(), "image/png")) {
+            if (!Objects.equals(selectedImage.getContentType(), "image/png")) {
                 return new ResponseEntity<>("Only PNG files are allowed", HttpStatus.BAD_REQUEST);
             }
-            byte[] bytes = file.getBytes();
+            byte[] bytes = selectedImage.getBytes();
             String fileName = "image_" + System.currentTimeMillis() + ".png";
 
             Path directory = Paths.get("UploadFolder");
-//            if (!Files.exists(directory)) {
-//                Files.createDirectories(directory);  // Creates the directory if it doesn't exist
-//            }
             Path filePath = directory.resolve(fileName);
             Files.write(filePath, bytes);
+
+            // Process the product data here
+            System.out.println("Product data: " + productName + ", " + price + ", " + count + ", " + discount + ", " + description);
 
             return ResponseEntity.ok("File uploaded successfully");
         } catch (IOException e) {

@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { map } from 'rxjs';
+import { IProductUploader } from '../../interfaces/IProductUploader';
 
 @Injectable({
   providedIn: 'root',
@@ -22,11 +23,17 @@ export class RestService {
       }
     );
   }
-  uploadImage(image: File) {
+  uploadProductData(productData: IProductUploader) {
     const formData = new FormData();
-    formData.append('file', image);
+    formData.append('productName', productData.productName);
+    formData.append('price', productData.price.toString());
+    formData.append('count', productData.count.toString());
+    formData.append('discount', productData.discount.toString());
+    formData.append('description', productData.description);
+    formData.append('selectedImage', productData.selectedImage!);
+
     return this.http.post(
-      'http://localhost:8080/admin/panel/uploadImage',
+      'http://localhost:8080/admin/panel/uploadProduct',
       formData,
       {
         responseType: 'text',

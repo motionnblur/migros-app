@@ -8,6 +8,7 @@ import {
 import { FormsModule } from '@angular/forms';
 import { RestService } from '../../../../services/rest/rest.service';
 import { CommonModule } from '@angular/common';
+import { IProductUploader } from '../../../../interfaces/IProductUploader';
 
 @Component({
   selector: 'app-product-adder',
@@ -50,8 +51,16 @@ export class ProductAdderComponent {
       this.updateView(this.selectedImage);
     }
   }
-  uploadImage() {
-    this.restService.uploadImage(this.selectedImage!).subscribe();
+  uploadProductData() {
+    const productData: IProductUploader = {
+      productName: this.productName,
+      price: this.price,
+      count: this.count,
+      discount: this.discount,
+      description: this.description,
+      selectedImage: this.selectedImage,
+    };
+    this.restService.uploadProductData(productData).subscribe();
   }
 
   ngOnChanges(changes: SimpleChanges) {
