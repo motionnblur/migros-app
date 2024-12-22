@@ -1,12 +1,14 @@
 <div class="product-adder-main">
   <div
     class="product-adder-body__img"
+    #addImageRef
     id="add-image"
     (click)="openImageUploader()"
+    *ngIf="!imageUrl"
   >
     Add image
   </div>
-  <img id="image" />
+  <img #imageRef id="image" [src]="imageUrl" *ngIf="imageUrl" />
   <input
     class="product-adder-body__input"
     placeholder="Product name"
@@ -49,6 +51,7 @@
   name="file"
   accept="image/png"
   class="file-upload"
+  #imageUploaderRef
   id="imageUploader"
   (change)="onImageSelected($event)"
 />

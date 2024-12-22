@@ -1,4 +1,10 @@
-import { Component, Input } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  Input,
+  SimpleChanges,
+  ViewChild,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RestService } from '../../../../services/rest/rest.service';
 import { CommonModule } from '@angular/common';
@@ -16,31 +22,41 @@ export class ProductAdderComponent {
   @Input() discount!: number;
   @Input() description!: string;
 
-  imageInputRef: HTMLElement | null = null;
-  imageRef: HTMLImageElement | null = null;
-  addImageRef: HTMLElement | null = null;
-  selectedImage: File | null = null;
+  @ViewChild('imageUploaderRef')
+  imageUploaderRef!: ElementRef<HTMLInputElement>;
+  @ViewChild('imageRef') imageRef!: ElementRef<HTMLImageElement>;
+  @ViewChild('addImageRef') addImageRef!: ElementRef<HTMLDivElement>;
+  @Input() selectedImage: File | null = null;
+
+  imageUrl: string | null = null;
 
   constructor(private restService: RestService) {}
 
+  updateView(image: File | null) {
+    if (image) {
+      this.imageUrl = URL.createObjectURL(image);
+    } else {
+      this.imageUrl = null;
+    }
+  }
   openImageUploader() {
-    if (this.imageInputRef) {
-      this.imageInputRef.click();
+    if (this.imageUploaderRef) {
+      this.imageUploaderRef.nativeElement.click();
     }
   }
   onImageSelected(event: any) {
-    this.selectedImage = event.target.files[0];
-    this.addImageRef!.style.display = 'none';
-    this.imageRef!.style.display = 'block';
-    this.imageRef!.src = URL.createObjectURL(this.selectedImage!);
+    if (event.target.files && event.target.files.length > 0) {
+      this.selectedImage = event.target.files[0];
+      this.updateView(this.selectedImage);
+    }
   }
   uploadImage() {
     this.restService.uploadImage(this.selectedImage!).subscribe();
   }
 
-  ngOnInit() {
-    this.imageInputRef = document.getElementById('imageUploader');
-    this.addImageRef = document.getElementById('add-image');
-    this.imageRef = document.getElementById('image') as HTMLImageElement;
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes['selectedImage']) {
+      this.updateView(changes['selectedImage'].currentValue);
+    }
   }
 }
