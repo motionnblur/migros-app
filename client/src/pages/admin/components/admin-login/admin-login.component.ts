@@ -25,7 +25,7 @@ export class AdminLoginComponent {
   }
   login(username: string, password: string) {
     this.signService.adminLogin(username, password).subscribe(() => {
-      alert('login on');
+      this.adminService.setLoginCompleted(true);
     });
   }
 }

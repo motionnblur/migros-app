@@ -1,4 +1,5 @@
 <div class="admin-page-main">
-  <app-admin-login *ngIf="!isLoginPhaseActive" />
-  <app-admin-signup *ngIf="isLoginPhaseActive" />
+  <app-admin-login *ngIf="!isLoginCompleted && !isLoginPhaseActive" />
+  <app-admin-signup *ngIf="!isLoginCompleted && isLoginPhaseActive" />
+  <app-admin-panel *ngIf="isLoginCompleted" />
 </div>
