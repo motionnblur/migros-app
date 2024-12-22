@@ -42,3 +42,8 @@
 .file-upload {
   display: none;
 }
+#image {
+  width: 100px;
+  height: 100px;
+  display: none;
+}

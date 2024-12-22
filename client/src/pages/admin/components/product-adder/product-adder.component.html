@@ -1,7 +1,12 @@
 <div class="product-adder-main">
-  <div class="product-adder-body__img" (click)="openImageUploader()">
+  <div
+    class="product-adder-body__img"
+    id="add-image"
+    (click)="openImageUploader()"
+  >
     Add image
   </div>
+  <img id="image" />
   <input
     class="product-adder-body__input"
     placeholder="Product name"
