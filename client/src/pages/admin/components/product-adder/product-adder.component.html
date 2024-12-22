@@ -1,5 +1,7 @@
 <div class="product-adder-main">
-  <div class="product-adder-body__img">Add image</div>
+  <div class="product-adder-body__img" (click)="openImageUploader()">
+    Add image
+  </div>
   <input
     class="product-adder-body__input"
     placeholder="Product name"
@@ -34,3 +36,12 @@
   />
   <button class="product-adder-body__button">Add</button>
 </div>
+
+<input
+  type="file"
+  name="file"
+  accept="image/*"
+  class="file-upload"
+  id="imageUploader"
+  (change)="onImageSelected($event)"
+/>

@@ -21,4 +21,15 @@ export class RestService {
       }
     );
   }
+  uploadImage(image: File) {
+    const formData = new FormData();
+    formData.append('file', image);
+    return this.http.post(
+      'http://localhost:8080/admin/upload/uploadImage',
+      formData,
+      {
+        responseType: 'json',
+      }
+    );
+  }
 }

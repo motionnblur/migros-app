@@ -38,3 +38,7 @@
   height: 40px;
   cursor: pointer;
 }
+
+.file-upload {
+  display: none;
+}
