@@ -3,6 +3,7 @@ package com.example.MigrosBackend.controller.user;
 import com.example.MigrosBackend.dto.ItemPreviewDto;
 import com.example.MigrosBackend.service.user.UserSupplyService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -40,5 +41,9 @@ public class UserSupplyController {
     @GetMapping("getItemImageNames")
     public List<String> getItemImageNames(@RequestParam Long itemId) {
         return userSupplyService.getItemImageNames(itemId);
+    }
+    @GetMapping("getItemImage")
+    public ResponseEntity<Resource> getItemImage(@RequestParam Long itemId) throws Exception {
+        return userSupplyService.getItemImage(itemId);
     }
 }

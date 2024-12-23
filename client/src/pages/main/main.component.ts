@@ -3,6 +3,7 @@ import { EventService } from '../../services/event/event.service';
 import { ItemPageComponent } from './components/item-page/item-page.component';
 import { CommonModule } from '@angular/common';
 import { DiscoverComponent } from './components/discover-area/parent/discover-area.component';
+import { data } from '../../memory/global-data';
 
 @Component({
   selector: 'app-main',
@@ -16,6 +17,7 @@ export class MainComponent {
 
   constructor(private eventManager: EventService) {
     eventManager.on('openItemPage', (categoryId: number) => {
+      data.currentSelectedCategoryId = categoryId;
       this.setItemPageOpened(true);
     });
   }

@@ -23,6 +23,12 @@ export class RestService {
       }
     );
   }
+  getItemImage(itemId: number) {
+    return this.http.get(`http://localhost:8080/user/supply/getItemImage`, {
+      params: { itemId },
+      responseType: 'blob',
+    });
+  }
   uploadProductData(productData: IProductUploader) {
     const formData = new FormData();
     formData.append('adminId', productData.adminId.toString());

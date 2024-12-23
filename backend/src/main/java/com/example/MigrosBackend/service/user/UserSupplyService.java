@@ -9,11 +9,18 @@ import com.example.MigrosBackend.repository.CategoryEntityRepository;
 import com.example.MigrosBackend.repository.ItemEntityRepository;
 import com.example.MigrosBackend.repository.ItemImageEntityRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import java.net.MalformedURLException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -49,6 +56,7 @@ public class UserSupplyService {
 
         return entities.stream().map(itemEntity -> {
             ItemPreviewDto itemDto = new ItemPreviewDto();
+            itemDto.setItemId(itemEntity.getId());
             itemDto.setItemImageName(itemEntity.getItemName());
             itemDto.setItemTitle(itemEntity.getItemName());
             itemDto.setItemPrice(itemEntity.getItemPrice());
@@ -58,5 +66,20 @@ public class UserSupplyService {
     public List<String> getItemImageNames(Long itemId) {
         List<ItemImageEntity> itemImageEntity = itemImageEntityRepository.findByItemEntityId(itemId);
         return itemImageEntity.stream().map(ItemImageEntity::getImagePath).toList();
+    }
+
+    public ResponseEntity<Resource> getItemImage(Long itemId) throws Exception {
+        ItemImageEntity itemImageEntity = itemImageEntityRepository.findByItemEntityId(itemId).get(0);
+        String filename = itemImageEntity.getImagePath();
+
+        Resource resource = new UrlResource(Paths.get(filename).toUri());
+
+        if (resource.exists() && resource.isReadable()) {
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
+                    .body(resource);
+        } else {
+            throw new Exception("File not found");
+        }
     }
 }
