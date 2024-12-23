@@ -31,6 +31,7 @@ export class RestService {
     formData.append('discount', productData.discount.toString());
     formData.append('description', productData.description);
     formData.append('selectedImage', productData.selectedImage!);
+    formData.append('categoryValue', productData.categoryValue.toString());
 
     return this.http
       .post('http://localhost:8080/admin/panel/uploadProduct', formData, {

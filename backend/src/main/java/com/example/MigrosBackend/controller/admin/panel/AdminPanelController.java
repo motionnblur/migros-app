@@ -39,7 +39,8 @@ public class AdminPanelController {
                                                @RequestParam("count") int count,
                                                @RequestParam("discount") double discount,
                                                @RequestParam("description") String description,
-                                               @RequestParam("selectedImage") MultipartFile selectedImage) {
+                                               @RequestParam("selectedImage") MultipartFile selectedImage,
+                                               @RequestParam("categoryValue") int categoryValue) {
         // Save the file to your desired location
         try {
             if (!Objects.equals(selectedImage.getContentType(), "image/png")) {
@@ -53,7 +54,7 @@ public class AdminPanelController {
             Files.write(filePath, bytes);
 
             // Process the product data here
-            System.out.println("Product data: " + productName + ", " + price + ", " + count + ", " + discount + ", " + description);
+            System.out.println("Product data: " + productName + ", " + price + ", " + count + ", " + discount + ", " + description + "," + categoryValue);
 
             return ResponseEntity.ok("File uploaded successfully");
         } catch (IOException e) {

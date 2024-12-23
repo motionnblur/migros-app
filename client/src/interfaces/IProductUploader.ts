@@ -5,4 +5,5 @@ export interface IProductUploader {
   discount: number;
   description: string;
   selectedImage: File | null;
+  categoryValue: number;
 }

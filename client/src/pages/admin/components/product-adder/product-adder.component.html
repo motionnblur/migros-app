@@ -41,6 +41,11 @@
     type="text"
     [(ngModel)]="description"
   />
+  <select [formControl]="categoryControl">
+    <option *ngFor="let category of categories" [value]="category.value">
+      {{ category.name }}
+    </option>
+  </select>
   <button class="product-adder-body__button" (click)="uploadProductData()">
     Add
   </button>
