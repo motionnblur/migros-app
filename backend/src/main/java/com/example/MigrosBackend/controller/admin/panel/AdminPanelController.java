@@ -34,10 +34,11 @@ public class AdminPanelController {
         }
     }
     @PostMapping("uploadProduct")
-    private ResponseEntity<String> uploadImage(@RequestParam("productName") String productName,
-                                               @RequestParam("price") double price,
+    private ResponseEntity<String> uploadImage(@RequestParam("adminId") Long adminId,
+                                                @RequestParam("productName") String productName,
+                                               @RequestParam("price") float price,
                                                @RequestParam("count") int count,
-                                               @RequestParam("discount") double discount,
+                                               @RequestParam("discount") float discount,
                                                @RequestParam("description") String description,
                                                @RequestParam("selectedImage") MultipartFile selectedImage,
                                                @RequestParam("categoryValue") int categoryValue) {
@@ -55,6 +56,8 @@ public class AdminPanelController {
 
             // Process the product data here
             System.out.println("Product data: " + productName + ", " + price + ", " + count + ", " + discount + ", " + description + "," + categoryValue);
+
+            adminSupplyService.uploadProduct(adminId, productName, price, count, discount, description, categoryValue);
 
             return ResponseEntity.ok("File uploaded successfully");
         } catch (IOException e) {

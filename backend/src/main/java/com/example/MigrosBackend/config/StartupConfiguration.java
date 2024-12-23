@@ -1,0 +1,49 @@
+package com.example.MigrosBackend.config;
+
+import com.example.MigrosBackend.entity.AdminEntity;
+import com.example.MigrosBackend.entity.CategoryEntity;
+import com.example.MigrosBackend.repository.AdminEntityRepository;
+import com.example.MigrosBackend.repository.CategoryEntityRepository;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class StartupConfiguration {
+    @Bean
+    public CommandLineRunner run(CategoryEntityRepository categoryEntityRepository, AdminEntityRepository adminEntityRepository) {
+        return (args) -> {
+            AdminEntity adminEntity = new AdminEntity();
+            adminEntity.setAdminName("admin");
+            adminEntity.setAdminPassword("admin");
+            adminEntityRepository.save(adminEntity);
+
+            String[] categoryNames = {
+                    "Yılbaşı",
+                    "Meyve, Sebze",
+                    "Süt, Kahvaltılık",
+                    "Temel Gıda",
+                    "Meze, Hazır yemek, Donut",
+                    "İçecek",
+                    "Dondurma",
+                    "Atistirmalik",
+                    "Fırın, Pastane",
+                    "Deterjan, Temizlik",
+                    "Kağıt, Islak mendil",
+                    "Kişisel Bakım,Kozmetik, Sağlık",
+                    "Bebek",
+                    "Ev, Yaşam",
+                    "Kitap, Kırtasiye, Oyuncak",
+                    "Çiçek",
+                    "Pet Shop",
+                    "Elektronik"
+            };
+
+            for (String categoryName : categoryNames) {
+                CategoryEntity categoryEntity = new CategoryEntity();
+                categoryEntity.setCategoryName(categoryName);
+                categoryEntityRepository.save(categoryEntity);
+            }
+        };
+    }
+}

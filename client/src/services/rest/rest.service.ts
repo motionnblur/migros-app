@@ -25,6 +25,7 @@ export class RestService {
   }
   uploadProductData(productData: IProductUploader) {
     const formData = new FormData();
+    formData.append('adminId', productData.adminId.toString());
     formData.append('productName', productData.productName);
     formData.append('price', productData.price.toString());
     formData.append('count', productData.count.toString());

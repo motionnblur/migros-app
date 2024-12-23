@@ -82,4 +82,20 @@ public class AdminSupplyService {
             itemImageEntityRepository.save(itemImageEntity);
         }
     }
+
+    public void uploadProduct(Long adminId, String productName, float price, int count, float discount, String description, int categoryValue) {
+        CategoryEntity categoryEntity = categoryEntityRepository.findAll().get(categoryValue);
+        AdminEntity adminEntity = adminEntityRepository.findById(adminId).orElseThrow(() -> new RuntimeException("Admin with that id: " + adminId + " could not be found."));
+
+        ItemEntity itemEntity = new ItemEntity();
+        itemEntity.setAdminEntity(adminEntity);
+        itemEntity.setItemName(productName);
+        itemEntity.setItemCount(count);
+        itemEntity.setItemPrice(price);
+        itemEntity.setDiscount(discount);
+        itemEntity.setCategoryEntity(categoryEntity);
+        itemEntity.setDescription(description);
+
+        itemEntityRepository.save(itemEntity);
+    }
 }

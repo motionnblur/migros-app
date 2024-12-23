@@ -22,6 +22,12 @@ public class ItemEntity {
     private int itemCount;
     private float itemPrice;
     private float discount;
+    private String description;
+
+    @ManyToOne
+    @JoinColumn(name = "admin_entity_id", referencedColumnName = "admin_entity_id")
+    @JsonManagedReference
+    private AdminEntity adminEntity;
 
     @ManyToOne
     @JoinColumn(name = "category_entity_id", referencedColumnName = "category_entity_id")

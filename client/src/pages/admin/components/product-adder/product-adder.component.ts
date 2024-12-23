@@ -82,6 +82,7 @@ export class ProductAdderComponent {
   }
   uploadProductData() {
     const productData: IProductUploader = {
+      adminId: 1,
       productName: this.productName,
       price: this.price,
       count: this.count,
