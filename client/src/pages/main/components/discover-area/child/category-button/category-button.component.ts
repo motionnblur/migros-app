@@ -1,5 +1,5 @@
 import { Component, Input } from '@angular/core';
-import { EventService } from '../../../../services/event/event.service';
+import { EventService } from '../../../../../../services/event/event.service';
 
 @Component({
   selector: 'app-category-button',

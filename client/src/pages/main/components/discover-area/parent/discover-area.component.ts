@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CategoryButtonComponent } from '../child/category-button/category-button.component';
-import { RestService } from '../../../services/rest/rest.service';
+import { RestService } from '../../../../../services/rest/rest.service';
 
 @Component({
   selector: 'app-discover',

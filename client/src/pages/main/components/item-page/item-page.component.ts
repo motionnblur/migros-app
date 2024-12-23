@@ -1,8 +1,8 @@
 import { Component, Input, OnInit } from '@angular/core';
-import { RestService } from '../../services/rest/rest.service';
+import { RestService } from '../../../../services/rest/rest.service';
 import { ItemPreviewComponent } from '../item-preview/item-preview.component';
 import { NgFor } from '@angular/common';
-import { IItemPreview } from '../../interfaces/IItemPreview';
+import { IItemPreview } from '../../../../interfaces/IItemPreview';
 
 @Component({
   selector: 'app-item-page',

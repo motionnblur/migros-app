@@ -1,8 +1,8 @@
 import { Component } from '@angular/core';
 import { EventService } from '../../services/event/event.service';
-import { ItemPageComponent } from '../../views/item-page/item-page.component';
+import { ItemPageComponent } from './components/item-page/item-page.component';
 import { CommonModule } from '@angular/common';
-import { DiscoverComponent } from '../../views/discover-area/parent/discover-area.component';
+import { DiscoverComponent } from './components/discover-area/parent/discover-area.component';
 
 @Component({
   selector: 'app-main',
