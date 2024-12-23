@@ -39,9 +39,12 @@ public class StartupConfiguration {
                     "Elektronik"
             };
 
+            int idCounter = 1;
             for (String categoryName : categoryNames) {
                 CategoryEntity categoryEntity = new CategoryEntity();
+                categoryEntity.setCategoryId(idCounter++);
                 categoryEntity.setCategoryName(categoryName);
+
                 categoryEntityRepository.save(categoryEntity);
             }
         };

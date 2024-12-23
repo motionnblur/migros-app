@@ -16,7 +16,7 @@ export class ItemPageComponent implements OnInit {
   constructor(public restService: RestService) {}
 
   ngOnInit(): void {
-    this.restService.getItemPageData(1, 0, 10).subscribe((data: any) => {
+    this.restService.getItemPageData(18, 0, 10).subscribe((data: any) => {
       data.forEach((item: any) => {
         const itemData: IItemPreview = {
           itemImageName: item.itemImageName,

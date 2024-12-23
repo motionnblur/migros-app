@@ -1,5 +1,7 @@
 package com.example.MigrosBackend.entity;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
@@ -15,10 +17,10 @@ public class ItemImageEntity {
     @Column(name = "item_image_entity_id")
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    private String imageName;
+    private String imagePath;
 
     @ManyToOne
     @JoinColumn(name = "item_entity_id", referencedColumnName = "item_entity_id")
-    @JsonManagedReference
+    @JsonBackReference
     private ItemEntity itemEntity;
 }

@@ -57,7 +57,7 @@ public class AdminPanelController {
             // Process the product data here
             System.out.println("Product data: " + productName + ", " + price + ", " + count + ", " + discount + ", " + description + "," + categoryValue);
 
-            adminSupplyService.uploadProduct(adminId, productName, price, count, discount, description, categoryValue);
+            adminSupplyService.uploadProduct(adminId, productName, price, count, discount, description, categoryValue, filePath.toString());
 
             return ResponseEntity.ok("File uploaded successfully");
         } catch (IOException e) {

@@ -63,28 +63,28 @@ public class AdminSupplyService {
         categoryEntityRepository.save(categoryEntity);
     }
     public void addItem(ItemDto itemDto) throws Exception {
-        CategoryEntity categoryEntity = categoryEntityRepository.findByCategoryName(itemDto.getCategoryName());
-        if(categoryEntity == null) throw new Exception("Category with that name: " +itemDto.getCategoryName()+ " could not be found.");
-
-        ItemEntity itemEntity = new ItemEntity();
-        itemEntity.setItemName(itemDto.getItemName());
-        itemEntity.setItemCount(itemDto.getItemCount());
-        itemEntity.setItemPrice(itemDto.getItemPrice());
-        itemEntity.setDiscount(itemDto.getDiscount());
-        itemEntity.setCategoryEntity(categoryEntity);
-
-        itemEntityRepository.save(itemEntity);
-
-        for(String imageName : itemDto.getItemImageNames()) {
-            ItemImageEntity itemImageEntity = new ItemImageEntity();
-            itemImageEntity.setImageName(imageName);
-            itemImageEntity.setItemEntity(itemEntity);
-            itemImageEntityRepository.save(itemImageEntity);
-        }
+//        CategoryEntity categoryEntity = categoryEntityRepository.findByCategoryName(itemDto.getCategoryName());
+//        if(categoryEntity == null) throw new Exception("Category with that name: " +itemDto.getCategoryName()+ " could not be found.");
+//
+//        ItemEntity itemEntity = new ItemEntity();
+//        itemEntity.setItemName(itemDto.getItemName());
+//        itemEntity.setItemCount(itemDto.getItemCount());
+//        itemEntity.setItemPrice(itemDto.getItemPrice());
+//        itemEntity.setDiscount(itemDto.getDiscount());
+//        itemEntity.setCategoryEntity(categoryEntity);
+//
+//        itemEntityRepository.save(itemEntity);
+//
+//        for(String imageName : itemDto.getItemImageNames()) {
+//            ItemImageEntity itemImageEntity = new ItemImageEntity();
+//            itemImageEntity.setImageName(imageName);
+//            itemImageEntity.setItemEntity(itemEntity);
+//            itemImageEntityRepository.save(itemImageEntity);
+//        }
     }
 
-    public void uploadProduct(Long adminId, String productName, float price, int count, float discount, String description, int categoryValue) {
-        CategoryEntity categoryEntity = categoryEntityRepository.findAll().get(categoryValue);
+    public void uploadProduct(Long adminId, String productName, float price, int count, float discount, String description, int categoryValue, String imagePath) {
+        CategoryEntity categoryEntity = categoryEntityRepository.findByCategoryId(categoryValue);
         AdminEntity adminEntity = adminEntityRepository.findById(adminId).orElseThrow(() -> new RuntimeException("Admin with that id: " + adminId + " could not be found."));
 
         ItemEntity itemEntity = new ItemEntity();
@@ -97,5 +97,10 @@ public class AdminSupplyService {
         itemEntity.setDescription(description);
 
         itemEntityRepository.save(itemEntity);
+
+        ItemImageEntity itemImageEntity = new ItemImageEntity();
+        itemImageEntity.setImagePath(imagePath);
+        itemImageEntity.setItemEntity(itemEntity);
+        itemImageEntityRepository.save(itemImageEntity);
     }
 }

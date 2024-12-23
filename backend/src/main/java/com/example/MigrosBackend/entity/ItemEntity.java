@@ -1,5 +1,6 @@
 package com.example.MigrosBackend.entity;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
@@ -24,18 +25,30 @@ public class ItemEntity {
     private float discount;
     private String description;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "admin_entity_id", referencedColumnName = "admin_entity_id")
-    @JsonManagedReference
+    @JsonBackReference
     private AdminEntity adminEntity;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_entity_id", referencedColumnName = "category_entity_id")
-    @JsonManagedReference
+    @JsonBackReference
     private CategoryEntity categoryEntity;
 
-    @OneToMany(cascade = CascadeType.ALL)
+    @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @JoinColumn(name = "item_entity_id", referencedColumnName = "item_entity_id")
-    @JsonIgnore
+    @JsonManagedReference
     private List<ItemImageEntity> itemImageEntities;
+
+    @Override
+    public String toString() {
+        return "ItemEntity{" +
+                "id=" + id +
+                ", itemName='" + itemName + '\'' +
+                ", itemCount=" + itemCount +
+                ", itemPrice=" + itemPrice +
+                ", discount=" + discount +
+                ", description='" + description + '\'' +
+                '}';
+    }
 }

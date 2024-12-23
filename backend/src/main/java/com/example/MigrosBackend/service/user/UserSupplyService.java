@@ -49,7 +49,7 @@ public class UserSupplyService {
 
         return entities.stream().map(itemEntity -> {
             ItemPreviewDto itemDto = new ItemPreviewDto();
-            itemDto.setItemImageName(itemEntity.getItemImageEntities().get(0).getImageName());
+            itemDto.setItemImageName(itemEntity.getItemName());
             itemDto.setItemTitle(itemEntity.getItemName());
             itemDto.setItemPrice(itemEntity.getItemPrice());
             return itemDto;
@@ -57,6 +57,6 @@ public class UserSupplyService {
     }
     public List<String> getItemImageNames(Long itemId) {
         List<ItemImageEntity> itemImageEntity = itemImageEntityRepository.findByItemEntityId(itemId);
-        return itemImageEntity.stream().map(ItemImageEntity::getImageName).toList();
+        return itemImageEntity.stream().map(ItemImageEntity::getImagePath).toList();
     }
 }

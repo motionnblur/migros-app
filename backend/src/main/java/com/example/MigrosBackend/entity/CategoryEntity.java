@@ -1,6 +1,7 @@
 package com.example.MigrosBackend.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -17,10 +18,11 @@ public class CategoryEntity {
     @Column(name = "category_entity_id")
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    private int categoryId;
     private String categoryName;
 
     @OneToMany(cascade = CascadeType.ALL)
     @JoinColumn(name = "category_entity_id", referencedColumnName = "category_entity_id")
-    @JsonIgnore
+    @JsonManagedReference
     private List<ItemEntity> itemEntities;
 }
