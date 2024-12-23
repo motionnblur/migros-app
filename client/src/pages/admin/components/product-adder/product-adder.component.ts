@@ -22,12 +22,12 @@ export class ProductAdderComponent {
   @Input() count!: number;
   @Input() discount!: number;
   @Input() description!: string;
+  @Input() selectedImage: File | null = null;
 
   @ViewChild('imageUploaderRef')
   imageUploaderRef!: ElementRef<HTMLInputElement>;
   @ViewChild('imageRef') imageRef!: ElementRef<HTMLImageElement>;
   @ViewChild('addImageRef') addImageRef!: ElementRef<HTMLDivElement>;
-  @Input() selectedImage: File | null = null;
 
   imageUrl: string | null = null;
 
@@ -60,7 +60,11 @@ export class ProductAdderComponent {
       description: this.description,
       selectedImage: this.selectedImage,
     };
-    this.restService.uploadProductData(productData).subscribe();
+    this.restService
+      .uploadProductData(productData)
+      .subscribe((status: boolean) => {
+        console.log(status);
+      });
   }
 
   ngOnChanges(changes: SimpleChanges) {

@@ -32,12 +32,11 @@ export class RestService {
     formData.append('description', productData.description);
     formData.append('selectedImage', productData.selectedImage!);
 
-    return this.http.post(
-      'http://localhost:8080/admin/panel/uploadProduct',
-      formData,
-      {
+    return this.http
+      .post('http://localhost:8080/admin/panel/uploadProduct', formData, {
         responseType: 'text',
-      }
-    );
+        observe: 'response',
+      })
+      .pipe(map((response) => response.status === 200));
   }
 }
