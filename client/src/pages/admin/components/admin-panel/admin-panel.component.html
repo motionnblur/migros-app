@@ -18,3 +18,7 @@
     <app-product-body />
   </div>
 </div>
+<app-wall
+  *ngIf="hasProductAdderOpened"
+  (hasWallOnClicked)="hasWallOnClickedEventAdder($event)"
+/>
