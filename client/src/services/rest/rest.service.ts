@@ -29,6 +29,19 @@ export class RestService {
       responseType: 'blob',
     });
   }
+  getAllAdminProducts(adminId: number, page: number, itemRange: number) {
+    return this.http.get(
+      `http://localhost:8080/admin/panel/getAllAdminProducts`,
+      {
+        params: {
+          adminId,
+          page,
+          itemRange,
+        },
+        responseType: 'json',
+      }
+    );
+  }
   uploadProductData(productData: IProductUploader) {
     const formData = new FormData();
     formData.append('adminId', productData.adminId.toString());
