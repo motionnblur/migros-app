@@ -10,12 +10,16 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class StartupConfiguration {
+    private final SecurityConfiguration securityConfiguration;
+    public StartupConfiguration(SecurityConfiguration securityConfiguration) {
+        this.securityConfiguration = securityConfiguration;
+    }
     @Bean
     public CommandLineRunner run(CategoryEntityRepository categoryEntityRepository, AdminEntityRepository adminEntityRepository) {
         return (args) -> {
             AdminEntity adminEntity = new AdminEntity();
             adminEntity.setAdminName("admin");
-            adminEntity.setAdminPassword("admin");
+            adminEntity.setAdminPassword(securityConfiguration.passwordEncoder().encode("admin"));
             adminEntityRepository.save(adminEntity);
 
             String[] categoryNames = {
