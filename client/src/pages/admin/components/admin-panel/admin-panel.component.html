@@ -2,11 +2,19 @@
   <div class="admin-panel-header">
     <div class="admin-panel-header__left"></div>
     <div class="admin-panel-header__right">
-      <div class="admin-panel-header__button-field__button">Add product</div>
+      <div
+        class="admin-panel-header__button-field__button"
+        (click)="addProduct()"
+      >
+        Add product
+      </div>
     </div>
   </div>
   <div class="admin-panel-body">
-    <app-product-adder />
+    <app-product-adder
+      *ngIf="hasProductAdderOpened"
+      (hasProductAdded)="eventHandler($event)"
+    />
     <div id="product-body"></div>
   </div>
 </div>

@@ -1,7 +1,9 @@
 import {
   Component,
   ElementRef,
+  EventEmitter,
   Input,
+  Output,
   SimpleChanges,
   ViewChild,
 } from '@angular/core';
@@ -33,6 +35,11 @@ export class ProductAdderComponent {
   imageUploaderRef!: ElementRef<HTMLInputElement>;
   @ViewChild('imageRef') imageRef!: ElementRef<HTMLImageElement>;
   @ViewChild('addImageRef') addImageRef!: ElementRef<HTMLDivElement>;
+
+  @Output() hasProductAdded = new EventEmitter<boolean>();
+  outProductAdded() {
+    this.hasProductAdded.emit(true);
+  }
 
   imageUrl: string | null = null;
 
@@ -94,7 +101,9 @@ export class ProductAdderComponent {
     this.restService
       .uploadProductData(productData)
       .subscribe((status: boolean) => {
-        console.log(status);
+        if (status) {
+          this.outProductAdded();
+        }
       });
   }
 
