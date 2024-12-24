@@ -76,4 +76,13 @@ public class AdminPanelController {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
     }
+    @DeleteMapping("deleteProduct")
+    private ResponseEntity<?> deleteProduct(@RequestParam Long productId) throws Exception {
+        try{
+            adminSupplyService.deleteProduct(productId);
+            return new ResponseEntity<>(HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
 }

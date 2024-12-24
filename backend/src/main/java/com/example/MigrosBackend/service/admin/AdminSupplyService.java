@@ -122,4 +122,8 @@ public class AdminSupplyService {
             return itemDto;
         }).collect(Collectors.toList());
     }
+
+    public void deleteProduct(Long productId) {
+        itemEntityRepository.deleteById(productId);
+    }
 }
