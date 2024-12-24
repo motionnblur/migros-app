@@ -36,4 +36,12 @@ export class ProductBodyComponent {
       this.productsData = data;
     });
   }
+
+  deleteProduct(itemId: number) {
+    this.restService.deleteProduct(itemId).subscribe((status: boolean) => {
+      if (status) {
+        this.loadProducts();
+      }
+    });
+  }
 }

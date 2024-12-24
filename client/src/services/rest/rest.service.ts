@@ -60,4 +60,14 @@ export class RestService {
       })
       .pipe(map((response) => response.status === 200));
   }
+
+  deleteProduct(itemId: number) {
+    return this.http
+      .delete('http://localhost:8080/admin/panel/deleteProduct', {
+        params: { itemId },
+        responseType: 'text',
+        observe: 'response',
+      })
+      .pipe(map((response) => response.status === 200));
+  }
 }

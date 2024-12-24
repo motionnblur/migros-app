@@ -1,7 +1,13 @@
 <div id="product-body">
-  <div *ngFor="let item of productsData">
-    <div id="product-body-item" class="line-bottom">
-      {{ item.itemImageName }}
-    </div>
+  <div
+    *ngFor="let item of productsData"
+    id="product-body-item"
+    class="line-bottom"
+  >
+    <div id="product-body-item-data">{{ item.itemImageName }}</div>
+    <div
+      id="product-body-item-delete"
+      (click)="deleteProduct(item.itemId)"
+    ></div>
   </div>
 </div>

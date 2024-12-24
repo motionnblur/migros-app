@@ -9,11 +9,28 @@
   height: 40px;
   display: flex;
   align-items: center;
+  flex-direction: row;
   background-color: rgb(231, 231, 231);
-  padding-left: 10px;
   box-sizing: border-box;
 }
-#product-body-item:hover {
+
+#product-body-item-data {
+  width: 95%;
+  height: 100%;
+  padding-left: 10px;
+  display: flex;
+  align-items: center;
+}
+#product-body-item-data:hover {
   background-color: rgb(216, 216, 216);
   cursor: pointer;
+}
+#product-body-item-delete {
+  width: 5%;
+  height: 100%;
+  background-color: red;
+  cursor: pointer;
+}
+#product-body-item-delete:hover {
+  background-color: rgb(206, 15, 15);
 }
