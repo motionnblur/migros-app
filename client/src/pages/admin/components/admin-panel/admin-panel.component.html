@@ -13,8 +13,8 @@
   <div class="admin-panel-body">
     <app-product-adder
       *ngIf="hasProductAdderOpened"
-      (hasProductAdded)="eventHandler($event)"
+      (hasProductAdded)="productAddedEventHandler($event)"
     />
-    <div id="product-body"></div>
+    <app-product-body />
   </div>
 </div>
