@@ -1,1 +1,7 @@
-<div id="product-body"></div>
+<div id="product-body">
+  <div *ngFor="let item of productsData">
+    <div id="product-body-item" class="line-bottom">
+      {{ item.itemImageName }}
+    </div>
+  </div>
+</div>

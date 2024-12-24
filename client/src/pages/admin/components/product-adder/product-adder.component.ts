@@ -16,6 +16,7 @@ import {
 import { RestService } from '../../../../services/rest/rest.service';
 import { CommonModule } from '@angular/common';
 import { IProductUploader } from '../../../../interfaces/IProductUploader';
+import { EventService } from '../../../../services/event/event.service';
 
 @Component({
   selector: 'app-product-adder',
@@ -37,6 +38,7 @@ export class ProductAdderComponent {
   @ViewChild('addImageRef') addImageRef!: ElementRef<HTMLDivElement>;
 
   @Output() hasProductAdded = new EventEmitter<boolean>();
+
   outProductAdded() {
     this.hasProductAdded.emit(true);
   }
@@ -67,7 +69,10 @@ export class ProductAdderComponent {
 
   categoryControl = new FormControl('');
 
-  constructor(private restService: RestService) {}
+  constructor(
+    private restService: RestService,
+    private eventManager: EventService
+  ) {}
 
   updateView(image: File | null) {
     if (image) {
@@ -103,6 +108,7 @@ export class ProductAdderComponent {
       .subscribe((status: boolean) => {
         if (status) {
           this.outProductAdded();
+          this.eventManager.trigger('productAdded');
         }
       });
   }
