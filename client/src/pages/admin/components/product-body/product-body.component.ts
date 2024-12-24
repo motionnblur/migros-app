@@ -11,22 +11,29 @@ import { EventService } from '../../../../services/event/event.service';
   styleUrl: './product-body.component.css',
 })
 export class ProductBodyComponent {
+  productsData: IItemPreview[] = [];
+  private productAddedCallback!: (data: any) => void;
+
   constructor(
     private restService: RestService,
-    private eventManager: EventService
-  ) {}
-
-  productsData: IItemPreview[] = [];
+    private eventService: EventService
+  ) {
+    this.productAddedCallback = () => {
+      this.loadProducts();
+    };
+  }
 
   ngOnInit() {
+    this.loadProducts();
+    this.eventService.on('productAdded', this.productAddedCallback);
+  }
+  ngOnDestroy() {
+    this.eventService.off('productAdded', this.productAddedCallback);
+  }
+
+  private loadProducts() {
     this.restService.getAllAdminProducts(1, 0, 10).subscribe((data: any) => {
       this.productsData = data;
-    });
-
-    this.eventManager.on('productAdded', () => {
-      this.restService.getAllAdminProducts(1, 0, 10).subscribe((data: any) => {
-        this.productsData = data;
-      });
     });
   }
 }
