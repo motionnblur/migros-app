@@ -10,4 +10,5 @@ import org.springframework.stereotype.Repository;
 public interface ItemEntityRepository extends JpaRepository<ItemEntity, Long> {
     ItemEntity findByItemName(String itemName);
     Page<ItemEntity> findByCategoryEntityId(Long categoryId, Pageable pageable);
+    Page<ItemEntity> findByAdminEntityId(Long adminId, Pageable pageable);
 }

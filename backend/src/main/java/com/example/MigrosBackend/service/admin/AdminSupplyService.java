@@ -1,6 +1,7 @@
 package com.example.MigrosBackend.service.admin;
 
 import com.example.MigrosBackend.dto.ItemDto;
+import com.example.MigrosBackend.dto.ItemPreviewDto;
 import com.example.MigrosBackend.dto.admin.panel.AdminAddItemDto;
 import com.example.MigrosBackend.entity.AdminEntity;
 import com.example.MigrosBackend.entity.CategoryEntity;
@@ -11,9 +12,13 @@ import com.example.MigrosBackend.repository.CategoryEntityRepository;
 import com.example.MigrosBackend.repository.ItemEntityRepository;
 import com.example.MigrosBackend.repository.ItemImageEntityRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class AdminSupplyService {
@@ -102,5 +107,19 @@ public class AdminSupplyService {
         itemImageEntity.setImagePath(imagePath);
         itemImageEntity.setItemEntity(itemEntity);
         itemImageEntityRepository.save(itemImageEntity);
+    }
+
+    public List<ItemPreviewDto> getAllAdminProducts(Long adminId, int page, int itemRange) throws Exception {
+        Pageable pageable = PageRequest.of(page, itemRange);
+        Page<ItemEntity> entities =  itemEntityRepository.findByAdminEntityId(adminId, pageable);
+
+        return entities.stream().map(itemEntity -> {
+            ItemPreviewDto itemDto = new ItemPreviewDto();
+            itemDto.setItemId(itemEntity.getId());
+            itemDto.setItemImageName(itemEntity.getItemName());
+            itemDto.setItemTitle(itemEntity.getItemName());
+            itemDto.setItemPrice(itemEntity.getItemPrice());
+            return itemDto;
+        }).collect(Collectors.toList());
     }
 }

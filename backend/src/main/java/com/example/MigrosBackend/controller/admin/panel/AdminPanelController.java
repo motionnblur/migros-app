@@ -1,5 +1,6 @@
 package com.example.MigrosBackend.controller.admin.panel;
 
+import com.example.MigrosBackend.dto.ItemPreviewDto;
 import com.example.MigrosBackend.dto.admin.panel.AdminAddItemDto;
 import com.example.MigrosBackend.service.admin.AdminSupplyService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,6 +13,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.Objects;
 
 @RestController
@@ -33,9 +35,19 @@ public class AdminPanelController {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
     }
+    @GetMapping("getAllAdminProducts")
+    private ResponseEntity<?> getAllAdminProducts(@RequestParam Long adminId, @RequestParam int page, @RequestParam int itemRange) throws Exception {
+        // Process the product data here
+        try{
+            List<ItemPreviewDto> allAdminProducts = adminSupplyService.getAllAdminProducts(adminId, page, itemRange);
+            return ResponseEntity.ok(allAdminProducts);
+        } catch (Exception e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
     @PostMapping("uploadProduct")
     private ResponseEntity<String> uploadImage(@RequestParam("adminId") Long adminId,
-                                                @RequestParam("productName") String productName,
+                                               @RequestParam("productName") String productName,
                                                @RequestParam("price") float price,
                                                @RequestParam("count") int count,
                                                @RequestParam("discount") float discount,
