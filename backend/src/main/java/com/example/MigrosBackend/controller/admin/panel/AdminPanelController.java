@@ -56,23 +56,9 @@ public class AdminPanelController {
                                                @RequestParam("categoryValue") int categoryValue) {
         // Save the file to your desired location
         try {
-            if (!Objects.equals(selectedImage.getContentType(), "image/png")) {
-                return new ResponseEntity<>("Only PNG files are allowed", HttpStatus.BAD_REQUEST);
-            }
-            byte[] bytes = selectedImage.getBytes();
-            String fileName = "image_" + System.currentTimeMillis() + ".png";
-
-            Path directory = Paths.get("UploadFolder");
-            Path filePath = directory.resolve(fileName);
-            Files.write(filePath, bytes);
-
-            // Process the product data here
-            System.out.println("Product data: " + productName + ", " + price + ", " + count + ", " + discount + ", " + description + "," + categoryValue);
-
-            adminSupplyService.uploadProduct(adminId, productName, price, count, discount, description, categoryValue, filePath.toString());
-
+            adminSupplyService.uploadProduct(adminId, productName, price, count, discount, description, categoryValue, selectedImage);
             return ResponseEntity.ok("File uploaded successfully");
-        } catch (IOException e) {
+        } catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
     }

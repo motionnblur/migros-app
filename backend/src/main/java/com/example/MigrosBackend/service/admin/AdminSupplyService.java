@@ -11,13 +11,21 @@ import com.example.MigrosBackend.repository.AdminEntityRepository;
 import com.example.MigrosBackend.repository.CategoryEntityRepository;
 import com.example.MigrosBackend.repository.ItemEntityRepository;
 import com.example.MigrosBackend.repository.ItemImageEntityRepository;
+import com.example.MigrosBackend.service.global.FileService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,18 +34,21 @@ public class AdminSupplyService {
     private final ItemEntityRepository itemEntityRepository;
     private final ItemImageEntityRepository itemImageEntityRepository;
     private final AdminEntityRepository adminEntityRepository;
+    private final FileService fileService;
 
     @Autowired
     public AdminSupplyService(
             CategoryEntityRepository categoryEntityRepository,
             ItemEntityRepository itemEntityRepository,
             ItemImageEntityRepository itemImageEntityRepository,
-            AdminEntityRepository adminEntityRepository
+            AdminEntityRepository adminEntityRepository,
+            FileService fileService
     ) {
         this.categoryEntityRepository = categoryEntityRepository;
         this.itemEntityRepository = itemEntityRepository;
         this.itemImageEntityRepository = itemImageEntityRepository;
         this.adminEntityRepository = adminEntityRepository;
+        this.fileService = fileService;
     }
 
     public void addItem(AdminAddItemDto adminAddItemDto) throws Exception {
@@ -88,9 +99,28 @@ public class AdminSupplyService {
 //        }
     }
 
-    public void uploadProduct(Long adminId, String productName, float price, int count, float discount, String description, int categoryValue, String imagePath) {
+    public void uploadProduct(Long adminId,
+                              String productName,
+                              float price,
+                              int count,
+                              float discount,
+                              String description,
+                              int categoryValue,
+                              MultipartFile selectedImage) throws Exception {
+        if (!Objects.equals(selectedImage.getContentType(), "image/png")) {
+            throw new Exception("Only PNG files are allowed");
+        }
+        String fileNameToSave = "image_" + System.currentTimeMillis() + ".png";
+        Path savedFilePath = fileService.writeFileToDisk(selectedImage.getBytes(),
+                fileNameToSave,
+                "UploadFolder"); // Save the file to hard coded "UploadFolder"
+
+        // Process the product data here
+        System.out.println("Product data: " + productName + ", " + price + ", " + count + ", " + discount + ", " + description + "," + categoryValue);
+
         CategoryEntity categoryEntity = categoryEntityRepository.findByCategoryId(categoryValue);
-        AdminEntity adminEntity = adminEntityRepository.findById(adminId).orElseThrow(() -> new RuntimeException("Admin with that id: " + adminId + " could not be found."));
+        AdminEntity adminEntity = adminEntityRepository.findById(adminId)
+                .orElseThrow(() -> new RuntimeException("Admin with that id: " + adminId + " could not be found."));
 
         ItemEntity itemEntity = new ItemEntity();
         itemEntity.setAdminEntity(adminEntity);
@@ -100,11 +130,10 @@ public class AdminSupplyService {
         itemEntity.setDiscount(discount);
         itemEntity.setCategoryEntity(categoryEntity);
         itemEntity.setDescription(description);
-
         itemEntityRepository.save(itemEntity);
 
         ItemImageEntity itemImageEntity = new ItemImageEntity();
-        itemImageEntity.setImagePath(imagePath);
+        itemImageEntity.setImagePath(savedFilePath.toString());
         itemImageEntity.setItemEntity(itemEntity);
         itemImageEntityRepository.save(itemImageEntity);
     }
