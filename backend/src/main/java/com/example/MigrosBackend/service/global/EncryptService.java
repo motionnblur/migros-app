@@ -11,10 +11,10 @@ public class EncryptService {
         this.securityConfiguration = securityConfiguration;
     }
 
-    public String getEncryptedPassword(String password) {
-        return securityConfiguration.passwordEncoder().encode(password);
+    public String getEncryptedPassword(String decryptedPassword) {
+        return securityConfiguration.passwordEncoder().encode(decryptedPassword);
     }
-    public boolean checkIfPasswordMatches(String password, String encryptedPassword) {
-        return securityConfiguration.passwordEncoder().matches(password, encryptedPassword);
+    public boolean checkIfPasswordMatches(String decryptedPassword, String encryptedPassword) {
+        return securityConfiguration.passwordEncoder().matches(decryptedPassword, encryptedPassword);
     }
 }
