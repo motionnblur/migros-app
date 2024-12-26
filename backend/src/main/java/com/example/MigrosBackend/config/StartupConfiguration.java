@@ -45,11 +45,13 @@ public class StartupConfiguration {
 
             int idCounter = 1;
             for (String categoryName : categoryNames) {
-                CategoryEntity categoryEntity = new CategoryEntity();
-                categoryEntity.setCategoryId(idCounter++);
-                categoryEntity.setCategoryName(categoryName);
+                if (!categoryEntityRepository.existsByCategoryName(categoryName)) {
+                    CategoryEntity categoryEntity = new CategoryEntity();
+                    categoryEntity.setCategoryId(idCounter++);
+                    categoryEntity.setCategoryName(categoryName);
 
-                categoryEntityRepository.save(categoryEntity);
+                    categoryEntityRepository.save(categoryEntity);
+                }
             }
         };
     }

@@ -6,13 +6,12 @@
       class="line-bottom"
     >
       <div id="product-body-item-data">{{ item.itemImageName }}</div>
-      <div
-        id="product-body-item-delete"
-        (click)="deleteProduct(item.itemId)"
-      ></div>
+      <div id="product-body-item-delete" (click)="deleteProduct(item.itemId)">
+        <img id="product-body-item-delete__img" src="delete.png" />
+      </div>
     </div>
   </div>
-  <div id="product-body-pageswitcher">
+  <div id="product-body-pageswitcher" class="line-top">
     <img
       class="product-body-pageswitcher-arrow rotate-left"
       src="arrow.png"

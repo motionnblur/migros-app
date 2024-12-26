@@ -141,6 +141,7 @@ public class AdminSupplyService {
     public List<ItemPreviewDto> getAllAdminProducts(Long adminId, int page, int itemRange) throws Exception {
         Pageable pageable = PageRequest.of(page, itemRange);
         Page<ItemEntity> entities =  itemEntityRepository.findByAdminEntityId(adminId, pageable);
+        if(entities.isEmpty()) throw new Exception("Admin with that ID: " +adminId+ " has no products.");
 
         return entities.stream().map(itemEntity -> {
             ItemPreviewDto itemDto = new ItemPreviewDto();

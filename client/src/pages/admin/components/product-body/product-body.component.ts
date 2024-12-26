@@ -13,7 +13,7 @@ import { EventService } from '../../../../services/event/event.service';
 export class ProductBodyComponent {
   productsData: IItemPreview[] = [];
   private productAddedCallback!: (data: any) => void;
-  currentPageNumber = 1;
+  currentPageNumber = 0;
 
   constructor(
     private restService: RestService,
@@ -39,27 +39,46 @@ export class ProductBodyComponent {
   }
 
   deleteProduct(itemId: number) {
-    this.restService.deleteProduct(itemId).subscribe((status: boolean) => {
-      if (status) {
+    this.restService.deleteProduct(itemId).subscribe({
+      next: () => {
         this.loadProducts();
-      }
+      },
+      error: (error: any) => {
+        console.error(error);
+      },
     });
   }
 
   fetchPageLeft() {
-    this.currentPageNumber -= 1;
     this.restService
-      .getAllAdminProducts(1, this.currentPageNumber, 19)
-      .subscribe((data: any) => {
-        this.productsData = data;
+      .getAllAdminProducts(1, this.currentPageNumber - 1, 19)
+      .subscribe({
+        next: (data: any) => {
+          this.productsData = data;
+        },
+        error: (error: any) => {
+          console.error(error);
+        },
+        complete: () => {
+          console.log('Completed');
+          this.currentPageNumber -= 1;
+        },
       });
   }
   fetchPageRight() {
-    this.currentPageNumber += 1;
     this.restService
-      .getAllAdminProducts(1, this.currentPageNumber, 19)
-      .subscribe((data: any) => {
-        this.productsData = data;
+      .getAllAdminProducts(1, this.currentPageNumber + 1, 19)
+      .subscribe({
+        next: (data: any) => {
+          this.productsData = data;
+        },
+        error: (error: any) => {
+          console.error(error);
+        },
+        complete: () => {
+          console.log('Completed');
+          this.currentPageNumber += 1;
+        },
       });
   }
 }
