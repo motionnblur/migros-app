@@ -1,13 +1,27 @@
 <div id="product-body">
-  <div
-    *ngFor="let item of productsData"
-    id="product-body-item"
-    class="line-bottom"
-  >
-    <div id="product-body-item-data">{{ item.itemImageName }}</div>
+  <div id="product-body-content">
     <div
-      id="product-body-item-delete"
-      (click)="deleteProduct(item.itemId)"
-    ></div>
+      *ngFor="let item of productsData"
+      id="product-body-item"
+      class="line-bottom"
+    >
+      <div id="product-body-item-data">{{ item.itemImageName }}</div>
+      <div
+        id="product-body-item-delete"
+        (click)="deleteProduct(item.itemId)"
+      ></div>
+    </div>
+  </div>
+  <div id="product-body-pageswitcher">
+    <img
+      class="product-body-pageswitcher-arrow rotate-left"
+      src="arrow.png"
+      (click)="fetchPageLeft()"
+    />
+    <img
+      class="product-body-pageswitcher-arrow rotate-right"
+      src="arrow.png"
+      (click)="fetchPageRight()"
+    />
   </div>
 </div>

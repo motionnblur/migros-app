@@ -13,6 +13,7 @@ import { EventService } from '../../../../services/event/event.service';
 export class ProductBodyComponent {
   productsData: IItemPreview[] = [];
   private productAddedCallback!: (data: any) => void;
+  currentPageNumber = 1;
 
   constructor(
     private restService: RestService,
@@ -32,7 +33,7 @@ export class ProductBodyComponent {
   }
 
   private loadProducts() {
-    this.restService.getAllAdminProducts(1, 0, 10).subscribe((data: any) => {
+    this.restService.getAllAdminProducts(1, 0, 19).subscribe((data: any) => {
       this.productsData = data;
     });
   }
@@ -43,5 +44,22 @@ export class ProductBodyComponent {
         this.loadProducts();
       }
     });
+  }
+
+  fetchPageLeft() {
+    this.currentPageNumber -= 1;
+    this.restService
+      .getAllAdminProducts(1, this.currentPageNumber, 19)
+      .subscribe((data: any) => {
+        this.productsData = data;
+      });
+  }
+  fetchPageRight() {
+    this.currentPageNumber += 1;
+    this.restService
+      .getAllAdminProducts(1, this.currentPageNumber, 19)
+      .subscribe((data: any) => {
+        this.productsData = data;
+      });
   }
 }
