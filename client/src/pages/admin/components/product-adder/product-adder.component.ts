@@ -32,6 +32,8 @@ export class ProductAdderComponent {
   @Input() description!: string;
   @Input() selectedImage: File | null = null;
 
+  @Output() hasEscapePressed = new EventEmitter<boolean>();
+
   @ViewChild('imageUploaderRef')
   imageUploaderRef!: ElementRef<HTMLInputElement>;
   @ViewChild('imageRef') imageRef!: ElementRef<HTMLImageElement>;
@@ -69,10 +71,13 @@ export class ProductAdderComponent {
 
   categoryControl = new FormControl('');
 
+  private boundKeyDownEvent!: (event: KeyboardEvent) => void;
   constructor(
     private restService: RestService,
     private eventManager: EventService
-  ) {}
+  ) {
+    this.boundKeyDownEvent = this.keyDownEvent.bind(this);
+  }
 
   updateView(image: File | null) {
     if (image) {
@@ -112,6 +117,12 @@ export class ProductAdderComponent {
         }
       });
   }
+  keyDownEvent(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      console.log('a');
+      this.hasEscapePressed.emit(true);
+    }
+  }
 
   ngOnChanges(changes: SimpleChanges) {
     if (changes['selectedImage']) {
@@ -120,11 +131,16 @@ export class ProductAdderComponent {
   }
 
   ngOnInit() {
+    document.addEventListener('keydown', this.boundKeyDownEvent);
     this.categoryControl.valueChanges.subscribe((value) => {
       //console.log('Selected value:', value);
       if (value !== null && value !== undefined) {
         this.selectedFormValue = value;
       }
     });
+  }
+
+  ngOnDestroy() {
+    document.removeEventListener('keydown', this.boundKeyDownEvent);
   }
 }
