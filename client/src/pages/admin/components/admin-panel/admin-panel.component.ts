@@ -29,6 +29,9 @@ export class AdminPanelComponent {
       this.closeProductAdder();
     }
   }
+  productBodyClickedEventHandler() {
+    console.log('clicked');
+  }
 
   addProduct() {
     this.hasProductAdderOpened = !this.hasProductAdderOpened;

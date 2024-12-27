@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, EventEmitter, Output } from '@angular/core';
 import { RestService } from '../../../../services/rest/rest.service';
 import { IItemPreview } from '../../../../interfaces/IItemPreview';
 import { CommonModule } from '@angular/common';
@@ -11,6 +11,8 @@ import { EventService } from '../../../../services/event/event.service';
   styleUrl: './product-body.component.css',
 })
 export class ProductBodyComponent {
+  @Output() hasBodyClicked = new EventEmitter();
+
   productsData: IItemPreview[] = [];
   private productAddedCallback!: (data: any) => void;
   currentPageNumber = 0;
@@ -30,6 +32,10 @@ export class ProductBodyComponent {
   }
   ngOnDestroy() {
     this.eventService.off('productAdded', this.productAddedCallback);
+  }
+
+  onBodyClick() {
+    this.hasBodyClicked.emit();
   }
 
   private loadProducts() {

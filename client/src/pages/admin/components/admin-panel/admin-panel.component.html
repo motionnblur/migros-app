@@ -16,7 +16,7 @@
       (hasProductAdded)="productAddedEventHandler($event)"
       (hasEscapePressed)="closeProductAdder()"
     />
-    <app-product-body />
+    <app-product-body (hasBodyClicked)="productBodyClickedEventHandler()" />
   </div>
 </div>
 <app-wall
