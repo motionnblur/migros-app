@@ -45,8 +45,16 @@ public class AdminPanelController {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
     }
+    @GetMapping("getItemData")
+    private ResponseEntity<?> getItemData(@RequestParam Long itemId) throws Exception {
+        try{
+            return ResponseEntity.ok(adminSupplyService.getItemData(itemId));
+        } catch (Exception e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
     @PostMapping("uploadProduct")
-    private ResponseEntity<String> uploadImage(@RequestParam("adminId") Long adminId,
+    private ResponseEntity<String> uploadProduct(@RequestParam("adminId") Long adminId,
                                                @RequestParam("productName") String productName,
                                                @RequestParam("price") float price,
                                                @RequestParam("count") int count,
@@ -57,6 +65,24 @@ public class AdminPanelController {
         // Save the file to your desired location
         try {
             adminSupplyService.uploadProduct(adminId, productName, price, count, discount, description, categoryValue, selectedImage);
+            return ResponseEntity.ok("File uploaded successfully");
+        } catch (Exception e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+    @PostMapping("updateProduct")
+    private ResponseEntity<String> updateProduct(@RequestParam("adminId") Long adminId,
+                                               @RequestParam("productId") Long productId,
+                                               @RequestParam("productName") String productName,
+                                               @RequestParam("price") float price,
+                                               @RequestParam("count") int count,
+                                               @RequestParam("discount") float discount,
+                                               @RequestParam("description") String description,
+                                               @RequestParam("selectedImage") MultipartFile selectedImage,
+                                               @RequestParam("categoryValue") int categoryValue) {
+        // Save the file to your desired location
+        try {
+            adminSupplyService.updateProduct(adminId, productId, productName, price, count, discount, description, categoryValue, selectedImage);
             return ResponseEntity.ok("File uploaded successfully");
         } catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);

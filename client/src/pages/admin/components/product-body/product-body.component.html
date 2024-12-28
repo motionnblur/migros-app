@@ -5,7 +5,7 @@
       id="product-body-item"
       class="line-bottom"
     >
-      <div id="product-body-item-data" (click)="onBodyClick()">
+      <div id="product-body-item-data" (click)="onBodyClick(item.itemId)">
         {{ item.itemImageName }}
       </div>
       <div id="product-body-item-delete" (click)="deleteProduct(item.itemId)">

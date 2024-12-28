@@ -8,7 +8,13 @@
   >
     Add image
   </div>
-  <img #imageRef id="image" [src]="imageUrl" *ngIf="imageUrl" />
+  <img
+    #imageRef
+    id="image"
+    [src]="imageUrl"
+    *ngIf="imageUrl"
+    (click)="openImageUploader()"
+  />
   <input
     class="product-adder-body__input"
     placeholder="Product name"
@@ -47,7 +53,7 @@
     </option>
   </select>
   <button class="product-adder-body__button" (click)="uploadProductData()">
-    Add
+    {{ buttonString }}
   </button>
 </div>
 

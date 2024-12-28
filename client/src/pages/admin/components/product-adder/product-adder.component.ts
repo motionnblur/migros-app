@@ -7,12 +7,7 @@ import {
   SimpleChanges,
   ViewChild,
 } from '@angular/core';
-import {
-  FormControl,
-  FormGroup,
-  FormsModule,
-  ReactiveFormsModule,
-} from '@angular/forms';
+import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { RestService } from '../../../../services/rest/rest.service';
 import { CommonModule } from '@angular/common';
 import { IProductUploader } from '../../../../interfaces/IProductUploader';
@@ -40,6 +35,8 @@ export class ProductAdderComponent {
   @ViewChild('addImageRef') addImageRef!: ElementRef<HTMLDivElement>;
 
   @Output() hasProductAdded = new EventEmitter<boolean>();
+
+  buttonString: string = 'Add';
 
   outProductAdded() {
     this.hasProductAdded.emit(true);
@@ -73,8 +70,8 @@ export class ProductAdderComponent {
 
   private boundKeyDownEvent!: (event: KeyboardEvent) => void;
   constructor(
-    private restService: RestService,
-    private eventManager: EventService
+    protected restService: RestService,
+    protected eventManager: EventService
   ) {
     this.boundKeyDownEvent = this.keyDownEvent.bind(this);
   }
@@ -119,7 +116,6 @@ export class ProductAdderComponent {
   }
   keyDownEvent(event: KeyboardEvent) {
     if (event.key === 'Escape') {
-      console.log('a');
       this.hasEscapePressed.emit(true);
     }
   }

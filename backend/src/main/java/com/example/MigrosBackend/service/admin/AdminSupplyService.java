@@ -1,6 +1,7 @@
 package com.example.MigrosBackend.service.admin;
 
 import com.example.MigrosBackend.dto.ItemDto;
+import com.example.MigrosBackend.dto.ItemDto2;
 import com.example.MigrosBackend.dto.ItemPreviewDto;
 import com.example.MigrosBackend.dto.admin.panel.AdminAddItemDto;
 import com.example.MigrosBackend.entity.AdminEntity;
@@ -137,6 +138,41 @@ public class AdminSupplyService {
         itemImageEntity.setItemEntity(itemEntity);
         itemImageEntityRepository.save(itemImageEntity);
     }
+    public void updateProduct(Long adminId,
+                              Long productId,
+                              String productName, float price,
+                              int count, float discount,
+                              String description, int categoryValue,
+                              MultipartFile selectedImage) throws Exception {
+        if (!Objects.equals(selectedImage.getContentType(), "image/png")) {
+            throw new Exception("Only PNG files are allowed");
+        }
+        String fileNameToSave = "image_" + System.currentTimeMillis() + ".png";
+        Path savedFilePath = fileService.writeFileToDisk(selectedImage.getBytes(),
+                fileNameToSave,
+                "UploadFolder"); // Save the file to hard coded "UploadFolder"
+
+        // Process the product data here
+        System.out.println("Product data: " + productName + ", " + price + ", " + count + ", " + discount + ", " + description + "," + categoryValue);
+
+        CategoryEntity categoryEntity = categoryEntityRepository.findByCategoryId(categoryValue);
+        AdminEntity adminEntity = adminEntityRepository.findById(adminId)
+                .orElseThrow(() -> new RuntimeException("Admin with that id: " + adminId + " could not be found."));
+
+        ItemEntity itemEntity = itemEntityRepository.findById(productId).orElseThrow(() -> new RuntimeException("Product with that id: " + productId + " could not be found."));
+        itemEntity.setAdminEntity(adminEntity);
+        itemEntity.setItemName(productName);
+        itemEntity.setItemCount(count);
+        itemEntity.setItemPrice(price);
+        itemEntity.setDiscount(discount);
+        itemEntity.setCategoryEntity(categoryEntity);
+        itemEntity.setDescription(description);
+        itemEntityRepository.save(itemEntity);
+
+        ItemImageEntity itemImageEntity = itemImageEntityRepository.findByItemEntityId(itemEntity.getId()).get(0);
+        itemImageEntity.setImagePath(savedFilePath.toString());
+        itemImageEntityRepository.save(itemImageEntity);
+    }
 
     public List<ItemPreviewDto> getAllAdminProducts(Long adminId, int page, int itemRange) throws Exception {
         Pageable pageable = PageRequest.of(page, itemRange);
@@ -155,5 +191,19 @@ public class AdminSupplyService {
 
     public void deleteProduct(Long productId) {
         itemEntityRepository.deleteById(productId);
+    }
+
+    public ItemDto2 getItemData(Long itemId) {
+        ItemEntity itemEntity = itemEntityRepository.findById(itemId).orElseThrow(() -> new RuntimeException("Item with that id: " + itemId + " could not be found."));
+
+        ItemDto2 itemDto = new ItemDto2();
+        itemDto.setProductName(itemEntity.getItemName());
+        itemDto.setProductPrice(itemEntity.getItemPrice());
+        itemDto.setProductCount(itemEntity.getItemCount());
+        itemDto.setProductDiscount(itemEntity.getDiscount());
+        itemDto.setProductDescription(itemEntity.getDescription());
+        itemDto.setProductCategoryId(Math.toIntExact(itemEntity.getCategoryEntity().getId()));
+
+        return itemDto;
     }
 }

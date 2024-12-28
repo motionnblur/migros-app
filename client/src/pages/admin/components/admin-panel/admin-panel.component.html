@@ -16,10 +16,16 @@
       (hasProductAdded)="productAddedEventHandler($event)"
       (hasEscapePressed)="closeProductAdder()"
     />
-    <app-product-body (hasBodyClicked)="productBodyClickedEventHandler()" />
+    <app-product-updater
+      *ngIf="hasProductUpdaterOpened"
+      [id]="itemId"
+      (hasProductAdded)="productAddedEventHandler($event)"
+      (hasEscapePressed)="closeProductUpdater()"
+    />
+    <app-product-body />
   </div>
 </div>
 <app-wall
-  *ngIf="hasProductAdderOpened"
+  *ngIf="hasProductAdderOpened || hasProductUpdaterOpened"
   (hasWallOnClicked)="hasWallOnClickedEventAdder($event)"
 />

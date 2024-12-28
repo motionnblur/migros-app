@@ -2,6 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { map } from 'rxjs';
 import { IProductUploader } from '../../interfaces/IProductUploader';
+import { IProductUpdater } from '../../interfaces/IProductUpdater';
 
 @Injectable({
   providedIn: 'root',
@@ -27,6 +28,12 @@ export class RestService {
     return this.http.get(`http://localhost:8080/user/supply/getItemImage`, {
       params: { itemId },
       responseType: 'blob',
+    });
+  }
+  getItemData(itemId: number) {
+    return this.http.get(`http://localhost:8080/admin/panel/getItemData`, {
+      params: { itemId },
+      responseType: 'json',
     });
   }
   getAllAdminProducts(adminId: number, page: number, itemRange: number) {
@@ -55,6 +62,25 @@ export class RestService {
 
     return this.http
       .post('http://localhost:8080/admin/panel/uploadProduct', formData, {
+        responseType: 'text',
+        observe: 'response',
+      })
+      .pipe(map((response) => response.status === 200));
+  }
+  updateProductData(productData: IProductUpdater) {
+    const formData = new FormData();
+    formData.append('adminId', productData.adminId.toString());
+    formData.append('productId', productData.productId.toString());
+    formData.append('productName', productData.productName);
+    formData.append('price', productData.price.toString());
+    formData.append('count', productData.count.toString());
+    formData.append('discount', productData.discount.toString());
+    formData.append('description', productData.description);
+    formData.append('selectedImage', productData.selectedImage!);
+    formData.append('categoryValue', productData.categoryValue.toString());
+
+    return this.http
+      .post('http://localhost:8080/admin/panel/updateProduct', formData, {
         responseType: 'text',
         observe: 'response',
       })

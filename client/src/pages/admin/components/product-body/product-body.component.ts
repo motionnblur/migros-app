@@ -34,8 +34,9 @@ export class ProductBodyComponent {
     this.eventService.off('productAdded', this.productAddedCallback);
   }
 
-  onBodyClick() {
+  onBodyClick(itemId: number) {
     this.hasBodyClicked.emit();
+    this.eventService.trigger('productChanged', itemId);
   }
 
   private loadProducts() {
