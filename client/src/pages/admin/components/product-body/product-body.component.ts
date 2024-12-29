@@ -15,7 +15,7 @@ export class ProductBodyComponent {
 
   productsData: IItemPreview[] = [];
   private productAddedCallback!: (data: any) => void;
-  currentPageNumber = 0;
+  currentPageNumber: number = 0;
 
   constructor(
     private restService: RestService,
@@ -25,7 +25,6 @@ export class ProductBodyComponent {
       this.loadProducts();
     };
   }
-
   ngOnInit() {
     this.loadProducts();
     this.eventService.on('productAdded', this.productAddedCallback);

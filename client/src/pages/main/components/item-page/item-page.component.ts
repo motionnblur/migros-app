@@ -15,7 +15,6 @@ export class ItemPageComponent implements OnInit {
   items: IItemPreview[] = [];
 
   constructor(public restService: RestService) {}
-
   ngOnInit(): void {
     this.restService
       .getItemPageData(data.currentSelectedCategoryId, 0, 10)

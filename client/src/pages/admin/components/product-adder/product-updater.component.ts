@@ -21,6 +21,26 @@ export class ProductUpdaterComponent extends ProductAdderComponent {
     super(restService, eventManager);
     this.buttonString = 'Update';
   }
+  override ngOnInit(): void {
+    super.ngOnInit();
+    this.restService.getItemImage(this.id).subscribe((blob) => {
+      const file = new File([this.selectedImage!], 'image.png', {
+        type: 'image/png',
+      });
+      this.selectedImage = file;
+      this.imageUrl = URL.createObjectURL(blob);
+    });
+    this.restService.getItemData(this.id).subscribe((data: any) => {
+      this.productName = data.productName;
+      this.price = data.productPrice;
+      this.count = data.productCount;
+      this.discount = data.productDiscount;
+      this.description = data.productDescription;
+      this.selectedFormValue = data.productCategoryId;
+
+      this.categoryControl.setValue(this.selectedFormValue);
+    });
+  }
 
   override uploadProductData(): void {
     const productData: IProductUpdater = {
@@ -42,26 +62,5 @@ export class ProductUpdaterComponent extends ProductAdderComponent {
           this.eventManager.trigger('productAdded');
         }
       });
-  }
-
-  override ngOnInit(): void {
-    super.ngOnInit();
-    this.restService.getItemImage(this.id).subscribe((blob) => {
-      const file = new File([this.selectedImage!], 'image.png', {
-        type: 'image/png',
-      });
-      this.selectedImage = file;
-      this.imageUrl = URL.createObjectURL(blob);
-    });
-    this.restService.getItemData(this.id).subscribe((data: any) => {
-      this.productName = data.productName;
-      this.price = data.productPrice;
-      this.count = data.productCount;
-      this.discount = data.productDiscount;
-      this.description = data.productDescription;
-      this.selectedFormValue = data.productCategoryId;
-
-      this.categoryControl.setValue(this.selectedFormValue);
-    });
   }
 }

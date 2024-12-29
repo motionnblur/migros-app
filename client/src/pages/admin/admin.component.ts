@@ -18,11 +18,11 @@ import { AdminPanelComponent } from './components/admin-panel/admin-panel.compon
   styleUrl: './admin.component.css',
 })
 export class AdminComponent {
-  isLoginPhaseActive = false;
-  isLoginCompleted = localStorage.getItem('isLoginCompleted') === 'true';
+  isLoginPhaseActive: boolean = false;
+  isLoginCompleted: boolean =
+    localStorage.getItem('isLoginCompleted') === 'true';
 
   constructor(private adminService: AdminService) {}
-
   ngOnInit(): void {
     this.adminService.getLoginPhaseStatus().subscribe((status) => {
       this.isLoginPhaseActive = status;

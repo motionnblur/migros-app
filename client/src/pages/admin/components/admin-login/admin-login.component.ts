@@ -11,8 +11,8 @@ import { SignService } from '../../services/sign/sign.service';
 })
 export class AdminLoginComponent {
   passwordVisible: boolean = false;
-  adminName = '';
-  adminPassword = '';
+  adminName: string = '';
+  adminPassword: string = '';
   constructor(
     private adminService: AdminService,
     private signService: SignService

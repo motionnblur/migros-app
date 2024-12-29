@@ -11,8 +11,8 @@ import { FormsModule } from '@angular/forms';
 })
 export class AdminSignupComponent {
   passwordVisible: boolean = false;
-  adminName = '';
-  adminPassword = '';
+  adminName: string = '';
+  adminPassword: string = '';
   constructor(
     private adminService: AdminService,
     private signService: SignService

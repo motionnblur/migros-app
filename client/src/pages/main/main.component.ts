@@ -13,7 +13,7 @@ import { data } from '../../memory/global-data';
 })
 export class MainComponent {
   isItemPageOpened: boolean = false;
-  title = 'migros-app';
+  title: string = 'migros-app';
 
   constructor(private eventManager: EventService) {
     eventManager.on('openItemPage', (categoryId: number) => {

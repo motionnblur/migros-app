@@ -19,14 +19,20 @@ import { EventService } from '../../../../services/event/event.service';
 })
 export class AdminPanelComponent {
   itemId!: number;
-  hasProductAdderOpened = false;
-  hasProductUpdaterOpened = false;
+  hasProductAdderOpened: boolean = false;
+  hasProductUpdaterOpened: boolean = false;
   private productChangedCallback!: (data: any) => void;
 
   constructor(private eventManager: EventService) {
     this.productChangedCallback = (data: any) => {
       this.productChangedEventHandler(data);
     };
+  }
+  ngOnInit(): void {
+    this.eventManager.on('productChanged', this.productChangedCallback);
+  }
+  ngOnDestroy(): void {
+    this.eventManager.off('productChanged', this.productChangedCallback);
   }
 
   productAddedEventHandler(event: boolean) {
@@ -58,12 +64,5 @@ export class AdminPanelComponent {
   }
   closeProductUpdater() {
     this.hasProductUpdaterOpened = false;
-  }
-
-  ngOnInit(): void {
-    this.eventManager.on('productChanged', this.productChangedCallback);
-  }
-  ngOnDestroy(): void {
-    this.eventManager.off('productChanged', this.productChangedCallback);
   }
 }

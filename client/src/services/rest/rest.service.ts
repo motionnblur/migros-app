@@ -10,11 +10,6 @@ import { IProductUpdater } from '../../interfaces/IProductUpdater';
 export class RestService {
   constructor(private http: HttpClient) {}
 
-  getHello() {
-    return this.http.get('http://localhost:8080/hello', {
-      responseType: 'text',
-    });
-  }
   getItemPageData(categoryId: number, page: number, itemRange: number) {
     return this.http.get(
       `http://localhost:8080/user/supply/getItemsFromCategory`,

@@ -16,18 +16,17 @@ export class ItemPreviewComponent {
   imageUrl: string | null = null;
 
   constructor(private restService: RestService) {}
+  ngOnInit() {
+    this.restService.getItemImage(this.itemId).subscribe((blob: Blob) => {
+      const url: string = window.URL.createObjectURL(blob); // Create a URL for the blob
+      this.imageUrl = url;
+    });
+  }
 
   getItemTitle() {
     return this.itemTitle;
   }
   getItemPrice() {
     return this.itemPrice;
-  }
-
-  ngOnInit() {
-    this.restService.getItemImage(this.itemId).subscribe((blob: Blob) => {
-      const url = window.URL.createObjectURL(blob); // Create a URL for the blob
-      this.imageUrl = url;
-    });
   }
 }
