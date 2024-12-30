@@ -13,19 +13,33 @@
   width: 150px;
   height: 180px;
   object-fit: contain;
+  cursor: pointer;
 }
 .product-preview__title {
   width: 150px;
   height: 60px;
+  cursor: pointer;
 }
+.product-preview__title:hover {
+  color: orange;
+}
+
 .product-preview__price {
   width: 150px;
   height: 30px;
 }
 .product-preview__buybutton {
-  width: 50px;
-  height: 50px;
-  background-color: gold;
+  margin-top: 8px;
+  width: 40px;
+  height: 40px;
+  background-color: orange;
   border-radius: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   cursor: pointer;
+}
+.product-preview__buybutton__image {
+  width: 24px;
+  height: 24px;
 }

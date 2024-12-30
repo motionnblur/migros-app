@@ -3,6 +3,7 @@ import { Injectable } from '@angular/core';
 import { map } from 'rxjs';
 import { IProductUploader } from '../../interfaces/IProductUploader';
 import { IProductUpdater } from '../../interfaces/IProductUpdater';
+import { IAdminProductPreview } from '../../interfaces/IAdminProductPreview';
 
 @Injectable({
   providedIn: 'root',
@@ -32,17 +33,16 @@ export class RestService {
     });
   }
   getAllAdminProducts(adminId: number, page: number, productRange: number) {
-    return this.http.get(
-      `http://localhost:8080/admin/panel/getAllAdminProducts`,
-      {
+    return this.http
+      .get(`http://localhost:8080/admin/panel/getAllAdminProducts`, {
         params: {
           adminId,
           page,
           productRange,
         },
         responseType: 'json',
-      }
-    );
+      })
+      .pipe(map((response) => response as IAdminProductPreview[]));
   }
   uploadProductData(productData: IProductUploader) {
     const formData = new FormData();

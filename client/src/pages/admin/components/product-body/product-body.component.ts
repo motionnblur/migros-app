@@ -3,6 +3,7 @@ import { RestService } from '../../../../services/rest/rest.service';
 import { IProductPreview } from '../../../../interfaces/IProductPreview';
 import { CommonModule } from '@angular/common';
 import { EventService } from '../../../../services/event/event.service';
+import { IAdminProductPreview } from '../../../../interfaces/IAdminProductPreview';
 
 @Component({
   selector: 'app-product-body',
@@ -13,7 +14,7 @@ import { EventService } from '../../../../services/event/event.service';
 export class ProductBodyComponent {
   @Output() hasBodyClicked = new EventEmitter();
 
-  productsData: IProductPreview[] = [];
+  productsData: IAdminProductPreview[] = [];
   private productAddedCallback!: (data: any) => void;
   currentPageNumber: number = 0;
 
@@ -39,18 +40,23 @@ export class ProductBodyComponent {
   }
 
   private loadProducts() {
-    this.restService.getAllAdminProducts(1, 0, 19).subscribe((data: any) => {
-      this.productsData = data;
-    });
+    this.restService
+      .getAllAdminProducts(1, 0, 19)
+      .subscribe((data: IAdminProductPreview[]) => {
+        this.productsData = data;
+      });
   }
 
   deleteProduct(productId: number) {
     this.restService.deleteProduct(productId).subscribe({
-      next: () => {
-        this.loadProducts();
-      },
+      next: () => {},
       error: (error: any) => {
         console.error(error);
+      },
+      complete: () => {
+        this.productsData = this.productsData.filter(
+          (item) => item.productId !== productId
+        );
       },
     });
   }

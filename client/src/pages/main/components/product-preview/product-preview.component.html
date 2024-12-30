@@ -1,8 +1,10 @@
 <div class="product-preview">
   <img class="product-preview__image" [src]="imageUrl" />
   <div class="product-preview__title">
-    {{ productTitle }}
+    {{ productName }}
   </div>
   <div class="product-preview__price">{{ productPrice }} TL</div>
-  <div class="product-preview__buybutton"></div>
+  <div class="product-preview__buybutton">
+    <img class="product-preview__buybutton__image" src="plus.png" />
+  </div>
 </div>

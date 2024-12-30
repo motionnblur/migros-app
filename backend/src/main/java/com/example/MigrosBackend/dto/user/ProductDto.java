@@ -1,4 +1,4 @@
-package com.example.MigrosBackend.dto;
+package com.example.MigrosBackend.dto.user;
 
 import lombok.Getter;
 import lombok.Setter;

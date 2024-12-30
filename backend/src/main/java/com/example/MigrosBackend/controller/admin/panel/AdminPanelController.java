@@ -1,7 +1,7 @@
 package com.example.MigrosBackend.controller.admin.panel;
 
-import com.example.MigrosBackend.dto.ProductPreviewDto;
 import com.example.MigrosBackend.dto.admin.panel.AdminAddItemDto;
+import com.example.MigrosBackend.dto.admin.panel.AdminProductPreviewDto;
 import com.example.MigrosBackend.service.admin.AdminSupplyService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -33,7 +33,7 @@ public class AdminPanelController {
     private ResponseEntity<?> getAllAdminProducts(@RequestParam Long adminId, @RequestParam int page, @RequestParam int productRange) throws Exception {
         // Process the product data here
         try{
-            List<ProductPreviewDto> allAdminProducts = adminSupplyService.getAllAdminProducts(adminId, page, productRange);
+            List<AdminProductPreviewDto> allAdminProducts = adminSupplyService.getAllAdminProducts(adminId, page, productRange);
             return ResponseEntity.ok(allAdminProducts);
         } catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);

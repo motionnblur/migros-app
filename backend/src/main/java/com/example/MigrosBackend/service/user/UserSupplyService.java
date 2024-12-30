@@ -1,6 +1,6 @@
 package com.example.MigrosBackend.service.user;
 
-import com.example.MigrosBackend.dto.ProductPreviewDto;
+import com.example.MigrosBackend.dto.user.ProductPreviewDto;
 import com.example.MigrosBackend.entity.CategoryEntity;
 import com.example.MigrosBackend.entity.ProductEntity;
 import com.example.MigrosBackend.entity.ProductImageEntity;
@@ -55,7 +55,6 @@ public class UserSupplyService {
             ProductPreviewDto itemDto = new ProductPreviewDto();
             itemDto.setProductId(itemEntity.getId());
             itemDto.setProductName(itemEntity.getProductName());
-            itemDto.setProductTitle(itemEntity.getProductName());
             itemDto.setProductPrice(itemEntity.getProductPrice());
 
             return itemDto;

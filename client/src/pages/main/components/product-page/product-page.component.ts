@@ -19,14 +19,8 @@ export class ProductPageComponent implements OnInit {
     this.restService
       .getProductPageData(data.currentSelectedCategoryId, 0, 10)
       .subscribe((data: any) => {
-        data.forEach((productData: any) => {
-          const itemData: IProductPreview = {
-            productId: productData.productId,
-            productName: productData.productName,
-            productTitle: productData.productTitle,
-            productPrice: productData.productPrice,
-          };
-          this.items.push(itemData);
+        data.forEach((productData: IProductPreview) => {
+          this.items.push(productData);
         });
       });
   }

@@ -1,9 +1,9 @@
 package com.example.MigrosBackend.service.admin;
 
-import com.example.MigrosBackend.dto.ProductDto;
-import com.example.MigrosBackend.dto.ProductDto2;
-import com.example.MigrosBackend.dto.ProductPreviewDto;
+import com.example.MigrosBackend.dto.user.ProductDto;
+import com.example.MigrosBackend.dto.admin.panel.ProductDto2;
 import com.example.MigrosBackend.dto.admin.panel.AdminAddItemDto;
+import com.example.MigrosBackend.dto.admin.panel.AdminProductPreviewDto;
 import com.example.MigrosBackend.entity.AdminEntity;
 import com.example.MigrosBackend.entity.CategoryEntity;
 import com.example.MigrosBackend.entity.ProductEntity;
@@ -167,17 +167,15 @@ public class AdminSupplyService {
         productImageEntityRepository.save(productImageEntity);
     }
 
-    public List<ProductPreviewDto> getAllAdminProducts(Long adminId, int page, int productRange) throws Exception {
+    public List<AdminProductPreviewDto> getAllAdminProducts(Long adminId, int page, int productRange) throws Exception {
         Pageable pageable = PageRequest.of(page, productRange);
         Page<ProductEntity> entities =  productEntityRepository.findByAdminEntityId(adminId, pageable);
         if(entities.isEmpty()) throw new Exception("Admin with that ID: " +adminId+ " has no products.");
 
         return entities.stream().map(productEntity -> {
-            ProductPreviewDto productPreviewDto = new ProductPreviewDto();
+            AdminProductPreviewDto productPreviewDto = new AdminProductPreviewDto();
             productPreviewDto.setProductId(productEntity.getId());
             productPreviewDto.setProductName(productEntity.getProductName());
-            productPreviewDto.setProductTitle(productEntity.getProductName());
-            productPreviewDto.setProductPrice(productEntity.getProductPrice());
 
             return productPreviewDto;
         }).collect(Collectors.toList());

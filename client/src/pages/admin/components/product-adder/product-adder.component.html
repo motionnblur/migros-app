@@ -27,12 +27,14 @@
     type="number"
     [(ngModel)]="price"
     step="0.01"
+    min="0"
   />
   <input
     class="product-adder-body__input"
     placeholder="Count"
     type="number"
     [(ngModel)]="count"
+    min="0"
   />
   <input
     class="product-adder-body__input"
@@ -40,6 +42,7 @@
     type="number"
     [(ngModel)]="discount"
     step="0.01"
+    min="0"
   />
   <input
     class="product-adder-body__input"
