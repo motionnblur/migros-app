@@ -1,10 +1,10 @@
 export interface IProductUploader {
   adminId: number;
   productName: string;
-  price: number;
-  count: number;
-  discount: number;
-  description: string;
+  productPrice: number;
+  productCount: number;
+  productDiscount: number;
+  productDescription: string;
   selectedImage: File | null;
   categoryValue: number;
 }

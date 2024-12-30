@@ -116,10 +116,10 @@ export class ProductAdderComponent {
     const productData: IProductUploader = {
       adminId: 1,
       productName: this.productName,
-      price: this.price,
-      count: this.count,
-      discount: this.discount,
-      description: this.description,
+      productPrice: this.price,
+      productCount: this.count,
+      productDiscount: this.discount,
+      productDescription: this.description,
       selectedImage: this.selectedImage,
       categoryValue: this.selectedFormValue,
     };

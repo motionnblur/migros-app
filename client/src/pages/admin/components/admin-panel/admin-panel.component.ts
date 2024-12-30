@@ -18,7 +18,7 @@ import { EventService } from '../../../../services/event/event.service';
   styleUrl: './admin-panel.component.css',
 })
 export class AdminPanelComponent {
-  itemId!: number;
+  productId!: number;
   hasProductAdderOpened: boolean = false;
   hasProductUpdaterOpened: boolean = false;
   private productChangedCallback!: (data: any) => void;
@@ -41,8 +41,8 @@ export class AdminPanelComponent {
       this.closeProductUpdater();
     }
   }
-  productChangedEventHandler(itemId: number) {
-    this.itemId = itemId;
+  productChangedEventHandler(productId: number) {
+    this.productId = productId;
     this.hasProductAdderOpened = false;
     this.hasProductUpdaterOpened = !this.hasProductUpdaterOpened;
   }

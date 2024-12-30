@@ -10,35 +10,35 @@ import { IProductUpdater } from '../../interfaces/IProductUpdater';
 export class RestService {
   constructor(private http: HttpClient) {}
 
-  getItemPageData(categoryId: number, page: number, itemRange: number) {
+  getProductPageData(categoryId: number, page: number, productRange: number) {
     return this.http.get(
-      `http://localhost:8080/user/supply/getItemsFromCategory`,
+      `http://localhost:8080/user/supply/getProductsFromCategory`,
       {
-        params: { categoryId, page, itemRange },
+        params: { categoryId, page, productRange },
         responseType: 'json',
       }
     );
   }
-  getItemImage(itemId: number) {
-    return this.http.get(`http://localhost:8080/user/supply/getItemImage`, {
-      params: { itemId },
+  getProductImage(productId: number) {
+    return this.http.get(`http://localhost:8080/user/supply/getProductImage`, {
+      params: { productId },
       responseType: 'blob',
     });
   }
-  getItemData(itemId: number) {
-    return this.http.get(`http://localhost:8080/admin/panel/getItemData`, {
-      params: { itemId },
+  getProductData(productId: number) {
+    return this.http.get(`http://localhost:8080/admin/panel/getProductData`, {
+      params: { productId },
       responseType: 'json',
     });
   }
-  getAllAdminProducts(adminId: number, page: number, itemRange: number) {
+  getAllAdminProducts(adminId: number, page: number, productRange: number) {
     return this.http.get(
       `http://localhost:8080/admin/panel/getAllAdminProducts`,
       {
         params: {
           adminId,
           page,
-          itemRange,
+          productRange,
         },
         responseType: 'json',
       }
@@ -48,10 +48,10 @@ export class RestService {
     const formData = new FormData();
     formData.append('adminId', productData.adminId.toString());
     formData.append('productName', productData.productName);
-    formData.append('price', productData.price.toString());
-    formData.append('count', productData.count.toString());
-    formData.append('discount', productData.discount.toString());
-    formData.append('description', productData.description);
+    formData.append('productPrice', productData.productPrice.toString());
+    formData.append('productCount', productData.productCount.toString());
+    formData.append('productDiscount', productData.productDiscount.toString());
+    formData.append('productDescription', productData.productDescription);
     formData.append('selectedImage', productData.selectedImage!);
     formData.append('categoryValue', productData.categoryValue.toString());
 
@@ -67,10 +67,10 @@ export class RestService {
     formData.append('adminId', productData.adminId.toString());
     formData.append('productId', productData.productId.toString());
     formData.append('productName', productData.productName);
-    formData.append('price', productData.price.toString());
-    formData.append('count', productData.count.toString());
-    formData.append('discount', productData.discount.toString());
-    formData.append('description', productData.description);
+    formData.append('productPrice', productData.productPrice.toString());
+    formData.append('productCount', productData.productCount.toString());
+    formData.append('productDiscount', productData.productDiscount.toString());
+    formData.append('productDescription', productData.productDescription);
     formData.append('selectedImage', productData.selectedImage!);
     formData.append('categoryValue', productData.categoryValue.toString());
 

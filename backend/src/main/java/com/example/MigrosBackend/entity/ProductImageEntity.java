@@ -1,8 +1,6 @@
 package com.example.MigrosBackend.entity;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -12,15 +10,15 @@ import lombok.*;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-public class ItemImageEntity {
+public class ProductImageEntity {
     @Id
-    @Column(name = "item_image_entity_id")
+    @Column(name = "product_image_entity_id")
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String imagePath;
 
     @ManyToOne
-    @JoinColumn(name = "item_entity_id", referencedColumnName = "item_entity_id")
+    @JoinColumn(name = "product_entity_id", referencedColumnName = "product_entity_id")
     @JsonBackReference
-    private ItemEntity itemEntity;
+    private ProductEntity productEntity;
 }

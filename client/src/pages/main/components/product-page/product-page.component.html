@@ -1,0 +1,9 @@
+<div class="product-page padding-10">
+  <app-product-preview
+    *ngFor="let item of items"
+    [productId]="item.productId"
+    [productName]="item.productName"
+    [productTitle]="item.productTitle"
+    [productPrice]="item.productPrice"
+  />
+</div>

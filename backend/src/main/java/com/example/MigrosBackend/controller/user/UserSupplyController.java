@@ -1,6 +1,6 @@
 package com.example.MigrosBackend.controller.user;
 
-import com.example.MigrosBackend.dto.ItemPreviewDto;
+import com.example.MigrosBackend.dto.ProductPreviewDto;
 import com.example.MigrosBackend.service.user.UserSupplyService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
@@ -28,22 +28,22 @@ public class UserSupplyController {
         return userSupplyService.getAllCategoryNames();
     }
 
-    @GetMapping("getItemsFromCategory")
-    public ResponseEntity<?> getItemsFromCategory(@RequestParam Long categoryId, @RequestParam int page, @RequestParam int itemRange) {
+    @GetMapping("getProductsFromCategory")
+    public ResponseEntity<?> getProductsFromCategory(@RequestParam Long categoryId, @RequestParam int page, @RequestParam int productRange) {
         try {
-            List<ItemPreviewDto> itemIDs = userSupplyService.getItemsFromCategory(categoryId, page, itemRange);
+            List<ProductPreviewDto> itemIDs = userSupplyService.getProductsFromCategory(categoryId, page, productRange);
             return ResponseEntity.ok(itemIDs);
         } catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
     }
 
-    @GetMapping("getItemImageNames")
-    public List<String> getItemImageNames(@RequestParam Long itemId) {
-        return userSupplyService.getItemImageNames(itemId);
+    @GetMapping("getProductImageNames")
+    public List<String> getProductImageNames(@RequestParam Long productId) {
+        return userSupplyService.getProductImageNames(productId);
     }
-    @GetMapping("getItemImage")
-    public ResponseEntity<Resource> getItemImage(@RequestParam Long itemId) throws Exception {
-        return userSupplyService.getItemImage(itemId);
+    @GetMapping("getProductImage")
+    public ResponseEntity<Resource> getProductImage(@RequestParam Long productId) throws Exception {
+        return userSupplyService.getProductImage(productId);
     }
 }

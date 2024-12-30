@@ -5,10 +5,13 @@
       id="product-body-item"
       class="line-bottom"
     >
-      <div id="product-body-item-data" (click)="onBodyClick(item.itemId)">
-        {{ item.itemImageName }}
+      <div id="product-body-item-data" (click)="onBodyClick(item.productId)">
+        {{ item.productName }}
       </div>
-      <div id="product-body-item-delete" (click)="deleteProduct(item.itemId)">
+      <div
+        id="product-body-item-delete"
+        (click)="deleteProduct(item.productId)"
+      >
         <img id="product-body-item-delete__img" src="delete.png" />
       </div>
     </div>

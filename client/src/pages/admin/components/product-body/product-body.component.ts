@@ -1,6 +1,6 @@
 import { Component, EventEmitter, Output } from '@angular/core';
 import { RestService } from '../../../../services/rest/rest.service';
-import { IItemPreview } from '../../../../interfaces/IItemPreview';
+import { IProductPreview } from '../../../../interfaces/IProductPreview';
 import { CommonModule } from '@angular/common';
 import { EventService } from '../../../../services/event/event.service';
 
@@ -13,7 +13,7 @@ import { EventService } from '../../../../services/event/event.service';
 export class ProductBodyComponent {
   @Output() hasBodyClicked = new EventEmitter();
 
-  productsData: IItemPreview[] = [];
+  productsData: IProductPreview[] = [];
   private productAddedCallback!: (data: any) => void;
   currentPageNumber: number = 0;
 
@@ -33,9 +33,9 @@ export class ProductBodyComponent {
     this.eventService.off('productAdded', this.productAddedCallback);
   }
 
-  onBodyClick(itemId: number) {
+  onBodyClick(productId: number) {
     this.hasBodyClicked.emit();
-    this.eventService.trigger('productChanged', itemId);
+    this.eventService.trigger('productChanged', productId);
   }
 
   private loadProducts() {
@@ -44,8 +44,8 @@ export class ProductBodyComponent {
     });
   }
 
-  deleteProduct(itemId: number) {
-    this.restService.deleteProduct(itemId).subscribe({
+  deleteProduct(productId: number) {
+    this.restService.deleteProduct(productId).subscribe({
       next: () => {
         this.loadProducts();
       },

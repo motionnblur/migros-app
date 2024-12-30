@@ -1,7 +1,6 @@
 package com.example.MigrosBackend.entity;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
@@ -14,16 +13,16 @@ import java.util.List;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-public class ItemEntity {
+public class ProductEntity {
     @Id
-    @Column(name = "item_entity_id")
+    @Column(name = "product_entity_id")
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    private String itemName;
-    private int itemCount;
-    private float itemPrice;
-    private float discount;
-    private String description;
+    private String productName;
+    private int productCount;
+    private float productPrice;
+    private float productDiscount;
+    private String productDescription;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "admin_entity_id", referencedColumnName = "admin_entity_id")
@@ -36,19 +35,19 @@ public class ItemEntity {
     private CategoryEntity categoryEntity;
 
     @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
-    @JoinColumn(name = "item_entity_id", referencedColumnName = "item_entity_id")
+    @JoinColumn(name = "product_entity_id", referencedColumnName = "product_entity_id")
     @JsonManagedReference
-    private List<ItemImageEntity> itemImageEntities;
+    private List<ProductImageEntity> productImageEntities;
 
     @Override
     public String toString() {
-        return "ItemEntity{" +
+        return "ProductEntity{" +
                 "id=" + id +
-                ", itemName='" + itemName + '\'' +
-                ", itemCount=" + itemCount +
-                ", itemPrice=" + itemPrice +
-                ", discount=" + discount +
-                ", description='" + description + '\'' +
+                ", productName='" + productName + '\'' +
+                ", productCount=" + productCount +
+                ", productPrice=" + productPrice +
+                ", productDiscount=" + productDiscount +
+                ", productDescription='" + productDescription + '\'' +
                 '}';
     }
 }

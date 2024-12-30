@@ -1,13 +1,12 @@
 package com.example.MigrosBackend.service.user;
 
-import com.example.MigrosBackend.dto.ItemPreviewDto;
-import com.example.MigrosBackend.dto.ItemDto;
+import com.example.MigrosBackend.dto.ProductPreviewDto;
 import com.example.MigrosBackend.entity.CategoryEntity;
-import com.example.MigrosBackend.entity.ItemEntity;
-import com.example.MigrosBackend.entity.ItemImageEntity;
+import com.example.MigrosBackend.entity.ProductEntity;
+import com.example.MigrosBackend.entity.ProductImageEntity;
 import com.example.MigrosBackend.repository.CategoryEntityRepository;
-import com.example.MigrosBackend.repository.ItemEntityRepository;
-import com.example.MigrosBackend.repository.ItemImageEntityRepository;
+import com.example.MigrosBackend.repository.ProductEntityRepository;
+import com.example.MigrosBackend.repository.ProductImageEntityRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
@@ -18,8 +17,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
-import java.net.MalformedURLException;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -27,50 +24,51 @@ import java.util.stream.Collectors;
 @Service
 public class UserSupplyService {
     private final CategoryEntityRepository categoryEntityRepository;
-    private final ItemEntityRepository itemEntityRepository;
-    private final ItemImageEntityRepository itemImageEntityRepository;
+    private final ProductEntityRepository productEntityRepository;
+    private final ProductImageEntityRepository productImageEntityRepository;
 
     @Autowired
     public UserSupplyService(
             CategoryEntityRepository categoryEntityRepository,
-            ItemEntityRepository itemEntityRepository, 
-            ItemImageEntityRepository itemImageEntityRepository
+            ProductEntityRepository productEntityRepository,
+            ProductImageEntityRepository productImageEntityRepository
     ) {
         this.categoryEntityRepository = categoryEntityRepository;
-        this.itemEntityRepository = itemEntityRepository;
-        this.itemImageEntityRepository = itemImageEntityRepository;
+        this.productEntityRepository = productEntityRepository;
+        this.productImageEntityRepository = productImageEntityRepository;
     }
 
     public List<String> getAllCategoryNames() {
         return categoryEntityRepository.findAll().stream().map(CategoryEntity::getCategoryName).toList();
     }
 
-    public List<ItemPreviewDto> getItemsFromCategory(Long categoryId, int page, int itemRange) throws Exception {
+    public List<ProductPreviewDto> getProductsFromCategory(Long categoryId, int page, int itemRange) throws Exception {
         boolean b = categoryEntityRepository.existsById(categoryId);
         if(!b) throw new Exception("Category with that ID: " +categoryId+ " could not be found.");
 
         //Pageable pageable = PageRequest.of(page, itemRange, Sort.by("id").ascending());
         Pageable pageable = PageRequest.of(page, itemRange);
 
-        Page<ItemEntity> entities =  itemEntityRepository.findByCategoryEntityId(categoryId, pageable);
+        Page<ProductEntity> entities =  productEntityRepository.findByCategoryEntityId(categoryId, pageable);
 
         return entities.stream().map(itemEntity -> {
-            ItemPreviewDto itemDto = new ItemPreviewDto();
-            itemDto.setItemId(itemEntity.getId());
-            itemDto.setItemImageName(itemEntity.getItemName());
-            itemDto.setItemTitle(itemEntity.getItemName());
-            itemDto.setItemPrice(itemEntity.getItemPrice());
+            ProductPreviewDto itemDto = new ProductPreviewDto();
+            itemDto.setProductId(itemEntity.getId());
+            itemDto.setProductName(itemEntity.getProductName());
+            itemDto.setProductTitle(itemEntity.getProductName());
+            itemDto.setProductPrice(itemEntity.getProductPrice());
+
             return itemDto;
         }).collect(Collectors.toList());
     }
-    public List<String> getItemImageNames(Long itemId) {
-        List<ItemImageEntity> itemImageEntity = itemImageEntityRepository.findByItemEntityId(itemId);
-        return itemImageEntity.stream().map(ItemImageEntity::getImagePath).toList();
+    public List<String> getProductImageNames(Long itemId) {
+        List<ProductImageEntity> productImageEntity = productImageEntityRepository.findByProductEntityId(itemId);
+        return productImageEntity.stream().map(ProductImageEntity::getImagePath).toList();
     }
 
-    public ResponseEntity<Resource> getItemImage(Long itemId) throws Exception {
-        ItemImageEntity itemImageEntity = itemImageEntityRepository.findByItemEntityId(itemId).get(0);
-        String filename = itemImageEntity.getImagePath();
+    public ResponseEntity<Resource> getProductImage(Long itemId) throws Exception {
+        ProductImageEntity productImageEntity = productImageEntityRepository.findByProductEntityId(itemId).get(0);
+        String filename = productImageEntity.getImagePath();
 
         Resource resource = new UrlResource(Paths.get(filename).toUri());
 

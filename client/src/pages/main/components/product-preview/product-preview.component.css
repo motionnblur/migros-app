@@ -1,0 +1,31 @@
+.product-preview {
+  width: 180px;
+  height: 340px;
+  background-color: white;
+  border: 1px solid gainsboro;
+  border-radius: 3%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.product-preview__image {
+  width: 150px;
+  height: 180px;
+  object-fit: contain;
+}
+.product-preview__title {
+  width: 150px;
+  height: 60px;
+}
+.product-preview__price {
+  width: 150px;
+  height: 30px;
+}
+.product-preview__buybutton {
+  width: 50px;
+  height: 50px;
+  background-color: gold;
+  border-radius: 10px;
+  cursor: pointer;
+}

@@ -1,6 +1,6 @@
 package com.example.MigrosBackend.controller.admin;
 
-import com.example.MigrosBackend.dto.ItemDto;
+import com.example.MigrosBackend.dto.ProductDto;
 import com.example.MigrosBackend.service.admin.AdminSupplyService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -26,10 +26,10 @@ public class AdminSupplyController {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
     }
-    @PostMapping("addItem")
-    private ResponseEntity<?> addItem(@RequestBody ItemDto itemDto) throws Exception {
+    @PostMapping("addProduct")
+    private ResponseEntity<?> addItem(@RequestBody ProductDto productDto) throws Exception {
         try{
-            adminSupplyService.addItem(itemDto);
+            adminSupplyService.addProduct(productDto);
             return new ResponseEntity<>(HttpStatus.OK);
         } catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);

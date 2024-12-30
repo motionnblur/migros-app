@@ -1,6 +1,6 @@
 package com.example.MigrosBackend.dto.admin.panel;
 
-import com.example.MigrosBackend.dto.ItemDto;
+import com.example.MigrosBackend.dto.ProductDto;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -8,5 +8,5 @@ import lombok.Setter;
 @Setter
 public class AdminAddItemDto {
     private Long adminId;
-    private ItemDto itemDto;
+    private ProductDto productDto;
 }
