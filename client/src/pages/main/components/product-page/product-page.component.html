@@ -7,7 +7,7 @@
       [productPrice]="item.productPrice"
     />
   </div>
-  <div *ngIf="hasProductBuyViewOpened">
+  <div class="product-buy-container" *ngIf="hasProductBuyViewOpened">
     <app-product-buy [productId]="selectedProductId" />
   </div>
 </div>

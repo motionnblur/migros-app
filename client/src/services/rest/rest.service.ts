@@ -4,6 +4,7 @@ import { map } from 'rxjs';
 import { IProductUploader } from '../../interfaces/IProductUploader';
 import { IProductUpdater } from '../../interfaces/IProductUpdater';
 import { IAdminProductPreview } from '../../interfaces/IAdminProductPreview';
+import { IProductData } from '../../interfaces/IProductData';
 
 @Injectable({
   providedIn: 'root',
@@ -27,10 +28,12 @@ export class RestService {
     });
   }
   getProductData(productId: number) {
-    return this.http.get(`http://localhost:8080/admin/panel/getProductData`, {
-      params: { productId },
-      responseType: 'json',
-    });
+    return this.http
+      .get(`http://localhost:8080/admin/panel/getProductData`, {
+        params: { productId },
+        responseType: 'json',
+      })
+      .pipe(map((response) => response as IProductData));
   }
   getAllAdminProducts(adminId: number, page: number, productRange: number) {
     return this.http

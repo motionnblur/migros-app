@@ -1,4 +1,4 @@
-<div class="product-buy__container">
+<div class="product-buy__container" *ngIf="productData">
   <div class="product-buy__buy-view">
     <div class="product-buy__buy-view__head">
       <div class="product-buy__buy-view__head-left">
@@ -9,9 +9,11 @@
       </div>
       <div class="product-buy__buy-view__head-right">
         <div class="product-buy__buy-view__head-right-1 line-bottom">
-          <div class="product-buy__buy-view__head-right-1__title">Test</div>
+          <div class="product-buy__buy-view__head-right-1__title">
+            {{ productData.productName }}
+          </div>
           <div class="product-buy__buy-view__head-right-1__price">
-            349,95
+            {{ productData.productPrice }}
             <span class="product-buy__buy-view__head-right-1__currency"
               >TL</span
             >
