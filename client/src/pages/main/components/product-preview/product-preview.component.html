@@ -1,10 +1,26 @@
 <div class="product-preview">
-  <img class="product-preview__image" [src]="imageUrl" />
-  <div class="product-preview__title">
-    {{ productName }}
+  <div class="product-preview__image-container">
+    <img class="product-preview__image" [src]="imageUrl" />
   </div>
-  <div class="product-preview__price">{{ productPrice }} TL</div>
+  <div class="product-preview__name_container">
+    <div class="product-preview__title">
+      {{ productName }}
+    </div>
+  </div>
+  <div class="product-preview__price_container">
+    <div class="product-preview__price">
+      {{ productPrice
+      }}<span class="product-preview__price__currency"> TL</span>
+    </div>
+  </div>
+  <div class="product-preview__button_container">
+    <div class="product-preview__buybutton">
+      <img class="product-preview__buybutton__image" src="plus.png" />
+    </div>
+  </div>
+  <!--
   <div class="product-preview__buybutton">
     <img class="product-preview__buybutton__image" src="plus.png" />
   </div>
+  -->
 </div>

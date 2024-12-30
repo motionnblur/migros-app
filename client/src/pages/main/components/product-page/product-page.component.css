@@ -3,8 +3,11 @@
   height: 2000px;
   display: flex;
   flex-wrap: wrap;
-  background-color: aliceblue;
+  background-color: #fafafa;
   gap: 10px;
   flex-direction: row;
   align-content: flex-start;
+  border: 1px solid gainsboro;
+  margin-top: 15px;
+  border-radius: 5px;
 }

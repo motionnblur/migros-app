@@ -1,24 +1,32 @@
 .category-button {
-    width: 144px;
-    height: 180px;
-    display: flex;
-    flex-direction: column;
+  width: 144px;
+  height: 180px;
+  display: flex;
+  flex-direction: column;
+  background-color: #fafafa;
+}
+.category-button__image__container {
+  width: 143px;
+  height: 135px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: 1px solid gainsboro;
+  border-radius: 5%;
+  cursor: pointer;
 }
 .category-button__image {
-    width: 143px;
-    height: 135px;
-    border: 1px solid gainsboro;
-    border-radius: 5%;
-    cursor: pointer;
-    object-fit: contain;
+  width: 88px;
+  height: 88px;
+  object-fit: contain;
 }
 .category-button__title {
-    margin-top: 5px;
-    height: auto;
-    font-size: 14px;
-    font-weight: 600;
-    color: black;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+  margin-top: 5px;
+  height: auto;
+  font-size: 14px;
+  font-weight: 600;
+  color: black;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
