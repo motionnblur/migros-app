@@ -1,8 +1,13 @@
-<div class="product-page padding-10">
-  <app-product-preview
-    *ngFor="let item of items"
-    [productId]="item.productId"
-    [productName]="item.productName"
-    [productPrice]="item.productPrice"
-  />
+<div #product_page_ref class="product-page padding-10">
+  <div *ngIf="hasProductPreviewOpened">
+    <app-product-preview
+      *ngFor="let item of items"
+      [productId]="item.productId"
+      [productName]="item.productName"
+      [productPrice]="item.productPrice"
+    />
+  </div>
+  <div *ngIf="hasProductBuyViewOpened">
+    <app-product-buy [productId]="selectedProductId" />
+  </div>
 </div>

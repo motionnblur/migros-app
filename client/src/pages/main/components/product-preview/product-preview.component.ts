@@ -1,5 +1,6 @@
 import { Component, Input, input } from '@angular/core';
 import { RestService } from '../../../../services/rest/rest.service';
+import { EventService } from '../../../../services/event/event.service';
 
 @Component({
   selector: 'app-product-preview',
@@ -14,7 +15,10 @@ export class ProductPreviewComponent {
   @Input() productPrice!: number;
   imageUrl: string | null = null;
 
-  constructor(private restService: RestService) {}
+  constructor(
+    private restService: RestService,
+    private eventService: EventService
+  ) {}
   ngOnInit() {
     this.restService.getProductImage(this.productId).subscribe((blob: Blob) => {
       const url: string = window.URL.createObjectURL(blob); // Create a URL for the blob
@@ -27,5 +31,8 @@ export class ProductPreviewComponent {
   }
   getproductPrice() {
     return this.productPrice;
+  }
+  onProductViewClicked() {
+    this.eventService.trigger('onProductPreviewClicked', this.productId);
   }
 }

@@ -1,8 +1,11 @@
 <div class="product-preview">
-  <div class="product-preview__image-container">
+  <div
+    class="product-preview__image-container"
+    (click)="onProductViewClicked()"
+  >
     <img class="product-preview__image" [src]="imageUrl" />
   </div>
-  <div class="product-preview__name_container">
+  <div class="product-preview__name_container" (click)="onProductViewClicked()">
     <div class="product-preview__title">
       {{ productName }}
     </div>
