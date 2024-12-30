@@ -1,5 +1,16 @@
 <div class="main-page">
-  <div class="header line-bottom"></div>
+  <div class="header line-bottom">
+    <div class="header__top">
+      <img src="migros_header.png" />
+    </div>
+    <div class="header__line"></div>
+    <div class="header__bottom">
+      <img src="migros_header2.png" />
+    </div>
+    <div class="header__bottom-2">
+      <img src="migros_header_bottom.png" />
+    </div>
+  </div>
   <div class="content">
     <app-discover *ngIf="!hasItemPageOpened()" />
     <app-product-page *ngIf="hasItemPageOpened()" />

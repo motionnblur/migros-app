@@ -6,6 +6,32 @@
   width: 100%;
   height: 196px;
   background-color: white;
+  display: flex;
+  flex-direction: column;
+}
+.header__top {
+  width: 100%;
+  height: 60px;
+  display: flex;
+  justify-content: center;
+}
+.header__line {
+  width: 100%;
+  height: 6px;
+  background-color: #ff7f00;
+}
+.header__bottom {
+  width: 100%;
+  background-color: #fafafa;
+  flex: auto;
+}
+.header__bottom-2 {
+  width: 100%;
+  flex: auto;
+  display: flex;
+  justify-content: center;
+  background-color: #fafafa;
+  align-items: center;
 }
 .content {
   background-color: #fafafa;

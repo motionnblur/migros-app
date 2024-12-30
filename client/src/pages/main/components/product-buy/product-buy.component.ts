@@ -18,5 +18,8 @@ export class ProductBuyComponent {
     this.restService.getProductImage(this.productId).subscribe((data: Blob) => {
       this.productImageRef.nativeElement.src = URL.createObjectURL(data);
     });
+    this.restService.getProductData(this.productId).subscribe((data: any) => {
+      console.log(data);
+    });
   }
 }
