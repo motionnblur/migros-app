@@ -1,7 +1,7 @@
 package com.example.MigrosBackend.service.admin.sign;
 
 import com.example.MigrosBackend.dto.admin.sign.AdminSignDto;
-import com.example.MigrosBackend.entity.AdminEntity;
+import com.example.MigrosBackend.entity.admin.AdminEntity;
 import com.example.MigrosBackend.repository.AdminEntityRepository;
 import com.example.MigrosBackend.service.global.EncryptService;
 import org.springframework.beans.factory.annotation.Autowired;

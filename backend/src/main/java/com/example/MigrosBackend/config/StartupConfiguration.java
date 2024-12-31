@@ -1,7 +1,7 @@
 package com.example.MigrosBackend.config;
 
-import com.example.MigrosBackend.entity.AdminEntity;
-import com.example.MigrosBackend.entity.CategoryEntity;
+import com.example.MigrosBackend.entity.admin.AdminEntity;
+import com.example.MigrosBackend.entity.category.CategoryEntity;
 import com.example.MigrosBackend.repository.AdminEntityRepository;
 import com.example.MigrosBackend.repository.CategoryEntityRepository;
 import org.springframework.boot.CommandLineRunner;

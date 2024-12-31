@@ -1,5 +1,7 @@
-package com.example.MigrosBackend.entity;
+package com.example.MigrosBackend.entity.product;
 
+import com.example.MigrosBackend.entity.admin.AdminEntity;
+import com.example.MigrosBackend.entity.category.CategoryEntity;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
@@ -38,6 +40,11 @@ public class ProductEntity {
     @JoinColumn(name = "product_entity_id", referencedColumnName = "product_entity_id")
     @JsonManagedReference
     private List<ProductImageEntity> productImageEntities;
+
+    @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @JoinColumn(name = "product_entity_id", referencedColumnName = "product_entity_id")
+    @JsonManagedReference
+    private List<DescriptionEntity> descriptionEntities;
 
     @Override
     public String toString() {

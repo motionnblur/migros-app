@@ -1,6 +1,6 @@
 package com.example.MigrosBackend.repository;
 
-import com.example.MigrosBackend.entity.ProductEntity;
+import com.example.MigrosBackend.entity.product.ProductEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

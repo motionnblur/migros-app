@@ -1,6 +1,6 @@
 package com.example.MigrosBackend.repository;
 
-import com.example.MigrosBackend.entity.ProductImageEntity;
+import com.example.MigrosBackend.entity.product.ProductImageEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

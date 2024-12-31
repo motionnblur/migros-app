@@ -1,5 +1,6 @@
-package com.example.MigrosBackend.entity;
+package com.example.MigrosBackend.entity.category;
 
+import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;

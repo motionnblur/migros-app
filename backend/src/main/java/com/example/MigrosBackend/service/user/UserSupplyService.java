@@ -1,9 +1,9 @@
 package com.example.MigrosBackend.service.user;
 
 import com.example.MigrosBackend.dto.user.ProductPreviewDto;
-import com.example.MigrosBackend.entity.CategoryEntity;
-import com.example.MigrosBackend.entity.ProductEntity;
-import com.example.MigrosBackend.entity.ProductImageEntity;
+import com.example.MigrosBackend.entity.category.CategoryEntity;
+import com.example.MigrosBackend.entity.product.ProductEntity;
+import com.example.MigrosBackend.entity.product.ProductImageEntity;
 import com.example.MigrosBackend.repository.CategoryEntityRepository;
 import com.example.MigrosBackend.repository.ProductEntityRepository;
 import com.example.MigrosBackend.repository.ProductImageEntityRepository;
