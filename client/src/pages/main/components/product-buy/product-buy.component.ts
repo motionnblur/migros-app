@@ -55,7 +55,7 @@ export class ProductBuyComponent {
     if (this.currentTabRef) {
       if (this.currentTabRef !== tabRef) {
         tabRef.style.color = 'orange';
-        this.currentTabRef.style.color = 'black';
+        this.currentTabRef.style.color = '#696969';
 
         this.currentTabRef = tabRef;
       }

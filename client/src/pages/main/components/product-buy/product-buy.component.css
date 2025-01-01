@@ -113,6 +113,7 @@
   font-size: 11px;
   padding: 12px;
   box-sizing: border-box;
+  color: #696969;
 }
 
 .product-buy__buy-view__tail {
@@ -136,6 +137,9 @@
   padding: 10px;
   box-sizing: border-box;
   cursor: pointer;
+  color: #696969;
+  font-weight: 500;
+  font-size: 14px;
 }
 .product-buy__buy-view__tail-head > div:hover {
   background-color: rgb(255, 247, 232);
