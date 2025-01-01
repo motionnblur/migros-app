@@ -34,8 +34,9 @@
   <div class="product-buy__buy-view__tail">
     <div class="product-buy__buy-view__tail-head" *ngIf="productDescriptions">
       <div
+        #tabRef
         *ngFor="let item of productDescriptions; let i = index"
-        (click)="changeTab(i)"
+        (click)="changeTab(i, tabRef)"
       >
         {{ item.descriptionTabName }}
       </div>

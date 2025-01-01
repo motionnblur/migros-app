@@ -17,6 +17,7 @@ export class ProductBuyComponent {
   productData!: IProductData;
   productDescriptions: IProductDescription[] = [];
   currentProductDescriptionBody: string = '';
+  currentTabRef: HTMLDivElement | null = null;
 
   constructor(private restService: RestService) {}
 
@@ -39,8 +40,20 @@ export class ProductBuyComponent {
       this.productImageRef.nativeElement.src = URL.createObjectURL(data);
     });
   }
-  changeTab(index: number) {
+  changeTab(index: number, tabRef: HTMLDivElement) {
     this.currentProductDescriptionBody =
       this.productDescriptions[index].descriptionTabContent;
+    tabRef.style.color = 'orange';
+
+    if (this.currentTabRef) {
+      if (this.currentTabRef !== tabRef) {
+        tabRef.style.color = 'orange';
+        this.currentTabRef.style.color = 'black';
+
+        this.currentTabRef = tabRef;
+      }
+    } else {
+      this.currentTabRef = tabRef;
+    }
   }
 }
