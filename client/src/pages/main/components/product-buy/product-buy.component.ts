@@ -3,6 +3,7 @@ import { RestService } from '../../../../services/rest/rest.service';
 import { IProductData } from '../../../../interfaces/IProductData';
 import { CommonModule } from '@angular/common';
 import { IProductDescription } from '../../../../interfaces/IProductDescription';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 
 @Component({
   selector: 'app-product-buy',
@@ -16,10 +17,13 @@ export class ProductBuyComponent {
   productImageRef!: ElementRef<HTMLImageElement>;
   productData!: IProductData;
   productDescriptions: IProductDescription[] = [];
-  currentProductDescriptionBody: string = '';
+  currentProductDescriptionBody!: SafeHtml;
   currentTabRef: HTMLDivElement | null = null;
 
-  constructor(private restService: RestService) {}
+  constructor(
+    private restService: RestService,
+    private sanitizer: DomSanitizer
+  ) {}
 
   ngOnInit() {
     this.restService
@@ -41,6 +45,9 @@ export class ProductBuyComponent {
     });
   }
   changeTab(index: number, tabRef: HTMLDivElement) {
+    this.updateProductDescriptionBody(
+      this.productDescriptions[index].descriptionTabContent
+    );
     this.currentProductDescriptionBody =
       this.productDescriptions[index].descriptionTabContent;
     tabRef.style.color = 'orange';
@@ -55,5 +62,9 @@ export class ProductBuyComponent {
     } else {
       this.currentTabRef = tabRef;
     }
+  }
+  private updateProductDescriptionBody(description: string) {
+    this.currentProductDescriptionBody =
+      this.sanitizer.bypassSecurityTrustHtml(description);
   }
 }

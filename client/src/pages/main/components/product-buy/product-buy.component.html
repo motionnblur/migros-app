@@ -41,7 +41,10 @@
         {{ item.descriptionTabName }}
       </div>
     </div>
-    <div class="product-buy__buy-view__tail-body">
+    <div
+      [innerHTML]="currentProductDescriptionBody"
+      class="product-buy__buy-view__tail-body"
+    >
       {{ this.currentProductDescriptionBody }}
     </div>
   </div>
