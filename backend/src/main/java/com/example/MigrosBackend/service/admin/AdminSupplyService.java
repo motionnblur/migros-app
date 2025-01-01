@@ -1,17 +1,16 @@
 package com.example.MigrosBackend.service.admin;
 
+import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionDto;
 import com.example.MigrosBackend.dto.user.ProductDto;
 import com.example.MigrosBackend.dto.admin.panel.ProductDto2;
 import com.example.MigrosBackend.dto.admin.panel.AdminAddItemDto;
 import com.example.MigrosBackend.dto.admin.panel.AdminProductPreviewDto;
 import com.example.MigrosBackend.entity.admin.AdminEntity;
 import com.example.MigrosBackend.entity.category.CategoryEntity;
+import com.example.MigrosBackend.entity.product.ProductDescriptionEntity;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.product.ProductImageEntity;
-import com.example.MigrosBackend.repository.AdminEntityRepository;
-import com.example.MigrosBackend.repository.CategoryEntityRepository;
-import com.example.MigrosBackend.repository.ProductEntityRepository;
-import com.example.MigrosBackend.repository.ProductImageEntityRepository;
+import com.example.MigrosBackend.repository.*;
 import com.example.MigrosBackend.service.global.FileService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -21,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -31,6 +31,7 @@ public class AdminSupplyService {
     private final ProductEntityRepository productEntityRepository;
     private final ProductImageEntityRepository productImageEntityRepository;
     private final AdminEntityRepository adminEntityRepository;
+    private final ProductDescriptionEntityRepository productDescriptionEntityRepository;
     private final FileService fileService;
 
     @Autowired
@@ -39,12 +40,14 @@ public class AdminSupplyService {
             ProductEntityRepository productEntityRepository,
             ProductImageEntityRepository productImageEntityRepository,
             AdminEntityRepository adminEntityRepository,
+            ProductDescriptionEntityRepository productDescriptionEntityRepository,
             FileService fileService
     ) {
         this.categoryEntityRepository = categoryEntityRepository;
         this.productEntityRepository = productEntityRepository;
         this.productImageEntityRepository = productImageEntityRepository;
         this.adminEntityRepository = adminEntityRepository;
+        this.productDescriptionEntityRepository = productDescriptionEntityRepository;
         this.fileService = fileService;
     }
 
@@ -197,5 +200,34 @@ public class AdminSupplyService {
         productDto2.setProductCategoryId(Math.toIntExact(productEntity.getCategoryEntity().getId()));
 
         return productDto2;
+    }
+
+    public void addProductDescription(ProductDescriptionDto productDescription) {
+        ProductEntity productEntity = productEntityRepository.findById(productDescription.getProductId())
+                .orElseThrow(() -> new RuntimeException("Item with that id: " + productDescription.getProductId() + " could not be found."));
+
+        ProductDescriptionEntity productDescriptionEntity = new ProductDescriptionEntity();
+        productDescriptionEntity.setDescriptionTabName(productDescription.getDescriptionTabName());
+        productDescriptionEntity.setDescriptionTabContent(productDescription.getDescriptionTabContent());
+        productDescriptionEntity.setProductEntity(productEntity);
+
+        productDescriptionEntityRepository.save(productDescriptionEntity);
+    }
+
+    public List<ProductDescriptionDto> getProductDescription(Long productId) {
+        ProductDescriptionEntity productDescriptionEntity = productDescriptionEntityRepository.findById(productId)
+                .orElseThrow(() -> new RuntimeException("Item with that id: " + productId + " could not be found."));
+
+        List<ProductDescriptionDto> productDescriptionDto = new ArrayList<>();
+        for(ProductDescriptionEntity item : productDescriptionEntity.getProductEntity().getDescriptionEntities()) {
+            ProductDescriptionDto dto = new ProductDescriptionDto();
+            dto.setDescriptionTabName(item.getDescriptionTabName());
+            dto.setDescriptionTabContent(item.getDescriptionTabContent());
+            dto.setProductId(item.getProductEntity().getId());
+
+            productDescriptionDto.add(dto);
+        }
+
+        return productDescriptionDto;
     }
 }

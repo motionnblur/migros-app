@@ -31,5 +31,17 @@
       </div>
     </div>
   </div>
-  <div class="product-buy__buy-view__tail"></div>
+  <div class="product-buy__buy-view__tail">
+    <div class="product-buy__buy-view__tail-head" *ngIf="productDescriptions">
+      <div
+        *ngFor="let item of productDescriptions; let i = index"
+        (click)="changeTab(i)"
+      >
+        {{ item.descriptionTabName }}
+      </div>
+    </div>
+    <div class="product-buy__buy-view__tail-body">
+      {{ this.currentProductDescriptionBody }}
+    </div>
+  </div>
 </div>

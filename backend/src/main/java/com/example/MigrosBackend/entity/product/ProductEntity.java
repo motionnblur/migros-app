@@ -44,7 +44,7 @@ public class ProductEntity {
     @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @JoinColumn(name = "product_entity_id", referencedColumnName = "product_entity_id")
     @JsonManagedReference
-    private List<DescriptionEntity> descriptionEntities;
+    private List<ProductDescriptionEntity> descriptionEntities;
 
     @Override
     public String toString() {

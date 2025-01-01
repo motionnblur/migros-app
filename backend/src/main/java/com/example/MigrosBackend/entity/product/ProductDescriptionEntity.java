@@ -10,9 +10,9 @@ import lombok.*;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-public class DescriptionEntity {
+public class ProductDescriptionEntity {
     @Id
-    @Column(name = "description_entity_id")
+    @Column(name = "product_description_entity_id")
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String descriptionTabName;

@@ -2,6 +2,7 @@ package com.example.MigrosBackend.controller.admin.panel;
 
 import com.example.MigrosBackend.dto.admin.panel.AdminAddItemDto;
 import com.example.MigrosBackend.dto.admin.panel.AdminProductPreviewDto;
+import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionDto;
 import com.example.MigrosBackend.service.admin.AdminSupplyService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -20,11 +21,19 @@ public class AdminPanelController {
         this.adminSupplyService = adminSupplyService;
     }
 
-    @PostMapping("addProduct")
-    private ResponseEntity<?> addProduct(@RequestBody AdminAddItemDto adminAddItemDto) throws Exception {
+    @PostMapping("addProductDescription")
+    private ResponseEntity<?> addProductDescription(@RequestBody ProductDescriptionDto productDescription) throws Exception {
         try{
-            adminSupplyService.addProduct(adminAddItemDto);
+            adminSupplyService.addProductDescription(productDescription);
             return new ResponseEntity<>(HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+    @GetMapping("getProductDescription")
+    private ResponseEntity<?> getProductDescription(@RequestParam Long productId) throws Exception {
+        try{
+            return ResponseEntity.ok(adminSupplyService.getProductDescription(productId));
         } catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
@@ -43,6 +52,15 @@ public class AdminPanelController {
     private ResponseEntity<?> getProductData(@RequestParam Long productId) throws Exception {
         try{
             return ResponseEntity.ok(adminSupplyService.getProductData(productId));
+        } catch (Exception e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+    @PostMapping("addProduct")
+    private ResponseEntity<?> addProduct(@RequestBody AdminAddItemDto adminAddItemDto) throws Exception {
+        try{
+            adminSupplyService.addProduct(adminAddItemDto);
+            return new ResponseEntity<>(HttpStatus.OK);
         } catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }

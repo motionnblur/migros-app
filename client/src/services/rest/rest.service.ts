@@ -5,6 +5,7 @@ import { IProductUploader } from '../../interfaces/IProductUploader';
 import { IProductUpdater } from '../../interfaces/IProductUpdater';
 import { IAdminProductPreview } from '../../interfaces/IAdminProductPreview';
 import { IProductData } from '../../interfaces/IProductData';
+import { IProductDescription } from '../../interfaces/IProductDescription';
 
 @Injectable({
   providedIn: 'root',
@@ -93,5 +94,26 @@ export class RestService {
         observe: 'response',
       })
       .pipe(map((response) => response.status === 200));
+  }
+
+  addProductDescription(productDescription: IProductDescription) {
+    return this.http
+      .post(
+        'http://localhost:8080/admin/panel/addProductDescription',
+        productDescription,
+        {
+          responseType: 'text',
+          observe: 'response',
+        }
+      )
+      .pipe(map((response) => response.status === 200));
+  }
+  getProductDescription(productId: number) {
+    return this.http
+      .get(`http://localhost:8080/admin/panel/getProductDescription`, {
+        params: { productId },
+        responseType: 'json',
+      })
+      .pipe(map((response) => response as IProductDescription[]));
   }
 }
