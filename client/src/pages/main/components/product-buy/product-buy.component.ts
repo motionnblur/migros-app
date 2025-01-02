@@ -40,6 +40,16 @@ export class ProductBuyComponent {
       });
   }
   ngAfterViewInit() {
+    setTimeout(() => {
+      const firstTab: HTMLDivElement = document.querySelectorAll(
+        '[data-tab-ref]'
+      )[0] as HTMLDivElement;
+      if (firstTab) {
+        firstTab.style.color = 'orange';
+        this.currentTabRef = firstTab;
+      }
+    }, 50);
+
     this.restService.getProductImage(this.productId).subscribe((data: Blob) => {
       this.productImageRef.nativeElement.src = URL.createObjectURL(data);
     });
@@ -50,19 +60,18 @@ export class ProductBuyComponent {
     );
     this.currentProductDescriptionBody =
       this.productDescriptions[index].descriptionTabContent;
-    tabRef.style.color = 'orange';
 
     if (this.currentTabRef) {
       if (this.currentTabRef !== tabRef) {
         tabRef.style.color = 'orange';
-        this.currentTabRef.style.color = '#696969';
-
+        this.currentTabRef.style.color = '#696969'; // Set previous tab to default color
         this.currentTabRef = tabRef;
       }
     } else {
       this.currentTabRef = tabRef;
     }
   }
+
   private updateProductDescriptionBody(description: string) {
     this.currentProductDescriptionBody =
       this.sanitizer.bypassSecurityTrustHtml(description);

@@ -37,6 +37,7 @@
         #tabRef
         *ngFor="let item of productDescriptions; let i = index"
         (click)="changeTab(i, tabRef)"
+        [attr.data-tab-ref]="i"
       >
         {{ item.descriptionTabName }}
       </div>
