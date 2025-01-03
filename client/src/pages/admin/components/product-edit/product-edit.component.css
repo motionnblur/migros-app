@@ -29,6 +29,7 @@
 .product-edit__buy-view__head-left__image {
   width: 80%;
   object-fit: contain;
+  cursor: pointer;
 }
 
 .product-edit__buy-view__head-right {

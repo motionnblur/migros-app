@@ -35,6 +35,9 @@ export abstract class ProductBuyBase {
         this.currentProductDescriptionBody =
           this.productDescriptions[0].descriptionTabContent;
       });
+    this.restService.getProductImage(this.productId).subscribe((data: Blob) => {
+      this.productImageRef.nativeElement.src = URL.createObjectURL(data);
+    });
   }
   ngAfterViewInit() {
     setTimeout(() => {
@@ -53,16 +56,6 @@ export abstract class ProductBuyBase {
       }
     }, 50);
   }
-  ngAfterViewChecked() {
-    if (this.productImageRef) {
-      this.restService
-        .getProductImage(this.productId)
-        .subscribe((data: Blob) => {
-          this.productImageRef.nativeElement.src = URL.createObjectURL(data);
-        });
-    }
-  }
-
   protected changeTab(index: number, tabRef: HTMLDivElement) {
     this.currentProductDescriptionBody =
       this.productDescriptions[index].descriptionTabContent;
