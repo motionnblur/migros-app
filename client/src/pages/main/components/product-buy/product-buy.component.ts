@@ -4,6 +4,8 @@ import { IProductData } from '../../../../interfaces/IProductData';
 import { CommonModule } from '@angular/common';
 import { IProductDescription } from '../../../../interfaces/IProductDescription';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { ProductBuyBase } from '../../../../base-components/product-buy.base';
+import { EventService } from '../../../../services/event/event.service';
 
 @Component({
   selector: 'app-product-buy',
@@ -11,56 +13,16 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
   templateUrl: './product-buy.component.html',
   styleUrl: './product-buy.component.css',
 })
-export class ProductBuyComponent {
-  @Input() productId!: number;
-  @ViewChild('product_image_ref')
-  productImageRef!: ElementRef<HTMLImageElement>;
-  productData!: IProductData;
-  productDescriptions: IProductDescription[] = [];
-  currentProductDescriptionBody!: SafeHtml;
-  currentTabRef: HTMLDivElement | null = null;
-
+export class ProductBuyComponent extends ProductBuyBase {
   constructor(
-    protected restService: RestService,
-    protected sanitizer: DomSanitizer
-  ) {}
-
-  ngOnInit() {
-    this.restService
-      .getProductData(this.productId)
-      .subscribe((data: IProductData) => {
-        this.productData = data;
-      });
-    this.restService
-      .getProductDescription(this.productId)
-      .subscribe((data: IProductDescription[]) => {
-        this.productDescriptions = data;
-        this.currentProductDescriptionBody =
-          this.productDescriptions[0].descriptionTabContent;
-      });
+    protected override restService: RestService,
+    protected sanitizer: DomSanitizer,
+    protected override eventManager: EventService // Add the eventManager parameter
+  ) {
+    super(restService, eventManager); // Call the base class constructor
   }
-  ngAfterViewInit() {
-    setTimeout(() => {
-      const firstTab: HTMLDivElement = document.querySelectorAll(
-        '[data-tab-ref]'
-      )[0] as HTMLDivElement;
-      const firstLine: HTMLDivElement = document.querySelectorAll(
-        '[data-line-ref]'
-      )[0] as HTMLDivElement;
-      if (firstTab) {
-        firstTab.style.color = 'orange';
-        this.currentTabRef = firstTab;
-      }
-      if (firstLine) {
-        firstLine.style.display = 'block';
-      }
-    }, 50);
 
-    this.restService.getProductImage(this.productId).subscribe((data: Blob) => {
-      this.productImageRef.nativeElement.src = URL.createObjectURL(data);
-    });
-  }
-  changeTab(index: number, tabRef: HTMLDivElement) {
+  override changeTab(index: number, tabRef: HTMLDivElement) {
     this.updateProductDescriptionBody(
       this.productDescriptions[index].descriptionTabContent
     );
