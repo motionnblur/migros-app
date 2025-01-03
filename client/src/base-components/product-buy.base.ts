@@ -1,4 +1,4 @@
-import { Directive, Input } from '@angular/core';
+import { Directive, ElementRef, Input, ViewChild } from '@angular/core';
 import { EventService } from '../services/event/event.service';
 import { RestService } from '../services/rest/rest.service';
 import { IProductData } from '../interfaces/IProductData';
@@ -8,9 +8,12 @@ import { SafeHtml } from '@angular/platform-browser';
 @Directive()
 export abstract class ProductBuyBase {
   @Input() productId!: number;
+  @ViewChild('product_image_ref')
+  productImageRef!: ElementRef<HTMLImageElement>;
   productData!: IProductData;
   productDescriptions: IProductDescription[] = [];
   currentProductDescriptionBody!: SafeHtml;
+  currentTabRef: HTMLDivElement | null = null;
 
   protected restService: RestService;
   protected eventManager: EventService;
@@ -32,5 +35,45 @@ export abstract class ProductBuyBase {
         this.currentProductDescriptionBody =
           this.productDescriptions[0].descriptionTabContent;
       });
+  }
+  ngAfterViewInit() {
+    setTimeout(() => {
+      const firstTab: HTMLDivElement = document.querySelectorAll(
+        '[data-tab-ref]'
+      )[0] as HTMLDivElement;
+      const firstLine: HTMLDivElement = document.querySelectorAll(
+        '[data-line-ref]'
+      )[0] as HTMLDivElement;
+      if (firstTab) {
+        firstTab.style.color = 'orange';
+        this.currentTabRef = firstTab;
+      }
+      if (firstLine) {
+        firstLine.style.display = 'block';
+      }
+    }, 50);
+
+    this.restService.getProductImage(this.productId).subscribe((data: Blob) => {
+      this.productImageRef.nativeElement.src = URL.createObjectURL(data);
+    });
+  }
+
+  protected changeTab(index: number, tabRef: HTMLDivElement) {
+    this.currentProductDescriptionBody =
+      this.productDescriptions[index].descriptionTabContent;
+
+    if (this.currentTabRef) {
+      if (this.currentTabRef !== tabRef) {
+        tabRef.style.color = 'orange';
+        this.currentTabRef.style.color = '#696969'; // Set previous tab to default color
+
+        (tabRef.children[1] as HTMLElement).style.display = 'block';
+        (this.currentTabRef.children[1] as HTMLElement).style.display = 'none';
+
+        this.currentTabRef = tabRef;
+      }
+    } else {
+      this.currentTabRef = tabRef;
+    }
   }
 }
