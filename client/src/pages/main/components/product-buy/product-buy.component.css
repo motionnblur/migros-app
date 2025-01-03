@@ -140,7 +140,17 @@
   color: #696969;
   font-weight: 500;
   font-size: 14px;
+  display: flex;
+  flex-direction: column;
 }
+.product-buy__buy-view__tail-head > div > div:nth-child(2) {
+  width: 100%;
+  height: 5px;
+  background-color: #ff7f00;
+  border-radius: 2px;
+  display: none;
+}
+
 .product-buy__buy-view__tail-head > div:hover {
   background-color: rgb(255, 247, 232);
 }

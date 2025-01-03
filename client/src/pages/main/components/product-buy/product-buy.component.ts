@@ -44,9 +44,15 @@ export class ProductBuyComponent {
       const firstTab: HTMLDivElement = document.querySelectorAll(
         '[data-tab-ref]'
       )[0] as HTMLDivElement;
+      const firstLine: HTMLDivElement = document.querySelectorAll(
+        '[data-line-ref]'
+      )[0] as HTMLDivElement;
       if (firstTab) {
         firstTab.style.color = 'orange';
         this.currentTabRef = firstTab;
+      }
+      if (firstLine) {
+        firstLine.style.display = 'block';
       }
     }, 50);
 
@@ -65,6 +71,10 @@ export class ProductBuyComponent {
       if (this.currentTabRef !== tabRef) {
         tabRef.style.color = 'orange';
         this.currentTabRef.style.color = '#696969'; // Set previous tab to default color
+
+        (tabRef.children[1] as HTMLElement).style.display = 'block';
+        (this.currentTabRef.children[1] as HTMLElement).style.display = 'none';
+
         this.currentTabRef = tabRef;
       }
     } else {

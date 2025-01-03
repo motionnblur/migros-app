@@ -39,7 +39,10 @@
         (click)="changeTab(i, tabRef)"
         [attr.data-tab-ref]="i"
       >
-        {{ item.descriptionTabName }}
+        <div>
+          {{ item.descriptionTabName }}
+        </div>
+        <div [attr.data-line-ref]="i"></div>
       </div>
     </div>
     <div
