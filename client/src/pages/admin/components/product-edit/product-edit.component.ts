@@ -11,6 +11,7 @@ import { ProductBuyBase } from '../../../../base-components/product-buy.base';
 import { CommonModule } from '@angular/common';
 import { RestService } from '../../../../services/rest/rest.service';
 import { EventService } from '../../../../services/event/event.service';
+import { IProductDescription } from '../../../../interfaces/IProductDescription';
 
 @Component({
   selector: 'app-product-edit',
@@ -83,6 +84,11 @@ export class ProductEditComponent extends ProductBuyBase {
   }
 
   createProductTab() {
-    alert('a');
+    const newTab: IProductDescription = {
+      productId: this.productId,
+      descriptionTabName: 'Yeni Tab',
+      descriptionTabContent: '',
+    };
+    this.productDescriptions.push(newTab);
   }
 }
