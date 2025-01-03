@@ -23,9 +23,16 @@
       (hasEscapePressed)="closeProductUpdater()"
     />
     <app-product-body />
+    <app-product-edit
+      *ngIf="hasProductEditOpened"
+      [productId]="productId"
+      (hasEscapePressed)="closeProductEdit()"
+    />
   </div>
 </div>
 <app-wall
-  *ngIf="hasProductAdderOpened || hasProductUpdaterOpened"
+  *ngIf="
+    hasProductAdderOpened || hasProductUpdaterOpened || hasProductEditOpened
+  "
   (hasWallOnClicked)="hasWallOnClickedEventAdder($event)"
 />

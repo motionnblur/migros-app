@@ -5,6 +5,7 @@ import { ProductBodyComponent } from '../product-body/product-body.component';
 import { WallComponent } from '../wall/wall.component';
 import { ProductUpdaterComponent } from '../product-adder/product-updater.component';
 import { EventService } from '../../../../services/event/event.service';
+import { ProductEditComponent } from '../product-edit/product-edit.component';
 @Component({
   selector: 'app-admin-panel',
   imports: [
@@ -13,6 +14,7 @@ import { EventService } from '../../../../services/event/event.service';
     CommonModule,
     WallComponent,
     ProductUpdaterComponent,
+    ProductEditComponent,
   ],
   templateUrl: './admin-panel.component.html',
   styleUrl: './admin-panel.component.css',
@@ -21,6 +23,7 @@ export class AdminPanelComponent {
   productId!: number;
   hasProductAdderOpened: boolean = false;
   hasProductUpdaterOpened: boolean = false;
+  hasProductEditOpened: boolean = false;
   private productChangedCallback!: (data: any) => void;
 
   constructor(private eventManager: EventService) {
@@ -44,12 +47,14 @@ export class AdminPanelComponent {
   productChangedEventHandler(productId: number) {
     this.productId = productId;
     this.hasProductAdderOpened = false;
-    this.hasProductUpdaterOpened = !this.hasProductUpdaterOpened;
+    //this.hasProductUpdaterOpened = !this.hasProductUpdaterOpened;
+    this.hasProductEditOpened = !this.hasProductEditOpened;
   }
   hasWallOnClickedEventAdder(event: boolean) {
     if (event === true) {
       this.closeProductAdder();
       this.closeProductUpdater();
+      this.closeProductEdit();
     }
   }
   addProduct() {
@@ -64,5 +69,8 @@ export class AdminPanelComponent {
   }
   closeProductUpdater() {
     this.hasProductUpdaterOpened = false;
+  }
+  closeProductEdit() {
+    this.hasProductEditOpened = false;
   }
 }

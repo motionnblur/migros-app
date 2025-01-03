@@ -52,10 +52,15 @@ export abstract class ProductBuyBase {
         firstLine.style.display = 'block';
       }
     }, 50);
-
-    this.restService.getProductImage(this.productId).subscribe((data: Blob) => {
-      this.productImageRef.nativeElement.src = URL.createObjectURL(data);
-    });
+  }
+  ngAfterViewChecked() {
+    if (this.productImageRef) {
+      this.restService
+        .getProductImage(this.productId)
+        .subscribe((data: Blob) => {
+          this.productImageRef.nativeElement.src = URL.createObjectURL(data);
+        });
+    }
   }
 
   protected changeTab(index: number, tabRef: HTMLDivElement) {

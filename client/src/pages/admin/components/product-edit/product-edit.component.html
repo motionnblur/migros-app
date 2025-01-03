@@ -1,0 +1,58 @@
+<div class="product-edit__buy-view" *ngIf="productData">
+  <div class="product-edit__buy-view__head">
+    <div class="product-edit__buy-view__head-left">
+      <img
+        #product_image_ref
+        class="product-edit__buy-view__head-left__image"
+      />
+    </div>
+    <div class="product-edit__buy-view__head-right">
+      <div class="product-edit__buy-view__head-right-1 line-bottom">
+        <div class="product-edit__buy-view__head-right-1__title">
+          {{ productData.productName }}
+        </div>
+        <div class="product-edit__buy-view__head-right-1__price">
+          {{ productData.productPrice }}
+          <span class="product-edit__buy-view__head-right-1__currency">TL</span>
+        </div>
+      </div>
+      <div class="product-edit__buy-view__head-right-3 line-bottom">
+        <img
+          class="product-edit__buy-view__head-right-3__image"
+          src="moneyy.png"
+        />
+      </div>
+      <div class="product-edit__buy-view__head-right-4 line-bottom">
+        <div class="product-edit__buy-view__head-right-4__title">Adet</div>
+        <div class="product-edit__buy-view__head-right-4__button">
+          Sepete Ekle
+        </div>
+      </div>
+      <div class="product-edit__buy-view__head-right-5">
+        Ürünün stok, fiyat ve kampanya bilgisi, teslimatı gerçekleştirecek
+        mağazanın stok, fiyat ve kampanya bilgilerine göre belirlenmektedir.
+      </div>
+    </div>
+  </div>
+  <div class="product-edit__buy-view__tail">
+    <div class="product-edit__buy-view__tail-head" *ngIf="productDescriptions">
+      <div
+        #tabRef
+        *ngFor="let item of productDescriptions; let i = index"
+        (click)="changeTab(i, tabRef)"
+        [attr.data-tab-ref]="i"
+      >
+        <div>
+          {{ item.descriptionTabName }}
+        </div>
+        <div [attr.data-line-ref]="i"></div>
+      </div>
+    </div>
+    <div
+      [innerHTML]="currentProductDescriptionBody"
+      class="product-edit__buy-view__tail-body"
+    >
+      {{ this.currentProductDescriptionBody }}
+    </div>
+  </div>
+</div>

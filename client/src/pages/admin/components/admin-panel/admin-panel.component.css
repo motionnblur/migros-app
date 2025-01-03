@@ -62,3 +62,11 @@ app-product-updater {
   border-radius: 7px;
   z-index: 100;
 }
+
+app-product-edit {
+  position: absolute;
+  background-color: #fafafa;
+  width: 1100px;
+  height: 740px;
+  z-index: 100;
+}
