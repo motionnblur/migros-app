@@ -10,10 +10,20 @@
     </div>
     <div class="product-edit__buy-view__head-right">
       <div class="product-edit__buy-view__head-right-1 line-bottom">
-        <div class="product-edit__buy-view__head-right-1__title">
+        <div
+          class="product-edit__buy-view__head-right-1__title"
+          [contentEditable]="isEditing"
+          (blur)="saveChanges($event)"
+          (click)="makeEditable()"
+        >
           {{ productData.productName }}
         </div>
-        <div class="product-edit__buy-view__head-right-1__price">
+        <div
+          class="product-edit__buy-view__head-right-1__price"
+          [contentEditable]="isEditing"
+          (blur)="saveChanges($event)"
+          (click)="makeEditable()"
+        >
           {{ productData.productPrice }}
           <span class="product-edit__buy-view__head-right-1__currency">TL</span>
         </div>

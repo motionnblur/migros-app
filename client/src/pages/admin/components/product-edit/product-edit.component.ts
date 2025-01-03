@@ -26,6 +26,8 @@ export class ProductEditComponent extends ProductBuyBase {
 
   private boundKeyDownEvent!: (event: KeyboardEvent) => void;
   imageUrl: string | null = null;
+  isEditing = false;
+
   constructor(
     protected override restService: RestService,
     protected override eventManager: EventService
@@ -69,5 +71,14 @@ export class ProductEditComponent extends ProductBuyBase {
     } else {
       this.imageUrl = null;
     }
+  }
+
+  makeEditable() {
+    this.isEditing = true;
+  }
+
+  saveChanges(event: any) {
+    this.productData.productName = event.target.innerText;
+    this.isEditing = false;
   }
 }
