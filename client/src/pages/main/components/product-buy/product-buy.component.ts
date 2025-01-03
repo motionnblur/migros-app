@@ -21,8 +21,8 @@ export class ProductBuyComponent {
   currentTabRef: HTMLDivElement | null = null;
 
   constructor(
-    private restService: RestService,
-    private sanitizer: DomSanitizer
+    protected restService: RestService,
+    protected sanitizer: DomSanitizer
   ) {}
 
   ngOnInit() {
@@ -85,5 +85,14 @@ export class ProductBuyComponent {
   private updateProductDescriptionBody(description: string) {
     this.currentProductDescriptionBody =
       this.sanitizer.bypassSecurityTrustHtml(description);
+  }
+}
+
+export class ProductBuyEditableComponent extends ProductBuyComponent {
+  constructor(
+    protected override restService: RestService,
+    protected override sanitizer: DomSanitizer
+  ) {
+    super(restService, sanitizer);
   }
 }
