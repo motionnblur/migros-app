@@ -40,7 +40,12 @@
           Sepete Ekle
         </div>
       </div>
-      <div class="product-edit__buy-view__head-right-5">
+      <div
+        class="product-edit__buy-view__head-right-5"
+        [contentEditable]="isEditing"
+        (blur)="saveChanges($event)"
+        (click)="makeEditable()"
+      >
         Ürünün stok, fiyat ve kampanya bilgisi, teslimatı gerçekleştirecek
         mağazanın stok, fiyat ve kampanya bilgilerine göre belirlenmektedir.
       </div>
@@ -54,7 +59,11 @@
         (click)="changeTab(i, tabRef)"
         [attr.data-tab-ref]="i"
       >
-        <div>
+        <div
+          [contentEditable]="isEditing"
+          (blur)="saveChanges($event)"
+          (click)="makeEditable()"
+        >
           {{ item.descriptionTabName }}
         </div>
         <div [attr.data-line-ref]="i"></div>
@@ -63,6 +72,9 @@
     <div
       [innerHTML]="currentProductDescriptionBody"
       class="product-edit__buy-view__tail-body"
+      [contentEditable]="isEditing"
+      (blur)="saveChanges($event)"
+      (click)="makeEditable()"
     >
       {{ this.currentProductDescriptionBody }}
     </div>
