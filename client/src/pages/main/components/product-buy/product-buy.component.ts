@@ -87,12 +87,3 @@ export class ProductBuyComponent {
       this.sanitizer.bypassSecurityTrustHtml(description);
   }
 }
-
-export class ProductBuyEditableComponent extends ProductBuyComponent {
-  constructor(
-    protected override restService: RestService,
-    protected override sanitizer: DomSanitizer
-  ) {
-    super(restService, sanitizer);
-  }
-}
