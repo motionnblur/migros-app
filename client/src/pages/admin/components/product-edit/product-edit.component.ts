@@ -81,4 +81,8 @@ export class ProductEditComponent extends ProductBuyBase {
     this.productData.productName = event.target.innerText;
     this.isEditing = false;
   }
+
+  createProductTab() {
+    alert('a');
+  }
 }

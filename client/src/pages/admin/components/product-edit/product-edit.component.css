@@ -134,6 +134,16 @@
   box-sizing: border-box;
   padding: 3px;
 }
+.product-edit__buy-view__tail-head__plus {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.product-edit__buy-view__tail-head__plus > img {
+  width: 20px;
+  height: 20px;
+}
+
 .product-edit__buy-view__tail-head > div {
   padding: 10px;
   box-sizing: border-box;

@@ -12,17 +12,13 @@
       <div class="product-edit__buy-view__head-right-1 line-bottom">
         <div
           class="product-edit__buy-view__head-right-1__title"
-          [contentEditable]="isEditing"
-          (blur)="saveChanges($event)"
-          (click)="makeEditable()"
+          contenteditable="true"
         >
           {{ productData.productName }}
         </div>
         <div
           class="product-edit__buy-view__head-right-1__price"
-          [contentEditable]="isEditing"
-          (blur)="saveChanges($event)"
-          (click)="makeEditable()"
+          contenteditable="true"
         >
           {{ productData.productPrice }}
           <span class="product-edit__buy-view__head-right-1__currency">TL</span>
@@ -40,12 +36,7 @@
           Sepete Ekle
         </div>
       </div>
-      <div
-        class="product-edit__buy-view__head-right-5"
-        [contentEditable]="isEditing"
-        (blur)="saveChanges($event)"
-        (click)="makeEditable()"
-      >
+      <div class="product-edit__buy-view__head-right-5" contenteditable="true">
         Ürünün stok, fiyat ve kampanya bilgisi, teslimatı gerçekleştirecek
         mağazanın stok, fiyat ve kampanya bilgilerine göre belirlenmektedir.
       </div>
@@ -59,22 +50,22 @@
         (click)="changeTab(i, tabRef)"
         [attr.data-tab-ref]="i"
       >
-        <div
-          [contentEditable]="isEditing"
-          (blur)="saveChanges($event)"
-          (click)="makeEditable()"
-        >
+        <div contenteditable="true">
           {{ item.descriptionTabName }}
         </div>
         <div [attr.data-line-ref]="i"></div>
+      </div>
+      <div
+        class="product-edit__buy-view__tail-head__plus"
+        (click)="createProductTab()"
+      >
+        <img src="plus.png" />
       </div>
     </div>
     <div
       [innerHTML]="currentProductDescriptionBody"
       class="product-edit__buy-view__tail-body"
-      [contentEditable]="isEditing"
-      (blur)="saveChanges($event)"
-      (click)="makeEditable()"
+      contenteditable="true"
     >
       {{ this.currentProductDescriptionBody }}
     </div>
