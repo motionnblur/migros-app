@@ -50,9 +50,15 @@
         (click)="changeTab(i, tabRef)"
         [attr.data-tab-ref]="i"
       >
-        <div contenteditable="true">
-          {{ item.descriptionTabName }}
+        <div>
+          <div contenteditable="true" (blur)="changeTabName($event, i)">
+            {{ item.descriptionTabName }}
+          </div>
+          <div (click)="deleteProductTab($event, i)">
+            <img src="delete.png" />
+          </div>
         </div>
+
         <div [attr.data-line-ref]="i"></div>
       </div>
       <div
@@ -66,6 +72,7 @@
       [innerHTML]="currentProductDescriptionBody"
       class="product-edit__buy-view__tail-body"
       contenteditable="true"
+      (blur)="changeTabBody($event)"
     >
       {{ this.currentProductDescriptionBody }}
     </div>

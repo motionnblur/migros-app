@@ -24,6 +24,7 @@ export class ProductEditComponent extends ProductBuyBase {
   @Output() hasEscapePressed = new EventEmitter<boolean>();
   @ViewChild('imageUploaderRef')
   imageUploaderRef!: ElementRef<HTMLInputElement>;
+  currentSelectedTabIndis: number = 0;
 
   private boundKeyDownEvent!: (event: KeyboardEvent) => void;
   imageUrl: string | null = null;
@@ -78,11 +79,21 @@ export class ProductEditComponent extends ProductBuyBase {
     this.isEditing = true;
   }
 
-  saveChanges(event: any) {
-    this.productData.productName = event.target.innerText;
-    this.isEditing = false;
+  protected override changeTab(index: number, tabRef: HTMLDivElement): void {
+    super.changeTab(index, tabRef);
+    this.currentSelectedTabIndis = index;
   }
 
+  changeTabName(event: any, index: number) {
+    this.productDescriptions[index].descriptionTabName = event.target.innerText;
+  }
+  changeTabBody(event: any) {
+    this.currentProductDescriptionBody = event.target.innerHTML;
+
+    this.productDescriptions[
+      this.currentSelectedTabIndis
+    ].descriptionTabContent = event.target.innerHTML;
+  }
   createProductTab() {
     const newTab: IProductDescription = {
       productId: this.productId,
@@ -90,5 +101,19 @@ export class ProductEditComponent extends ProductBuyBase {
       descriptionTabContent: '',
     };
     this.productDescriptions.push(newTab);
+    //this.currentProductDescriptionBody = '';
+  }
+  deleteProductTab(event: any, index: number) {
+    event.stopPropagation();
+    this.productDescriptions[index].descriptionTabContent = '';
+    this.productDescriptions.splice(index, 1);
+
+    if (this.productDescriptions.length > 0) {
+      this.changeTab(0, this.currentTabRef!);
+    } else {
+      this.currentProductDescriptionBody = '';
+      this.currentTabRef = null;
+      this.currentSelectedTabIndis = 0;
+    }
   }
 }
