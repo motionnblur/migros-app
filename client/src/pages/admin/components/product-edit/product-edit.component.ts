@@ -126,7 +126,7 @@ export class ProductEditComponent extends ProductBuyBase {
         descriptionList: [],
       };
     }
-    if (this.productDescriptions.descriptionList === undefined) {
+    if (this.productDescriptions.descriptionList === null) {
       this.productDescriptions.descriptionList = [];
     }
     this.productDescriptions.descriptionList.push(newTab);

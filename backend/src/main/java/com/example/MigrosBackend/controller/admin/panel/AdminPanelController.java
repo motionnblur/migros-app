@@ -34,7 +34,7 @@ public class AdminPanelController {
     @GetMapping("getProductDescription")
     private ResponseEntity<?> getProductDescription(@RequestParam Long productId) throws Exception {
         try{
-            List<ProductDescriptionDto> productDescriptionDto = adminSupplyService.getProductDescription(productId);
+            ProductDescriptionListDto productDescriptionDto = adminSupplyService.getProductDescription(productId);
             return ResponseEntity.ok(productDescriptionDto);
         } catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);

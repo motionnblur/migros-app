@@ -213,19 +213,21 @@ public class AdminSupplyService {
         }
     }
 
-    public List<ProductDescriptionDto> getProductDescription(Long productId) {
+    public ProductDescriptionListDto getProductDescription(Long productId) {
         List<ProductDescriptionEntity> productDescriptionEntities = productDescriptionEntityRepository.findByProductEntityId(productId);
         if(productDescriptionEntities == null)
             throw new RuntimeException("Item with that id: " + productId + " could not be found.");
-        
-        List<ProductDescriptionDto> productDescriptionDto = new ArrayList<>();
+
+        ProductDescriptionListDto productDescriptionDto = new ProductDescriptionListDto();
+        productDescriptionDto.setProductId(productId);
+        productDescriptionDto.setDescriptionList(new ArrayList<>());
+
         for(ProductDescriptionEntity item : productDescriptionEntities) {
-            ProductDescriptionDto dto = new ProductDescriptionDto();
+            DescriptionsDto dto = new DescriptionsDto();
             dto.setDescriptionTabName(item.getDescriptionTabName());
             dto.setDescriptionTabContent(item.getDescriptionTabContent());
-            dto.setProductId(item.getProductEntity().getId());
 
-            productDescriptionDto.add(dto);
+            productDescriptionDto.getDescriptionList().add(dto);
         }
 
         return productDescriptionDto;
