@@ -47,8 +47,8 @@ export class AdminPanelComponent {
   productChangedEventHandler(productId: number) {
     this.productId = productId;
     this.hasProductAdderOpened = false;
-    //this.hasProductUpdaterOpened = !this.hasProductUpdaterOpened;
-    this.hasProductEditOpened = !this.hasProductEditOpened;
+    this.hasProductUpdaterOpened = !this.hasProductUpdaterOpened;
+    //this.hasProductEditOpened = !this.hasProductEditOpened;
   }
   hasWallOnClickedEventAdder(event: boolean) {
     if (event === true) {

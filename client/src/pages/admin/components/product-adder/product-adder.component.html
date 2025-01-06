@@ -55,9 +55,14 @@
       {{ category.name }}
     </option>
   </select>
-  <button class="product-adder-body__button" (click)="uploadProductData()">
-    {{ buttonString }}
-  </button>
+  <div class="product-adder-body__button-container">
+    <button class="product-adder-body__button" (click)="uploadProductData()">
+      {{ buttonString }}
+    </button>
+    <button class="product-adder-body__button" *ngIf="isUpdateMode">
+      Open Editor
+    </button>
+  </div>
 </div>
 
 <input

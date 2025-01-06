@@ -1,16 +1,9 @@
-import {
-  Component,
-  ElementRef,
-  EventEmitter,
-  Input,
-  Output,
-  SimpleChanges,
-  ViewChild,
-} from '@angular/core';
-import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { RestService } from '../../../../services/rest/rest.service';
+import { Component } from '@angular/core';
+import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { IProductUploader } from '../../../../interfaces/IProductUploader';
+import { ProductAdderBase } from '../../../../base-components/product-adder.base';
+import { RestService } from '../../../../services/rest/rest.service';
 import { EventService } from '../../../../services/event/event.service';
 
 @Component({
@@ -19,99 +12,17 @@ import { EventService } from '../../../../services/event/event.service';
   templateUrl: './product-adder.component.html',
   styleUrl: './product-adder.component.css',
 })
-export class ProductAdderComponent {
-  @Input() productName!: string;
-  @Input() price!: number;
-  @Input() count!: number;
-  @Input() discount!: number;
-  @Input() description!: string;
-  @Input() selectedImage: File | null = null;
-
-  @Output() hasEscapePressed = new EventEmitter<boolean>();
-
-  @ViewChild('imageUploaderRef')
-  imageUploaderRef!: ElementRef<HTMLInputElement>;
-  @ViewChild('imageRef') imageRef!: ElementRef<HTMLImageElement>;
-  @ViewChild('addImageRef') addImageRef!: ElementRef<HTMLDivElement>;
-
-  @Output() hasProductAdded = new EventEmitter<boolean>();
-
+export class ProductAdderComponent extends ProductAdderBase {
   buttonString: string = 'Add';
 
-  outProductAdded() {
-    this.hasProductAdded.emit(true);
-  }
-
-  imageUrl: string | null = null;
-
-  categories = [
-    { value: 1, name: 'Yılbaşı' },
-    { value: 2, name: 'Meyve, Sebze' },
-    { value: 3, name: 'Süt, Kahvaltılık' },
-    { value: 4, name: 'Temel Gıda' },
-    { value: 5, name: 'Meze, Hazır yemek, Donut' },
-    { value: 6, name: 'İçecek' },
-    { value: 7, name: 'Dondurma' },
-    { value: 8, name: 'Atistirmalik' },
-    { value: 9, name: 'Fırın, Pastane' },
-    { value: 10, name: 'Deterjan, Temizlik' },
-    { value: 11, name: 'Kağıt, Islak mendil' },
-    { value: 12, name: 'Kişisel Bakım,Kozmetik, Sağlık' },
-    { value: 13, name: 'Bebek' },
-    { value: 14, name: 'Ev, Yaşam' },
-    { value: 15, name: 'Kitap, Kırtasiye, Oyuncak' },
-    { value: 16, name: 'Çiçek' },
-    { value: 17, name: 'Pet Shop' },
-    { value: 18, name: 'Elektronik' },
-  ];
-  selectedFormValue: any = null;
-
-  categoryControl = new FormControl('');
-
-  private boundKeyDownEvent!: (event: KeyboardEvent) => void;
   constructor(
-    protected restService: RestService,
-    protected eventManager: EventService
+    protected override restService: RestService,
+    protected override eventManager: EventService
   ) {
-    this.boundKeyDownEvent = this.keyDownEvent.bind(this);
-  }
-  ngOnChanges(changes: SimpleChanges) {
-    if (changes['selectedImage']) {
-      this.updateView(changes['selectedImage'].currentValue);
-    }
-  }
-  ngOnInit() {
-    document.addEventListener('keydown', this.boundKeyDownEvent);
-    this.categoryControl.valueChanges.subscribe((value) => {
-      //console.log('Selected value:', value);
-      if (value !== null && value !== undefined) {
-        this.selectedFormValue = value;
-      }
-    });
+    super(restService, eventManager);
+    this.isUpdateMode = false;
   }
 
-  ngOnDestroy() {
-    document.removeEventListener('keydown', this.boundKeyDownEvent);
-  }
-
-  updateView(image: File | null) {
-    if (image) {
-      this.imageUrl = URL.createObjectURL(image);
-    } else {
-      this.imageUrl = null;
-    }
-  }
-  openImageUploader() {
-    if (this.imageUploaderRef) {
-      this.imageUploaderRef.nativeElement.click();
-    }
-  }
-  onImageSelected(event: any) {
-    if (event.target.files && event.target.files.length > 0) {
-      this.selectedImage = event.target.files[0];
-      this.updateView(this.selectedImage);
-    }
-  }
   uploadProductData() {
     const productData: IProductUploader = {
       adminId: 1,
@@ -131,10 +42,5 @@ export class ProductAdderComponent {
           this.eventManager.trigger('productAdded');
         }
       });
-  }
-  keyDownEvent(event: KeyboardEvent) {
-    if (event.key === 'Escape') {
-      this.hasEscapePressed.emit(true);
-    }
   }
 }

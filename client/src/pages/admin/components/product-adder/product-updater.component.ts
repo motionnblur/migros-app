@@ -1,10 +1,10 @@
 import { Component, Input } from '@angular/core';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { ProductAdderComponent } from './product-adder.component';
+import { IProductUpdater } from '../../../../interfaces/IProductUpdater';
+import { ProductAdderBase } from '../../../../base-components/product-adder.base';
 import { RestService } from '../../../../services/rest/rest.service';
 import { EventService } from '../../../../services/event/event.service';
-import { IProductUpdater } from '../../../../interfaces/IProductUpdater';
 
 @Component({
   selector: 'app-product-updater',
@@ -12,15 +12,18 @@ import { IProductUpdater } from '../../../../interfaces/IProductUpdater';
   templateUrl: './product-adder.component.html',
   styleUrl: './product-adder.component.css',
 })
-export class ProductUpdaterComponent extends ProductAdderComponent {
+export class ProductUpdaterComponent extends ProductAdderBase {
   @Input() id!: number;
+  buttonString: string = 'Update';
+
   constructor(
-    override restService: RestService,
-    override eventManager: EventService
+    protected override restService: RestService,
+    protected override eventManager: EventService
   ) {
     super(restService, eventManager);
-    this.buttonString = 'Update';
+    this.isUpdateMode = true;
   }
+
   override ngOnInit(): void {
     super.ngOnInit();
     this.restService.getProductImage(this.id).subscribe((blob) => {
@@ -39,12 +42,10 @@ export class ProductUpdaterComponent extends ProductAdderComponent {
       this.selectedFormValue = data.productCategoryId;
 
       this.categoryControl.setValue(this.selectedFormValue);
-
-      console.log(data);
     });
   }
 
-  override uploadProductData(): void {
+  uploadProductData(): void {
     const productData: IProductUpdater = {
       adminId: 1,
       productId: this.id,
