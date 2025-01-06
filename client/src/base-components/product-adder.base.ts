@@ -112,4 +112,6 @@ export abstract class ProductAdderBase {
       this.hasEscapePressed.emit(true);
     }
   }
+
+  openEditor?(): void {}
 }

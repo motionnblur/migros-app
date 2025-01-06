@@ -66,4 +66,7 @@ export class ProductUpdaterComponent extends ProductAdderBase {
         }
       });
   }
+  override openEditor() {
+    this.eventManager.trigger('editorOpened');
+  }
 }

@@ -59,7 +59,11 @@
     <button class="product-adder-body__button" (click)="uploadProductData()">
       {{ buttonString }}
     </button>
-    <button class="product-adder-body__button" *ngIf="isUpdateMode">
+    <button
+      class="product-adder-body__button"
+      *ngIf="isUpdateMode"
+      (click)="openEditor!()"
+    >
       Open Editor
     </button>
   </div>

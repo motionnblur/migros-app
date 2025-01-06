@@ -13,6 +13,9 @@ import { EventService } from '../../../../services/event/event.service';
   styleUrl: './product-adder.component.css',
 })
 export class ProductAdderComponent extends ProductAdderBase {
+  override openEditor?(): void {
+    throw new Error('Method not implemented.');
+  }
   buttonString: string = 'Add';
 
   constructor(

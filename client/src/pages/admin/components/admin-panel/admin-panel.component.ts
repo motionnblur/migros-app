@@ -25,17 +25,23 @@ export class AdminPanelComponent {
   hasProductUpdaterOpened: boolean = false;
   hasProductEditOpened: boolean = false;
   private productChangedCallback!: (data: any) => void;
+  private editorOpenedCallback!: (id: number) => void;
 
   constructor(private eventManager: EventService) {
     this.productChangedCallback = (data: any) => {
       this.productChangedEventHandler(data);
     };
+    this.editorOpenedCallback = () => {
+      this.editorOpenedEventHandler();
+    };
   }
   ngOnInit(): void {
     this.eventManager.on('productChanged', this.productChangedCallback);
+    this.eventManager.on('editorOpened', this.editorOpenedCallback);
   }
   ngOnDestroy(): void {
     this.eventManager.off('productChanged', this.productChangedCallback);
+    this.eventManager.off('editorOpened', this.editorOpenedCallback);
   }
 
   productAddedEventHandler(event: boolean) {
@@ -44,11 +50,14 @@ export class AdminPanelComponent {
       this.closeProductUpdater();
     }
   }
+
+  editorOpenedEventHandler() {
+    this.hasProductEditOpened = !this.hasProductEditOpened;
+  }
   productChangedEventHandler(productId: number) {
     this.productId = productId;
     this.hasProductAdderOpened = false;
     this.hasProductUpdaterOpened = !this.hasProductUpdaterOpened;
-    //this.hasProductEditOpened = !this.hasProductEditOpened;
   }
   hasWallOnClickedEventAdder(event: boolean) {
     if (event === true) {
