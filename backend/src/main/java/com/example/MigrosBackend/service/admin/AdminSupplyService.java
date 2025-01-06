@@ -1,10 +1,7 @@
 package com.example.MigrosBackend.service.admin;
 
-import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionDto;
+import com.example.MigrosBackend.dto.admin.panel.*;
 import com.example.MigrosBackend.dto.user.ProductDto;
-import com.example.MigrosBackend.dto.admin.panel.ProductDto2;
-import com.example.MigrosBackend.dto.admin.panel.AdminAddItemDto;
-import com.example.MigrosBackend.dto.admin.panel.AdminProductPreviewDto;
 import com.example.MigrosBackend.entity.admin.AdminEntity;
 import com.example.MigrosBackend.entity.category.CategoryEntity;
 import com.example.MigrosBackend.entity.product.ProductDescriptionEntity;
@@ -202,24 +199,27 @@ public class AdminSupplyService {
         return productDto2;
     }
 
-    public void addProductDescription(ProductDescriptionDto productDescription) {
-        ProductEntity productEntity = productEntityRepository.findById(productDescription.getProductId())
-                .orElseThrow(() -> new RuntimeException("Item with that id: " + productDescription.getProductId() + " could not be found."));
+    public void addProductDescription(ProductDescriptionListDto productDescriptions) {
+        ProductEntity productEntity = productEntityRepository.findById(productDescriptions.getProductId())
+                .orElseThrow(() -> new RuntimeException("Item with that id: " + productDescriptions.getProductId() + " could not be found."));
 
-        ProductDescriptionEntity productDescriptionEntity = new ProductDescriptionEntity();
-        productDescriptionEntity.setDescriptionTabName(productDescription.getDescriptionTabName());
-        productDescriptionEntity.setDescriptionTabContent(productDescription.getDescriptionTabContent());
-        productDescriptionEntity.setProductEntity(productEntity);
+        for(DescriptionsDto item : productDescriptions.getDescriptionList()) {
+            ProductDescriptionEntity productDescriptionEntity = new ProductDescriptionEntity();
+            productDescriptionEntity.setDescriptionTabName(item.getDescriptionTabName());
+            productDescriptionEntity.setDescriptionTabContent(item.getDescriptionTabContent());
+            productDescriptionEntity.setProductEntity(productEntity);
 
-        productDescriptionEntityRepository.save(productDescriptionEntity);
+            productDescriptionEntityRepository.save(productDescriptionEntity);
+        }
     }
 
     public List<ProductDescriptionDto> getProductDescription(Long productId) {
-        ProductDescriptionEntity productDescriptionEntity = productDescriptionEntityRepository.findById(productId)
-                .orElseThrow(() -> new RuntimeException("Item with that id: " + productId + " could not be found."));
-
+        List<ProductDescriptionEntity> productDescriptionEntities = productDescriptionEntityRepository.findByProductEntityId(productId);
+        if(productDescriptionEntities == null)
+            throw new RuntimeException("Item with that id: " + productId + " could not be found.");
+        
         List<ProductDescriptionDto> productDescriptionDto = new ArrayList<>();
-        for(ProductDescriptionEntity item : productDescriptionEntity.getProductEntity().getDescriptionEntities()) {
+        for(ProductDescriptionEntity item : productDescriptionEntities) {
             ProductDescriptionDto dto = new ProductDescriptionDto();
             dto.setDescriptionTabName(item.getDescriptionTabName());
             dto.setDescriptionTabContent(item.getDescriptionTabContent());

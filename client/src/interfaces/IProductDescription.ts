@@ -1,5 +1,6 @@
+import { IDescriptions } from './IDescriptions';
+
 export interface IProductDescription {
   productId: number;
-  descriptionTabName: string;
-  descriptionTabContent: string;
+  descriptionList: IDescriptions[];
 }

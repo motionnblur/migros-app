@@ -11,7 +11,7 @@ export abstract class ProductBuyBase {
   @ViewChild('product_image_ref')
   productImageRef!: ElementRef<HTMLImageElement>;
   productData!: IProductData;
-  productDescriptions: IProductDescription[] = [];
+  productDescriptions!: IProductDescription;
   currentProductDescriptionBody!: SafeHtml;
   currentTabRef: HTMLDivElement | null = null;
 
@@ -30,10 +30,9 @@ export abstract class ProductBuyBase {
       });
     this.restService
       .getProductDescription(this.productId)
-      .subscribe((data: IProductDescription[]) => {
+      .subscribe((data: IProductDescription) => {
         this.productDescriptions = data;
-        this.currentProductDescriptionBody =
-          this.productDescriptions[0].descriptionTabContent;
+        this.currentProductDescriptionBody = this.productDescriptions;
       });
     this.restService.getProductImage(this.productId).subscribe((data: Blob) => {
       this.productImageRef.nativeElement.src = URL.createObjectURL(data);
@@ -58,7 +57,7 @@ export abstract class ProductBuyBase {
   }
   protected changeTab(index: number, tabRef: HTMLDivElement) {
     this.currentProductDescriptionBody =
-      this.productDescriptions[index].descriptionTabContent;
+      this.productDescriptions.descriptionList[index].descriptionTabContent;
 
     if (this.currentTabRef) {
       if (this.currentTabRef !== tabRef) {

@@ -11,7 +11,7 @@ import { ProductBuyBase } from '../../../../base-components/product-buy.base';
 import { CommonModule } from '@angular/common';
 import { RestService } from '../../../../services/rest/rest.service';
 import { EventService } from '../../../../services/event/event.service';
-import { IProductDescription } from '../../../../interfaces/IProductDescription';
+import { IDescriptions } from '../../../../interfaces/IDescriptions';
 
 @Component({
   selector: 'app-product-edit',
@@ -65,6 +65,16 @@ export class ProductEditComponent extends ProductBuyBase {
   keyDownEvent(event: KeyboardEvent) {
     if (event.key === 'Escape') {
       this.hasEscapePressed.emit(true);
+    } else if (event.key === 'Enter') {
+      this.productDescriptions.productId = this.productId;
+      console.log(this.productDescriptions);
+      this.restService
+        .addProductDescription(this.productDescriptions)
+        .subscribe((status: boolean) => {
+          if (status) {
+            console.log(status);
+          }
+        });
     }
   }
   updateView(image: File | null) {
@@ -75,17 +85,15 @@ export class ProductEditComponent extends ProductBuyBase {
     }
   }
 
-  makeEditable() {
-    this.isEditing = true;
-  }
-
   protected override changeTab(index: number, tabRef: HTMLDivElement): void {
     super.changeTab(index, tabRef);
     this.currentSelectedTabIndis = index;
   }
 
   changeTabName(event: any, index: number) {
-    this.productDescriptions[index].descriptionTabName = event.target.innerText;
+    console.log(event.target.innerHTML);
+    this.productDescriptions.descriptionList[index].descriptionTabName =
+      event.target.innerText;
   }
   changeProductDescription(event: any) {
     this.productData.productDescription = event.target.innerText;
@@ -100,27 +108,36 @@ export class ProductEditComponent extends ProductBuyBase {
     console.log(this.productData.productName);
   } */
   changeTabBody(event: any) {
+    console.log(event.target.innerHTML);
     this.currentProductDescriptionBody = event.target.innerHTML;
 
-    this.productDescriptions[
+    this.productDescriptions.descriptionList[
       this.currentSelectedTabIndis
     ].descriptionTabContent = event.target.innerHTML;
   }
   createProductTab() {
-    const newTab: IProductDescription = {
-      productId: this.productId,
-      descriptionTabName: 'Yeni Tab',
-      descriptionTabContent: '',
+    const newTab: IDescriptions = {
+      descriptionTabName: 'Test tab',
+      descriptionTabContent: 'Test body',
     };
-    this.productDescriptions.push(newTab);
+    if (this.productDescriptions === undefined) {
+      this.productDescriptions = {
+        productId: 0,
+        descriptionList: [],
+      };
+    }
+    if (this.productDescriptions.descriptionList === undefined) {
+      this.productDescriptions.descriptionList = [];
+    }
+    this.productDescriptions.descriptionList.push(newTab);
     //this.currentProductDescriptionBody = '';
   }
   deleteProductTab(event: any, index: number) {
     event.stopPropagation();
-    this.productDescriptions[index].descriptionTabContent = '';
-    this.productDescriptions.splice(index, 1);
+    this.productDescriptions.descriptionList[index].descriptionTabContent = '';
+    this.productDescriptions.descriptionList.splice(index, 1);
 
-    if (this.productDescriptions.length > 0) {
+    if (this.productDescriptions.descriptionList.length > 0) {
       this.changeTab(0, this.currentTabRef!);
     } else {
       this.currentProductDescriptionBody = '';

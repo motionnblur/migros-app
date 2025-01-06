@@ -3,6 +3,7 @@ package com.example.MigrosBackend.controller.admin.panel;
 import com.example.MigrosBackend.dto.admin.panel.AdminAddItemDto;
 import com.example.MigrosBackend.dto.admin.panel.AdminProductPreviewDto;
 import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionDto;
+import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionListDto;
 import com.example.MigrosBackend.service.admin.AdminSupplyService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -22,9 +23,9 @@ public class AdminPanelController {
     }
 
     @PostMapping("addProductDescription")
-    private ResponseEntity<?> addProductDescription(@RequestBody ProductDescriptionDto productDescription) throws Exception {
+    private ResponseEntity<?> addProductDescription(@RequestBody ProductDescriptionListDto productDescriptions) throws Exception {
         try{
-            adminSupplyService.addProductDescription(productDescription);
+            adminSupplyService.addProductDescription(productDescriptions);
             return new ResponseEntity<>(HttpStatus.OK);
         } catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
@@ -33,7 +34,8 @@ public class AdminPanelController {
     @GetMapping("getProductDescription")
     private ResponseEntity<?> getProductDescription(@RequestParam Long productId) throws Exception {
         try{
-            return ResponseEntity.ok(adminSupplyService.getProductDescription(productId));
+            List<ProductDescriptionDto> productDescriptionDto = adminSupplyService.getProductDescription(productId);
+            return ResponseEntity.ok(productDescriptionDto);
         } catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }

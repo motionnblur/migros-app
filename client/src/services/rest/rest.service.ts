@@ -97,15 +97,15 @@ export class RestService {
   }
 
   addProductDescription(productDescription: IProductDescription) {
+    const data: IProductDescription = {
+      productId: productDescription.productId,
+      descriptionList: productDescription.descriptionList,
+    };
     return this.http
-      .post(
-        'http://localhost:8080/admin/panel/addProductDescription',
-        productDescription,
-        {
-          responseType: 'text',
-          observe: 'response',
-        }
-      )
+      .post('http://localhost:8080/admin/panel/addProductDescription', data, {
+        responseType: 'text',
+        observe: 'response',
+      })
       .pipe(map((response) => response.status === 200));
   }
   getProductDescription(productId: number) {
@@ -114,6 +114,6 @@ export class RestService {
         params: { productId },
         responseType: 'json',
       })
-      .pipe(map((response) => response as IProductDescription[]));
+      .pipe(map((response) => response as IProductDescription));
   }
 }

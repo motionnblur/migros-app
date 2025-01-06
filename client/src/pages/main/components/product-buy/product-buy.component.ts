@@ -1,9 +1,7 @@
-import { Component, ElementRef, Input, ViewChild } from '@angular/core';
+import { Component } from '@angular/core';
 import { RestService } from '../../../../services/rest/rest.service';
-import { IProductData } from '../../../../interfaces/IProductData';
 import { CommonModule } from '@angular/common';
-import { IProductDescription } from '../../../../interfaces/IProductDescription';
-import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { DomSanitizer } from '@angular/platform-browser';
 import { ProductBuyBase } from '../../../../base-components/product-buy.base';
 import { EventService } from '../../../../services/event/event.service';
 
@@ -24,10 +22,10 @@ export class ProductBuyComponent extends ProductBuyBase {
 
   override changeTab(index: number, tabRef: HTMLDivElement) {
     this.updateProductDescriptionBody(
-      this.productDescriptions[index].descriptionTabContent
+      this.productDescriptions.descriptionList[index].descriptionTabContent
     );
     this.currentProductDescriptionBody =
-      this.productDescriptions[index].descriptionTabContent;
+      this.productDescriptions.descriptionList[index].descriptionTabContent;
 
     if (this.currentTabRef) {
       if (this.currentTabRef !== tabRef) {

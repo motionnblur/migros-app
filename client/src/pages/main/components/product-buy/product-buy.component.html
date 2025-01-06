@@ -35,7 +35,7 @@
     <div class="product-buy__buy-view__tail-head" *ngIf="productDescriptions">
       <div
         #tabRef
-        *ngFor="let item of productDescriptions; let i = index"
+        *ngFor="let item of productDescriptions.descriptionList; let i = index"
         (click)="changeTab(i, tabRef)"
         [attr.data-tab-ref]="i"
       >
