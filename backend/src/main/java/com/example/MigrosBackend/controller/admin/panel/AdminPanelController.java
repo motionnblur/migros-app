@@ -31,6 +31,15 @@ public class AdminPanelController {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
     }
+    @DeleteMapping("deleteProductDescription")
+    private ResponseEntity<?> deleteProductDescription(@RequestParam Long descriptionId) throws Exception {
+        try{
+            adminSupplyService.deleteProductDescription(descriptionId);
+            return new ResponseEntity<>(HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
     @GetMapping("getProductDescription")
     private ResponseEntity<?> getProductDescription(@RequestParam Long productId) throws Exception {
         try{

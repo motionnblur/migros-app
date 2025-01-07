@@ -6,6 +6,7 @@ import lombok.Setter;
 @Getter
 @Setter
 public class DescriptionsDto {
+    private Long descriptionId;
     private String descriptionTabName;
     private String descriptionTabContent;
 }

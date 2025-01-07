@@ -32,7 +32,8 @@ export abstract class ProductBuyBase {
       .getProductDescription(this.productId)
       .subscribe((data: IProductDescription) => {
         this.productDescriptions = data;
-        this.currentProductDescriptionBody = this.productDescriptions;
+        this.currentProductDescriptionBody =
+          this.productDescriptions.descriptionList[0].descriptionTabContent;
       });
     this.restService.getProductImage(this.productId).subscribe((data: Blob) => {
       this.productImageRef.nativeElement.src = URL.createObjectURL(data);

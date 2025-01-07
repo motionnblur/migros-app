@@ -20,6 +20,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -203,11 +204,26 @@ public class AdminSupplyService {
         ProductEntity productEntity = productEntityRepository.findById(productDescriptions.getProductId())
                 .orElseThrow(() -> new RuntimeException("Item with that id: " + productDescriptions.getProductId() + " could not be found."));
 
-        for(DescriptionsDto item : productDescriptions.getDescriptionList()) {
-            ProductDescriptionEntity productDescriptionEntity = new ProductDescriptionEntity();
-            productDescriptionEntity.setDescriptionTabName(item.getDescriptionTabName());
-            productDescriptionEntity.setDescriptionTabContent(item.getDescriptionTabContent());
-            productDescriptionEntity.setProductEntity(productEntity);
+        List<ProductDescriptionEntity> productDescriptionEntities = productDescriptionEntityRepository.findByProductEntityId(productEntity.getId());
+        if(productDescriptionEntities.isEmpty()) {
+            for(DescriptionsDto item : productDescriptions.getDescriptionList()) {
+                ProductDescriptionEntity productDescriptionEntity = new ProductDescriptionEntity();
+                productDescriptionEntity.setDescriptionTabName(item.getDescriptionTabName());
+                productDescriptionEntity.setDescriptionTabContent(item.getDescriptionTabContent());
+                productDescriptionEntity.setProductEntity(productEntity);
+
+                productDescriptionEntityRepository.save(productDescriptionEntity);
+            }
+            return;
+        }
+
+        List<DescriptionsDto> descriptionsDtoList = productDescriptions.getDescriptionList();
+        for (int i = 0; i < productDescriptionEntities.size(); i++) {
+            ProductDescriptionEntity productDescriptionEntity = productDescriptionEntities.get(i);
+            DescriptionsDto descriptionsDto = descriptionsDtoList.get(i);
+
+            productDescriptionEntity.setDescriptionTabName(descriptionsDto.getDescriptionTabName());
+            productDescriptionEntity.setDescriptionTabContent(descriptionsDto.getDescriptionTabContent());
 
             productDescriptionEntityRepository.save(productDescriptionEntity);
         }
@@ -224,6 +240,7 @@ public class AdminSupplyService {
 
         for(ProductDescriptionEntity item : productDescriptionEntities) {
             DescriptionsDto dto = new DescriptionsDto();
+            dto.setDescriptionId(item.getId());
             dto.setDescriptionTabName(item.getDescriptionTabName());
             dto.setDescriptionTabContent(item.getDescriptionTabContent());
 
@@ -231,5 +248,9 @@ public class AdminSupplyService {
         }
 
         return productDescriptionDto;
+    }
+
+    public void deleteProductDescription(Long descriptionId) {
+        productDescriptionEntityRepository.deleteById(descriptionId);
     }
 }

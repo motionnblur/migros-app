@@ -117,6 +117,7 @@ export class ProductEditComponent extends ProductBuyBase {
   }
   createProductTab() {
     const newTab: IDescriptions = {
+      descriptionId: 0,
       descriptionTabName: 'Test tab',
       descriptionTabContent: 'Test body',
     };
@@ -134,15 +135,26 @@ export class ProductEditComponent extends ProductBuyBase {
   }
   deleteProductTab(event: any, index: number) {
     event.stopPropagation();
-    this.productDescriptions.descriptionList[index].descriptionTabContent = '';
-    this.productDescriptions.descriptionList.splice(index, 1);
 
-    if (this.productDescriptions.descriptionList.length > 0) {
-      this.changeTab(0, this.currentTabRef!);
-    } else {
-      this.currentProductDescriptionBody = '';
-      this.currentTabRef = null;
-      this.currentSelectedTabIndis = 0;
-    }
+    this.restService
+      .deleteProductDescription(
+        this.productDescriptions.descriptionList[index].descriptionId
+      )
+      .subscribe((status: boolean) => {
+        if (status) {
+          this.productDescriptions.descriptionList[
+            index
+          ].descriptionTabContent = '';
+          this.productDescriptions.descriptionList.splice(index, 1);
+
+          if (this.productDescriptions.descriptionList.length > 0) {
+            this.changeTab(0, this.currentTabRef!);
+          } else {
+            this.currentProductDescriptionBody = '';
+            this.currentTabRef = null;
+            this.currentSelectedTabIndis = 0;
+          }
+        }
+      });
   }
 }

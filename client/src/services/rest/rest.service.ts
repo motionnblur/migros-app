@@ -116,4 +116,13 @@ export class RestService {
       })
       .pipe(map((response) => response as IProductDescription));
   }
+  deleteProductDescription(descriptionId: number) {
+    return this.http
+      .delete('http://localhost:8080/admin/panel/deleteProductDescription', {
+        params: { descriptionId },
+        responseType: 'text',
+        observe: 'response',
+      })
+      .pipe(map((response) => response.status === 200));
+  }
 }
