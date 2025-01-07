@@ -91,13 +91,11 @@ export class ProductEditComponent extends ProductBuyBase {
   }
 
   changeTabName(event: any, index: number) {
-    console.log(event.target.innerHTML);
     this.productDescriptions.descriptionList[index].descriptionTabName =
       event.target.innerText;
   }
   changeProductDescription(event: any) {
     this.productData.productDescription = event.target.innerText;
-    console.log(this.productData.productDescription);
   }
   /*   changeProductPrice(event: any) {
     this.productData.productPrice = event.target.innerText;
@@ -108,7 +106,6 @@ export class ProductEditComponent extends ProductBuyBase {
     console.log(this.productData.productName);
   } */
   changeTabBody(event: any) {
-    console.log(event.target.innerHTML);
     this.currentProductDescriptionBody = event.target.innerHTML;
 
     this.productDescriptions.descriptionList[
