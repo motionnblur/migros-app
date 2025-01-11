@@ -1,6 +1,6 @@
-import { IDescriptions } from './IDescriptions';
+import { IDescription } from './IDescription';
 
 export interface IProductDescription {
   productId: number;
-  descriptionList: IDescriptions[];
+  descriptionList: IDescription[];
 }

@@ -218,15 +218,32 @@ public class AdminSupplyService {
         }
 
         List<DescriptionsDto> descriptionsDtoList = productDescriptions.getDescriptionList();
-        for (int i = 0; i < productDescriptionEntities.size(); i++) {
-            ProductDescriptionEntity productDescriptionEntity = productDescriptionEntities.get(i);
-            DescriptionsDto descriptionsDto = descriptionsDtoList.get(i);
+        for(int i = 0; i < descriptionsDtoList.size(); i++) {
+            Optional<ProductDescriptionEntity> pE = productDescriptionEntityRepository.findById(descriptionsDtoList.get(i).getDescriptionId());
+            if(pE.isPresent()) {
+                ProductDescriptionEntity productDescriptionEntity = pE.get();
+                productDescriptionEntity.setDescriptionTabName(descriptionsDtoList.get(i).getDescriptionTabName());
+                productDescriptionEntity.setDescriptionTabContent(descriptionsDtoList.get(i).getDescriptionTabContent());
 
-            productDescriptionEntity.setDescriptionTabName(descriptionsDto.getDescriptionTabName());
-            productDescriptionEntity.setDescriptionTabContent(descriptionsDto.getDescriptionTabContent());
+                productDescriptionEntityRepository.save(productDescriptionEntity);
+            }else{
+                ProductDescriptionEntity productDescriptionEntity = new ProductDescriptionEntity();
+                productDescriptionEntity.setDescriptionTabName(descriptionsDtoList.get(i).getDescriptionTabName());
+                productDescriptionEntity.setDescriptionTabContent(descriptionsDtoList.get(i).getDescriptionTabContent());
+                productDescriptionEntity.setProductEntity(productEntity);
 
-            productDescriptionEntityRepository.save(productDescriptionEntity);
+                productDescriptionEntityRepository.save(productDescriptionEntity);
+            }
         }
+//        for (int i = 0; i < productDescriptionEntities.size(); i++) {
+//            ProductDescriptionEntity productDescriptionEntity = productDescriptionEntities.get(i);
+//            DescriptionsDto descriptionsDto = descriptionsDtoList.get(i);
+//
+//            productDescriptionEntity.setDescriptionTabName(descriptionsDto.getDescriptionTabName());
+//            productDescriptionEntity.setDescriptionTabContent(descriptionsDto.getDescriptionTabContent());
+//
+//            productDescriptionEntityRepository.save(productDescriptionEntity);
+//        }
     }
 
     public ProductDescriptionListDto getProductDescription(Long productId) {

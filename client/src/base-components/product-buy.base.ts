@@ -34,6 +34,7 @@ export abstract class ProductBuyBase {
         this.productDescriptions = data;
         this.currentProductDescriptionBody =
           this.productDescriptions.descriptionList[0].descriptionTabContent;
+        this.onProductDescritptionUpdate(data);
       });
     this.restService.getProductImage(this.productId).subscribe((data: Blob) => {
       this.productImageRef.nativeElement.src = URL.createObjectURL(data);
@@ -55,6 +56,9 @@ export abstract class ProductBuyBase {
         firstLine.style.display = 'block';
       }
     }, 50);
+  }
+  protected onProductDescritptionUpdate(data: IProductDescription) {
+    console.log('onProductDescritptionUpdate');
   }
   protected changeTab(index: number, tabRef: HTMLDivElement) {
     this.currentProductDescriptionBody =
