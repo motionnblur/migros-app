@@ -1,6 +1,5 @@
 import { Component, EventEmitter, Output } from '@angular/core';
 import { RestService } from '../../../../services/rest/rest.service';
-import { IProductPreview } from '../../../../interfaces/IProductPreview';
 import { CommonModule } from '@angular/common';
 import { EventService } from '../../../../services/event/event.service';
 import { IAdminProductPreview } from '../../../../interfaces/IAdminProductPreview';
