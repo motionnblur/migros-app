@@ -50,6 +50,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
+  margin-bottom: 54px;
 }
 
 app-product-adder,
@@ -66,7 +67,7 @@ app-product-updater {
 app-product-edit {
   position: absolute;
   background-color: #fafafa;
-  width: 1100px;
-  height: 740px;
+  width: 1200px;
+  height: 900px;
   z-index: 100;
 }

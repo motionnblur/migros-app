@@ -1,38 +1,44 @@
 <div class="product-edit__buy-view" *ngIf="productData">
   <div class="product-edit__buy-view__head">
-    <div class="product-edit__buy-view__head-left">
-      <img
-        #product_image_ref
-        [src]="imageUrl"
-        class="product-edit__buy-view__head-left__image"
-        (click)="openImageUploader()"
-      />
-    </div>
-    <div class="product-edit__buy-view__head-right">
-      <div class="product-edit__buy-view__head-right-1 line-bottom">
-        <div class="product-edit__buy-view__head-right-1__title">
-          {{ productData.productName }}
-        </div>
-        <div class="product-edit__buy-view__head-right-1__price">
-          {{ productData.productPrice }}
-          <span class="product-edit__buy-view__head-right-1__currency">TL</span>
-        </div>
-      </div>
-      <div class="product-edit__buy-view__head-right-3 line-bottom">
+    <div class="container-left">
+      <div class="product-edit__buy-view__head-left">
         <img
-          class="product-edit__buy-view__head-right-3__image"
-          src="moneyy.png"
+          #product_image_ref
+          [src]="imageUrl"
+          class="product-edit__buy-view__head-left__image"
+          (click)="openImageUploader()"
         />
       </div>
-      <div class="product-edit__buy-view__head-right-4 line-bottom">
-        <div class="product-edit__buy-view__head-right-4__title">Adet</div>
-        <div class="product-edit__buy-view__head-right-4__button">
-          Sepete Ekle
+    </div>
+    <div class="container-right">
+      <div class="product-edit__buy-view__head-right">
+        <div class="product-edit__buy-view__head-right-1 line-bottom">
+          <div class="product-edit__buy-view__head-right-1__title">
+            {{ productData.productName }}
+          </div>
+          <div class="product-edit__buy-view__head-right-1__price">
+            {{ productData.productPrice }}
+            <span class="product-edit__buy-view__head-right-1__currency"
+              >TL</span
+            >
+          </div>
         </div>
-      </div>
-      <div class="product-edit__buy-view__head-right-5">
-        Ürünün stok, fiyat ve kampanya bilgisi, teslimatı gerçekleştirecek
-        mağazanın stok, fiyat ve kampanya bilgilerine göre belirlenmektedir.
+        <div class="product-edit__buy-view__head-right-3 line-bottom">
+          <img
+            class="product-edit__buy-view__head-right-3__image"
+            src="moneyy.png"
+          />
+        </div>
+        <div class="product-edit__buy-view__head-right-4 line-bottom">
+          <div class="product-edit__buy-view__head-right-4__title">Adet</div>
+          <div class="product-edit__buy-view__head-right-4__button">
+            Sepete Ekle
+          </div>
+        </div>
+        <div class="product-edit__buy-view__head-right-5">
+          Ürünün stok, fiyat ve kampanya bilgisi, teslimatı gerçekleştirecek
+          mağazanın stok, fiyat ve kampanya bilgilerine göre belirlenmektedir.
+        </div>
       </div>
     </div>
   </div>
