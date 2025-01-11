@@ -46,11 +46,7 @@ export class ProductEditComponent extends ProductBuyBase {
     super.ngOnInit();
     document.addEventListener('keydown', this.boundKeyDownEvent);
   }
-  ngOnChanges(changes: SimpleChanges) {
-    if (changes['selectedImage']) {
-      this.updateView(changes['selectedImage'].currentValue);
-    }
-  }
+
   ngOnDestroy() {
     document.removeEventListener('keydown', this.boundKeyDownEvent);
   }
@@ -72,28 +68,9 @@ export class ProductEditComponent extends ProductBuyBase {
     });
   }
 
-  public openImageUploader() {
-    if (this.imageUploaderRef) {
-      this.imageUploaderRef.nativeElement.click();
-    }
-  }
-  public onImageSelected(event: any) {
-    if (event.target.files && event.target.files.length > 0) {
-      this.selectedImage = event.target.files[0];
-      this.updateView(this.selectedImage);
-    }
-  }
-
   private keyDownEvent(event: KeyboardEvent) {
     if (event.key === 'Escape') {
       this.hasEscapePressed.emit(true);
-    }
-  }
-  private updateView(image: File | null) {
-    if (image) {
-      this.imageUrl = URL.createObjectURL(image);
-    } else {
-      this.imageUrl = null;
     }
   }
 

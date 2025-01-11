@@ -6,7 +6,6 @@
           #product_image_ref
           [src]="imageUrl"
           class="product-edit__buy-view__head-left__image"
-          (click)="openImageUploader()"
         />
       </div>
     </div>
@@ -81,13 +80,3 @@
     <div (click)="updateButtonClick()">Update</div>
   </div>
 </div>
-
-<input
-  type="file"
-  name="file"
-  accept="image/png"
-  class="file-upload"
-  #imageUploaderRef
-  id="imageUploader"
-  (change)="onImageSelected($event)"
-/>
