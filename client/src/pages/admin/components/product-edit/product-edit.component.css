@@ -205,3 +205,24 @@
 .file-upload {
   display: none;
 }
+
+.product-edit__buy-view__update {
+  width: 100%;
+  flex: auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.product-edit__buy-view__update > div {
+  cursor: pointer;
+  background-color: #ff7f00;
+  font-weight: 500;
+  font-size: 14px;
+  width: 74px;
+  height: 34px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 5px;
+  color: white;
+}

@@ -87,38 +87,6 @@ export class ProductEditComponent extends ProductBuyBase {
   keyDownEvent(event: KeyboardEvent) {
     if (event.key === 'Escape') {
       this.hasEscapePressed.emit(true);
-    } else if (event.key === 'Enter') {
-      this.productDescriptions.productId = this.productId;
-
-      if (this.productDescriptionTabsToDelete.length > 0) {
-        this.productDescriptionTabsToDelete.forEach((descriptionId) => {
-          this.restService
-            .deleteProductDescription(descriptionId)
-            .subscribe((status: boolean) => {
-              if (status) {
-                console.log(status);
-              }
-            });
-        });
-        this.productDescriptionTabsToDelete = [];
-      }
-
-      if (
-        JSON.stringify(this.localProductDescriptions) !==
-        JSON.stringify(this.productDescriptions)
-      ) {
-        this.restService
-          .addProductDescription(this.productDescriptions)
-          .subscribe((status: boolean) => {
-            if (status) {
-              //this.productDescriptions = this.localProductDescriptions!;
-              this.localProductDescriptions = JSON.parse(
-                JSON.stringify(this.productDescriptions)
-              );
-              console.log(status);
-            }
-          });
-      }
     }
   }
   updateView(image: File | null) {
@@ -188,6 +156,39 @@ export class ProductEditComponent extends ProductBuyBase {
       this.currentProductDescriptionBody = '';
       this.currentTabRef = null;
       this.currentSelectedTabIndis = 0;
+    }
+  }
+  updateButtonClick() {
+    this.productDescriptions.productId = this.productId;
+
+    if (this.productDescriptionTabsToDelete.length > 0) {
+      this.productDescriptionTabsToDelete.forEach((descriptionId) => {
+        this.restService
+          .deleteProductDescription(descriptionId)
+          .subscribe((status: boolean) => {
+            if (status) {
+              console.log(status);
+            }
+          });
+      });
+      this.productDescriptionTabsToDelete = [];
+    }
+
+    if (
+      JSON.stringify(this.localProductDescriptions) !==
+      JSON.stringify(this.productDescriptions)
+    ) {
+      this.restService
+        .addProductDescription(this.productDescriptions)
+        .subscribe((status: boolean) => {
+          if (status) {
+            //this.productDescriptions = this.localProductDescriptions!;
+            this.localProductDescriptions = JSON.parse(
+              JSON.stringify(this.productDescriptions)
+            );
+            console.log(status);
+          }
+        });
     }
   }
 }
