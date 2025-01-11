@@ -8,8 +8,14 @@ import { SafeHtml } from '@angular/platform-browser';
 @Directive()
 export abstract class ProductBuyBase {
   @Input() productId!: number;
+
   @ViewChild('product_image_ref')
   productImageRef!: ElementRef<HTMLImageElement>;
+  @ViewChild('product_addbutton_ref')
+  productAddButtonRef!: ElementRef<HTMLDivElement>;
+  @ViewChild('product_money_ref')
+  productMoneyRef!: ElementRef<HTMLDivElement>;
+
   productData!: IProductData;
   productDescriptions!: IProductDescription;
   currentProductDescriptionBody!: SafeHtml;

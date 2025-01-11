@@ -96,11 +96,11 @@
   height: 100px;
   display: flex;
   align-items: center;
+  cursor: pointer;
 }
 .product-edit__buy-view__head-right-3__image {
   width: 100%;
   object-fit: contain;
-  cursor: pointer;
 }
 .product-edit__buy-view__head-right-4 {
   width: 100%;

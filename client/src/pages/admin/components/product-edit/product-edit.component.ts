@@ -1,12 +1,4 @@
-import {
-  Component,
-  ElementRef,
-  EventEmitter,
-  Input,
-  Output,
-  SimpleChanges,
-  ViewChild,
-} from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { ProductBuyBase } from '../../../../base-components/product-buy.base';
 import { CommonModule } from '@angular/common';
 import { RestService } from '../../../../services/rest/rest.service';
@@ -24,8 +16,6 @@ import { IProductDescription } from '../../../../interfaces/IProductDescription'
 export class ProductEditComponent extends ProductBuyBase {
   @Input() selectedImage: File | null = null;
   @Output() hasEscapePressed = new EventEmitter<boolean>();
-  @ViewChild('imageUploaderRef')
-  imageUploaderRef!: ElementRef<HTMLInputElement>;
   currentSelectedTabIndis: number = 0;
   productDescriptionTabs: IProductDescriptionTab[] = [];
   productDescriptionTabsToDelete: number[] = [];
@@ -45,6 +35,15 @@ export class ProductEditComponent extends ProductBuyBase {
   override ngOnInit() {
     super.ngOnInit();
     document.addEventListener('keydown', this.boundKeyDownEvent);
+  }
+
+  override ngAfterViewInit() {
+    super.ngAfterViewInit();
+    setTimeout(() => {
+      this.productImageRef.nativeElement.style.cursor = 'default';
+      this.productAddButtonRef.nativeElement.style.cursor = 'default';
+      this.productMoneyRef.nativeElement.style.cursor = 'default';
+    }, 200);
   }
 
   ngOnDestroy() {
