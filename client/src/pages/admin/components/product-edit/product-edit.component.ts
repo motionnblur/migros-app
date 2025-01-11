@@ -72,24 +72,24 @@ export class ProductEditComponent extends ProductBuyBase {
     });
   }
 
-  openImageUploader() {
+  public openImageUploader() {
     if (this.imageUploaderRef) {
       this.imageUploaderRef.nativeElement.click();
     }
   }
-  onImageSelected(event: any) {
+  public onImageSelected(event: any) {
     if (event.target.files && event.target.files.length > 0) {
       this.selectedImage = event.target.files[0];
       this.updateView(this.selectedImage);
     }
   }
 
-  keyDownEvent(event: KeyboardEvent) {
+  private keyDownEvent(event: KeyboardEvent) {
     if (event.key === 'Escape') {
       this.hasEscapePressed.emit(true);
     }
   }
-  updateView(image: File | null) {
+  private updateView(image: File | null) {
     if (image) {
       this.imageUrl = URL.createObjectURL(image);
     } else {
@@ -102,21 +102,21 @@ export class ProductEditComponent extends ProductBuyBase {
     this.currentSelectedTabIndis = index;
   }
 
-  changeTabName(event: any, index: number) {
+  public changeTabName(event: any, index: number) {
     this.productDescriptions.descriptionList[index].descriptionTabName =
       event.target.innerText;
   }
-  changeProductDescription(event: any) {
+  public changeProductDescription(event: any) {
     this.productData.productDescription = event.target.innerText;
   }
-  changeTabBody(event: any) {
+  public changeTabBody(event: any) {
     this.currentProductDescriptionBody = event.target.innerHTML;
 
     this.productDescriptions.descriptionList[
       this.currentSelectedTabIndis
     ].descriptionTabContent = event.target.innerHTML;
   }
-  createProductTab() {
+  public createProductTab() {
     const newTab: IDescription = {
       descriptionId: 0,
       descriptionTabName: 'Test tab',
@@ -134,7 +134,7 @@ export class ProductEditComponent extends ProductBuyBase {
     this.productDescriptions.descriptionList.push(newTab);
     //this.currentProductDescriptionBody = '';
   }
-  deleteProductTab(event: any, index: number) {
+  public deleteProductTab(event: any, index: number) {
     event.stopPropagation();
 
     if (this.productDescriptionTabs[index] === undefined) {
@@ -158,7 +158,7 @@ export class ProductEditComponent extends ProductBuyBase {
       this.currentSelectedTabIndis = 0;
     }
   }
-  updateButtonClick() {
+  public updateButtonClick() {
     this.productDescriptions.productId = this.productId;
 
     if (this.productDescriptionTabsToDelete.length > 0) {
@@ -182,11 +182,9 @@ export class ProductEditComponent extends ProductBuyBase {
         .addProductDescription(this.productDescriptions)
         .subscribe((status: boolean) => {
           if (status) {
-            //this.productDescriptions = this.localProductDescriptions!;
             this.localProductDescriptions = JSON.parse(
               JSON.stringify(this.productDescriptions)
             );
-            console.log(status);
           }
         });
     }
