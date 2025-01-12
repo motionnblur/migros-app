@@ -1,8 +1,13 @@
 <div id="product-body">
   <div id="product-body-menu">
     <button mat-button [matMenuTriggerFor]="menu">Categories</button>
+    <div id="product-body-menu__category-name">{{ selectedCategoryName }}</div>
     <mat-menu #menu="matMenu">
-      <button mat-menu-item *ngFor="let item of categories">
+      <button
+        mat-menu-item
+        *ngFor="let item of categories"
+        (click)="onCategorySelected(item.value)"
+      >
         {{ item.name }}
       </button>
     </mat-menu>

@@ -9,6 +9,12 @@
 #product-body-menu {
   width: 100%;
   height: 42px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+#product-body-menu__category-name {
+  margin-left: 5px;
 }
 #product-body-item {
   width: 100%;

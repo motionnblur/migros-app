@@ -20,6 +20,7 @@ export class ProductBodyComponent {
   private productAddedCallback!: (data: any) => void;
   currentPageNumber: number = 0;
   categories = categories;
+  public selectedCategoryName: string = 'All';
 
   constructor(
     private restService: RestService,
@@ -95,5 +96,18 @@ export class ProductBodyComponent {
           this.currentPageNumber += 1;
         },
       });
+  }
+  public onCategorySelected(index: number) {
+    this.restService.getProductPageData(index, 0, 19).subscribe({
+      next: (data: any) => {
+        this.productsData = data;
+      },
+      error: (error: any) => {
+        console.error(error);
+      },
+      complete: () => {
+        this.selectedCategoryName = this.categories[index - 1].name;
+      },
+    });
   }
 }
