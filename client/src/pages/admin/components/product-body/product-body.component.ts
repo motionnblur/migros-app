@@ -5,7 +5,7 @@ import { EventService } from '../../../../services/event/event.service';
 import { IAdminProductPreview } from '../../../../interfaces/IAdminProductPreview';
 import { MatButtonModule } from '@angular/material/button';
 import { MatMenuModule } from '@angular/material/menu';
-import { categories } from '../../../../memory/global-data';
+import { categories, data } from '../../../../memory/global-data';
 
 @Component({
   selector: 'app-product-body',
@@ -44,11 +44,18 @@ export class ProductBodyComponent {
   }
 
   private loadProducts() {
-    this.restService
-      .getAllAdminProducts(1, 0, 19)
-      .subscribe((data: IAdminProductPreview[]) => {
+    const id = data.currentSelectedCategoryId;
+    this.restService.getProductPageData(id, 0, 19).subscribe({
+      next: (data: any) => {
         this.productsData = data;
-      });
+      },
+      error: (error: any) => {
+        console.error(error);
+      },
+      complete: () => {
+        this.selectedCategoryName = this.categories[id - 1].name;
+      },
+    });
   }
 
   public deleteProduct(productId: number) {
@@ -98,6 +105,7 @@ export class ProductBodyComponent {
       });
   }
   public onCategorySelected(index: number) {
+    data.currentSelectedCategoryId = index;
     this.restService.getProductPageData(index, 0, 19).subscribe({
       next: (data: any) => {
         this.productsData = data;
