@@ -1,5 +1,11 @@
 <div id="product-body">
-  <div id="product-body-menu"></div>
+  <div id="product-body-menu">
+    <button mat-button [matMenuTriggerFor]="menu">Categories</button>
+    <mat-menu #menu="matMenu">
+      <button mat-menu-item>Item 1</button>
+      <button mat-menu-item>Item 2</button>
+    </mat-menu>
+  </div>
   <div id="product-body-content">
     <div
       *ngFor="let item of productsData"

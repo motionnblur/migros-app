@@ -3,10 +3,12 @@ import { RestService } from '../../../../services/rest/rest.service';
 import { CommonModule } from '@angular/common';
 import { EventService } from '../../../../services/event/event.service';
 import { IAdminProductPreview } from '../../../../interfaces/IAdminProductPreview';
+import { MatButtonModule } from '@angular/material/button';
+import { MatMenuModule } from '@angular/material/menu';
 
 @Component({
   selector: 'app-product-body',
-  imports: [CommonModule],
+  imports: [CommonModule, MatButtonModule, MatMenuModule],
   templateUrl: './product-body.component.html',
   styleUrl: './product-body.component.css',
 })
