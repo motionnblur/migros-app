@@ -48,8 +48,8 @@ public class UserSupplyService {
 
         //Pageable pageable = PageRequest.of(page, itemRange, Sort.by("id").ascending());
         Pageable pageable = PageRequest.of(page, itemRange);
-
         Page<ProductEntity> entities =  productEntityRepository.findByCategoryEntityId(categoryId, pageable);
+        if(entities.isEmpty()) throw new Exception("Category with that ID: " +categoryId+ " has no products.");
 
         return entities.stream().map(itemEntity -> {
             ProductPreviewDto itemDto = new ProductPreviewDto();

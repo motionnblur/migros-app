@@ -20,7 +20,7 @@ export class ProductBodyComponent {
   private productAddedCallback!: (data: any) => void;
   currentPageNumber: number = 0;
   categories = categories;
-  public selectedCategoryName: string = 'All';
+  public selectedCategoryName: string = 'Please select a category';
 
   constructor(
     private restService: RestService,
@@ -73,8 +73,9 @@ export class ProductBodyComponent {
   }
 
   public fetchPageLeft() {
+    const id = data.currentSelectedCategoryId;
     this.restService
-      .getAllAdminProducts(1, this.currentPageNumber - 1, 19)
+      .getProductPageData(id, this.currentPageNumber - 1, 19)
       .subscribe({
         next: (data: any) => {
           this.productsData = data;
@@ -83,14 +84,14 @@ export class ProductBodyComponent {
           console.error(error);
         },
         complete: () => {
-          console.log('Completed');
           this.currentPageNumber -= 1;
         },
       });
   }
   public fetchPageRight() {
+    const id = data.currentSelectedCategoryId;
     this.restService
-      .getAllAdminProducts(1, this.currentPageNumber + 1, 19)
+      .getProductPageData(id, this.currentPageNumber + 1, 19)
       .subscribe({
         next: (data: any) => {
           this.productsData = data;
@@ -99,7 +100,6 @@ export class ProductBodyComponent {
           console.error(error);
         },
         complete: () => {
-          console.log('Completed');
           this.currentPageNumber += 1;
         },
       });
