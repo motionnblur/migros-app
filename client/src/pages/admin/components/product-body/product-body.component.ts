@@ -5,6 +5,7 @@ import { EventService } from '../../../../services/event/event.service';
 import { IAdminProductPreview } from '../../../../interfaces/IAdminProductPreview';
 import { MatButtonModule } from '@angular/material/button';
 import { MatMenuModule } from '@angular/material/menu';
+import { categories } from '../../../../memory/global-data';
 
 @Component({
   selector: 'app-product-body',
@@ -18,6 +19,7 @@ export class ProductBodyComponent {
   productsData: IAdminProductPreview[] = [];
   private productAddedCallback!: (data: any) => void;
   currentPageNumber: number = 0;
+  categories = categories;
 
   constructor(
     private restService: RestService,
@@ -35,7 +37,7 @@ export class ProductBodyComponent {
     this.eventService.off('productAdded', this.productAddedCallback);
   }
 
-  onBodyClick(productId: number) {
+  public onBodyClick(productId: number) {
     this.hasBodyClicked.emit();
     this.eventService.trigger('productChanged', productId);
   }
@@ -48,7 +50,7 @@ export class ProductBodyComponent {
       });
   }
 
-  deleteProduct(productId: number) {
+  public deleteProduct(productId: number) {
     this.restService.deleteProduct(productId).subscribe({
       next: () => {},
       error: (error: any) => {
@@ -62,7 +64,7 @@ export class ProductBodyComponent {
     });
   }
 
-  fetchPageLeft() {
+  public fetchPageLeft() {
     this.restService
       .getAllAdminProducts(1, this.currentPageNumber - 1, 19)
       .subscribe({
@@ -78,7 +80,7 @@ export class ProductBodyComponent {
         },
       });
   }
-  fetchPageRight() {
+  public fetchPageRight() {
     this.restService
       .getAllAdminProducts(1, this.currentPageNumber + 1, 19)
       .subscribe({
