@@ -1,9 +1,10 @@
 .product-page {
   width: 1000px;
-  height: 740px;
+  height: 746px;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-direction: column;
   /* border: 1px solid gainsboro; */
 }
 .product-page > div {

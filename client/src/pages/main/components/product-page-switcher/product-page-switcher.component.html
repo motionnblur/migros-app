@@ -1,0 +1,27 @@
+<div class="product-page__switcher__button-area">
+  <div id="switch-first"><img src="two-arrow.png" /></div>
+  <div id="switch-left" (click)="switchLeft()"><img src="arrow2.png" /></div>
+  <div
+    #switch_1
+    id="switch-button-1"
+    (click)="changePage(0, currentPage + increaseFactor)"
+  >
+    {{ currentPage + increaseFactor }}
+  </div>
+  <div
+    #switch_2
+    id="switch-button-2"
+    (click)="changePage(1, currentPage + 1 + increaseFactor)"
+  >
+    {{ currentPage + 1 + increaseFactor }}
+  </div>
+  <div
+    #switch_3
+    id="switch-button-3"
+    (click)="changePage(2, currentPage + 2 + increaseFactor)"
+  >
+    {{ currentPage + 2 + increaseFactor }}
+  </div>
+  <div id="switch-right" (click)="switchRight()"><img src="arrow2.png" /></div>
+  <div id="switch-last"><img src="two-arrow.png" /></div>
+</div>

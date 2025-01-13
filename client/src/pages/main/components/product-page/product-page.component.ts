@@ -6,10 +6,16 @@ import { IProductPreview } from '../../../../interfaces/IProductPreview';
 import { data } from '../../../../memory/global-data';
 import { EventService } from '../../../../services/event/event.service';
 import { ProductBuyComponent } from '../product-buy/product-buy.component';
+import { ProductPageSwitcherComponent } from '../product-page-switcher/product-page-switcher.component';
 
 @Component({
   selector: 'app-product-page',
-  imports: [ProductPreviewComponent, CommonModule, ProductBuyComponent],
+  imports: [
+    ProductPreviewComponent,
+    CommonModule,
+    ProductBuyComponent,
+    ProductPageSwitcherComponent,
+  ],
   templateUrl: './product-page.component.html',
   styleUrl: './product-page.component.css',
 })
@@ -51,10 +57,21 @@ export class ProductPageComponent implements OnInit {
     );
   }
 
-  openProductBuyView(productId: number) {
+  private openProductBuyView(productId: number) {
     this.productPageRef.nativeElement.style.border = 'none';
     this.selectedProductId = productId;
     this.hasProductBuyViewOpened = true;
     this.hasProductPreviewOpened = false;
+  }
+
+  public changePage(pageNumber: number) {
+    this.restService
+      .getProductPageData(data.currentSelectedCategoryId, pageNumber - 1, 10)
+      .subscribe((data: any) => {
+        this.items = [];
+        data.forEach((productData: IProductPreview) => {
+          this.items.push(productData);
+        });
+      });
   }
 }
