@@ -38,9 +38,9 @@
 }
 .product-preview__buybutton {
   margin-top: 8px;
-  width: 40px;
-  height: 40px;
-  background-color: orange;
+  width: 34px;
+  height: 34px;
+  background-color: #ff7f00;
   border-radius: 10px;
   display: flex;
   justify-content: center;
@@ -48,8 +48,8 @@
   cursor: pointer;
 }
 .product-preview__buybutton__image {
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
 }
 
 .product-preview__image-container {
