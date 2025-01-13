@@ -11,4 +11,5 @@ public interface ProductEntityRepository extends JpaRepository<ProductEntity, Lo
     ProductEntity findByProductName(String productName);
     Page<ProductEntity> findByCategoryEntityId(Long categoryId, Pageable pageable);
     Page<ProductEntity> findByAdminEntityId(Long adminId, Pageable pageable);
+    int countByCategoryEntityId(Long categoryId);
 }

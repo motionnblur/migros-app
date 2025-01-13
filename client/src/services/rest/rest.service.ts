@@ -22,6 +22,15 @@ export class RestService {
       }
     );
   }
+  getProductCountsFromCategory(categoryId: number) {
+    return this.http.get(
+      `http://localhost:8080/user/supply/getProductCountsFromCategory`,
+      {
+        params: { categoryId },
+        responseType: 'json',
+      }
+    );
+  }
   getProductImage(productId: number) {
     return this.http.get(`http://localhost:8080/user/supply/getProductImage`, {
       params: { productId },

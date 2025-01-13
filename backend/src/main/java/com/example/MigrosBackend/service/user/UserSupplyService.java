@@ -14,6 +14,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
@@ -78,5 +79,12 @@ public class UserSupplyService {
         } else {
             throw new Exception("File not found");
         }
+    }
+
+    public ResponseEntity<?> getProductCountsFromCategory(Long categoryId) {
+        boolean b = categoryEntityRepository.existsById(categoryId);
+        if(!b) return new ResponseEntity<>("Category with that ID: " +categoryId+ " could not be found.", HttpStatus.BAD_REQUEST);
+
+        return ResponseEntity.ok(productEntityRepository.countByCategoryEntityId(categoryId));
     }
 }

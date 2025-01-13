@@ -29,16 +29,12 @@
       </div>
     </div>
   </div>
-  <div id="product-body-pageswitcher" class="line-top">
-    <img
-      class="product-body-pageswitcher-arrow rotate-left"
-      src="arrow.png"
-      (click)="fetchPageLeft()"
-    />
-    <img
-      class="product-body-pageswitcher-arrow rotate-right"
-      src="arrow.png"
-      (click)="fetchPageRight()"
-    />
-  </div>
+  <mat-paginator
+    [length]="productPageLength"
+    [pageSize]="5"
+    [pageSizeOptions]="[5, 10, 15]"
+    aria-label="Select page"
+    (page)="pageEvent($event)"
+  >
+  </mat-paginator>
 </div>
