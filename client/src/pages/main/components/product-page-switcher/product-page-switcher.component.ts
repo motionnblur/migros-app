@@ -66,7 +66,12 @@ export class ProductPageSwitcherComponent {
         this.switchRight();
         break;
       case 2:
-        this.switchRight();
+        if (this.buttons[0].isSelected) {
+          this.switchRight();
+          this.switchRight();
+        } else {
+          this.switchRight();
+        }
         break;
     }
   }
@@ -163,9 +168,13 @@ export class ProductPageSwitcherComponent {
     this.changePageToLastEvent.emit(this.pageCount);
     this.currentPageNumber = this.pageCount;
 
-    this.buttons[0].pageNumber = this.pageCount - 2;
-    this.buttons[1].pageNumber = this.pageCount - 1;
-    this.buttons[2].pageNumber = this.pageCount;
+    this.buttons[0].pageNumber = this.pageCount - 1;
+    this.buttons[1].pageNumber = this.pageCount;
+    this.buttons[2].pageNumber = this.pageCount + 1;
+
+    this.buttons.forEach((button: any) => {
+      button.isSelected = false;
+    });
 
     this.buttons[1].isSelected = true;
 
