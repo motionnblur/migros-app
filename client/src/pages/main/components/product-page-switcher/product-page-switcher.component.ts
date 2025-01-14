@@ -45,7 +45,6 @@ export class ProductPageSwitcherComponent {
         next: (data: any) => {
           this.productCounts = data;
           this.pageCount = Math.ceil(this.productCounts / 10);
-          console.log(this.pageCount);
         },
         error: (error: any) => {
           console.error(error);
@@ -58,48 +57,87 @@ export class ProductPageSwitcherComponent {
 
   public changePage(button: any) {
     if (button.isSelected) return;
-    if (this.pageCount < button.pageNumber) return;
 
-    this.currentPageNumber = button.pageNumber;
-    this.changePageEvent.emit(button.pageNumber);
-
-    this.buttons.forEach((button: any) => {
-      button.isSelected = false;
-    });
-    button.isSelected = true;
-
-    this.setButtonColorAsSelected(button.index);
+    switch (button.index) {
+      case 0:
+        this.switchLeft();
+        break;
+      case 1:
+        this.switchRight();
+        break;
+      case 2:
+        this.switchRight();
+        break;
+    }
   }
   public switchLeft() {
     if (this.currentPageNumber === 1) return;
 
-    this.currentPageNumber--;
+    if (this.buttons[0].pageNumber === 1) {
+      if (this.buttons[1].isSelected) {
+        this.currentPageNumber--;
+        this.changePageEvent.emit(this.currentPageNumber);
 
-    this.buttons.forEach((button: any) => {
-      button.isSelected = false;
-    });
-    this.buttons[this.currentPageNumber - 1].isSelected = true;
+        this.buttons.forEach((button: any) => {
+          button.isSelected = false;
+        });
+        this.buttons[0].isSelected = true;
+        this.setButtonColorAsSelected(this.buttons[0].index);
 
-    this.changePageEvent.emit(this.currentPageNumber);
-    this.setButtonColorAsSelected(
-      this.buttons[this.currentPageNumber - 1].index
-    );
+        return;
+      }
+      this.currentPageNumber--;
+
+      this.buttons.forEach((button: any) => {
+        button.isSelected = false;
+      });
+      this.buttons[this.currentPageNumber - 1].isSelected = true;
+
+      this.changePageEvent.emit(this.currentPageNumber);
+      this.setButtonColorAsSelected(
+        this.buttons[this.currentPageNumber - 1].index
+      );
+    } else {
+      this.changePageEvent.emit(this.currentPageNumber - 1);
+      this.currentPageNumber--;
+
+      this.buttons.forEach((button: any) => {
+        button.pageNumber--;
+      });
+    }
   }
 
   public switchRight() {
     if (this.currentPageNumber === this.pageCount) return;
 
     this.currentPageNumber++;
-
-    this.buttons.forEach((button: any) => {
-      button.isSelected = false;
-    });
-    this.buttons[this.currentPageNumber - 1].isSelected = true;
-
     this.changePageEvent.emit(this.currentPageNumber);
-    this.setButtonColorAsSelected(
-      this.buttons[this.currentPageNumber - 1].index
-    );
+
+    if (this.currentPageNumber > 2) {
+      this.buttons.forEach((button: any) => {
+        button.pageNumber++;
+      });
+      this.buttons[1].isSelected = true;
+      return;
+    }
+
+    if (this.buttons[2].isSelected) {
+      this.buttons.forEach((button: any) => {
+        button.isSelected = false;
+        button.pageNumber++;
+      });
+      this.buttons[1].isSelected = true;
+      this.setButtonColorAsSelected(this.buttons[1].index);
+    } else {
+      this.buttons.forEach((button: any) => {
+        button.isSelected = false;
+      });
+      this.buttons[this.currentPageNumber - 1].isSelected = true;
+
+      this.setButtonColorAsSelected(
+        this.buttons[this.currentPageNumber - 1].index
+      );
+    }
   }
 
   public switchFirst() {
@@ -113,6 +151,10 @@ export class ProductPageSwitcherComponent {
     });
     this.buttons[0].isSelected = true;
 
+    this.buttons[0].pageNumber = 1;
+    this.buttons[1].pageNumber = 2;
+    this.buttons[2].pageNumber = 3;
+
     this.setButtonColorAsSelected(this.buttons[0].index);
   }
   public switchLast() {
@@ -121,14 +163,13 @@ export class ProductPageSwitcherComponent {
     this.changePageToLastEvent.emit(this.pageCount);
     this.currentPageNumber = this.pageCount;
 
-    this.buttons.forEach((button: any) => {
-      button.isSelected = false;
-    });
-    this.buttons[this.maxIndexThirdButtonCanHave()].isSelected = true;
+    this.buttons[0].pageNumber = this.pageCount - 2;
+    this.buttons[1].pageNumber = this.pageCount - 1;
+    this.buttons[2].pageNumber = this.pageCount;
 
-    this.setButtonColorAsSelected(
-      this.buttons[this.maxIndexThirdButtonCanHave()].index
-    );
+    this.buttons[1].isSelected = true;
+
+    this.setButtonColorAsSelected(this.buttons[1].index);
   }
 
   private setButtonColorAsSelected(buttonIndex: number) {

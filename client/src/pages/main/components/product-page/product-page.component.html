@@ -8,6 +8,7 @@
     />
   </div>
   <app-product-page-switcher
+    *ngIf="!hasProductBuyViewOpened"
     (changePageEvent)="changePage($event)"
     (changePageToFirstEvent)="changePageToFirst()"
     (changePageToLastEvent)="changePageToLast($event)"
