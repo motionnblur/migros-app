@@ -1,27 +1,17 @@
 <div class="product-page__switcher__button-area">
-  <div id="switch-first"><img src="two-arrow.png" /></div>
+  <div id="switch-first" (click)="switchFirst()">
+    <img src="two-arrow.png" />
+  </div>
   <div id="switch-left" (click)="switchLeft()"><img src="arrow2.png" /></div>
-  <div
-    #switch_1
-    id="switch-button-1"
-    (click)="changePage(0, currentPage + increaseFactor)"
-  >
-    {{ currentPage + increaseFactor }}
+  <div #switch_1 id="switch-button-1" (click)="changePage(buttons[0])">
+    {{ buttons[0].pageNumber }}
   </div>
-  <div
-    #switch_2
-    id="switch-button-2"
-    (click)="changePage(1, currentPage + 1 + increaseFactor)"
-  >
-    {{ currentPage + 1 + increaseFactor }}
+  <div #switch_2 id="switch-button-2" (click)="changePage(buttons[1])">
+    {{ buttons[1].pageNumber }}
   </div>
-  <div
-    #switch_3
-    id="switch-button-3"
-    (click)="changePage(2, currentPage + 2 + increaseFactor)"
-  >
-    {{ currentPage + 2 + increaseFactor }}
+  <div #switch_3 id="switch-button-3" (click)="changePage(buttons[2])">
+    {{ buttons[2].pageNumber }}
   </div>
   <div id="switch-right" (click)="switchRight()"><img src="arrow2.png" /></div>
-  <div id="switch-last"><img src="two-arrow.png" /></div>
+  <div id="switch-last" (click)="switchLast()"><img src="two-arrow.png" /></div>
 </div>

@@ -7,7 +7,11 @@
       [productPrice]="item.productPrice"
     />
   </div>
-  <app-product-page-switcher (changePageEvent)="changePage($event)" />
+  <app-product-page-switcher
+    (changePageEvent)="changePage($event)"
+    (changePageToFirstEvent)="changePageToFirst()"
+    (changePageToLastEvent)="changePageToLast($event)"
+  />
   <div class="product-buy-container" *ngIf="hasProductBuyViewOpened">
     <app-product-buy [productId]="selectedProductId" />
   </div>

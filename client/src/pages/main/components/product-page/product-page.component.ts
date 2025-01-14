@@ -74,4 +74,24 @@ export class ProductPageComponent implements OnInit {
         });
       });
   }
+  public changePageToFirst() {
+    this.restService
+      .getProductPageData(data.currentSelectedCategoryId, 0, 10)
+      .subscribe((data: any) => {
+        this.items = [];
+        data.forEach((productData: IProductPreview) => {
+          this.items.push(productData);
+        });
+      });
+  }
+  public changePageToLast(pageCount: number) {
+    this.restService
+      .getProductPageData(data.currentSelectedCategoryId, pageCount - 1, 10)
+      .subscribe((data: any) => {
+        this.items = [];
+        data.forEach((productData: IProductPreview) => {
+          this.items.push(productData);
+        });
+      });
+  }
 }
