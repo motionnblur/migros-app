@@ -1,9 +1,9 @@
 import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { RestService } from '../../../../services/rest/rest.service';
 import { ProductPreviewComponent } from '../product-preview/product-preview.component';
-import { CommonModule, NgFor } from '@angular/common';
+import { CommonModule } from '@angular/common';
 import { IProductPreview } from '../../../../interfaces/IProductPreview';
-import { data } from '../../../../memory/global-data';
+import { categories, data } from '../../../../memory/global-data';
 import { EventService } from '../../../../services/event/event.service';
 import { ProductBuyComponent } from '../product-buy/product-buy.component';
 import { ProductPageSwitcherComponent } from '../product-page-switcher/product-page-switcher.component';
@@ -19,11 +19,12 @@ import { ProductPageSwitcherComponent } from '../product-page-switcher/product-p
   templateUrl: './product-page.component.html',
   styleUrl: './product-page.component.css',
 })
-export class ProductPageComponent implements OnInit {
+export class ProductPageComponent {
   items: IProductPreview[] = [];
   hasProductPreviewOpened: boolean = true;
   hasProductBuyViewOpened: boolean = false;
   selectedProductId!: number;
+  categoryName: string = 'Test';
 
   private onProductPreviewClickedCallback: (productId: number) => void;
 
@@ -35,6 +36,7 @@ export class ProductPageComponent implements OnInit {
     private eventService: EventService
   ) {
     this.onProductPreviewClickedCallback = this.openProductBuyView.bind(this);
+    this.categoryName = categories[data.currentSelectedCategoryId - 1].name;
   }
   ngOnInit(): void {
     this.restService

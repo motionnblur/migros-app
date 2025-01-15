@@ -1,19 +1,29 @@
-<div #product_page_ref class="product-page padding-10">
-  <div *ngIf="hasProductPreviewOpened">
-    <app-product-preview
-      *ngFor="let item of items"
-      [productId]="item.productId"
-      [productName]="item.productName"
-      [productPrice]="item.productPrice"
-    />
+<div class="product-page-container">
+  <div class="product-page__category">
+    <div class="line-bottom">
+      <div>{{ categoryName }}</div>
+      <div>1689 ürün</div>
+    </div>
+    <div class="line-bottom"></div>
+    <div></div>
   </div>
-  <app-product-page-switcher
-    *ngIf="!hasProductBuyViewOpened"
-    (changePageEvent)="changePage($event)"
-    (changePageToFirstEvent)="changePageToFirst()"
-    (changePageToLastEvent)="changePageToLast($event)"
-  />
-  <div class="product-buy-container" *ngIf="hasProductBuyViewOpened">
-    <app-product-buy [productId]="selectedProductId" />
+  <div #product_page_ref class="product-page padding-10">
+    <div *ngIf="hasProductPreviewOpened">
+      <app-product-preview
+        *ngFor="let item of items"
+        [productId]="item.productId"
+        [productName]="item.productName"
+        [productPrice]="item.productPrice"
+      />
+    </div>
+    <app-product-page-switcher
+      *ngIf="!hasProductBuyViewOpened"
+      (changePageEvent)="changePage($event)"
+      (changePageToFirstEvent)="changePageToFirst()"
+      (changePageToLastEvent)="changePageToLast($event)"
+    />
+    <div class="product-buy-container" *ngIf="hasProductBuyViewOpened">
+      <app-product-buy [productId]="selectedProductId" />
+    </div>
   </div>
 </div>
