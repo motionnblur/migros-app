@@ -1,11 +1,16 @@
 <div class="product-page-container">
   <div class="product-page__category">
-    <div class="line-bottom">
+    <div class="line-bottom padding-20">
       <div>{{ categoryName }}</div>
       <div>1689 ürün</div>
     </div>
-    <div class="line-bottom"></div>
-    <div></div>
+    <div class="line-bottom padding-20">
+      <div id="subcategories">Alt Kategoriler</div>
+      <div id="subcategory-items">
+        <div *ngFor="let name of subCategoryNames">{{ name }}</div>
+      </div>
+    </div>
+    <div class="padding-20"></div>
   </div>
   <div #product_page_ref class="product-page padding-10">
     <div *ngIf="hasProductPreviewOpened">

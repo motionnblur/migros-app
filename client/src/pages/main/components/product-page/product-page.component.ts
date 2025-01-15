@@ -25,6 +25,7 @@ export class ProductPageComponent {
   hasProductBuyViewOpened: boolean = false;
   selectedProductId!: number;
   categoryName: string = 'Test';
+  subCategoryNames: string[] = ['Meyve', 'Sebze', 'Tohum'];
 
   private onProductPreviewClickedCallback: (productId: number) => void;
 
