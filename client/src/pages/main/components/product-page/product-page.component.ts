@@ -26,6 +26,7 @@ export class ProductPageComponent {
   selectedProductId!: number;
   categoryName: string = 'Test';
   subCategoryNames: string[] = ['Meyve', 'Sebze', 'Tohum'];
+  totalProductCount: number = 0;
 
   private onProductPreviewClickedCallback: (productId: number) => void;
 
@@ -46,6 +47,20 @@ export class ProductPageComponent {
         data.forEach((productData: IProductPreview) => {
           this.items.push(productData);
         });
+      });
+
+    this.restService
+      .getProductCountsFromCategory(data.currentSelectedCategoryId)
+      .subscribe({
+        next: (data: any) => {
+          this.totalProductCount = data;
+        },
+        error: (error: any) => {
+          console.error(error);
+        },
+        complete: () => {
+          console.log('completed');
+        },
       });
 
     this.eventService.on(
