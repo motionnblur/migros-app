@@ -106,4 +106,17 @@ public class UserSupplyService {
 
         return ResponseEntity.ok(subCategoryDto);
     }
+
+    public List<ProductPreviewDto> getProductsFromSubcategory(String subcategoryName, int page, int productRange) {
+        Pageable pageable = PageRequest.of(page, productRange);
+        Page<ProductEntity> entities =  productEntityRepository.findBySubcategoryName(subcategoryName, pageable);
+        return entities.stream().map(itemEntity -> {
+            ProductPreviewDto itemDto = new ProductPreviewDto();
+            itemDto.setProductId(itemEntity.getId());
+            itemDto.setProductName(itemEntity.getProductName());
+            itemDto.setProductPrice(itemEntity.getProductPrice());
+
+            return itemDto;
+        }).collect(Collectors.toList());
+    }
 }

@@ -37,6 +37,15 @@ public class UserSupplyController {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
     }
+    @GetMapping("getProductsFromSubcategory")
+    public ResponseEntity<?> getSubProductsFromCategory(@RequestParam String subcategoryName, @RequestParam int page, @RequestParam int productRange) {
+        try {
+            List<ProductPreviewDto> itemIDs = userSupplyService.getProductsFromSubcategory(subcategoryName, page, productRange);
+            return ResponseEntity.ok(itemIDs);
+        } catch (Exception e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
     @GetMapping("getProductCountsFromCategory")
     public ResponseEntity<?> getProductCountsFromCategory(@RequestParam Long categoryId) {
         try {
