@@ -15,6 +15,7 @@ import { categories } from '../memory/global-data';
 @Directive()
 export abstract class ProductAdderBase {
   @Input() productName!: string;
+  @Input() subCategoryName!: string;
   @Input() price!: number;
   @Input() count!: number;
   @Input() discount!: number;

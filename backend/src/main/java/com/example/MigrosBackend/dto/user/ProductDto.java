@@ -9,6 +9,7 @@ import java.util.List;
 @Setter
 public class ProductDto {
     private String productName;
+    private String subCategoryName;
     private int productCount;
     private float productPrice;
     private float productDiscount;

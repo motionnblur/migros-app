@@ -35,6 +35,7 @@ export class ProductUpdaterComponent extends ProductAdderBase {
     });
     this.restService.getProductData(this.id).subscribe((data: any) => {
       this.productName = data.productName;
+      this.subCategoryName = data.subCategoryName;
       this.price = data.productPrice;
       this.count = data.productCount;
       this.discount = data.productDiscount;
@@ -50,6 +51,7 @@ export class ProductUpdaterComponent extends ProductAdderBase {
       adminId: 1,
       productId: this.id,
       productName: this.productName,
+      subCategoryName: this.subCategoryName,
       productPrice: this.price,
       productCount: this.count,
       productDiscount: this.discount,

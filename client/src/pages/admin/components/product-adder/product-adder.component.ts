@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, Input } from '@angular/core';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { IProductUploader } from '../../../../interfaces/IProductUploader';
@@ -30,6 +30,7 @@ export class ProductAdderComponent extends ProductAdderBase {
     const productData: IProductUploader = {
       adminId: 1,
       productName: this.productName,
+      subCategoryName: this.subCategoryName,
       productPrice: this.price,
       productCount: this.count,
       productDiscount: this.discount,

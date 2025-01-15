@@ -57,7 +57,7 @@ app-product-adder,
 app-product-updater {
   position: absolute;
   width: 300px;
-  height: 450px;
+  height: 500px;
   background-color: rgb(228, 228, 228);
   border: 1px solid rgb(197, 197, 197);
   border-radius: 7px;

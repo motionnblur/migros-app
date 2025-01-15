@@ -21,6 +21,7 @@ public class ProductEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String productName;
+    private String subcategoryName;
     private int productCount;
     private float productPrice;
     private float productDiscount;

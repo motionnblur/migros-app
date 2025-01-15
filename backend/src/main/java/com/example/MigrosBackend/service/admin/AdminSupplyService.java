@@ -55,6 +55,7 @@ public class AdminSupplyService {
 
         ProductEntity newProductEntity = new ProductEntity();
         newProductEntity.setProductName(adminAddItemDto.getProductDto().getProductName());
+        newProductEntity.setSubcategoryName(adminAddItemDto.getProductDto().getSubCategoryName());
         newProductEntity.setProductCount(adminAddItemDto.getProductDto().getProductCount());
         newProductEntity.setProductPrice(adminAddItemDto.getProductDto().getProductPrice());
         newProductEntity.setProductDiscount(adminAddItemDto.getProductDto().getProductDiscount());
@@ -99,6 +100,7 @@ public class AdminSupplyService {
 
     public void uploadProduct(Long adminId,
                               String productName,
+                              String subCategoryName,
                               float productPrice,
                               int productCount,
                               float productDiscount,
@@ -123,6 +125,7 @@ public class AdminSupplyService {
         ProductEntity productEntity = new ProductEntity();
         productEntity.setAdminEntity(adminEntity);
         productEntity.setProductName(productName);
+        productEntity.setSubcategoryName(subCategoryName);
         productEntity.setProductCount(productCount);
         productEntity.setProductPrice(productPrice);
         productEntity.setProductDiscount(productDiscount);
@@ -135,7 +138,7 @@ public class AdminSupplyService {
         productImageEntity.setProductEntity(productEntity);
         productImageEntityRepository.save(productImageEntity);
     }
-    public void updateProduct(Long adminId, Long productId, String productName,
+    public void updateProduct(Long adminId, Long productId, String productName, String subCategoryName,
                               float productPrice, int productCount, float productDiscount,
                               String productDescription, int categoryValue, MultipartFile selectedImage) throws Exception {
         if (!Objects.equals(selectedImage.getContentType(), "image/png")) {
@@ -156,6 +159,7 @@ public class AdminSupplyService {
         ProductEntity productEntity = productEntityRepository.findById(productId).orElseThrow(() -> new RuntimeException("Product with that id: " + productId + " could not be found."));
         productEntity.setAdminEntity(adminEntity);
         productEntity.setProductName(productName);
+        productEntity.setSubcategoryName(subCategoryName);
         productEntity.setProductCount(productCount);
         productEntity.setProductPrice(productPrice);
         productEntity.setProductDiscount(productDiscount);
@@ -191,6 +195,7 @@ public class AdminSupplyService {
 
         ProductDto2 productDto2 = new ProductDto2();
         productDto2.setProductName(productEntity.getProductName());
+        productDto2.setSubCategoryName(productEntity.getSubcategoryName());
         productDto2.setProductPrice(productEntity.getProductPrice());
         productDto2.setProductCount(productEntity.getProductCount());
         productDto2.setProductDiscount(productEntity.getProductDiscount());

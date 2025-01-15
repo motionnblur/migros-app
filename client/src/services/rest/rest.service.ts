@@ -61,6 +61,7 @@ export class RestService {
     const formData = new FormData();
     formData.append('adminId', productData.adminId.toString());
     formData.append('productName', productData.productName);
+    formData.append('subCategoryName', productData.subCategoryName);
     formData.append('productPrice', productData.productPrice.toString());
     formData.append('productCount', productData.productCount.toString());
     formData.append('productDiscount', productData.productDiscount.toString());
@@ -80,6 +81,7 @@ export class RestService {
     formData.append('adminId', productData.adminId.toString());
     formData.append('productId', productData.productId.toString());
     formData.append('productName', productData.productName);
+    formData.append('subCategoryName', productData.subCategoryName);
     formData.append('productPrice', productData.productPrice.toString());
     formData.append('productCount', productData.productCount.toString());
     formData.append('productDiscount', productData.productDiscount.toString());

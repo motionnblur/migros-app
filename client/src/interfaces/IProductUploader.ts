@@ -1,6 +1,7 @@
 export interface IProductUploader {
   adminId: number;
   productName: string;
+  subCategoryName: string;
   productPrice: number;
   productCount: number;
   productDiscount: number;

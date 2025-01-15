@@ -79,6 +79,7 @@ public class AdminPanelController {
     @PostMapping("uploadProduct")
     private ResponseEntity<String> uploadProduct(@RequestParam("adminId") Long adminId,
                                                @RequestParam("productName") String productName,
+                                               @RequestParam("subCategoryName") String subCategoryName,
                                                @RequestParam("productPrice") float productPrice,
                                                @RequestParam("productCount") int productCount,
                                                @RequestParam("productDiscount") float productDiscount,
@@ -87,7 +88,7 @@ public class AdminPanelController {
                                                @RequestParam("categoryValue") int categoryValue) {
         // Save the file to your desired location
         try {
-            adminSupplyService.uploadProduct(adminId, productName, productPrice,
+            adminSupplyService.uploadProduct(adminId, productName, subCategoryName, productPrice,
                     productCount, productDiscount, productDescription,
                     categoryValue, selectedImage);
             return ResponseEntity.ok("File uploaded successfully");
@@ -99,6 +100,7 @@ public class AdminPanelController {
     private ResponseEntity<String> updateProduct(@RequestParam("adminId") Long adminId,
                                                @RequestParam("productId") Long productId,
                                                @RequestParam("productName") String productName,
+                                               @RequestParam("subCategoryName") String subCategoryName,
                                                @RequestParam("productPrice") float productPrice,
                                                @RequestParam("productCount") int productCount,
                                                @RequestParam("productDiscount") float productDiscount,
@@ -107,7 +109,7 @@ public class AdminPanelController {
                                                @RequestParam("categoryValue") int categoryValue) {
         // Save the file to your desired location
         try {
-            adminSupplyService.updateProduct(adminId, productId, productName,
+            adminSupplyService.updateProduct(adminId, productId, productName, subCategoryName,
                     productPrice, productCount, productDiscount,
                     productDescription, categoryValue, selectedImage);
             return ResponseEntity.ok("File uploaded successfully");
