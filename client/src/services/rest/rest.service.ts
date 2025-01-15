@@ -145,4 +145,16 @@ export class RestService {
       })
       .pipe(map((response) => response as ISubCategory[]));
   }
+  getProducstFromSubCategory(
+    subcategoryName: string,
+    page: number,
+    productRange: number
+  ) {
+    return this.http
+      .get(`http://localhost:8080/user/supply/getProductsFromSubcategory`, {
+        params: { subcategoryName, page, productRange },
+        responseType: 'json',
+      })
+      .pipe(map((response) => response as IAdminProductPreview[]));
+  }
 }

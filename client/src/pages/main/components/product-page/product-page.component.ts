@@ -134,4 +134,16 @@ export class ProductPageComponent {
         });
       });
   }
+  public onSubCategoryClicked(subCategoryName: string) {
+    this.restService
+      .getProducstFromSubCategory(subCategoryName, 0, 10)
+      .subscribe({
+        next: (data: any) => {
+          this.items = [];
+          data.forEach((productData: IProductPreview) => {
+            this.items.push(productData);
+          });
+        },
+      });
+  }
 }
