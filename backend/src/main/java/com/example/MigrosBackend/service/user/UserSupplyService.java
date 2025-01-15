@@ -119,4 +119,8 @@ public class UserSupplyService {
             return itemDto;
         }).collect(Collectors.toList());
     }
+
+    public ResponseEntity<?> getProductCountsFromSubcategory(String subcategoryName) {
+        return ResponseEntity.ok(productEntityRepository.countBySubcategoryName(subcategoryName));
+    }
 }

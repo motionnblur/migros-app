@@ -105,34 +105,75 @@ export class ProductPageComponent {
   }
 
   public changePage(pageNumber: number) {
-    this.restService
-      .getProductPageData(data.currentSelectedCategoryId, pageNumber - 1, 10)
-      .subscribe((data: any) => {
-        this.items = [];
-        data.forEach((productData: IProductPreview) => {
-          this.items.push(productData);
+    if (data.currentSelectedSubCategoryName !== '') {
+      this.restService
+        .getProducstFromSubCategory(
+          data.currentSelectedSubCategoryName,
+          pageNumber - 1,
+          10
+        )
+        .subscribe((data: any) => {
+          this.items = [];
+          data.forEach((productData: IProductPreview) => {
+            this.items.push(productData);
+          });
         });
-      });
+    } else {
+      this.restService
+        .getProductPageData(data.currentSelectedCategoryId, pageNumber - 1, 10)
+        .subscribe((data: any) => {
+          this.items = [];
+          data.forEach((productData: IProductPreview) => {
+            this.items.push(productData);
+          });
+        });
+    }
   }
   public changePageToFirst() {
-    this.restService
-      .getProductPageData(data.currentSelectedCategoryId, 0, 10)
-      .subscribe((data: any) => {
-        this.items = [];
-        data.forEach((productData: IProductPreview) => {
-          this.items.push(productData);
+    if (data.currentSelectedSubCategoryName !== '') {
+      this.restService
+        .getProducstFromSubCategory(data.currentSelectedSubCategoryName, 0, 10)
+        .subscribe((data: any) => {
+          this.items = [];
+          data.forEach((productData: IProductPreview) => {
+            this.items.push(productData);
+          });
         });
-      });
+    } else {
+      this.restService
+        .getProductPageData(data.currentSelectedCategoryId, 0, 10)
+        .subscribe((data: any) => {
+          this.items = [];
+          data.forEach((productData: IProductPreview) => {
+            this.items.push(productData);
+          });
+        });
+    }
   }
   public changePageToLast(pageCount: number) {
-    this.restService
-      .getProductPageData(data.currentSelectedCategoryId, pageCount - 1, 10)
-      .subscribe((data: any) => {
-        this.items = [];
-        data.forEach((productData: IProductPreview) => {
-          this.items.push(productData);
+    if (data.currentSelectedSubCategoryName !== '') {
+      this.restService
+        .getProducstFromSubCategory(
+          data.currentSelectedSubCategoryName,
+          pageCount - 1,
+          10
+        )
+        .subscribe((data: any) => {
+          this.items = [];
+          data.forEach((productData: IProductPreview) => {
+            this.items.push(productData);
+          });
         });
-      });
+    } else {
+      this.restService
+        .getProductPageData(data.currentSelectedCategoryId, pageCount - 1, 10)
+        .subscribe((data: any) => {
+          this.items = [];
+          data.forEach((productData: IProductPreview) => {
+            this.items.push(productData);
+          });
+        });
+    }
   }
   public onSubCategoryClicked(subCategoryName: string) {
     this.restService
@@ -143,6 +184,12 @@ export class ProductPageComponent {
           data.forEach((productData: IProductPreview) => {
             this.items.push(productData);
           });
+        },
+        error: (error: any) => {
+          console.error(error);
+        },
+        complete: () => {
+          data.currentSelectedSubCategoryName = subCategoryName;
         },
       });
   }

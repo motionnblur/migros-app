@@ -1,5 +1,6 @@
 export const data = {
   currentSelectedCategoryId: 0,
+  currentSelectedSubCategoryName: '',
 };
 
 export const categories = [
