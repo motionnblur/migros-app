@@ -7,6 +7,7 @@ import { categories, data } from '../../../../memory/global-data';
 import { EventService } from '../../../../services/event/event.service';
 import { ProductBuyComponent } from '../product-buy/product-buy.component';
 import { ProductPageSwitcherComponent } from '../product-page-switcher/product-page-switcher.component';
+import { ISubCategory } from '../../../../interfaces/ISubCategory';
 
 @Component({
   selector: 'app-product-page',
@@ -25,7 +26,7 @@ export class ProductPageComponent {
   hasProductBuyViewOpened: boolean = false;
   selectedProductId!: number;
   categoryName: string = 'Test';
-  subCategoryNames: string[] = ['Meyve', 'Sebze', 'Tohum'];
+  subCategories: ISubCategory[] = [];
   totalProductCount: number = 0;
 
   private onProductPreviewClickedCallback: (productId: number) => void;
@@ -39,6 +40,12 @@ export class ProductPageComponent {
   ) {
     this.onProductPreviewClickedCallback = this.openProductBuyView.bind(this);
     this.categoryName = categories[data.currentSelectedCategoryId - 1].name;
+
+    this.subCategories = [
+      { subCategoryId: 1, subCategoryName: 'Meyve', productCount: 0 },
+      { subCategoryId: 2, subCategoryName: 'Sebze', productCount: 0 },
+      { subCategoryId: 3, subCategoryName: 'Tohum', productCount: 0 },
+    ];
   }
   ngOnInit(): void {
     this.restService
@@ -47,6 +54,21 @@ export class ProductPageComponent {
         data.forEach((productData: IProductPreview) => {
           this.items.push(productData);
         });
+      });
+
+    this.restService
+      .getSubCategories(data.currentSelectedCategoryId)
+      .subscribe({
+        next: (data: any) => {
+          this.subCategories = data;
+          console.log(data);
+        },
+        error: (error: any) => {
+          console.error(error);
+        },
+        complete: () => {
+          console.log('completed');
+        },
       });
 
     this.restService

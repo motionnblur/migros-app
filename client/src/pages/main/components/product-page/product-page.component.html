@@ -7,7 +7,9 @@
     <div class="line-bottom padding-20">
       <div id="subcategories">Alt Kategoriler</div>
       <div id="subcategory-items">
-        <div *ngFor="let name of subCategoryNames">{{ name }}</div>
+        <div *ngFor="let item of subCategories">
+          {{ item.subCategoryName + " " + "(" + item.productCount + ")" }}
+        </div>
       </div>
     </div>
     <div class="padding-20"></div>

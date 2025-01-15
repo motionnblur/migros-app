@@ -6,6 +6,7 @@ import { IProductUpdater } from '../../interfaces/IProductUpdater';
 import { IAdminProductPreview } from '../../interfaces/IAdminProductPreview';
 import { IProductData } from '../../interfaces/IProductData';
 import { IProductDescription } from '../../interfaces/IProductDescription';
+import { ISubCategory } from '../../interfaces/ISubCategory';
 
 @Injectable({
   providedIn: 'root',
@@ -135,5 +136,13 @@ export class RestService {
         observe: 'response',
       })
       .pipe(map((response) => response.status === 200));
+  }
+  getSubCategories(categoryId: number) {
+    return this.http
+      .get(`http://localhost:8080/user/supply/getSubCategories`, {
+        params: { categoryId },
+        responseType: 'json',
+      })
+      .pipe(map((response) => response as ISubCategory[]));
   }
 }

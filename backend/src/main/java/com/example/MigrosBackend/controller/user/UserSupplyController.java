@@ -55,4 +55,13 @@ public class UserSupplyController {
     public ResponseEntity<Resource> getProductImage(@RequestParam Long productId) throws Exception {
         return userSupplyService.getProductImage(productId);
     }
+    @GetMapping("getSubCategories")
+    public ResponseEntity<?> getSubCategories(@RequestParam Long categoryId) {
+        try {
+            return userSupplyService.getSubCategories(categoryId);
+        }catch (Exception e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+
+    }
 }

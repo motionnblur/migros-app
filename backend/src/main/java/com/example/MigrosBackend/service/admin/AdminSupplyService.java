@@ -4,6 +4,7 @@ import com.example.MigrosBackend.dto.admin.panel.*;
 import com.example.MigrosBackend.dto.user.ProductDto;
 import com.example.MigrosBackend.entity.admin.AdminEntity;
 import com.example.MigrosBackend.entity.category.CategoryEntity;
+import com.example.MigrosBackend.entity.category.SubCategoryEntity;
 import com.example.MigrosBackend.entity.product.ProductDescriptionEntity;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.product.ProductImageEntity;
@@ -30,6 +31,7 @@ public class AdminSupplyService {
     private final ProductImageEntityRepository productImageEntityRepository;
     private final AdminEntityRepository adminEntityRepository;
     private final ProductDescriptionEntityRepository productDescriptionEntityRepository;
+    private final SubCategoryEntityRepository subCategoryEntityRepository;
     private final FileService fileService;
 
     @Autowired
@@ -39,6 +41,7 @@ public class AdminSupplyService {
             ProductImageEntityRepository productImageEntityRepository,
             AdminEntityRepository adminEntityRepository,
             ProductDescriptionEntityRepository productDescriptionEntityRepository,
+            SubCategoryEntityRepository subCategoryEntityRepository,
             FileService fileService
     ) {
         this.categoryEntityRepository = categoryEntityRepository;
@@ -46,6 +49,7 @@ public class AdminSupplyService {
         this.productImageEntityRepository = productImageEntityRepository;
         this.adminEntityRepository = adminEntityRepository;
         this.productDescriptionEntityRepository = productDescriptionEntityRepository;
+        this.subCategoryEntityRepository = subCategoryEntityRepository;
         this.fileService = fileService;
     }
 
@@ -132,6 +136,12 @@ public class AdminSupplyService {
         productEntity.setCategoryEntity(categoryEntity);
         productEntity.setProductDescription(productDescription);
         productEntityRepository.save(productEntity);
+
+        SubCategoryEntity subCategoryEntity = new SubCategoryEntity();
+        subCategoryEntity.setSubCategoryName(subCategoryName);
+        subCategoryEntity.setProductCount(productCount);
+        subCategoryEntity.setCategoryEntity(categoryEntity);
+        subCategoryEntityRepository.save(subCategoryEntity);
 
         ProductImageEntity productImageEntity = new ProductImageEntity();
         productImageEntity.setImagePath(savedFilePath.toString());

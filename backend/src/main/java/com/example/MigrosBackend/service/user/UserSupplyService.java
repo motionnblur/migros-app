@@ -1,6 +1,7 @@
 package com.example.MigrosBackend.service.user;
 
 import com.example.MigrosBackend.dto.user.ProductPreviewDto;
+import com.example.MigrosBackend.dto.user.SubCategoryDto;
 import com.example.MigrosBackend.entity.category.CategoryEntity;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.product.ProductImageEntity;
@@ -86,5 +87,23 @@ public class UserSupplyService {
         if(!b) return new ResponseEntity<>("Category with that ID: " +categoryId+ " could not be found.", HttpStatus.BAD_REQUEST);
 
         return ResponseEntity.ok(productEntityRepository.countByCategoryEntityId(categoryId));
+    }
+
+    public ResponseEntity<?> getSubCategories(Long categoryId) {
+        CategoryEntity categoryEntity = categoryEntityRepository.findById(categoryId).get();
+
+        List<SubCategoryDto> subCategoryDto = categoryEntity.getItemEntities().stream()
+                .filter(itemEntity -> itemEntity.getSubcategoryName() != null && !itemEntity.getSubcategoryName().isEmpty())
+                .collect(Collectors.groupingBy(ProductEntity::getSubcategoryName, Collectors.counting()))
+                .entrySet().stream()
+                .map(entry -> {
+                    SubCategoryDto dto = new SubCategoryDto();
+                    dto.setSubCategoryId(categoryEntity.getId());
+                    dto.setSubCategoryName(entry.getKey());
+                    dto.setProductCount(entry.getValue().intValue());
+                    return dto;
+                }).collect(Collectors.toList());
+
+        return ResponseEntity.ok(subCategoryDto);
     }
 }

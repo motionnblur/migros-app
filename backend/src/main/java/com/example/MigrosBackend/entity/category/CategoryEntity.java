@@ -25,4 +25,9 @@ public class CategoryEntity {
     @JoinColumn(name = "category_entity_id", referencedColumnName = "category_entity_id")
     @JsonManagedReference
     private List<ProductEntity> itemEntities;
+
+    @OneToMany(cascade = CascadeType.ALL)
+    @JoinColumn(name = "category_entity_id", referencedColumnName = "category_entity_id")
+    @JsonManagedReference
+    private List<SubCategoryEntity> subCategoryEntities;
 }
