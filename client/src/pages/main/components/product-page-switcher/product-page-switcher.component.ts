@@ -7,6 +7,7 @@ import {
 } from '@angular/core';
 import { RestService } from '../../../../services/rest/rest.service';
 import { data } from '../../../../memory/global-data';
+import { EventService } from '../../../../services/event/event.service';
 
 @Component({
   selector: 'app-product-page-switcher',
@@ -23,6 +24,9 @@ export class ProductPageSwitcherComponent {
   @ViewChild('switch_2') switch_2!: ElementRef<HTMLDivElement>;
   @ViewChild('switch_3') switch_3!: ElementRef<HTMLDivElement>;
 
+  private resetProductPageSwitcherCallback!: (data: any) => void;
+  private setProductCountCallback!: (data: any) => void;
+
   public buttons: any = [];
   public currentPage: number = 1;
 
@@ -30,12 +34,22 @@ export class ProductPageSwitcherComponent {
   private productCounts: number = 0;
   private pageCount: number = 1;
 
-  constructor(private restService: RestService) {
+  constructor(
+    private restService: RestService,
+    private eventService: EventService
+  ) {
     this.buttons.push(
       { index: 0, pageNumber: 1, isSelected: true },
       { index: 1, pageNumber: 2, isSelected: false },
       { index: 2, pageNumber: 3, isSelected: false }
     );
+
+    this.resetProductPageSwitcherCallback = () => {
+      this.reset();
+    };
+    this.setProductCountCallback = (data: number) => {
+      this.setProductCount(data);
+    };
   }
 
   ngOnInit(): void {
@@ -53,6 +67,21 @@ export class ProductPageSwitcherComponent {
           console.log('completed');
         },
       });
+
+    this.eventService.on(
+      'resetPageSwitcher',
+      this.resetProductPageSwitcherCallback
+    );
+
+    this.eventService.on('setProductCount', this.setProductCountCallback);
+  }
+  ngOnDestroy(): void {
+    this.eventService.off(
+      'resetPageSwitcher',
+      this.resetProductPageSwitcherCallback
+    );
+
+    this.eventService.off('setProductCount', this.setProductCountCallback);
   }
 
   public changePage(button: any) {
@@ -200,7 +229,16 @@ export class ProductPageSwitcherComponent {
         break;
     }
   }
-  private maxIndexThirdButtonCanHave(): number {
-    return this.pageCount - 1;
+  private reset(): void {
+    this.buttons.forEach((button: any) => {
+      button.isSelected = false;
+    });
+    this.buttons[0].isSelected = true;
+    this.setButtonColorAsSelected(this.buttons[0].index);
+
+    this.currentPageNumber = 1;
+  }
+  private setProductCount(productCounts: number): void {
+    this.pageCount = Math.ceil(productCounts / 10);
   }
 }

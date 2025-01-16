@@ -176,6 +176,8 @@ export class ProductPageComponent {
     }
   }
   public onSubCategoryClicked(subCategoryName: string) {
+    this.eventService.trigger('resetPageSwitcher');
+
     this.restService
       .getProducstFromSubCategory(subCategoryName, 0, 10)
       .subscribe({
@@ -184,6 +186,7 @@ export class ProductPageComponent {
           data.forEach((productData: IProductPreview) => {
             this.items.push(productData);
           });
+          this.eventService.trigger('setProductCount', data.length + 1);
         },
         error: (error: any) => {
           console.error(error);
