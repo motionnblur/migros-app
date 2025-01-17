@@ -51,6 +51,7 @@ export class ProductPageComponent {
     this.restService
       .getProductPageData(data.currentSelectedCategoryId, 0, 10)
       .subscribe((data: any) => {
+        console.log(data);
         data.forEach((productData: IProductPreview) => {
           this.items.push(productData);
         });

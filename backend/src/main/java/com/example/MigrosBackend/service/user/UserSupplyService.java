@@ -57,7 +57,11 @@ public class UserSupplyService {
             ProductPreviewDto itemDto = new ProductPreviewDto();
             itemDto.setProductId(itemEntity.getId());
             itemDto.setProductName(itemEntity.getProductName());
-            itemDto.setProductPrice(itemEntity.getProductPrice());
+            if(itemEntity.getProductDiscount() != 0){
+                itemDto.setProductPrice(itemEntity.getProductPrice() - (itemEntity.getProductPrice() * itemEntity.getProductDiscount() / 100));
+            }else{
+                itemDto.setProductPrice(itemEntity.getProductPrice());
+            }
 
             return itemDto;
         }).collect(Collectors.toList());
@@ -114,7 +118,11 @@ public class UserSupplyService {
             ProductPreviewDto itemDto = new ProductPreviewDto();
             itemDto.setProductId(itemEntity.getId());
             itemDto.setProductName(itemEntity.getProductName());
-            itemDto.setProductPrice(itemEntity.getProductPrice());
+            if(itemEntity.getProductDiscount() != 0){
+                itemDto.setProductPrice(itemEntity.getProductPrice() - (itemEntity.getProductPrice() * itemEntity.getProductDiscount() / 100));
+            }else{
+                itemDto.setProductPrice(itemEntity.getProductPrice());
+            }
 
             return itemDto;
         }).collect(Collectors.toList());
