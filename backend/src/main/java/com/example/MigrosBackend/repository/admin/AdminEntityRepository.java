@@ -1,4 +1,4 @@
-package com.example.MigrosBackend.repository;
+package com.example.MigrosBackend.repository.admin;
 
 import com.example.MigrosBackend.entity.admin.AdminEntity;
 import org.springframework.data.jpa.repository.JpaRepository;

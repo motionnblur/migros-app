@@ -2,8 +2,8 @@ package com.example.MigrosBackend.config;
 
 import com.example.MigrosBackend.entity.admin.AdminEntity;
 import com.example.MigrosBackend.entity.category.CategoryEntity;
-import com.example.MigrosBackend.repository.AdminEntityRepository;
-import com.example.MigrosBackend.repository.CategoryEntityRepository;
+import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
+import com.example.MigrosBackend.repository.category.CategoryEntityRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

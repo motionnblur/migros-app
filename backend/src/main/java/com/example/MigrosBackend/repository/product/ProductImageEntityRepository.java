@@ -1,4 +1,4 @@
-package com.example.MigrosBackend.repository;
+package com.example.MigrosBackend.repository.product;
 
 import com.example.MigrosBackend.entity.product.ProductImageEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
