@@ -5,7 +5,9 @@
       <div class="header-left-area"></div>
       <div class="header-button-area">
         <div class="button_order">Sipariş Takibi</div>
-        <div class="button_login">Üye Ol veya Giriş Yap</div>
+        <div class="button_login" (click)="openLoginComponent()">
+          Üye Ol veya Giriş Yap
+        </div>
       </div>
     </div>
     <div class="header__line"></div>
@@ -30,6 +32,56 @@
       <div id="footer_2" class="flex center-width width-66">
         <img id="migros-footer_1" src="footer/migros-footer.png" alt="" />
         <img id="migros-footer_2" src="footer/migros-footer2.png" alt="" />
+      </div>
+    </div>
+  </div>
+  <div *ngIf="isLoginButtonClicked" id="login-component">
+    <div *ngIf="isSignPhaseActive" id="login-component-content">
+      <div>Üye Ol</div>
+      <div>
+        <mat-form-field>
+          <mat-label>E-Posta</mat-label>
+          <input matInput />
+        </mat-form-field>
+        <mat-form-field>
+          <mat-label>Şifre</mat-label>
+          <input matInput type="password" />
+        </mat-form-field>
+      </div>
+      <div>
+        <button id="login-button" mat-raised-button>Üye Ol</button>
+        <div id="login-text">
+          Zaten üyeysen
+          <span style="color: orange; cursor: pointer" (click)="openSign()"
+            >Giriş Yap</span
+          >
+        </div>
+      </div>
+    </div>
+    <div *ngIf="!isSignPhaseActive" id="login-component-content">
+      <div>Giriş Yap</div>
+      <div>
+        <mat-form-field>
+          <mat-label>E-Posta</mat-label>
+          <input matInput />
+        </mat-form-field>
+        <mat-form-field>
+          <mat-label>Şifre Oluştur</mat-label>
+          <input matInput type="password" />
+        </mat-form-field>
+        <mat-form-field>
+          <mat-label>Şifreyi Onayla</mat-label>
+          <input matInput type="password" />
+        </mat-form-field>
+      </div>
+      <div>
+        <button id="login-button" mat-raised-button>Giriş Yap</button>
+        <div id="login-text">
+          Üye değilsen
+          <span style="color: orange; cursor: pointer" (click)="openLogin()"
+            >Üye Ol</span
+          >
+        </div>
       </div>
     </div>
   </div>
