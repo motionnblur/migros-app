@@ -1,7 +1,7 @@
-package com.example.MigrosBackend.service.admin;
+package com.example.MigrosBackend.service.admin.supply;
 
 import com.example.MigrosBackend.dto.admin.panel.*;
-import com.example.MigrosBackend.dto.user.ProductDto;
+import com.example.MigrosBackend.dto.user.product.ProductDto;
 import com.example.MigrosBackend.entity.admin.AdminEntity;
 import com.example.MigrosBackend.entity.category.CategoryEntity;
 import com.example.MigrosBackend.entity.product.ProductDescriptionEntity;

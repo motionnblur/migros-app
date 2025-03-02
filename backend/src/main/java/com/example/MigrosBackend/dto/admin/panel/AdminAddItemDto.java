@@ -1,6 +1,6 @@
 package com.example.MigrosBackend.dto.admin.panel;
 
-import com.example.MigrosBackend.dto.user.ProductDto;
+import com.example.MigrosBackend.dto.user.product.ProductDto;
 import lombok.Getter;
 import lombok.Setter;
 

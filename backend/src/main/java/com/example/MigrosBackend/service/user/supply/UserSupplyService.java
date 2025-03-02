@@ -1,7 +1,7 @@
-package com.example.MigrosBackend.service.user;
+package com.example.MigrosBackend.service.user.supply;
 
-import com.example.MigrosBackend.dto.user.ProductPreviewDto;
-import com.example.MigrosBackend.dto.user.SubCategoryDto;
+import com.example.MigrosBackend.dto.user.product.ProductPreviewDto;
+import com.example.MigrosBackend.dto.user.category.SubCategoryDto;
 import com.example.MigrosBackend.entity.category.CategoryEntity;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.product.ProductImageEntity;

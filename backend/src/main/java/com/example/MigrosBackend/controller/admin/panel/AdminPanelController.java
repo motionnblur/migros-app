@@ -2,9 +2,8 @@ package com.example.MigrosBackend.controller.admin.panel;
 
 import com.example.MigrosBackend.dto.admin.panel.AdminAddItemDto;
 import com.example.MigrosBackend.dto.admin.panel.AdminProductPreviewDto;
-import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionDto;
 import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionListDto;
-import com.example.MigrosBackend.service.admin.AdminSupplyService;
+import com.example.MigrosBackend.service.admin.supply.AdminSupplyService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

@@ -1,7 +1,7 @@
-package com.example.MigrosBackend.controller.admin;
+package com.example.MigrosBackend.controller.admin.supply;
 
-import com.example.MigrosBackend.dto.user.ProductDto;
-import com.example.MigrosBackend.service.admin.AdminSupplyService;
+import com.example.MigrosBackend.dto.user.product.ProductDto;
+import com.example.MigrosBackend.service.admin.supply.AdminSupplyService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

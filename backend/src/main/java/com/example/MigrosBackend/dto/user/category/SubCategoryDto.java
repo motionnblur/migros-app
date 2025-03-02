@@ -1,4 +1,4 @@
-package com.example.MigrosBackend.dto.user;
+package com.example.MigrosBackend.dto.user.category;
 
 import lombok.Getter;
 import lombok.Setter;
