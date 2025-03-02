@@ -1,0 +1,54 @@
+<div id="login-component">
+  <div *ngIf="isSignPhaseActive" id="login-component-content">
+    <div>Üye Ol</div>
+    <div>
+      <mat-form-field>
+        <mat-label>E-Posta</mat-label>
+        <input matInput [(ngModel)]="userMail" />
+      </mat-form-field>
+      <mat-form-field>
+        <mat-label>Şifre Oluştur</mat-label>
+        <input matInput type="password" [(ngModel)]="userPassword" />
+      </mat-form-field>
+      <mat-form-field>
+        <mat-label>Şifreyi Onayla</mat-label>
+        <input matInput type="password" [(ngModel)]="userPassword" />
+      </mat-form-field>
+    </div>
+    <div>
+      <button id="login-button" mat-raised-button (click)="signUser()">
+        Üye Ol
+      </button>
+      <div id="login-text">
+        Zaten üyeysen
+        <span style="color: orange; cursor: pointer" (click)="openSign()"
+          >Giriş Yap</span
+        >
+      </div>
+    </div>
+  </div>
+  <div *ngIf="!isSignPhaseActive" id="login-component-content">
+    <div>Giriş Yap</div>
+    <div>
+      <mat-form-field>
+        <mat-label>E-Posta</mat-label>
+        <input matInput [(ngModel)]="userMail" />
+      </mat-form-field>
+      <mat-form-field>
+        <mat-label>Şifre</mat-label>
+        <input matInput type="password" [(ngModel)]="userPassword" />
+      </mat-form-field>
+    </div>
+    <div>
+      <button id="login-button" mat-raised-button (click)="loginUser()">
+        Giriş Yap
+      </button>
+      <div id="login-text">
+        Üye değilsen
+        <span style="color: orange; cursor: pointer" (click)="openLogin()"
+          >Üye Ol</span
+        >
+      </div>
+    </div>
+  </div>
+</div>

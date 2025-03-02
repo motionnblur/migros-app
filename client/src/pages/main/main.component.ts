@@ -11,6 +11,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatButtonModule } from '@angular/material/button';
 import { RestService } from '../../services/rest/rest.service';
 import { FormsModule } from '@angular/forms';
+import { SignUserComponent } from './components/sign-user/sign-user.component';
 
 @Component({
   selector: 'app-main',
@@ -24,6 +25,7 @@ import { FormsModule } from '@angular/forms';
     MatSelectModule,
     MatButtonModule,
     FormsModule,
+    SignUserComponent,
   ],
   templateUrl: './main.component.html',
   styleUrl: './main.component.css',
@@ -31,7 +33,6 @@ import { FormsModule } from '@angular/forms';
 export class MainComponent {
   isItemPageOpened: boolean = false;
   isLoginButtonClicked: boolean = false;
-  isSignPhaseActive: boolean = true;
   title: string = 'migros-app';
   userMail!: string;
   userPassword!: string;
@@ -52,42 +53,7 @@ export class MainComponent {
   public hasItemPageOpened(): boolean {
     return this.isItemPageOpened;
   }
-  public openSign() {
-    this.isSignPhaseActive = false;
-  }
-  public openLogin() {
-    this.isSignPhaseActive = true;
-  }
-  public signUser() {
-    this.restService
-      .signUser({
-        userMail: this.userMail,
-        userPassword: this.userPassword,
-      })
-      .subscribe({
-        next: (response) => {
-          console.log('User signed up successfully:', response);
-        },
-        error: (error) => {
-          console.error('Error signing up user:', error);
-        },
-      });
-  }
-  public loginUser() {
-    this.restService
-      .loginUser({
-        userMail: this.userMail,
-        userPassword: this.userPassword,
-      })
-      .subscribe({
-        next: (response) => {
-          console.log('User logged in successfully:', response);
-        },
-        error: (error) => {
-          console.error('Error logging in user:', error);
-        },
-      });
-  }
+
   private setItemPageOpened(value: boolean) {
     this.isItemPageOpened = value;
   }
