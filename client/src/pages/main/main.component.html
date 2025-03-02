@@ -41,15 +41,21 @@
       <div>
         <mat-form-field>
           <mat-label>E-Posta</mat-label>
-          <input matInput />
+          <input matInput [(ngModel)]="userMail" />
         </mat-form-field>
         <mat-form-field>
-          <mat-label>Şifre</mat-label>
-          <input matInput type="password" />
+          <mat-label>Şifre Oluştur</mat-label>
+          <input matInput type="password" [(ngModel)]="userPassword" />
+        </mat-form-field>
+        <mat-form-field>
+          <mat-label>Şifreyi Onayla</mat-label>
+          <input matInput type="password" [(ngModel)]="userPassword" />
         </mat-form-field>
       </div>
       <div>
-        <button id="login-button" mat-raised-button>Üye Ol</button>
+        <button id="login-button" mat-raised-button (click)="signUser()">
+          Üye Ol
+        </button>
         <div id="login-text">
           Zaten üyeysen
           <span style="color: orange; cursor: pointer" (click)="openSign()"
@@ -63,19 +69,17 @@
       <div>
         <mat-form-field>
           <mat-label>E-Posta</mat-label>
-          <input matInput />
+          <input matInput [(ngModel)]="userMail" />
         </mat-form-field>
         <mat-form-field>
-          <mat-label>Şifre Oluştur</mat-label>
-          <input matInput type="password" />
-        </mat-form-field>
-        <mat-form-field>
-          <mat-label>Şifreyi Onayla</mat-label>
-          <input matInput type="password" />
+          <mat-label>Şifre</mat-label>
+          <input matInput type="password" [(ngModel)]="userPassword" />
         </mat-form-field>
       </div>
       <div>
-        <button id="login-button" mat-raised-button>Giriş Yap</button>
+        <button id="login-button" mat-raised-button (click)="loginUser()">
+          Giriş Yap
+        </button>
         <div id="login-text">
           Üye değilsen
           <span style="color: orange; cursor: pointer" (click)="openLogin()"

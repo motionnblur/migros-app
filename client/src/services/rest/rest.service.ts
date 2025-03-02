@@ -7,6 +7,7 @@ import { IAdminProductPreview } from '../../interfaces/IAdminProductPreview';
 import { IProductData } from '../../interfaces/IProductData';
 import { IProductDescription } from '../../interfaces/IProductDescription';
 import { ISubCategory } from '../../interfaces/ISubCategory';
+import { ISignDto } from '../../interfaces/ISignDto';
 
 @Injectable({
   providedIn: 'root',
@@ -165,5 +166,21 @@ export class RestService {
         responseType: 'json',
       })
       .pipe(map((response) => response as IAdminProductPreview[]));
+  }
+  signUser(userSignDto: ISignDto) {
+    return this.http
+      .post('http://localhost:8080/user/signup', userSignDto, {
+        responseType: 'text',
+        observe: 'response',
+      })
+      .pipe(map((response) => response.status === 200));
+  }
+  loginUser(userLoginDto: ISignDto) {
+    return this.http
+      .post('http://localhost:8080/user/login', userLoginDto, {
+        responseType: 'text',
+        observe: 'response',
+      })
+      .pipe(map((response) => response.status === 200));
   }
 }
