@@ -24,6 +24,7 @@ export class SignUserComponent {
   isSignPhaseActive: boolean = true;
   userMail!: string;
   userPassword!: string;
+  userPasswordConfirm!: string;
 
   constructor(private restService: RestService) {}
 
@@ -35,6 +36,15 @@ export class SignUserComponent {
   }
 
   public signUser() {
+    if (!this.userMail || !this.userPassword || !this.userPasswordConfirm) {
+      alert('Please fill in all fields correctly');
+      return;
+    }
+    if (this.userPassword !== this.userPasswordConfirm) {
+      alert('Passwords do not match');
+      return;
+    }
+
     this.restService
       .signUser({
         userMail: this.userMail,
@@ -50,6 +60,11 @@ export class SignUserComponent {
       });
   }
   public loginUser() {
+    if (!this.userMail || !this.userPassword) {
+      alert('Please fill in all fields correctly');
+      return;
+    }
+
     this.restService
       .loginUser({
         userMail: this.userMail,
