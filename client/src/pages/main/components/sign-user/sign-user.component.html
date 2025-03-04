@@ -4,15 +4,41 @@
     <div>
       <mat-form-field>
         <mat-label>E-Posta</mat-label>
-        <input matInput [(ngModel)]="userMail" />
+        <input matInput type="email" [(ngModel)]="userMail" />
       </mat-form-field>
       <mat-form-field>
         <mat-label>Şifre Oluştur</mat-label>
-        <input matInput type="password" [(ngModel)]="userPassword" />
+        <input
+          matInput
+          [type]="passwordVisible ? 'text' : 'password'"
+          [(ngModel)]="userPassword"
+        />
+        <button
+          mat-icon-button
+          matSuffix
+          (click)="passwordVisible = !passwordVisible"
+        >
+          <mat-icon>{{
+            passwordVisible ? "visibility_off" : "visibility"
+          }}</mat-icon>
+        </button>
       </mat-form-field>
       <mat-form-field>
         <mat-label>Şifreyi Onayla</mat-label>
-        <input matInput type="password" [(ngModel)]="userPasswordConfirm" />
+        <input
+          matInput
+          [type]="passwordVisible ? 'text' : 'password'"
+          [(ngModel)]="userPasswordConfirm"
+        />
+        <button
+          mat-icon-button
+          matSuffix
+          (click)="passwordVisible = !passwordVisible"
+        >
+          <mat-icon>{{
+            passwordVisible ? "visibility_off" : "visibility"
+          }}</mat-icon>
+        </button>
       </mat-form-field>
     </div>
     <div>
@@ -32,11 +58,24 @@
     <div>
       <mat-form-field>
         <mat-label>E-Posta</mat-label>
-        <input matInput [(ngModel)]="userMail" />
+        <input matInput type="email" [(ngModel)]="userMail" />
       </mat-form-field>
       <mat-form-field>
         <mat-label>Şifre</mat-label>
-        <input matInput type="password" [(ngModel)]="userPassword" />
+        <input
+          matInput
+          [type]="passwordVisible ? 'text' : 'password'"
+          [(ngModel)]="userPassword"
+        />
+        <button
+          mat-icon-button
+          matSuffix
+          (click)="passwordVisible = !passwordVisible"
+        >
+          <mat-icon>{{
+            passwordVisible ? "visibility_off" : "visibility"
+          }}</mat-icon>
+        </button>
       </mat-form-field>
     </div>
     <div>

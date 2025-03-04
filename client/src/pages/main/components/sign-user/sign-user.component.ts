@@ -6,6 +6,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatButtonModule } from '@angular/material/button';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
+import { MatIconModule } from '@angular/material/icon';
 
 @Component({
   selector: 'app-sign-user',
@@ -16,6 +17,7 @@ import { CommonModule } from '@angular/common';
     MatButtonModule,
     FormsModule,
     CommonModule,
+    MatIconModule,
   ],
   templateUrl: './sign-user.component.html',
   styleUrl: './sign-user.component.css',
@@ -25,6 +27,7 @@ export class SignUserComponent {
   userMail!: string;
   userPassword!: string;
   userPasswordConfirm!: string;
+  passwordVisible = false;
 
   constructor(private restService: RestService) {}
 
