@@ -40,6 +40,10 @@ export class SignUserComponent {
       alert('Please fill in all fields correctly');
       return;
     }
+    if (!this.userMail.endsWith('@gmail.com')) {
+      alert('Please use a Gmail address');
+      return;
+    }
     if (this.userPassword !== this.userPasswordConfirm) {
       alert('Passwords do not match');
       return;
@@ -62,6 +66,10 @@ export class SignUserComponent {
   public loginUser() {
     if (!this.userMail || !this.userPassword) {
       alert('Please fill in all fields correctly');
+      return;
+    }
+    if (!this.userMail.endsWith('@gmail.com')) {
+      alert('Please use a Gmail address');
       return;
     }
 
