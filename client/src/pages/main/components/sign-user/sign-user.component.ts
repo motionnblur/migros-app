@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, EventEmitter, Output } from '@angular/core';
 import { RestService } from '../../../../services/rest/rest.service';
 import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
@@ -31,11 +31,17 @@ export class SignUserComponent {
 
   constructor(private restService: RestService) {}
 
+  @Output() closeComponentEvent = new EventEmitter<void>();
   public openSign() {
     this.isSignPhaseActive = false;
   }
   public openLogin() {
     this.isSignPhaseActive = true;
+  }
+  public closeComponent(event: any) {
+    if (event.target.id === 'login-component') {
+      this.closeComponentEvent.emit();
+    }
   }
 
   public signUser() {

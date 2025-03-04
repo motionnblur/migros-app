@@ -50,6 +50,10 @@ export class MainComponent {
   public openLoginComponent() {
     this.isLoginButtonClicked = true;
   }
+
+  public closeLoginComponent() {
+    this.isLoginButtonClicked = false;
+  }
   public hasItemPageOpened(): boolean {
     return this.isItemPageOpened;
   }
