@@ -34,9 +34,16 @@ export class SignUserComponent {
   @Output() closeComponentEvent = new EventEmitter<void>();
   public openSign() {
     this.isSignPhaseActive = false;
+    this.clearFields();
   }
   public openLogin() {
     this.isSignPhaseActive = true;
+    this.clearFields();
+  }
+  private clearFields() {
+    this.userMail = '';
+    this.userPassword = '';
+    this.userPasswordConfirm = '';
   }
   public closeComponent(event: any) {
     if (event.target.id === 'login-component') {
