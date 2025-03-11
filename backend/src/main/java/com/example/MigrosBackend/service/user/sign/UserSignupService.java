@@ -44,7 +44,7 @@ public class UserSignupService {
             tokenToUserMap.remove(key);
         }, 5, TimeUnit.MINUTES);
 
-        mailService.sendSimpleMessage(userSignDto.getUserMail(), "Migros", "Welcome to Migros!\nPlease confirm your email address by clicking the link below:\n" + confirmationLink);
+        mailService.sendSimpleMessage(userSignDto.getUserMail(), "Migros", "Welcome to Migros!\n\nPlease confirm your email address by clicking the link below in 5 minutes:\n" + confirmationLink + "\n\nIf you did not request this email, please ignore it.");
     }
     public void login(UserSignDto userSignDto) {
         UserEntity userEntity = userEntityRepository.findByUserMail(userSignDto.getUserMail());

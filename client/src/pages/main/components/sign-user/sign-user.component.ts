@@ -73,6 +73,9 @@ export class SignUserComponent {
       .subscribe({
         next: (response) => {
           console.log('User signed up successfully:', response);
+          alert(
+            'Confirmation mail has been sent to your mailbox. Please click the link to activate your account in 5 minutes.'
+          );
         },
         error: (error) => {
           console.error('Error signing up user:', error);
