@@ -8,11 +8,19 @@ import com.example.MigrosBackend.service.global.MailService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
 @Service
 public class UserSignupService {
     private final UserEntityRepository userEntityRepository;
     private final EncryptService encryptService;
     private final MailService mailService;
+
+    private final ConcurrentHashMap<String, UserEntity> tokenToUserMap = new ConcurrentHashMap<>();
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
     @Autowired
     public UserSignupService(UserEntityRepository userEntityRepository, EncryptService encryptService, MailService mailService) {
@@ -20,7 +28,6 @@ public class UserSignupService {
         this.encryptService = encryptService;
         this.mailService = mailService;
     }
-
     public void signup(UserSignDto userSignDto) {
         UserEntity userEntityToCreate = new UserEntity();
         userEntityToCreate.setUserMail(userSignDto.getUserMail());
@@ -29,10 +36,15 @@ public class UserSignupService {
         if(userEntityRepository.existsByUserMail(userSignDto.getUserMail()))
             throw new RuntimeException("User with that email: "+ userSignDto.getUserMail()+" already exists.");
 
-        userEntityRepository.save(userEntityToCreate);
-
         String key = Long.toHexString(Double.doubleToLongBits(Math.random()));
-        mailService.sendSimpleMessage(userSignDto.getUserMail(), "Migros", "Welcome to Migros! Your key is: " + key);
+        String confirmationLink = "localhost:8080/user/signup/confirm?token=" + key;
+        tokenToUserMap.put(key, userEntityToCreate);
+
+        scheduler.schedule(() -> {
+            tokenToUserMap.remove(key);
+        }, 5, TimeUnit.MINUTES);
+
+        mailService.sendSimpleMessage(userSignDto.getUserMail(), "Migros", "Welcome to Migros!\nPlease confirm your email address by clicking the link below:\n" + confirmationLink);
     }
     public void login(UserSignDto userSignDto) {
         UserEntity userEntity = userEntityRepository.findByUserMail(userSignDto.getUserMail());
@@ -40,5 +52,16 @@ public class UserSignupService {
 
         if(!encryptService.checkIfPasswordMatches(userSignDto.getUserPassword(), userEntity.getUserPassword()))
             throw new RuntimeException("Wrong password.");
+    }
+    public void confirm(String token) {
+        UserEntity userEntity = tokenToUserMap.get(token);
+        if (userEntity != null) {
+            // User confirmed, save to database
+            userEntityRepository.save(userEntity);
+            tokenToUserMap.remove(token);
+        } else {
+            // Token not found or expired
+            throw new RuntimeException("Token not found or expired");
+        }
     }
 }
