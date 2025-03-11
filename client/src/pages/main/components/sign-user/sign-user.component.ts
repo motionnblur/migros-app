@@ -78,6 +78,8 @@ export class SignUserComponent {
           console.error('Error signing up user:', error);
         },
       });
+
+    this.clearFields();
   }
   public loginUser() {
     if (!this.userMail || !this.userPassword) {
@@ -102,5 +104,7 @@ export class SignUserComponent {
           console.error('Error logging in user:', error);
         },
       });
+
+    this.clearFields();
   }
 }
