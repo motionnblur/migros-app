@@ -1,5 +1,6 @@
 package com.example.MigrosBackend.config;
 
+import com.example.MigrosBackend.config.security.SecurityConfiguration;
 import com.example.MigrosBackend.entity.admin.AdminEntity;
 import com.example.MigrosBackend.entity.category.CategoryEntity;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;

@@ -1,6 +1,6 @@
 package com.example.MigrosBackend.service.global;
 
-import com.example.MigrosBackend.config.SecurityConfiguration;
+import com.example.MigrosBackend.config.security.SecurityConfiguration;
 import org.springframework.stereotype.Service;
 
 @Service
