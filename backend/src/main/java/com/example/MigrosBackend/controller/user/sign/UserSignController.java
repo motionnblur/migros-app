@@ -30,7 +30,7 @@ public class UserSignController {
     private ResponseEntity<?> confirm(@RequestParam String token) throws Exception {
         try{
             userSignupService.confirm(token);
-            return new ResponseEntity<>(HttpStatus.OK);
+            return new ResponseEntity<>("Your account has been created successfully, you can close this page now.",HttpStatus.OK);
         } catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }

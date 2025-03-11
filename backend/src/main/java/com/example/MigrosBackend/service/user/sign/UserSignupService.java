@@ -5,6 +5,7 @@ import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
 import com.example.MigrosBackend.service.global.EncryptService;
 import com.example.MigrosBackend.service.global.MailService;
+import jakarta.mail.MessagingException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -28,7 +29,7 @@ public class UserSignupService {
         this.encryptService = encryptService;
         this.mailService = mailService;
     }
-    public void signup(UserSignDto userSignDto) {
+    public void signup(UserSignDto userSignDto) throws MessagingException {
         UserEntity userEntityToCreate = new UserEntity();
         userEntityToCreate.setUserMail(userSignDto.getUserMail());
         userEntityToCreate.setUserPassword(encryptService.getEncryptedPassword(userSignDto.getUserPassword()));
@@ -37,14 +38,15 @@ public class UserSignupService {
             throw new RuntimeException("User with that email: "+ userSignDto.getUserMail()+" already exists.");
 
         String key = Long.toHexString(Double.doubleToLongBits(Math.random()));
-        String confirmationLink = "localhost:8080/user/signup/confirm?token=" + key;
+        String confirmationLink = "http://localhost:8080/user/signup/confirm?token=" + key;
         tokenToUserMap.put(key, userEntityToCreate);
 
         scheduler.schedule(() -> {
             tokenToUserMap.remove(key);
         }, 5, TimeUnit.MINUTES);
 
-        mailService.sendSimpleMessage(userSignDto.getUserMail(), "Migros", "Welcome to Migros!\n\nPlease confirm your email address by clicking the link below in 5 minutes:\n" + confirmationLink + "\n\nIf you did not request this email, please ignore it.");
+        String confirmationLinkHtml = "<a href=\"" + confirmationLink + "\">" + confirmationLink + "</a>";
+        mailService.sendMimeMessage(userSignDto.getUserMail(), "Migros", "<html><h1>Welcome to Migros!</h1><br>Please confirm your email address by clicking the link below in 5 minutes:<br>" + confirmationLinkHtml + "<br><br>If you did not request this email, please ignore it.</html>");
     }
     public void login(UserSignDto userSignDto) {
         UserEntity userEntity = userEntityRepository.findByUserMail(userSignDto.getUserMail());
