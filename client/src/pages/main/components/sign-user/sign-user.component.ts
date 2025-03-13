@@ -77,8 +77,9 @@ export class SignUserComponent {
             'Confirmation mail has been sent to your mailbox. Please click the link to activate your account in 5 minutes.'
           );
         },
-        error: (error) => {
-          console.error('Error signing up user:', error);
+        error: (errorObj) => {
+          console.error('Error signing up');
+          alert(errorObj.error);
         },
       });
 
@@ -101,11 +102,11 @@ export class SignUserComponent {
       })
       .subscribe({
         next: (response) => {
-          console.log('User logged in successfully:', response);
+          console.log('User logged in successfully');
           this.closeComponentEvent.emit();
         },
         error: (error) => {
-          console.error('Error logging in user:', error);
+          console.error('Error logging in user');
         },
       });
 

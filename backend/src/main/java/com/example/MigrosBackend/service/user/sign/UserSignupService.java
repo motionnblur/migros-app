@@ -30,12 +30,12 @@ public class UserSignupService {
         this.mailService = mailService;
     }
     public void signup(UserSignDto userSignDto) throws MessagingException {
+        if(userEntityRepository.existsByUserMail(userSignDto.getUserMail()))
+            throw new RuntimeException("User with that email: "+ userSignDto.getUserMail()+" already exists.");
+
         UserEntity userEntityToCreate = new UserEntity();
         userEntityToCreate.setUserMail(userSignDto.getUserMail());
         userEntityToCreate.setUserPassword(encryptService.getEncryptedPassword(userSignDto.getUserPassword()));
-
-        if(userEntityRepository.existsByUserMail(userSignDto.getUserMail()))
-            throw new RuntimeException("User with that email: "+ userSignDto.getUserMail()+" already exists.");
 
         String key = Long.toHexString(Double.doubleToLongBits(Math.random()));
         String confirmationLink = "http://localhost:8080/user/signup/confirm?token=" + key;
