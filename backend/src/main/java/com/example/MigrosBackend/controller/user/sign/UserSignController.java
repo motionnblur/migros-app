@@ -38,8 +38,8 @@ public class UserSignController {
     @PostMapping("login")
     private ResponseEntity<?> login(@RequestBody UserSignDto userSignDto) throws Exception {
         try{
-            userSignupService.login(userSignDto);
-            return new ResponseEntity<>(HttpStatus.OK);
+            String token = userSignupService.login(userSignDto);
+            return ResponseEntity.ok(token);
         } catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }

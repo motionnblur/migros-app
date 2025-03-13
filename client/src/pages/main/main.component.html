@@ -6,7 +6,7 @@
       <div class="header-button-area">
         <div class="button_order">Sipariş Takibi</div>
         <div class="button_login" (click)="openLoginComponent()">
-          Üye Ol veya Giriş Yap
+          {{ loginText }}
         </div>
       </div>
     </div>
@@ -36,6 +36,9 @@
     </div>
   </div>
   <div *ngIf="isLoginButtonClicked">
-    <app-sign-user (closeComponentEvent)="closeLoginComponent()" />
+    <app-sign-user
+      (closeComponentEvent)="closeLoginComponent()"
+      (userLoginEvent)="loginUser()"
+    />
   </div>
 </div>

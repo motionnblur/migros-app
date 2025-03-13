@@ -7,6 +7,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
+import { AuthService } from '../../../../services/auth/auth.service';
 
 @Component({
   selector: 'app-sign-user',
@@ -29,9 +30,13 @@ export class SignUserComponent {
   userPasswordConfirm!: string;
   passwordVisible = false;
 
-  constructor(private restService: RestService) {}
+  constructor(
+    private restService: RestService,
+    private authService: AuthService
+  ) {}
 
   @Output() closeComponentEvent = new EventEmitter<void>();
+  @Output() userLoginEvent = new EventEmitter<void>();
   public openSign() {
     this.isSignPhaseActive = false;
     this.clearFields();
@@ -103,6 +108,9 @@ export class SignUserComponent {
       .subscribe({
         next: (response) => {
           console.log('User logged in successfully');
+          this.authService.setToken(response!);
+          //console.log(response);
+          this.userLoginEvent.emit();
           this.closeComponentEvent.emit();
         },
         error: (error) => {

@@ -12,6 +12,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { RestService } from '../../services/rest/rest.service';
 import { FormsModule } from '@angular/forms';
 import { SignUserComponent } from './components/sign-user/sign-user.component';
+import { AuthService } from '../../services/auth/auth.service';
 
 @Component({
   selector: 'app-main',
@@ -36,19 +37,32 @@ export class MainComponent {
   title: string = 'migros-app';
   userMail!: string;
   userPassword!: string;
+  loginText: string = 'Üye Ol veya Giriş Yap';
 
   constructor(
     private eventManager: EventService,
-    private restService: RestService
+    private restService: RestService,
+    private authService: AuthService
   ) {
     eventManager.on('openItemPage', (categoryId: number) => {
       data.currentSelectedCategoryId = categoryId;
       this.setItemPageOpened(true);
     });
+    if (this.authService.isLoggedIn()) {
+      this.loginText = 'Can';
+    } else {
+      if (this.authService.isTokenExists()) {
+        this.authService.logout();
+      }
+      this.loginText = 'Üye Ol veya Giriş Yap';
+    }
   }
 
   public openLoginComponent() {
     this.isLoginButtonClicked = true;
+  }
+  public loginUser() {
+    this.loginText = 'Can';
   }
 
   public closeLoginComponent() {

@@ -181,6 +181,6 @@ export class RestService {
         responseType: 'text',
         observe: 'response',
       })
-      .pipe(map((response) => response.status === 200));
+      .pipe(map((response) => response.body));
   }
 }
