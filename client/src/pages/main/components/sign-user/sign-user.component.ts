@@ -102,6 +102,7 @@ export class SignUserComponent {
       .subscribe({
         next: (response) => {
           console.log('User logged in successfully:', response);
+          this.closeComponentEvent.emit();
         },
         error: (error) => {
           console.error('Error logging in user:', error);
