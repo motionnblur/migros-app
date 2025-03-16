@@ -34,6 +34,8 @@ import { AuthService } from '../../services/auth/auth.service';
 export class MainComponent {
   isItemPageOpened: boolean = false;
   isLoginButtonClicked: boolean = false;
+  isOrderButtonClicked: boolean = false;
+  isUserSigned: boolean = false;
   title: string = 'migros-app';
   userMail!: string;
   userPassword!: string;
@@ -50,8 +52,10 @@ export class MainComponent {
     });
     if (this.authService.isLoggedIn()) {
       this.loginText = 'Can';
+      this.isUserSigned = true;
     } else {
       if (this.authService.isTokenExists()) {
+        this.isUserSigned = false;
         this.authService.logout();
       }
       this.loginText = 'Üye Ol veya Giriş Yap';
@@ -61,8 +65,16 @@ export class MainComponent {
   public openLoginComponent() {
     this.isLoginButtonClicked = true;
   }
+  public openOrderComponent() {
+    if (!this.authService.isLoggedIn()) {
+      this.isLoginButtonClicked = true;
+      return;
+    }
+    this.isOrderButtonClicked = true;
+  }
   public loginUser() {
     this.loginText = 'Can';
+    this.isUserSigned = true;
   }
 
   public closeLoginComponent() {

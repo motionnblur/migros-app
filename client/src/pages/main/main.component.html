@@ -4,7 +4,9 @@
       <!-- <img src="migros_header.png" /> -->
       <div class="header-left-area"></div>
       <div class="header-button-area">
-        <div class="button_order">Sipariş Takibi</div>
+        <div class="button_order" (click)="openOrderComponent()">
+          Sipariş Takibi
+        </div>
         <div class="button_login" (click)="openLoginComponent()">
           {{ loginText }}
         </div>
@@ -35,7 +37,7 @@
       </div>
     </div>
   </div>
-  <div *ngIf="isLoginButtonClicked">
+  <div *ngIf="isLoginButtonClicked && !this.isUserSigned">
     <app-sign-user
       (closeComponentEvent)="closeLoginComponent()"
       (userLoginEvent)="loginUser()"
