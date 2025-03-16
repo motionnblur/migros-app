@@ -80,6 +80,13 @@ public class UserSupplyController {
         }catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
-
+    }
+    @GetMapping("addProductToInventory")
+    public ResponseEntity<?> addProductToInventory(@RequestParam Long productId, @RequestParam String token) {
+        try {
+            return userSupplyService.addProductToInventory(productId, token);
+        }catch (Exception e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
     }
 }

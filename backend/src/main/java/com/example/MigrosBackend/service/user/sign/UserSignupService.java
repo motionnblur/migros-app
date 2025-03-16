@@ -1,6 +1,7 @@
 package com.example.MigrosBackend.service.user.sign;
 
 import com.example.MigrosBackend.dto.user.sign.UserSignDto;
+import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
 import com.example.MigrosBackend.service.global.EncryptService;
@@ -70,6 +71,14 @@ public class UserSignupService {
         } else {
             // Token not found or expired
             throw new RuntimeException("Token not found or expired");
+        }
+    }
+
+    public void addProductToInventory(String token, ProductEntity productDto) {
+        String userName = tokenService.extractUsername(token);
+        if(tokenService.validateToken(token, userEntityRepository.findByUserMail(userName).getUserMail()))
+        {
+            userEntityRepository.findByUserMail(userName).getProductEntities().add(productDto);
         }
     }
 }

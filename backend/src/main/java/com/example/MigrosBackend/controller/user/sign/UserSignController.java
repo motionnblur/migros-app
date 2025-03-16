@@ -1,6 +1,7 @@
 package com.example.MigrosBackend.controller.user.sign;
 
 import com.example.MigrosBackend.dto.user.sign.UserSignDto;
+import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.service.user.sign.UserSignupService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -40,6 +41,15 @@ public class UserSignController {
         try{
             String token = userSignupService.login(userSignDto);
             return ResponseEntity.ok(token);
+        } catch (Exception e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+    @PostMapping("addProductToInventory")
+    private ResponseEntity<?> addItem(@RequestParam String token, @RequestBody ProductEntity productDto) throws Exception {
+        try{
+            userSignupService.addProductToInventory(token, productDto);
+            return new ResponseEntity<>(HttpStatus.OK);
         } catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }

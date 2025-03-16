@@ -8,6 +8,8 @@ import com.example.MigrosBackend.entity.product.ProductImageEntity;
 import com.example.MigrosBackend.repository.category.CategoryEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductImageEntityRepository;
+import com.example.MigrosBackend.repository.user.UserEntityRepository;
+import com.example.MigrosBackend.service.global.TokenService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
@@ -28,16 +30,22 @@ public class UserSupplyService {
     private final CategoryEntityRepository categoryEntityRepository;
     private final ProductEntityRepository productEntityRepository;
     private final ProductImageEntityRepository productImageEntityRepository;
+    private final UserEntityRepository userEntityRepository;
+    private final TokenService tokenService;
 
     @Autowired
     public UserSupplyService(
             CategoryEntityRepository categoryEntityRepository,
             ProductEntityRepository productEntityRepository,
-            ProductImageEntityRepository productImageEntityRepository
+            ProductImageEntityRepository productImageEntityRepository,
+            UserEntityRepository userEntityRepository,
+            TokenService tokenService
     ) {
         this.categoryEntityRepository = categoryEntityRepository;
         this.productEntityRepository = productEntityRepository;
         this.productImageEntityRepository = productImageEntityRepository;
+        this.userEntityRepository = userEntityRepository;
+        this.tokenService = tokenService;
     }
 
     public List<String> getAllCategoryNames() {
@@ -130,5 +138,14 @@ public class UserSupplyService {
 
     public ResponseEntity<?> getProductCountsFromSubcategory(String subcategoryName) {
         return ResponseEntity.ok(productEntityRepository.countBySubcategoryName(subcategoryName));
+    }
+
+    public ResponseEntity<?> addProductToInventory(Long productId, String token) {
+        String userName = tokenService.extractUsername(token);
+        if(tokenService.validateToken(token, userEntityRepository.findByUserMail(userName).getUserMail())){
+            userEntityRepository.findByUserMail(userName).getProductEntities().add(productEntityRepository.findById(productId).get());
+            return ResponseEntity.ok("Product added to inventory");
+        }
+        return new ResponseEntity<>("Invalid token", HttpStatus.BAD_REQUEST);
     }
 }
