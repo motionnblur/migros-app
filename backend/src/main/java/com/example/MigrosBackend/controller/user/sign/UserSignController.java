@@ -45,13 +45,4 @@ public class UserSignController {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
     }
-    @PostMapping("addProductToInventory")
-    private ResponseEntity<?> addItem(@RequestParam String token, @RequestBody ProductEntity productDto) throws Exception {
-        try{
-            userSignupService.addProductToInventory(token, productDto);
-            return new ResponseEntity<>(HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
-    }
 }

@@ -76,9 +76,11 @@ public class UserSignupService {
 
     public void addProductToInventory(String token, ProductEntity productDto) {
         String userName = tokenService.extractUsername(token);
-        if(tokenService.validateToken(token, userEntityRepository.findByUserMail(userName).getUserMail()))
+        UserEntity user = userEntityRepository.findByUserMail(userName);
+        if(tokenService.validateToken(token, user.getUserMail()))
         {
-            userEntityRepository.findByUserMail(userName).getProductEntities().add(productDto);
+            user.getProductEntities().add(productDto);
+            userEntityRepository.save(user);
         }
     }
 }
