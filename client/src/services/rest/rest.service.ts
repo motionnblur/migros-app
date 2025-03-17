@@ -188,8 +188,9 @@ export class RestService {
     return this.http
       .get(`http://localhost:8080/user/supply/addProductToUserCart`, {
         params: { productId, token },
-        responseType: 'json',
+        responseType: 'text',
+        observe: 'response',
       })
-      .pipe(map((response) => response));
+      .pipe(map((response) => response.body));
   }
 }

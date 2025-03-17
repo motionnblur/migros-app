@@ -46,4 +46,17 @@ export class ProductBuyComponent extends ProductBuyBase {
     this.currentProductDescriptionBody =
       this.sanitizer.bypassSecurityTrustHtml(description);
   }
+  public addProductToUserCart() {
+    this.restService.addProductToUserCart(this.productId).subscribe({
+      next: () => {
+        // // Emit the event
+      },
+      error: (error) => {
+        console.error('Error adding product to user cart');
+      },
+      complete: () => {
+        alert('Product added to cart');
+      },
+    });
+  }
 }

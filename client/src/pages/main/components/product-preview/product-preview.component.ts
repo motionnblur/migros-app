@@ -35,7 +35,17 @@ export class ProductPreviewComponent {
   onProductViewClicked() {
     this.eventService.trigger('onProductPreviewClicked', this.productId);
   }
-  addProductToUserCart() {
-    this.restService.addProductToUserCart(this.productId).subscribe();
+  public addProductToUserCart() {
+    this.restService.addProductToUserCart(this.productId).subscribe({
+      next: () => {
+        // // Emit the event
+      },
+      error: (error) => {
+        console.error('Error adding product to user cart');
+      },
+      complete: () => {
+        alert('Product added to cart');
+      },
+    });
   }
 }
