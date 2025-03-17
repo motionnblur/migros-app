@@ -183,4 +183,13 @@ export class RestService {
       })
       .pipe(map((response) => response.body));
   }
+  addProductToUserCart(productId: number) {
+    const token: string = localStorage.getItem('token') as string;
+    return this.http
+      .get(`http://localhost:8080/user/supply/addProductToUserCart`, {
+        params: { productId, token },
+        responseType: 'json',
+      })
+      .pipe(map((response) => response));
+  }
 }

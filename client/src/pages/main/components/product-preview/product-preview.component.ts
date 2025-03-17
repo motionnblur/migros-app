@@ -35,4 +35,7 @@ export class ProductPreviewComponent {
   onProductViewClicked() {
     this.eventService.trigger('onProductPreviewClicked', this.productId);
   }
+  addProductToUserCart() {
+    this.restService.addProductToUserCart(this.productId).subscribe();
+  }
 }

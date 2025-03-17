@@ -22,8 +22,5 @@ public class UserEntity {
     private String userName;
     private String userPassword;
 
-    @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
-    @JoinColumn(name = "user_entity_id", referencedColumnName = "user_entity_id")
-    @JsonManagedReference
-    private List<ProductEntity> productEntities;
+    private List<Long> productsIdsInCart;
 }

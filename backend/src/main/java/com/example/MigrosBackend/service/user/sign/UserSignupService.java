@@ -73,14 +73,4 @@ public class UserSignupService {
             throw new RuntimeException("Token not found or expired");
         }
     }
-
-    public void addProductToInventory(String token, ProductEntity productDto) {
-        String userName = tokenService.extractUsername(token);
-        UserEntity user = userEntityRepository.findByUserMail(userName);
-        if(tokenService.validateToken(token, user.getUserMail()))
-        {
-            user.getProductEntities().add(productDto);
-            userEntityRepository.save(user);
-        }
-    }
 }

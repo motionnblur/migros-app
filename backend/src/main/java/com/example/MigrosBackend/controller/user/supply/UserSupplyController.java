@@ -81,10 +81,11 @@ public class UserSupplyController {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
     }
-    @GetMapping("addProductToInventory")
-    public ResponseEntity<?> addProductToInventory(@RequestParam Long productId, @RequestParam String token) {
+    @GetMapping("addProductToUserCart")
+    public ResponseEntity<?> addProductToUserCart(@RequestParam Long productId, @RequestParam String token) {
         try {
-            return userSupplyService.addProductToInventory(productId, token);
+            userSupplyService.addProductToInventory(productId, token);
+            return new ResponseEntity<>("Product added to inventory", HttpStatus.OK);
         }catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }

@@ -5,6 +5,7 @@ import com.example.MigrosBackend.dto.user.category.SubCategoryDto;
 import com.example.MigrosBackend.entity.category.CategoryEntity;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.product.ProductImageEntity;
+import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.repository.category.CategoryEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductImageEntityRepository;
@@ -22,6 +23,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -140,12 +142,18 @@ public class UserSupplyService {
         return ResponseEntity.ok(productEntityRepository.countBySubcategoryName(subcategoryName));
     }
 
-    public ResponseEntity<?> addProductToInventory(Long productId, String token) {
+    public void addProductToInventory(Long productId, String token) {
         String userName = tokenService.extractUsername(token);
-        if(tokenService.validateToken(token, userEntityRepository.findByUserMail(userName).getUserMail())){
-            userEntityRepository.findByUserMail(userName).getProductEntities().add(productEntityRepository.findById(productId).get());
-            return ResponseEntity.ok("Product added to inventory");
+        UserEntity user = userEntityRepository.findByUserMail(userName);
+        if(tokenService.validateToken(token, user.getUserMail()))
+        {
+            if (user.getProductsIdsInCart() == null) {
+                user.setProductsIdsInCart(new ArrayList<>()); // Initialize if null
+            }
+            user.getProductsIdsInCart().add(productId);
+            userEntityRepository.save(user);
+        }else{
+            throw new RuntimeException("Token not valid");
         }
-        return new ResponseEntity<>("Invalid token", HttpStatus.BAD_REQUEST);
     }
 }
