@@ -14,7 +14,7 @@ public class TokenService {
         return Jwts.builder()
                 .setSubject(username)
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60)) // 10 min
+                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60*3)) // 10 min
                 .signWith(SignatureAlgorithm.HS256, secretKey)
                 .compact();
     }
