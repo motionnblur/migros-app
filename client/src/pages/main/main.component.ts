@@ -13,6 +13,7 @@ import { RestService } from '../../services/rest/rest.service';
 import { FormsModule } from '@angular/forms';
 import { SignUserComponent } from './components/sign-user/sign-user.component';
 import { AuthService } from '../../services/auth/auth.service';
+import { MatMenuModule } from '@angular/material/menu';
 
 @Component({
   selector: 'app-main',
@@ -27,6 +28,7 @@ import { AuthService } from '../../services/auth/auth.service';
     MatButtonModule,
     FormsModule,
     SignUserComponent,
+    MatMenuModule,
   ],
   templateUrl: './main.component.html',
   styleUrl: './main.component.css',
@@ -75,6 +77,9 @@ export class MainComponent {
   public loginUser() {
     this.loginText = 'Can';
     this.isUserSigned = true;
+  }
+  public isUserLoggedIn() {
+    return this.isUserSigned;
   }
 
   public closeLoginComponent() {

@@ -7,8 +7,26 @@
         <div class="button_order" (click)="openOrderComponent()">
           Sipariş Takibi
         </div>
-        <div class="button_login" (click)="openLoginComponent()">
+        <!-- <div class="button_login" (click)="openLoginComponent()">
           {{ loginText }}
+        </div> -->
+        <div *ngIf="!isUserLoggedIn()">
+          <button mat-button (click)="openLoginComponent()">
+            {{ loginText }}
+          </button>
+        </div>
+        <div *ngIf="isUserLoggedIn()">
+          <button
+            mat-button
+            [matMenuTriggerFor]="menu"
+            (click)="openLoginComponent()"
+          >
+            {{ loginText }}
+          </button>
+          <mat-menu #menu="matMenu">
+            <button mat-menu-item>Sepetim</button>
+            <button mat-menu-item>Profilim</button>
+          </mat-menu>
         </div>
       </div>
     </div>
