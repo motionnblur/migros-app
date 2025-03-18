@@ -62,7 +62,6 @@
     />
   </div>
   <div *ngIf="isCartComponentOpened">
-    <div id="cart-component-bg" (click)="closeCartComponent()"></div>
-    <div id="cart-component"></div>
+    <app-user-cart (closeComponentEvent)="closeCartComponent()" />
   </div>
 </div>

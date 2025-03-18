@@ -14,6 +14,7 @@ import { FormsModule } from '@angular/forms';
 import { SignUserComponent } from './components/sign-user/sign-user.component';
 import { AuthService } from '../../services/auth/auth.service';
 import { MatMenuModule } from '@angular/material/menu';
+import { UserCartComponent } from './components/user-cart/user-cart.component';
 
 @Component({
   selector: 'app-main',
@@ -29,6 +30,7 @@ import { MatMenuModule } from '@angular/material/menu';
     FormsModule,
     SignUserComponent,
     MatMenuModule,
+    UserCartComponent,
   ],
   templateUrl: './main.component.html',
   styleUrl: './main.component.css',
