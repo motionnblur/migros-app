@@ -42,6 +42,7 @@ export class MainComponent {
   userMail!: string;
   userPassword!: string;
   loginText: string = 'Üye Ol veya Giriş Yap';
+  isCartComponentOpened: boolean = false;
 
   constructor(
     private eventManager: EventService,
@@ -87,6 +88,12 @@ export class MainComponent {
   }
   public hasItemPageOpened(): boolean {
     return this.isItemPageOpened;
+  }
+  public openCartComponent() {
+    this.isCartComponentOpened = true;
+  }
+  public closeCartComponent() {
+    this.isCartComponentOpened = false;
   }
 
   private setItemPageOpened(value: boolean) {

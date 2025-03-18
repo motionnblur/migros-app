@@ -24,7 +24,7 @@
             {{ loginText }}
           </button>
           <mat-menu #menu="matMenu">
-            <button mat-menu-item>Sepetim</button>
+            <button mat-menu-item (click)="openCartComponent()">Sepetim</button>
             <button mat-menu-item>Profilim</button>
           </mat-menu>
         </div>
@@ -60,5 +60,9 @@
       (closeComponentEvent)="closeLoginComponent()"
       (userLoginEvent)="loginUser()"
     />
+  </div>
+  <div *ngIf="isCartComponentOpened">
+    <div id="cart-component-bg" (click)="closeCartComponent()"></div>
+    <div id="cart-component"></div>
   </div>
 </div>
