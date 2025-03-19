@@ -8,6 +8,7 @@ import { IProductData } from '../../interfaces/IProductData';
 import { IProductDescription } from '../../interfaces/IProductDescription';
 import { ISubCategory } from '../../interfaces/ISubCategory';
 import { ISignDto } from '../../interfaces/ISignDto';
+import { IUserCartItemDto } from '../../interfaces/IUserCartItemDto';
 
 @Injectable({
   providedIn: 'root',
@@ -55,6 +56,21 @@ export class RestService {
         responseType: 'json',
       })
       .pipe(map((response) => response as IProductData));
+  }
+  getProductDataForUserCart(productId: number) {
+    return this.http
+      .get(`http://localhost:8080/user/supply/getProductData`, {
+        params: { productId },
+        responseType: 'json',
+      })
+      .pipe(map((response) => response as IProductData));
+  }
+  getAllProductsFromUserCart() {
+    return this.http
+      .get(`http://localhost:8080/user/supply/getProductData`, {
+        responseType: 'json',
+      })
+      .pipe(map((response) => response as IUserCartItemDto[]));
   }
   getAllAdminProducts(adminId: number, page: number, productRange: number) {
     return this.http

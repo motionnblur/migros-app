@@ -1,7 +1,9 @@
 package com.example.MigrosBackend.service.user.supply;
 
+import com.example.MigrosBackend.dto.user.product.ProductDto;
 import com.example.MigrosBackend.dto.user.product.ProductPreviewDto;
 import com.example.MigrosBackend.dto.user.category.SubCategoryDto;
+import com.example.MigrosBackend.dto.user.product.UserCartItemDto;
 import com.example.MigrosBackend.entity.category.CategoryEntity;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.product.ProductImageEntity;
@@ -25,6 +27,8 @@ import org.springframework.stereotype.Service;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -155,5 +159,31 @@ public class UserSupplyService {
         }else{
             throw new RuntimeException("Token not valid");
         }
+    }
+
+    public List<UserCartItemDto> getProductData() {
+        UserEntity user = userEntityRepository.findById(1L).orElseThrow(() -> new RuntimeException("User not found"));
+        List<Long> productIds = user.getProductsIdsInCart();
+
+        Map<Long, Long> productIdCounts = productIds.stream()
+                .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
+
+        List<ProductEntity> productEntities = productEntityRepository.findAllById(productIdCounts.keySet());
+
+        Map<Long, ProductEntity> productEntityMap = productEntities.stream()
+                .collect(Collectors.toMap(ProductEntity::getId, Function.identity()));
+
+        return productIdCounts.entrySet().stream()
+                .map(entry -> {
+                    ProductEntity productEntity = productEntityMap.get(entry.getKey());
+
+                    UserCartItemDto dto = new UserCartItemDto();
+                    dto.setProductId(productEntity.getId());
+                    dto.setProductName(productEntity.getProductName());
+                    dto.setProductPrice(productEntity.getProductPrice());
+                    dto.setProductCount(entry.getValue().intValue());
+
+                    return dto;
+                }).toList();
     }
 }

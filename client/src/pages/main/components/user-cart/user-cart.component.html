@@ -1,2 +1,18 @@
 <div id="cart-component-bg" (click)="closeCartComponent()"></div>
-<div id="cart-component"></div>
+<div id="cart-component">
+  <!--   <img
+    class="cart-component__image"
+    *ngFor="let url of imageUrls"
+    src="{{ url }}"
+  /> -->
+  <div id="user-cart__head">
+    <div *ngFor="let item of items; let i = index">
+      <div class="cart-component__item">
+        <img class="cart-component__item-image" src="{{ imageUrls?.[i] }}" />
+        <div class="cart-component__item-name">{{ item.productName }}</div>
+        <div class="cart-component__item-price">{{ item.productPrice }} ₺</div>
+      </div>
+    </div>
+  </div>
+  <div id="user-cart__bottom"></div>
+</div>

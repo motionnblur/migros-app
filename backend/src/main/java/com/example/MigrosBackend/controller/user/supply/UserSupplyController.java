@@ -1,6 +1,8 @@
 package com.example.MigrosBackend.controller.user.supply;
 
+import com.example.MigrosBackend.dto.user.product.ProductDto;
 import com.example.MigrosBackend.dto.user.product.ProductPreviewDto;
+import com.example.MigrosBackend.dto.user.product.UserCartItemDto;
 import com.example.MigrosBackend.service.user.supply.UserSupplyService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
@@ -87,6 +89,15 @@ public class UserSupplyController {
             userSupplyService.addProductToInventory(productId, token);
             return new ResponseEntity<>("Product added to inventory", HttpStatus.OK);
         }catch (Exception e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+    @GetMapping("getProductData")
+    public ResponseEntity<?> getProductData() throws Exception {
+        try{
+            List<UserCartItemDto> dto = userSupplyService.getProductData();
+            return ResponseEntity.ok(dto);
+        } catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
     }
