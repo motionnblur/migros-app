@@ -8,11 +8,28 @@
   <div id="user-cart__head">
     <div *ngFor="let item of items; let i = index">
       <div class="cart-component__item">
-        <img class="cart-component__item-image" src="{{ imageUrls?.[i] }}" />
+        <img
+          class="cart-component__item-image"
+          src="{{ item.productImageUrl }}"
+        />
         <div class="cart-component__item-name">{{ item.productName }}</div>
         <div class="cart-component__item-price">{{ item.productPrice }} ₺</div>
+        <div
+          class="cart-component__item-remove"
+          (click)="removeProductFromUserCart(item.productId)"
+        ></div>
       </div>
     </div>
   </div>
-  <div id="user-cart__bottom"></div>
+  <div id="user-cart__bottom">
+    <div class="user-cart__left-field">
+      <div id="user-cart__total-text">Toplam Tutar</div>
+      <div id="user-cart__total-price">{{ totalPrice + " ₺" }}</div>
+    </div>
+    <div class="user-cart__right-field">
+      <div id="user-cart__buy-button">
+        {{ items.length > 0 ? "Sepeti onayla" : "Sepetiniz boş" }}
+      </div>
+    </div>
+  </div>
 </div>

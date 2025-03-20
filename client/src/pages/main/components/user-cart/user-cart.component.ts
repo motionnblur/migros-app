@@ -12,8 +12,9 @@ import { CommonModule } from '@angular/common';
 })
 export class UserCartComponent {
   @Output() closeComponentEvent = new EventEmitter<void>();
-  imageUrls: string[] | null = [];
   items: IUserCartItemDto[] = [];
+  itemsToDelete: number[] = [];
+  totalPrice: number = 0;
   constructor(private restService: RestService) {
     /* restService.getProductDataForUserCart(1).subscribe((data: IProductData) => {
       console.log(data.productName);
@@ -28,11 +29,12 @@ export class UserCartComponent {
       },
       complete: () => {
         this.items.forEach((item) => {
+          this.totalPrice += item.productPrice;
           this.restService
             .getProductImage(item.productId)
             .subscribe((blob: Blob) => {
               const url: string = window.URL.createObjectURL(blob); // Create a URL for the blob
-              this.imageUrls?.push(url);
+              item.productImageUrl = url;
             });
         });
       },
@@ -51,8 +53,20 @@ export class UserCartComponent {
         this.closeCartComponent();
       }
     });
+    if (this.itemsToDelete.length > 0) {
+      this.itemsToDelete.forEach((productId) => {
+        this.restService.removeProductFromUserCart(productId).subscribe();
+      });
+    }
   }
   public closeCartComponent() {
     this.closeComponentEvent.emit();
+  }
+  public removeProductFromUserCart(productId: number) {
+    this.totalPrice -= this.items.find(
+      (item) => item.productId === productId
+    )!.productPrice;
+    this.itemsToDelete.push(productId);
+    this.items = this.items.filter((item) => item.productId !== productId);
   }
 }

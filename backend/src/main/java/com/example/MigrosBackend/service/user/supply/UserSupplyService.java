@@ -26,6 +26,7 @@ import org.springframework.stereotype.Service;
 
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -185,5 +186,20 @@ public class UserSupplyService {
 
                     return dto;
                 }).toList();
+    }
+
+    public void removeProductFromInventory(Long productId, String token) {
+        String userName = tokenService.extractUsername(token);
+        UserEntity user = userEntityRepository.findByUserMail(userName);
+        if(tokenService.validateToken(token, user.getUserMail()))
+        {
+            if (user.getProductsIdsInCart() == null) {
+                user.setProductsIdsInCart(new ArrayList<>()); // Initialize if null
+            }
+            user.getProductsIdsInCart().removeAll(Collections.singleton(productId));
+            userEntityRepository.save(user);
+        }else{
+            throw new RuntimeException("Token not valid");
+        }
     }
 }

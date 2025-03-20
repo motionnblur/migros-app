@@ -1,6 +1,7 @@
 export interface IUserCartItemDto {
   productId: number;
   productName: string;
-  productPrice: string;
+  productPrice: number;
   productCount: number;
+  productImageUrl?: string;
 }

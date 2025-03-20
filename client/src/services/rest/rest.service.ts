@@ -209,4 +209,14 @@ export class RestService {
       })
       .pipe(map((response) => response.body));
   }
+  removeProductFromUserCart(productId: number) {
+    const token: string = localStorage.getItem('token') as string;
+    return this.http
+      .delete(`http://localhost:8080/user/supply/removeProductFromUserCart`, {
+        params: { productId, token },
+        responseType: 'text',
+        observe: 'response',
+      })
+      .pipe(map((response) => response.body));
+  }
 }
