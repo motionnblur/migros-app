@@ -29,7 +29,7 @@ export class UserCartComponent {
       },
       complete: () => {
         this.items.forEach((item) => {
-          this.totalPrice += item.productPrice;
+          this.totalPrice += item.productPrice * item.productCount;
           this.restService
             .getProductImage(item.productId)
             .subscribe((blob: Blob) => {
@@ -63,10 +63,19 @@ export class UserCartComponent {
     this.closeComponentEvent.emit();
   }
   public removeProductFromUserCart(productId: number) {
-    this.totalPrice -= this.items.find(
+    const itemToRemove = this.items.find(
       (item) => item.productId === productId
-    )!.productPrice;
+    );
+    if (itemToRemove) {
+      this.totalPrice -= itemToRemove.productPrice * itemToRemove.productCount;
+    }
     this.itemsToDelete.push(productId);
     this.items = this.items.filter((item) => item.productId !== productId);
+  }
+  public increaseProductCount(productId: number) {
+    this.items.find((item) => item.productId === productId)!.productCount++;
+  }
+  public decreaseProductCount(arg0: number) {
+    this.items.find((item) => item.productId === arg0)!.productCount--;
   }
 }
