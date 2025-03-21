@@ -15,6 +15,7 @@ export class UserCartComponent {
   items: IUserCartItemDto[] = [];
   itemsToDelete: number[] = [];
   totalPrice: number = 0;
+  itemCountMap: Map<number, number> = new Map();
   constructor(private restService: RestService) {
     /* restService.getProductDataForUserCart(1).subscribe((data: IProductData) => {
       console.log(data.productName);
@@ -58,6 +59,13 @@ export class UserCartComponent {
         this.restService.removeProductFromUserCart(productId).subscribe();
       });
     }
+    if (this.itemCountMap.size > 0) {
+      this.itemCountMap.forEach((count, productId) => {
+        this.restService
+          .updateProductCountInUserCart(productId, count)
+          .subscribe();
+      });
+    }
   }
   public closeCartComponent() {
     this.closeComponentEvent.emit();
@@ -73,9 +81,21 @@ export class UserCartComponent {
     this.items = this.items.filter((item) => item.productId !== productId);
   }
   public increaseProductCount(productId: number) {
-    this.items.find((item) => item.productId === productId)!.productCount++;
+    const item = this.items.find((item) => item.productId === productId);
+    if (item) {
+      item.productCount++;
+      this.totalPrice += item.productPrice;
+
+      this.itemCountMap.set(item.productId, item.productCount);
+    }
   }
-  public decreaseProductCount(arg0: number) {
-    this.items.find((item) => item.productId === arg0)!.productCount--;
+  public decreaseProductCount(productId: number) {
+    const item = this.items.find((item) => item.productId === productId);
+    if (item) {
+      item.productCount--;
+      this.totalPrice -= item.productPrice;
+
+      this.itemCountMap.set(item.productId, item.productCount);
+    }
   }
 }

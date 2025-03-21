@@ -107,4 +107,13 @@ public class UserSupplyController {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
     }
+    @GetMapping("updateProductCountInUserCart")
+    public ResponseEntity<?> updateProductCountInUserCart(@RequestParam Long productId, @RequestParam int count, @RequestParam String token) {
+        try {
+            userSupplyService.updateProductCountInInventory(productId, count, token);
+            return new ResponseEntity<>("Product count updated in inventory", HttpStatus.OK);
+        }catch (Exception e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
 }

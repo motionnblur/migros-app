@@ -202,4 +202,29 @@ public class UserSupplyService {
             throw new RuntimeException("Token not valid");
         }
     }
+
+    public void updateProductCountInInventory(Long productId, int count, String token) {
+        if(count <= 0) throw new RuntimeException("Count can not be negative or zero");
+
+        String userName = tokenService.extractUsername(token);
+        if(userName == null) throw new RuntimeException("User not found");
+
+        UserEntity user = userEntityRepository.findByUserMail(userName);
+        if(user == null) throw new RuntimeException("User not found");
+
+        if(tokenService.validateToken(token, user.getUserMail()))
+        {
+            if (user.getProductsIdsInCart() == null) {
+                user.setProductsIdsInCart(new ArrayList<>()); // Initialize if null
+            }
+            user.getProductsIdsInCart().removeAll(Collections.singleton(productId));
+            for(int i = 0; i < count; i++)
+            {
+                user.getProductsIdsInCart().add(productId);
+            }
+            userEntityRepository.save(user);
+        }else{
+            throw new RuntimeException("Token not valid");
+        }
+    }
 }

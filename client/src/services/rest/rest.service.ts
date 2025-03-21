@@ -219,4 +219,14 @@ export class RestService {
       })
       .pipe(map((response) => response.body));
   }
+  updateProductCountInUserCart(productId: number, count: number) {
+    const token: string = localStorage.getItem('token') as string;
+    return this.http
+      .get(`http://localhost:8080/user/supply/updateProductCountInUserCart`, {
+        params: { productId, count, token },
+        responseType: 'text',
+        observe: 'response',
+      })
+      .pipe(map((response) => response.body));
+  }
 }
