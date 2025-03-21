@@ -93,6 +93,10 @@ export class UserCartComponent {
     const item = this.items.find((item) => item.productId === productId);
     if (item) {
       item.productCount--;
+      if(item.productCount <= 0) {
+        this.removeProductFromUserCart(item.productId);
+      }
+
       this.totalPrice -= item.productPrice;
 
       this.itemCountMap.set(item.productId, item.productCount);
