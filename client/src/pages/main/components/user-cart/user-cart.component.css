@@ -52,13 +52,16 @@
   .cart-component__item-remove {
     width: 30px;
     height: 30px;
-    background-color: red;
     border-radius: 5px;
     display: flex;
     justify-content: center;
     align-items: center;
     cursor: pointer;
     margin-left: 40px;
+  }
+  .cart-component__item-remove > img {
+    width: 28px;
+    height: 28px;
   }
   #user-cart__head {
     width: 100%;

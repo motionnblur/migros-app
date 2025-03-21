@@ -4,4 +4,5 @@ export interface IUserCartItemDto {
   productPrice: number;
   productCount: number;
   productImageUrl?: string;
+  deleteState?: boolean;
 }

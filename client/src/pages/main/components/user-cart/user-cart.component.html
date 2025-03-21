@@ -21,7 +21,9 @@
           <div
             class="cart-component__item-remove"
             (click)="removeProductFromUserCart(item.productId)"
-          ></div>
+          >
+            <img src="delete.png" />
+          </div>
         </div>
         <div>
           <div class="cart-component__item-count">
@@ -29,7 +31,7 @@
               class="cart-component__item-count__button"
               (click)="decreaseProductCount(item.productId)"
             >
-              <img src="minus.png" />
+              <img [src]="item.deleteState ? 'delete.png' : 'minus.png'" />
             </div>
             <div class="cart-component__item-count__text">
               {{ item.productCount + " adet" }}

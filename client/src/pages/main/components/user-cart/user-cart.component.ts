@@ -83,6 +83,10 @@ export class UserCartComponent {
   public increaseProductCount(productId: number) {
     const item = this.items.find((item) => item.productId === productId);
     if (item) {
+      if(item.deleteState) {
+        item.deleteState = false;
+      }
+
       item.productCount++;
       this.totalPrice += item.productPrice;
 
@@ -91,10 +95,16 @@ export class UserCartComponent {
   }
   public decreaseProductCount(productId: number) {
     const item = this.items.find((item) => item.productId === productId);
+    
     if (item) {
+      if(item.deleteState) {
+        this.removeProductFromUserCart(item.productId);
+        return;
+      }
+
       item.productCount--;
       if(item.productCount <= 0) {
-        this.removeProductFromUserCart(item.productId);
+        item.deleteState = true;
       }
 
       this.totalPrice -= item.productPrice;
