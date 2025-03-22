@@ -1,0 +1,85 @@
+/* General container for the payment form */
+.payment-container {
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    font-family: 'Arial', sans-serif;
+  }
+  
+  /* Title of the payment form */
+  .payment-title {
+    text-align: center;
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 20px;
+    color: #333;
+  }
+  
+  /* Payment form wrapper */
+  .payment-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  /* Styling the Stripe card element */
+  .card-element {
+    height: 40px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 10px;
+    font-size: 16px;
+    background-color: #fafafa;
+  }
+  
+  .card-element input {
+    border: none;
+    outline: none;
+    width: 100%;
+    font-size: 16px;
+  }
+  
+  /* Error message for invalid input */
+  .error-message {
+    color: #ff5c5c;
+    font-size: 14px;
+    margin-top: -10px;
+    margin-bottom: 20px;
+  }
+  
+  /* Styling the payment button */
+  .payment-button {
+    padding: 12px;
+    background-color: #4CAF50;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+  
+  .payment-button:hover {
+    background-color: #45a049;
+  }
+  
+  /* Styling for informational text */
+  .payment-info {
+    text-align: center;
+    font-size: 14px;
+    color: #777;
+  }
+  
+  .payment-info a {
+    color: #4CAF50;
+    text-decoration: none;
+  }
+  
+  .payment-info a:hover {
+    text-decoration: underline;
+  }
+  

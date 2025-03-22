@@ -1,0 +1,21 @@
+<div class="payment-container">
+  <h3 class="payment-title">Secure Payment</h3>
+
+  <div class="payment-form">
+    <div id="card-element" class="card-element">
+      <!-- A Stripe Element will be inserted here. -->
+    </div>
+
+    <div id="card-errors" role="alert" class="error-message">
+      <!-- Stripe form errors will be displayed here -->
+    </div>
+
+    <button (click)="handlePayment()" class="payment-button">Pay Now</button>
+  </div>
+
+  <p class="payment-info">
+    <span>By completing this transaction, you agree to our</span>
+    <a href="#" class="terms-link">Terms of Service</a> and
+    <a href="#" class="privacy-link">Privacy Policy</a>.
+  </p>
+</div>

@@ -3,10 +3,11 @@ import { RestService } from '../../../../services/rest/rest.service';
 import { IProductData } from '../../../../interfaces/IProductData';
 import { IUserCartItemDto } from '../../../../interfaces/IUserCartItemDto';
 import { CommonModule } from '@angular/common';
+import { PaymentComponent } from '../payment/payment.component';
 
 @Component({
   selector: 'app-user-cart',
-  imports: [CommonModule],
+  imports: [CommonModule, PaymentComponent],
   templateUrl: './user-cart.component.html',
   styleUrl: './user-cart.component.css',
 })
@@ -83,7 +84,7 @@ export class UserCartComponent {
   public increaseProductCount(productId: number) {
     const item = this.items.find((item) => item.productId === productId);
     if (item) {
-      if(item.deleteState) {
+      if (item.deleteState) {
         item.deleteState = false;
       }
 
@@ -95,15 +96,15 @@ export class UserCartComponent {
   }
   public decreaseProductCount(productId: number) {
     const item = this.items.find((item) => item.productId === productId);
-    
+
     if (item) {
-      if(item.deleteState) {
+      if (item.deleteState) {
         this.removeProductFromUserCart(item.productId);
         return;
       }
 
       item.productCount--;
-      if(item.productCount <= 0) {
+      if (item.productCount <= 0) {
         item.deleteState = true;
       }
 
