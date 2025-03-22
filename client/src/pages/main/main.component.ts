@@ -15,7 +15,6 @@ import { SignUserComponent } from './components/sign-user/sign-user.component';
 import { AuthService } from '../../services/auth/auth.service';
 import { MatMenuModule } from '@angular/material/menu';
 import { UserCartComponent } from './components/user-cart/user-cart.component';
-import { PaymentComponent } from './components/payment/payment.component';
 
 @Component({
   selector: 'app-main',

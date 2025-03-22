@@ -1,0 +1,85 @@
+<div class="order-tracker-container">
+  <div class="progress-bar">
+    <div
+      class="step"
+      [ngClass]="{
+        active: currentStatus === 'Ordered',
+        completed: currentStatus !== 'Ordered'
+      }"
+    >
+      <span
+        class="indicator"
+        [ngClass]="{
+          active: currentStatus === 'Ordered',
+          completed: currentStatus !== 'Ordered'
+        }"
+      >
+        <ng-container *ngIf="currentStatus === 'Ordered'">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path
+              fill-rule="evenodd"
+              d="M19.916 4.641a2 2 0 010 2.828l-11.049 11.048a2 2 0 01-2.828 0l-5.869-5.869a2 2 0 012.828-2.828L9.97 16.636l10.03-10.03a2 2 0 012.828 0z"
+              clip-rule="evenodd"
+            />
+          </svg>
+        </ng-container>
+      </span>
+      <span class="label">Ordered</span>
+    </div>
+    <div class="line" [ngClass]="{ active: currentStatus !== 'Ordered' }"></div>
+    <div
+      class="step"
+      [ngClass]="{
+        active: currentStatus === 'Shipped',
+        completed: currentStatus !== 'Shipped' && currentStatus !== 'Ordered'
+      }"
+    >
+      <span
+        class="indicator"
+        [ngClass]="{
+          active: currentStatus === 'Shipped',
+          completed: currentStatus !== 'Shipped' && currentStatus !== 'Ordered'
+        }"
+      ></span>
+      <span class="label">Shipped</span>
+    </div>
+    <div
+      class="line"
+      [ngClass]="{
+        active:
+          currentStatus === 'Out for delivery' || currentStatus === 'Delivered'
+      }"
+    ></div>
+    <div
+      class="step"
+      [ngClass]="{
+        active: currentStatus === 'Out for delivery',
+        completed: currentStatus === 'Delivered'
+      }"
+    >
+      <span
+        class="indicator"
+        [ngClass]="{
+          active: currentStatus === 'Out for delivery',
+          completed: currentStatus === 'Delivered'
+        }"
+      ></span>
+      <span class="label">Out for delivery</span>
+    </div>
+    <div
+      class="line"
+      [ngClass]="{ active: currentStatus === 'Delivered' }"
+    ></div>
+    <div class="step" [ngClass]="{ active: currentStatus === 'Delivered' }">
+      <span
+        class="indicator"
+        [ngClass]="{ active: currentStatus === 'Delivered' }"
+      ></span>
+      <span class="label">Delivered</span>
+    </div>
+  </div>
+  <div class="actions">
+    <button class="update-delivery">Update delivery instructions</button>
+    <button class="cancel-order">Cancel order</button>
+  </div>
+</div>
