@@ -18,7 +18,7 @@ public class PaymentController {
 
     static {
         // Set your secret key (from Stripe dashboard)
-        Stripe.apiKey = "pk_test_51R5GK1RpCkckemuqxqwmtU3jtnARLIiSxsxaeU8lg7wQrJJH8oUxH5ZdykHQCRvFNvSL4duOLcL6XQY5Cwkxjcvp00VDagc07P";
+        Stripe.apiKey = "sk_test_51R5GK1RpCkckemuqtK5XI8QJxHsbBSGrRrnbDflhRsGruY72jTXPwn4loYYIIFiXN090DwSm174SEi3OMVCzZp0J00NtCoHtU0";
     }
 
     @PostMapping("/create-charge")
@@ -37,12 +37,25 @@ public class PaymentController {
                     .build();
 
             Charge charge = Charge.create(params);
+
+            // Manually extract relevant data from the charge object to return in the response
+            Map<String, Object> chargeDetails = new HashMap<>();
+            chargeDetails.put("id", charge.getId());
+            chargeDetails.put("amount", charge.getAmount());
+            chargeDetails.put("currency", charge.getCurrency());
+            chargeDetails.put("status", charge.getStatus());
+            chargeDetails.put("description", charge.getDescription());
+
             response.put("success", true);
-            response.put("charge", charge);
+            response.put("charge", chargeDetails);
         } catch (StripeException e) {
             e.printStackTrace();
             response.put("success", false);
-            response.put("error", e.getMessage());
+            response.put("error", "Stripe error: " + e.getMessage());
+        } catch (Exception e) {
+            e.printStackTrace();
+            response.put("success", false);
+            response.put("error", "Unexpected error: " + e.getMessage());
         }
 
         return response;
