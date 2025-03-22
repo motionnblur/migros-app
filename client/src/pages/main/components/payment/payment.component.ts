@@ -66,6 +66,7 @@ export class PaymentComponent implements OnInit {
         this.isProcessing = false; // Reset processing state
 
         if (data.success) {
+          data.totalCartPrice = 0;
           alert('Payment Successful!');
         } else {
           alert('Payment Failed! Please try again.');
