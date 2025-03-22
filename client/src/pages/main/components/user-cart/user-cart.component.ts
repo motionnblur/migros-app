@@ -18,6 +18,7 @@ export class UserCartComponent {
   itemsToDelete: number[] = [];
   totalPrice: number = 0;
   itemCountMap: Map<number, number> = new Map();
+  isPaymentPhaseActive: boolean = false;
 
   constructor(
     private restService: RestService,
@@ -116,6 +117,9 @@ export class UserCartComponent {
     }
   }
   public openPaymentComponent() {
-    this.eventService.trigger('OnStripePaymentComponentOpened');
+    this.isPaymentPhaseActive = true;
+  }
+  public closePaymentComponent() {
+    this.isPaymentPhaseActive = false;
   }
 }

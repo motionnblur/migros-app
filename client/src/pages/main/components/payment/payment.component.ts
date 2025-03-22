@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, EventEmitter, OnInit, Output } from '@angular/core';
 import { loadStripe } from '@stripe/stripe-js';
 
 @Component({
@@ -12,6 +12,8 @@ export class PaymentComponent implements OnInit {
   card: any;
   isProcessing: boolean = false; // To track payment process
   errorMessage: string = ''; // To store and display errors
+
+  @Output() closePaymentComponentEvent = new EventEmitter<void>();
 
   ngOnInit() {
     this.loadStripe();
@@ -73,5 +75,9 @@ export class PaymentComponent implements OnInit {
         this.errorMessage =
           'Payment failed due to a network issue. Please try again.';
       });
+  }
+
+  public closePaymentComponent() {
+    this.closePaymentComponentEvent.emit();
   }
 }
