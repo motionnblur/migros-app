@@ -4,6 +4,7 @@ import { IProductData } from '../../../../interfaces/IProductData';
 import { IUserCartItemDto } from '../../../../interfaces/IUserCartItemDto';
 import { CommonModule } from '@angular/common';
 import { PaymentComponent } from '../payment/payment.component';
+import { EventService } from '../../../../services/event/event.service';
 
 @Component({
   selector: 'app-user-cart',
@@ -17,10 +18,11 @@ export class UserCartComponent {
   itemsToDelete: number[] = [];
   totalPrice: number = 0;
   itemCountMap: Map<number, number> = new Map();
-  constructor(private restService: RestService) {
-    /* restService.getProductDataForUserCart(1).subscribe((data: IProductData) => {
-      console.log(data.productName);
-    }); */
+
+  constructor(
+    private restService: RestService,
+    private eventService: EventService
+  ) {
     restService.getAllProductsFromUserCart().subscribe({
       next: (data: IUserCartItemDto[]) => {
         this.items = data;
@@ -112,5 +114,8 @@ export class UserCartComponent {
 
       this.itemCountMap.set(item.productId, item.productCount);
     }
+  }
+  public openPaymentComponent() {
+    this.eventService.trigger('OnStripePaymentComponentOpened');
   }
 }

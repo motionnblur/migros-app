@@ -15,6 +15,7 @@ import { SignUserComponent } from './components/sign-user/sign-user.component';
 import { AuthService } from '../../services/auth/auth.service';
 import { MatMenuModule } from '@angular/material/menu';
 import { UserCartComponent } from './components/user-cart/user-cart.component';
+import { PaymentComponent } from './components/payment/payment.component';
 
 @Component({
   selector: 'app-main',
@@ -45,6 +46,7 @@ export class MainComponent {
   userPassword!: string;
   loginText: string = 'Üye Ol veya Giriş Yap';
   isCartComponentOpened: boolean = false;
+  isPaymentComponentOpened: boolean = false;
 
   constructor(
     private eventManager: EventService,
