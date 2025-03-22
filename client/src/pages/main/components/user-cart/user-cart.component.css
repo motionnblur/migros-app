@@ -1,7 +1,7 @@
 #cart-component {
     width: 424px;
     height: 640px;
-    background-color: antiquewhite;
+    background-color: rgb(255, 247, 238);
     position: fixed; /* Keep fixed positioning */
     top: 50%; /* Center vertically */
     left: 50%; /* Center horizontally */
@@ -77,6 +77,8 @@
     align-items: center;
     padding: 10px;
     box-sizing: border-box;
+    background-color: rgb(255, 255, 255);
+    border-top: 1px solid gainsboro;
   }
   .user-cart__left-field {
     height: 100%;
