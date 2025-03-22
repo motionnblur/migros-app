@@ -1,5 +1,6 @@
 import { Component, EventEmitter, OnInit, Output } from '@angular/core';
 import { loadStripe } from '@stripe/stripe-js';
+import { data } from '../../../../memory/global-data';
 
 @Component({
   selector: 'app-payment',
@@ -53,7 +54,7 @@ export class PaymentComponent implements OnInit {
       method: 'POST',
       body: JSON.stringify({
         token: token.id,
-        amount: 5000, // Example amount in cents (e.g., $50.00)
+        amount: data.totalCartPrice, // Example amount in cents (e.g., $50.00)
       }),
       headers: {
         'Content-Type': 'application/json',

@@ -11,6 +11,7 @@ import { IUserCartItemDto } from '../../../../interfaces/IUserCartItemDto';
 import { CommonModule } from '@angular/common';
 import { PaymentComponent } from '../payment/payment.component';
 import { EventService } from '../../../../services/event/event.service';
+import { data } from '../../../../memory/global-data';
 
 @Component({
   selector: 'app-user-cart',
@@ -131,6 +132,7 @@ export class UserCartComponent {
     if (this.items.length == 0) return;
 
     if (this.isCartConfirmed) {
+      data.totalCartPrice = this.totalPrice;
       this.isPaymentPhaseActive = true;
     } else {
       this.buyButtonRef.nativeElement.style.backgroundColor = 'green';
