@@ -1,4 +1,10 @@
-import { Component, EventEmitter, Output } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  EventEmitter,
+  Output,
+  ViewChild,
+} from '@angular/core';
 import { RestService } from '../../../../services/rest/rest.service';
 import { IProductData } from '../../../../interfaces/IProductData';
 import { IUserCartItemDto } from '../../../../interfaces/IUserCartItemDto';
@@ -13,12 +19,15 @@ import { EventService } from '../../../../services/event/event.service';
   styleUrl: './user-cart.component.css',
 })
 export class UserCartComponent {
+  @ViewChild('buyButton') buyButtonRef!: ElementRef<HTMLDivElement>;
   @Output() closeComponentEvent = new EventEmitter<void>();
+
   items: IUserCartItemDto[] = [];
   itemsToDelete: number[] = [];
   totalPrice: number = 0;
   itemCountMap: Map<number, number> = new Map();
   isPaymentPhaseActive: boolean = false;
+  isCartConfirmed: boolean = false;
 
   constructor(
     private restService: RestService,
@@ -58,6 +67,8 @@ export class UserCartComponent {
         this.closeCartComponent();
       }
     });
+  }
+  private saveCartItems() {
     if (this.itemsToDelete.length > 0) {
       this.itemsToDelete.forEach((productId) => {
         this.restService.removeProductFromUserCart(productId).subscribe();
@@ -117,7 +128,16 @@ export class UserCartComponent {
     }
   }
   public openPaymentComponent() {
-    this.isPaymentPhaseActive = true;
+    if (this.items.length == 0) return;
+
+    if (this.isCartConfirmed) {
+      this.isPaymentPhaseActive = true;
+    } else {
+      this.buyButtonRef.nativeElement.style.backgroundColor = 'green';
+      this.isCartConfirmed = true;
+
+      this.saveCartItems();
+    }
   }
   public closePaymentComponent() {
     this.isPaymentPhaseActive = false;

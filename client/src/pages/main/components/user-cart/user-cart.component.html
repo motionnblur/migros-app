@@ -53,8 +53,18 @@
       <div id="user-cart__total-price">{{ totalPrice + " ₺" }}</div>
     </div>
     <div class="user-cart__right-field">
-      <div id="user-cart__buy-button" (click)="openPaymentComponent()">
-        {{ items.length > 0 ? "Sepeti onayla" : "Sepetiniz boş" }}
+      <div
+        #buyButton
+        id="user-cart__buy-button"
+        (click)="openPaymentComponent()"
+      >
+        {{
+          items.length > 0
+            ? !this.isCartConfirmed
+              ? "Sepeti onayla"
+              : "Öde"
+            : "Sepetiniz boş"
+        }}
       </div>
     </div>
   </div>
