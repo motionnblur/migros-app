@@ -22,6 +22,7 @@ import { ProductEditComponent } from '../product-edit/product-edit.component';
 export class AdminPanelComponent {
   productId!: number;
   hasProductAdderOpened: boolean = false;
+  hasProductsOpened: boolean = false;
   hasProductUpdaterOpened: boolean = false;
   hasProductEditOpened: boolean = false;
   private productChangedCallback!: (data: any) => void;
@@ -66,9 +67,7 @@ export class AdminPanelComponent {
       this.closeProductEdit();
     }
   }
-  addProduct() {
-    this.hasProductAdderOpened = !this.hasProductAdderOpened;
-  }
+
   openProductAdder() {
     this.hasProductUpdaterOpened = false;
     this.hasProductAdderOpened = true;
@@ -81,5 +80,9 @@ export class AdminPanelComponent {
   }
   closeProductEdit() {
     this.hasProductEditOpened = false;
+  }
+
+  open_close_Products() {
+    this.hasProductsOpened = !this.hasProductsOpened;
   }
 }
