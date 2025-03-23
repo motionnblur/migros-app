@@ -78,3 +78,18 @@
 .rotate-right {
   transform: rotate(-90deg);
 }
+#product-body-menu__add-button{
+  box-sizing: border-box;
+  padding: 5px;
+  width: 120px;
+  height: 32px;
+  background-color: rgb(73, 73, 73);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  color: white;
+  font-weight: 500;
+  border-radius: 8px;
+  margin-left: 140px;
+}

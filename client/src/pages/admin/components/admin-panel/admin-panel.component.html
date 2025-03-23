@@ -2,12 +2,12 @@
   <div class="admin-panel-header">
     <div class="admin-panel-header__left"></div>
     <div class="admin-panel-header__right">
-      <div
+      <!-- <div
         class="admin-panel-header__button-field__button"
         (click)="addProduct()"
       >
         Add product
-      </div>
+      </div> -->
     </div>
   </div>
   <div class="admin-panel-body">
@@ -22,7 +22,7 @@
       (hasProductAdded)="productAddedEventHandler($event)"
       (hasEscapePressed)="closeProductUpdater()"
     />
-    <app-product-body />
+    <app-product-body (hasAddProductButtonClicked)="openProductAdder()" />
     <app-product-edit
       *ngIf="hasProductEditOpened"
       [productId]="productId"

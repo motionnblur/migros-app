@@ -2,6 +2,9 @@
   <div id="product-body-menu">
     <button mat-button [matMenuTriggerFor]="menu">Categories</button>
     <div id="product-body-menu__category-name">{{ selectedCategoryName }}</div>
+    <div id="product-body-menu__add-button" (click)="openProductAdder()">
+      Add product
+    </div>
     <mat-menu #menu="matMenu">
       <button
         mat-menu-item

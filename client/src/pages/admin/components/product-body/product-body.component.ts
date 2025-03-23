@@ -16,6 +16,7 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 })
 export class ProductBodyComponent {
   @Output() hasBodyClicked = new EventEmitter();
+  @Output() hasAddProductButtonClicked = new EventEmitter();
 
   productsData: IAdminProductPreview[] = [];
   private productAddedCallback!: (data: any) => void;
@@ -125,5 +126,8 @@ export class ProductBodyComponent {
           this.currentPageNumber = $event.pageIndex;
         },
       });
+  }
+  public openProductAdder() {
+    this.hasAddProductButtonClicked.emit();
   }
 }
