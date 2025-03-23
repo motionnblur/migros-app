@@ -55,6 +55,7 @@ export class PaymentComponent implements OnInit {
       body: JSON.stringify({
         token: token.id,
         amount: data.totalCartPrice, // Example amount in cents (e.g., $50.00)
+        userToken: localStorage.getItem('token'),
       }),
       headers: {
         'Content-Type': 'application/json',

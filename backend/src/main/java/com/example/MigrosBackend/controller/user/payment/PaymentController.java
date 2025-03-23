@@ -1,5 +1,6 @@
 package com.example.MigrosBackend.controller.user.payment;
 
+import com.example.MigrosBackend.service.user.supply.UserOrderService;
 import com.stripe.Stripe;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Charge;
@@ -15,6 +16,11 @@ import java.util.Map;
 @RestController
 @RequestMapping("/payment")
 public class PaymentController {
+    private final UserOrderService userOrderService;
+
+    public PaymentController(UserOrderService userOrderService) {
+        this.userOrderService = userOrderService;
+    }
 
     static {
         // Set your secret key (from Stripe dashboard)
@@ -25,6 +31,7 @@ public class PaymentController {
     public Map<String, Object> createCharge(@RequestBody Map<String, Object> payload) {
         String token = (String) payload.get("token");
         int amount = (int) payload.get("amount"); // Amount in cents
+        String userToken = (String) payload.get("userToken");
 
         Map<String, Object> response = new HashMap<>();
 
@@ -48,6 +55,8 @@ public class PaymentController {
 
             response.put("success", true);
             response.put("charge", chargeDetails);
+
+            userOrderService.createOrder(userToken);
         } catch (StripeException e) {
             e.printStackTrace();
             response.put("success", false);
