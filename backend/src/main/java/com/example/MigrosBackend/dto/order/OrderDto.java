@@ -6,6 +6,5 @@ import lombok.Setter;
 @Getter
 @Setter
 public class OrderDto {
-    private String userName;
     private Long orderId;
 }

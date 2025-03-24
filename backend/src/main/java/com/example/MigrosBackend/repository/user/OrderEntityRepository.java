@@ -6,6 +6,5 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface OrderEntityRepository extends JpaRepository<OrderEntity, Long> {
-    OrderEntity findByAdminId(Long adminId);
-    Page<OrderEntity> findByAdminId(Long adminId, Pageable pageable);
+    Page<OrderEntity> findAll(Pageable pageable);
 }

@@ -1,4 +1,10 @@
 <div id="order-panel-main">
-  <div id="order-panel-body"></div>
+  <div id="order-panel-body">
+    <div
+      *ngFor="let item of ordersData"
+      id="order-body-item"
+      class="line-bottom"
+    ></div>
+  </div>
   <mat-paginator [length]="1" [pageSize]="5" [pageSizeOptions]="[5, 10, 15]" />
 </div>

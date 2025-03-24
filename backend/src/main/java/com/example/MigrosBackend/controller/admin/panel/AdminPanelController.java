@@ -132,9 +132,9 @@ public class AdminPanelController {
     }
 
     @GetMapping("getAllOrders") //For testing purposes
-    public ResponseEntity<?> getOrder(@RequestParam String userToken, @RequestParam int page, @RequestParam int productRange) {
+    public ResponseEntity<?> getOrder(@RequestParam int page, @RequestParam int productRange) {
         try {
-            List<OrderDto> orderDtos = userOrderService.getAllOrders(userToken, page, productRange);
+            List<OrderDto> orderDtos = userOrderService.getAllOrders(page, productRange);
             return ResponseEntity.ok(orderDtos);
         } catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);

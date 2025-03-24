@@ -48,30 +48,23 @@ public class UserOrderService {
             List<Long> productsInCart = user.getProductsIdsInCart();
 
             OrderEntity order = new OrderEntity();
-            order.setAdminId(user.getId());
+            order.setUserId(user.getId());
             order.setOrderIds(productsInCart);
 
             orderEntityRepository.save(order);
         }
     }
 
-    public List<OrderDto> getAllOrders(String userToken, int page, int productRange) {
-        String userName = tokenService.extractUsername(userToken);
-        UserEntity user = userEntityRepository.findByUserMail(userName);
-        if(tokenService.validateToken(userToken, user.getUserMail()))
-        {
-            Pageable pageable = PageRequest.of(page, productRange);
-            Page<OrderEntity> orders = orderEntityRepository.findByAdminId(user.getId(), pageable);
+    public List<OrderDto> getAllOrders(int page, int productRange) {
+        Pageable pageable = PageRequest.of(page, productRange);
+        Page<OrderEntity> orders = orderEntityRepository.findAll(pageable);
 
-            List<OrderDto> orderDtos = new ArrayList<>();
-            for (OrderEntity order : orders) {
-                OrderDto orderDto = new OrderDto();
-                orderDto.setOrderId(order.getId());
-                orderDto.setUserName(user.getUserMail());
-                orderDtos.add(orderDto);
-            }
-            return orderDtos;
+        List<OrderDto> orderDtos = new ArrayList<>();
+        for (OrderEntity order : orders) {
+            OrderDto orderDto = new OrderDto();
+            orderDto.setOrderId(order.getId());
+            orderDtos.add(orderDto);
         }
-        return null;
+        return orderDtos;
     }
 }

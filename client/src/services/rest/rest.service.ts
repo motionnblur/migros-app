@@ -9,6 +9,7 @@ import { IProductDescription } from '../../interfaces/IProductDescription';
 import { ISubCategory } from '../../interfaces/ISubCategory';
 import { ISignDto } from '../../interfaces/ISignDto';
 import { IUserCartItemDto } from '../../interfaces/IUserCartItemDto';
+import { IOrder } from '../../interfaces/IOrder';
 
 @Injectable({
   providedIn: 'root',
@@ -228,5 +229,13 @@ export class RestService {
         observe: 'response',
       })
       .pipe(map((response) => response.body));
+  }
+  getAllOrders(page: number, productRange: number) {
+    return this.http
+      .get(`http://localhost:8080/admin/panel/getAllOrders`, {
+        params: { page, productRange },
+        responseType: 'json',
+      })
+      .pipe(map((response) => response as IOrder[]));
   }
 }
