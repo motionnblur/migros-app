@@ -3,7 +3,9 @@ package com.example.MigrosBackend.controller.admin.panel;
 import com.example.MigrosBackend.dto.admin.panel.AdminAddItemDto;
 import com.example.MigrosBackend.dto.admin.panel.AdminProductPreviewDto;
 import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionListDto;
+import com.example.MigrosBackend.dto.order.OrderDto;
 import com.example.MigrosBackend.service.admin.supply.AdminSupplyService;
+import com.example.MigrosBackend.service.user.supply.UserOrderService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,10 +17,13 @@ import java.util.List;
 @RequestMapping("admin/panel")
 public class AdminPanelController {
     private final AdminSupplyService adminSupplyService;
+    private final UserOrderService userOrderService;
 
     @Autowired
-    public AdminPanelController(AdminSupplyService adminSupplyService) {
+    public AdminPanelController(AdminSupplyService adminSupplyService,
+                                UserOrderService userOrderService) {
         this.adminSupplyService = adminSupplyService;
+        this.userOrderService = userOrderService;
     }
 
     @PostMapping("addProductDescription")
@@ -121,6 +126,16 @@ public class AdminPanelController {
         try{
             adminSupplyService.deleteProduct(productId);
             return new ResponseEntity<>(HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @GetMapping("getAllOrders") //For testing purposes
+    public ResponseEntity<?> getOrder(@RequestParam String userToken, @RequestParam int page, @RequestParam int productRange) {
+        try {
+            List<OrderDto> orderDtos = userOrderService.getAllOrders(userToken, page, productRange);
+            return ResponseEntity.ok(orderDtos);
         } catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }

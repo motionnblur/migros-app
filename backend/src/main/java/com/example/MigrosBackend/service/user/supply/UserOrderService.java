@@ -27,6 +27,18 @@ public class UserOrderService {
         this.userEntityRepository = userEntityRepository;
         this.orderEntityRepository = orderEntityRepository;
     }
+
+    @Async
+    public void clearUserCart(String userToken) {
+        String userName = tokenService.extractUsername(userToken);
+        UserEntity user = userEntityRepository.findByUserMail(userName);
+        if(tokenService.validateToken(userToken, user.getUserMail()))
+        {
+            user.setProductsIdsInCart(new ArrayList<>());
+            userEntityRepository.save(user);
+        }
+    }
+
     @Async
     public void createOrder(String userToken) {
         String userName = tokenService.extractUsername(userToken);
@@ -55,6 +67,7 @@ public class UserOrderService {
             for (OrderEntity order : orders) {
                 OrderDto orderDto = new OrderDto();
                 orderDto.setOrderId(order.getId());
+                orderDto.setUserName(user.getUserMail());
                 orderDtos.add(orderDto);
             }
             return orderDtos;
