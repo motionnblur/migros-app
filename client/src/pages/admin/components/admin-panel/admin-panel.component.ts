@@ -6,6 +6,7 @@ import { WallComponent } from '../wall/wall.component';
 import { ProductUpdaterComponent } from '../product-adder/product-updater.component';
 import { EventService } from '../../../../services/event/event.service';
 import { ProductEditComponent } from '../product-edit/product-edit.component';
+import { OrderPanelComponent } from '../order-panel/order-panel.component';
 @Component({
   selector: 'app-admin-panel',
   imports: [
@@ -15,6 +16,7 @@ import { ProductEditComponent } from '../product-edit/product-edit.component';
     WallComponent,
     ProductUpdaterComponent,
     ProductEditComponent,
+    OrderPanelComponent
   ],
   templateUrl: './admin-panel.component.html',
   styleUrl: './admin-panel.component.css',
@@ -25,6 +27,7 @@ export class AdminPanelComponent {
   hasProductsOpened: boolean = false;
   hasProductUpdaterOpened: boolean = false;
   hasProductEditOpened: boolean = false;
+  hasOrdersOpened: boolean = false;
   private productChangedCallback!: (data: any) => void;
   private editorOpenedCallback!: (id: number) => void;
 
@@ -84,5 +87,9 @@ export class AdminPanelComponent {
 
   open_close_Products() {
     this.hasProductsOpened = !this.hasProductsOpened;
+  }
+
+  open_close_Orders() {
+    this.hasOrdersOpened = !this.hasOrdersOpened;
   }
 }

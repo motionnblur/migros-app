@@ -8,6 +8,12 @@
       >
         Products
       </div>
+      <div
+        class="admin-panel-header__button-field__button"
+        (click)="open_close_Orders()"
+      >
+        Orders
+      </div>
     </div>
   </div>
   <div class="admin-panel-body">
@@ -31,6 +37,7 @@
       [productId]="productId"
       (hasEscapePressed)="closeProductEdit()"
     />
+    <app-order-panel *ngIf="hasOrdersOpened" />
   </div>
 </div>
 <app-wall
