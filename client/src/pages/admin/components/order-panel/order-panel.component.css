@@ -21,14 +21,7 @@
     background-color: rgb(231, 231, 231);
     box-sizing: border-box;
   }
-#order-body-item-data {
-    width: 95%;
-    height: 100%;
-    padding-left: 10px;
-    display: flex;
-    align-items: center;
-}
-#order-body-item-data:hover {
+#order-body-item:hover {
     background-color: rgb(216, 216, 216);
     cursor: pointer;
 }

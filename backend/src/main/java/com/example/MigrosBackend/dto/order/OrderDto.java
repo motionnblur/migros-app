@@ -6,5 +6,10 @@ import lombok.Setter;
 @Getter
 @Setter
 public class OrderDto {
-    private Long orderId;
+    private Long userId;
+    private Long itemId;
+    private Integer count;
+    private Float price;
+    private Float totalPrice;
+    private String status;
 }

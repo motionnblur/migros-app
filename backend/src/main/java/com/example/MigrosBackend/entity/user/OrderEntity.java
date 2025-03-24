@@ -18,5 +18,9 @@ public class OrderEntity {
     private Long id;
 
     private Long userId;
-    private List<Long> orderIds;
+    private Long itemId;
+    private Integer count;
+    private Float price;
+    private Float totalPrice;
+    private String status;
 }

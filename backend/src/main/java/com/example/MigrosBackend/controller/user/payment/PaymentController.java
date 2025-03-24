@@ -56,7 +56,6 @@ public class PaymentController {
             response.put("success", true);
             response.put("charge", chargeDetails);
 
-            userOrderService.clearUserCart(userToken);
             userOrderService.createOrder(userToken);
         } catch (StripeException e) {
             e.printStackTrace();

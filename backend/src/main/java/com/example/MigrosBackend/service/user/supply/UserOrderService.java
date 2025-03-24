@@ -1,8 +1,10 @@
 package com.example.MigrosBackend.service.user.supply;
 
 import com.example.MigrosBackend.dto.order.OrderDto;
+import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.user.OrderEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
+import com.example.MigrosBackend.repository.product.ProductEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
@@ -14,18 +16,24 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class UserOrderService {
     private final TokenService tokenService;
     private final UserEntityRepository userEntityRepository;
     private final OrderEntityRepository orderEntityRepository;
+    private final ProductEntityRepository productEntityRepository;
     public UserOrderService(TokenService tokenService,
                             UserEntityRepository userEntityRepository,
-                            OrderEntityRepository orderEntityRepository) {
+                            OrderEntityRepository orderEntityRepository,
+                            ProductEntityRepository productEntityRepository) {
         this.tokenService = tokenService;
         this.userEntityRepository = userEntityRepository;
         this.orderEntityRepository = orderEntityRepository;
+        this.productEntityRepository = productEntityRepository;
     }
 
     @Async
@@ -46,12 +54,22 @@ public class UserOrderService {
         if(tokenService.validateToken(userToken, user.getUserMail()))
         {
             List<Long> productsInCart = user.getProductsIdsInCart();
+            Map<Long, Integer> productCounts = productsInCart.stream()
+                    .collect(Collectors.groupingBy(Function.identity(), Collectors.summingInt(e -> 1)));
 
-            OrderEntity order = new OrderEntity();
-            order.setUserId(user.getId());
-            order.setOrderIds(productsInCart);
+            productCounts.forEach((productId, count) -> {
+                OrderEntity order = new OrderEntity();
+                order.setUserId(user.getId());
+                order.setItemId(productId);
+                ProductEntity product = productEntityRepository.findById(productId).get();
+                order.setPrice(product.getProductPrice());
+                order.setCount(count);
+                order.setTotalPrice(order.getPrice() * order.getCount());
+                order.setStatus("Pending");
+                orderEntityRepository.save(order);
+            });
 
-            orderEntityRepository.save(order);
+            clearUserCart(userToken);
         }
     }
 
