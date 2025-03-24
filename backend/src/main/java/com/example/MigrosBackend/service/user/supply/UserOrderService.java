@@ -1,10 +1,14 @@
 package com.example.MigrosBackend.service.user.supply;
 
+import com.example.MigrosBackend.dto.order.OrderDto;
 import com.example.MigrosBackend.entity.user.OrderEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.repository.user.OrderEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -37,5 +41,24 @@ public class UserOrderService {
 
             orderEntityRepository.save(order);
         }
+    }
+
+    public List<OrderDto> getAllOrders(String userToken, int page, int productRange) {
+        String userName = tokenService.extractUsername(userToken);
+        UserEntity user = userEntityRepository.findByUserMail(userName);
+        if(tokenService.validateToken(userToken, user.getUserMail()))
+        {
+            Pageable pageable = PageRequest.of(page, productRange);
+            Page<OrderEntity> orders = orderEntityRepository.findByAdminId(user.getId(), pageable);
+
+            List<OrderDto> orderDtos = new ArrayList<>();
+            for (OrderEntity order : orders) {
+                OrderDto orderDto = new OrderDto();
+                orderDto.setOrderId(order.getId());
+                orderDtos.add(orderDto);
+            }
+            return orderDtos;
+        }
+        return null;
     }
 }

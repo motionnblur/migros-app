@@ -1,5 +1,6 @@
 package com.example.MigrosBackend.controller.user.supply;
 
+import com.example.MigrosBackend.dto.order.OrderDto;
 import com.example.MigrosBackend.entity.user.OrderEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.repository.user.OrderEntityRepository;
@@ -12,6 +13,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("user/orders")
@@ -31,17 +34,11 @@ public class OrderSupplyController {
         this.userEntityRepository = userEntityRepository;
     }
 
-    @GetMapping("getOrders") //For testing purposes
-    public ResponseEntity<?> getOrder(@RequestParam String userToken) {
+    @GetMapping("getAllOrders") //For testing purposes
+    public ResponseEntity<?> getOrder(@RequestParam String userToken, @RequestParam int page, @RequestParam int productRange) {
         try {
-            String userName = tokenService.extractUsername(userToken);
-            UserEntity user = userEntityRepository.findByUserMail(userName);
-            if(tokenService.validateToken(userToken, user.getUserMail()))
-            {
-                OrderEntity orders = orderEntityRepository.findByAdminId(user.getId());
-                return ResponseEntity.ok(orders.getOrderIds());
-            }
-            return new ResponseEntity<>("Order created", HttpStatus.OK);
+            List<OrderDto> orderDtos = userOrderService.getAllOrders(userToken, page, productRange);
+            return ResponseEntity.ok(orderDtos);
         } catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
