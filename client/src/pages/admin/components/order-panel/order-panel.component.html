@@ -1,1 +1,8 @@
-<div id="order-panel-main"></div>
+<div id="order-panel-main">
+  <div id="order-panel-body"></div>
+  <mat-paginator
+    [length]="100"
+    [pageSize]="10"
+    [pageSizeOptions]="[5, 10, 25, 100]"
+  />
+</div>
