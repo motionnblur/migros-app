@@ -25,3 +25,14 @@
     background-color: rgb(216, 216, 216);
     cursor: pointer;
 }
+.order-actions {
+    width: 40px;
+    height: 40px;
+    background-color: rgb(198, 255, 196);
+    cursor: pointer;
+    border-radius: 50%;
+    margin-left: 10px;
+}
+.order-actions:hover {
+    background-color: rgb(169, 253, 166);
+}

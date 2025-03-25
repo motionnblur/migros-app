@@ -64,7 +64,7 @@ public class UserOrderService {
                 ProductEntity product = productEntityRepository.findById(productId).get();
                 order.setPrice(product.getProductPrice());
                 order.setCount(count);
-                order.setTotalPrice(order.getPrice() * order.getCount());
+                order.setTotalPrice(product.getProductPrice() * order.getCount());
                 order.setStatus("Pending");
                 orderEntityRepository.save(order);
             });
@@ -81,6 +81,9 @@ public class UserOrderService {
         for (OrderEntity order : orders) {
             OrderDto orderDto = new OrderDto();
             orderDto.setOrderId(order.getId());
+            orderDto.setTotalPrice(order.getTotalPrice());
+            orderDto.setStatus(order.getStatus());
+
             orderDtos.add(orderDto);
         }
         return orderDtos;

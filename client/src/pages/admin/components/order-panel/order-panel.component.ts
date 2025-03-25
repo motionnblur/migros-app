@@ -9,32 +9,38 @@ export interface PeriodicElement {
   orderId: number;
   totalPrice: number;
   status: string;
+  actions: void;
 }
 const ELEMENT_DATA: PeriodicElement[] = [
   {
     orderId: 1,
     totalPrice: 100,
     status: 'pending',
+    actions: undefined,
   },
   {
     orderId: 2,
     totalPrice: 200,
     status: 'pending',
+    actions: undefined,
   },
   {
     orderId: 3,
     totalPrice: 300,
     status: 'pending',
+    actions: undefined,
   },
   {
     orderId: 4,
     totalPrice: 400,
     status: 'pending',
+    actions: undefined,
   },
   {
     orderId: 5,
     totalPrice: 500,
     status: 'pending',
+    actions: undefined,
   },
 ];
 
@@ -45,7 +51,7 @@ const ELEMENT_DATA: PeriodicElement[] = [
   styleUrl: './order-panel.component.css',
 })
 export class OrderPanelComponent {
-  displayedColumns: string[] = ['orderId', 'totalPrice', 'status'];
+  displayedColumns: string[] = ['orderId', 'totalPrice', 'status', 'actions'];
   dataSource = ELEMENT_DATA;
   ordersData: IOrder[] = [];
   isOrderComponentOpen: boolean = false;
