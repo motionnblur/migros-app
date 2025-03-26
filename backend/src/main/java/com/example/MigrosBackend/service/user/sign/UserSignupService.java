@@ -34,10 +34,49 @@ public class UserSignupService {
         this.mailService = mailService;
         this.tokenService = tokenService;
     }
+
+    public boolean isPasswordStrongEnough(String password) {
+        // Define the password policy
+        int minPasswordLength = 8;
+        boolean requiresUppercase = true;
+        boolean requiresLowercase = true;
+        boolean requiresNumber = true;
+        boolean requiresSpecialChar = true;
+
+        // Check the password length
+        if (password.length() < minPasswordLength) {
+            return false;
+        }
+
+        // Check for uppercase letter
+        if (requiresUppercase && !password.matches(".*[A-Z].*")) {
+            return false;
+        }
+
+        // Check for lowercase letter
+        if (requiresLowercase && !password.matches(".*[a-z].*")) {
+            return false;
+        }
+
+        // Check for number
+        if (requiresNumber && !password.matches(".*\\d.*")) {
+            return false;
+        }
+
+        // Check for special character
+        if (requiresSpecialChar && !password.matches(".*[^A-Za-z0-9].*")) {
+            return false;
+        }
+
+        return true;
+    }
     public void signup(UserSignDto userSignDto) throws MessagingException {
         if(userEntityRepository.existsByUserMail(userSignDto.getUserMail()))
             throw new RuntimeException("User with that email: "+ userSignDto.getUserMail()+" already exists.");
 
+        if(!isPasswordStrongEnough(userSignDto.getUserPassword()))
+            throw new RuntimeException("Password is not strong enough.");
+        
         UserEntity userEntityToCreate = new UserEntity();
         userEntityToCreate.setUserMail(userSignDto.getUserMail());
         userEntityToCreate.setUserPassword(encryptService.getEncryptedPassword(userSignDto.getUserPassword()));
