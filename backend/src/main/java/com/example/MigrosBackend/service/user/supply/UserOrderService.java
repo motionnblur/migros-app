@@ -73,6 +73,24 @@ public class UserOrderService {
         }
     }
 
+    public float getOrderPrice(String userToken) {
+        String userName = tokenService.extractUsername(userToken);
+        UserEntity user = userEntityRepository.findByUserMail(userName);
+        if(tokenService.validateToken(userToken, user.getUserMail()))
+        {
+            List<Long> productsInCart = user.getProductsIdsInCart();
+            Map<Long, Integer> productCounts = productsInCart.stream()
+                    .collect(Collectors.groupingBy(Function.identity(), Collectors.summingInt(e -> 1)));
+            float total = 0;
+            for (Map.Entry<Long, Integer> entry : productCounts.entrySet()) {
+                ProductEntity product = productEntityRepository.findById(entry.getKey()).get();
+                total += product.getProductPrice() * entry.getValue();
+            }
+            return total;
+        }
+        return 0;
+    }
+
     public List<OrderDto> getAllOrders(int page, int productRange) {
         Pageable pageable = PageRequest.of(page, productRange);
         Page<OrderEntity> orders = orderEntityRepository.findAll(pageable);

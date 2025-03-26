@@ -30,8 +30,10 @@ public class PaymentController {
     @PostMapping("/create-charge")
     public Map<String, Object> createCharge(@RequestBody Map<String, Object> payload) {
         String token = (String) payload.get("token");
-        int amount = (int) payload.get("amount"); // Amount in cents
         String userToken = (String) payload.get("userToken");
+        float amount = userOrderService.getOrderPrice(userToken); // Amount in cents
+        if(amount == 0)
+            return null;
 
         Map<String, Object> response = new HashMap<>();
 

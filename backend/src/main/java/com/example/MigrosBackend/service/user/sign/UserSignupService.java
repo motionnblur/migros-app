@@ -76,7 +76,7 @@ public class UserSignupService {
 
         if(!isPasswordStrongEnough(userSignDto.getUserPassword()))
             throw new RuntimeException("Password is not strong enough.");
-        
+
         UserEntity userEntityToCreate = new UserEntity();
         userEntityToCreate.setUserMail(userSignDto.getUserMail());
         userEntityToCreate.setUserPassword(encryptService.getEncryptedPassword(userSignDto.getUserPassword()));
