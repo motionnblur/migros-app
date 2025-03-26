@@ -1,38 +1,46 @@
 #order-panel-main {
-    width: 600px;
-    height: 700px;
-    background-color: rgb(241, 241, 241);
-    border: 1px solid gainsboro;
-    display: flex;
-    flex-direction: column;
+  width: 600px;
+  height: 700px;
+  background-color: rgb(241, 241, 241);
+  border: 1px solid gainsboro;
+  display: flex;
+  flex-direction: column;
 }
 #order-panel-body {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
+  width: 100%;
+  height: 90%;
+}
+#order-panel-bottom {
+  width: 100%;
+  height: 10%;
+}
+#order-panel-body {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 #order-body-item {
-    width: 100%;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    flex-direction: row;
-    background-color: rgb(231, 231, 231);
-    box-sizing: border-box;
-  }
+  width: 100%;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  flex-direction: row;
+  background-color: rgb(231, 231, 231);
+  box-sizing: border-box;
+}
 #order-body-item:hover {
-    background-color: rgb(216, 216, 216);
-    cursor: pointer;
+  background-color: rgb(216, 216, 216);
+  cursor: pointer;
 }
 .order-actions {
-    width: 40px;
-    height: 40px;
-    background-color: rgb(198, 255, 196);
-    cursor: pointer;
-    border-radius: 50%;
-    margin-left: 10px;
+  width: 40px;
+  height: 40px;
+  background-color: rgb(198, 255, 196);
+  cursor: pointer;
+  border-radius: 50%;
+  margin-left: 10px;
 }
 .order-actions:hover {
-    background-color: rgb(169, 253, 166);
+  background-color: rgb(169, 253, 166);
 }
