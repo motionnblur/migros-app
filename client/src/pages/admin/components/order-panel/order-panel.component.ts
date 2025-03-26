@@ -5,44 +5,12 @@ import { IOrder } from '../../../../interfaces/IOrder';
 import { CommonModule } from '@angular/common';
 import { MatTableModule } from '@angular/material/table';
 
-export interface PeriodicElement {
+export interface ITable {
   orderId: number;
   totalPrice: number;
   status: string;
-  actions: void;
+  actions?: void;
 }
-const ELEMENT_DATA: PeriodicElement[] = [
-  {
-    orderId: 1,
-    totalPrice: 100,
-    status: 'pending',
-    actions: undefined,
-  },
-  {
-    orderId: 2,
-    totalPrice: 200,
-    status: 'pending',
-    actions: undefined,
-  },
-  {
-    orderId: 3,
-    totalPrice: 300,
-    status: 'pending',
-    actions: undefined,
-  },
-  {
-    orderId: 4,
-    totalPrice: 400,
-    status: 'pending',
-    actions: undefined,
-  },
-  {
-    orderId: 5,
-    totalPrice: 500,
-    status: 'pending',
-    actions: undefined,
-  },
-];
 
 @Component({
   selector: 'app-order-panel',
@@ -52,19 +20,17 @@ const ELEMENT_DATA: PeriodicElement[] = [
 })
 export class OrderPanelComponent {
   displayedColumns: string[] = ['orderId', 'totalPrice', 'status', 'actions'];
-  dataSource = ELEMENT_DATA;
   ordersData: IOrder[] = [];
+  tableData: ITable[] = [];
   isOrderComponentOpen: boolean = false;
+  dataSource = this.tableData;
   constructor(private restService: RestService) {
     restService.getAllOrders(0, 5).subscribe((data: IOrder[]) => {
-      console.log(data);
-      this.ordersData = data;
+      this.tableData = [...data];
+      this.dataSource = [...this.tableData];
     });
   }
   public openOrderComponent(orderId: number) {
     this.isOrderComponentOpen = true;
-    /* this.restService.getOrder(orderId).subscribe((data: any) => {
-      console.log(data);
-    }); */
   }
 }
