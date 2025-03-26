@@ -16,7 +16,7 @@ import { OrderPanelComponent } from '../order-panel/order-panel.component';
     WallComponent,
     ProductUpdaterComponent,
     ProductEditComponent,
-    OrderPanelComponent
+    OrderPanelComponent,
   ],
   templateUrl: './admin-panel.component.html',
   styleUrl: './admin-panel.component.css',
@@ -87,9 +87,11 @@ export class AdminPanelComponent {
 
   open_close_Products() {
     this.hasProductsOpened = !this.hasProductsOpened;
+    if (this.hasOrdersOpened) this.hasOrdersOpened = false;
   }
 
   open_close_Orders() {
     this.hasOrdersOpened = !this.hasOrdersOpened;
+    if (this.hasOrdersOpened) this.hasProductsOpened = false;
   }
 }

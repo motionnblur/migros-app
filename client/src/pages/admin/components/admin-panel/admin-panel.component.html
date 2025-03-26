@@ -29,7 +29,7 @@
       (hasEscapePressed)="closeProductUpdater()"
     />
     <app-product-body
-      *ngIf="hasProductsOpened"
+      *ngIf="hasProductsOpened && !hasOrdersOpened"
       (hasAddProductButtonClicked)="openProductAdder()"
     />
     <app-product-edit
@@ -37,7 +37,7 @@
       [productId]="productId"
       (hasEscapePressed)="closeProductEdit()"
     />
-    <app-order-panel *ngIf="hasOrdersOpened" />
+    <app-order-panel *ngIf="hasOrdersOpened && !hasProductsOpened" />
   </div>
 </div>
 <app-wall
