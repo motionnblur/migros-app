@@ -15,6 +15,7 @@ import { SignUserComponent } from './components/sign-user/sign-user.component';
 import { AuthService } from '../../services/auth/auth.service';
 import { MatMenuModule } from '@angular/material/menu';
 import { UserCartComponent } from './components/user-cart/user-cart.component';
+import { UserProfileComponent } from './components/user-profile/user-profile.component';
 
 @Component({
   selector: 'app-main',
@@ -31,6 +32,7 @@ import { UserCartComponent } from './components/user-cart/user-cart.component';
     SignUserComponent,
     MatMenuModule,
     UserCartComponent,
+    UserProfileComponent,
   ],
   templateUrl: './main.component.html',
   styleUrl: './main.component.css',
@@ -39,6 +41,7 @@ export class MainComponent {
   isItemPageOpened: boolean = false;
   isLoginButtonClicked: boolean = false;
   isOrderButtonClicked: boolean = false;
+  isProfileButtonClicked: boolean = false;
   isUserSigned: boolean = false;
   title: string = 'migros-app';
   userMail!: string;
@@ -95,8 +98,14 @@ export class MainComponent {
   public openCartComponent() {
     this.isCartComponentOpened = true;
   }
+  public openProfileComponent() {
+    this.isProfileButtonClicked = true;
+  }
   public closeCartComponent() {
     this.isCartComponentOpened = false;
+  }
+  public closeProfileComponent() {
+    this.isProfileButtonClicked = false;
   }
 
   private setItemPageOpened(value: boolean) {

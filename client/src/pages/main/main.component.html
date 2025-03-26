@@ -25,7 +25,9 @@
           </button>
           <mat-menu #menu="matMenu">
             <button mat-menu-item (click)="openCartComponent()">Sepetim</button>
-            <button mat-menu-item>Profilim</button>
+            <button mat-menu-item (click)="openProfileComponent()">
+              Profilim
+            </button>
           </mat-menu>
         </div>
       </div>
@@ -63,5 +65,8 @@
   </div>
   <div *ngIf="isCartComponentOpened">
     <app-user-cart (closeComponentEvent)="closeCartComponent()" />
+  </div>
+  <div *ngIf="isProfileButtonClicked">
+    <app-user-profile (closeComponentEvent)="closeProfileComponent()" />
   </div>
 </div>
