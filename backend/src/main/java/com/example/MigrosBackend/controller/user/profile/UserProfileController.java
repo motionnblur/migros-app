@@ -43,4 +43,21 @@ public class UserProfileController {
 
         return "User profile table uploaded";
     }
+    @GetMapping("getUserProfileTable")
+    public UserProfileTableDto getUserProfileTable(@RequestParam String token) {
+        String userName = tokenService.extractUsername(token);
+        if(!tokenService.validateToken(token, userName))
+            return null;
+        UserEntity user = userEntityRepository.findByUserMail(userName);
+        UserProfileTableDto userProfileTableDto = new UserProfileTableDto();
+        userProfileTableDto.setUserFirstName(user.getUserName());
+        userProfileTableDto.setUserLastName(user.getUserLastName());
+        userProfileTableDto.setUserAddress(user.getUserAddress());
+        userProfileTableDto.setUserAddress2(user.getUserAddress2());
+        userProfileTableDto.setUserTown(user.getUserTown());
+        userProfileTableDto.setUserCountry(user.getUserCountry());
+        userProfileTableDto.setUserPostalCode(user.getUserPostalCode());
+        
+        return userProfileTableDto;
+    }
 }

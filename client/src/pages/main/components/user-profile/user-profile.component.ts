@@ -22,7 +22,19 @@ export class UserProfileComponent {
   public userCountry: string = '';
   public userPostalCode: string = '';
 
-  constructor(private restService: RestService) {}
+  constructor(private restService: RestService) {
+    restService.getUserProfileTableData().subscribe({
+      next: (data: IUserProfileTable) => {
+        this.userFirstName = data.userFirstName;
+        this.userLastName = data.userLastName;
+        this.userAddress = data.userAddress;
+        this.userAddress2 = data.userAddress2;
+        this.userTown = data.userTown;
+        this.userCountry = data.userCountry;
+        this.userPostalCode = data.userPostalCode;
+      },
+    });
+  }
 
   public closeProfileComponent() {
     this.closeComponentEvent.emit();
