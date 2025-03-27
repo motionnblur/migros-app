@@ -1,14 +1,50 @@
 import { Component, EventEmitter, Output } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { RestService } from '../../../../services/rest/rest.service';
+import { IUserProfileTable } from '../../../../interfaces/IUserProfileTable';
 
 @Component({
   selector: 'app-user-profile',
-  imports: [],
+  imports: [FormsModule, MatFormFieldModule, MatInputModule, MatButtonModule],
   templateUrl: './user-profile.component.html',
   styleUrl: './user-profile.component.css',
 })
 export class UserProfileComponent {
   @Output() closeComponentEvent = new EventEmitter<void>();
+  public userFirstName: string = '';
+  public userLastName: string = '';
+  public userAddress: string = '';
+  public userAddress2: string = '';
+  public userTown: string = '';
+  public userCountry: string = '';
+  public userPostalCode: string = '';
+
+  constructor(private restService: RestService) {}
+
   public closeProfileComponent() {
     this.closeComponentEvent.emit();
+  }
+  public uploadTableData() {
+    const table: IUserProfileTable = {
+      userFirstName: this.userFirstName,
+      userLastName: this.userLastName,
+      userAddress: this.userAddress,
+      userAddress2: this.userAddress2,
+      userTown: this.userTown,
+      userCountry: this.userCountry,
+      userPostalCode: this.userPostalCode,
+    };
+
+    this.restService.uploadUserProfileTableData(table).subscribe({
+      next: () => {
+        console.log('Table data uploaded successfully');
+      },
+      error: (error) => {
+        console.error('Error uploading table data');
+      },
+    });
   }
 }

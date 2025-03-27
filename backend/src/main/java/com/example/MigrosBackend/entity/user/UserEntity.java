@@ -20,7 +20,14 @@ public class UserEntity {
     private Long id;
     private String userMail;
     private String userName;
+    private String userLastName;
     private String userPassword;
+
+    private String userAddress;
+    private String userAddress2;
+    private String userTown;
+    private String userCountry;
+    private String userPostalCode;
 
     private List<Long> productsIdsInCart;
 }

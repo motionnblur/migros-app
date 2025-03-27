@@ -10,6 +10,7 @@ import { ISubCategory } from '../../interfaces/ISubCategory';
 import { ISignDto } from '../../interfaces/ISignDto';
 import { IUserCartItemDto } from '../../interfaces/IUserCartItemDto';
 import { IOrder } from '../../interfaces/IOrder';
+import { IUserProfileTable } from '../../interfaces/IUserProfileTable';
 
 @Injectable({
   providedIn: 'root',
@@ -122,6 +123,30 @@ export class RestService {
         responseType: 'text',
         observe: 'response',
       })
+      .pipe(map((response) => response.status === 200));
+  }
+  uploadUserProfileTableData(table: IUserProfileTable) {
+    const formData = new FormData();
+    formData.append('userFirstName', table.userFirstName);
+    formData.append('userLastName', table.userLastName);
+    formData.append('userAddress', table.userAddress);
+    formData.append('userAddress2', table.userAddress2);
+    formData.append('userTown', table.userTown);
+    formData.append('userCountry', table.userCountry);
+    formData.append('userPostalCode', table.userPostalCode);
+
+    const userToken = localStorage.getItem('token');
+
+    return this.http
+      .post(
+        'http://localhost:8080/user/profile/uploadUserProfileTable',
+        formData,
+        {
+          params: { token: userToken! },
+          responseType: 'text',
+          observe: 'response',
+        }
+      )
       .pipe(map((response) => response.status === 200));
   }
 
