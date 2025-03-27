@@ -21,6 +21,7 @@ export class UserProfileComponent {
   public userTown: string = '';
   public userCountry: string = '';
   public userPostalCode: string = '';
+  private baseTableData: IUserProfileTable | null = null;
 
   constructor(private restService: RestService) {
     restService.getUserProfileTableData().subscribe({
@@ -32,6 +33,8 @@ export class UserProfileComponent {
         this.userTown = data.userTown;
         this.userCountry = data.userCountry;
         this.userPostalCode = data.userPostalCode;
+
+        this.baseTableData = data;
       },
     });
   }
@@ -50,12 +53,23 @@ export class UserProfileComponent {
       userPostalCode: this.userPostalCode,
     };
 
+    if (
+      this.baseTableData &&
+      JSON.stringify(this.baseTableData) === JSON.stringify(table)
+    ) {
+      return;
+    }
+
     this.restService.uploadUserProfileTableData(table).subscribe({
       next: () => {
         console.log('Table data uploaded successfully');
+        this.baseTableData = table;
       },
       error: (error) => {
         console.error('Error uploading table data');
+      },
+      complete: () => {
+        alert('Kaydedildi');
       },
     });
   }
