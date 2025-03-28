@@ -1,4 +1,15 @@
-<div class="order-tracker-container">
+<div id="order-tracker-main">
+  <cdk-virtual-scroll-viewport itemSize="50" class="example-viewport">
+    <div
+      *cdkVirtualFor="let item of items"
+      class="example-item"
+      (click)="openOrderTrackerComponent(item)"
+    >
+      <div>{{ item }}</div>
+    </div>
+  </cdk-virtual-scroll-viewport>
+</div>
+<div class="order-tracker-container" *ngIf="showOrderTrackerComponent">
   <div class="progress-bar">
     <div
       class="step"

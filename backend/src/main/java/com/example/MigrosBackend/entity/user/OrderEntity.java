@@ -1,5 +1,6 @@
 package com.example.MigrosBackend.entity.user;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -23,4 +24,9 @@ public class OrderEntity {
     private Float price;
     private Float totalPrice;
     private String status;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_entity_id", referencedColumnName = "user_entity_id")
+    @JsonBackReference
+    private UserEntity userEntity;
 }

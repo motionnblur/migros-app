@@ -7,10 +7,12 @@ import com.example.MigrosBackend.dto.user.product.UserCartItemDto;
 import com.example.MigrosBackend.entity.category.CategoryEntity;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.product.ProductImageEntity;
+import com.example.MigrosBackend.entity.user.OrderEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.repository.category.CategoryEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductImageEntityRepository;
+import com.example.MigrosBackend.repository.user.OrderEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,6 +41,7 @@ public class UserSupplyService {
     private final ProductImageEntityRepository productImageEntityRepository;
     private final UserEntityRepository userEntityRepository;
     private final TokenService tokenService;
+    private final OrderEntityRepository orderEntityRepository;
 
     @Autowired
     public UserSupplyService(
@@ -46,13 +49,15 @@ public class UserSupplyService {
             ProductEntityRepository productEntityRepository,
             ProductImageEntityRepository productImageEntityRepository,
             UserEntityRepository userEntityRepository,
-            TokenService tokenService
+            TokenService tokenService,
+            OrderEntityRepository orderEntityRepository
     ) {
         this.categoryEntityRepository = categoryEntityRepository;
         this.productEntityRepository = productEntityRepository;
         this.productImageEntityRepository = productImageEntityRepository;
         this.userEntityRepository = userEntityRepository;
         this.tokenService = tokenService;
+        this.orderEntityRepository = orderEntityRepository;
     }
 
     public List<String> getAllCategoryNames() {
@@ -223,6 +228,31 @@ public class UserSupplyService {
                 user.getProductsIdsInCart().add(productId);
             }
             userEntityRepository.save(user);
+        }else{
+            throw new RuntimeException("Token not valid");
+        }
+    }
+
+    public ResponseEntity<?> getAllOrderIds(String token) {
+        String userName = tokenService.extractUsername(token);
+        UserEntity user = userEntityRepository.findByUserMail(userName);
+        if(tokenService.validateToken(token, user.getUserMail()))
+        {
+            List<OrderEntity> orders = user.getOrderEntities();
+            List<Long> orderIds = orders.stream().map(OrderEntity::getId).toList();
+            return ResponseEntity.ok(orderIds);
+        }else{
+            throw new RuntimeException("Token not valid");
+        }
+    }
+
+    public ResponseEntity<?> getOrderStatusByOrderId(Long orderId, String token) {
+        String userName = tokenService.extractUsername(token);
+        UserEntity user = userEntityRepository.findByUserMail(userName);
+        if(tokenService.validateToken(token, user.getUserMail()))
+        {
+            OrderEntity order = orderEntityRepository.findById(orderId).orElseThrow(() -> new RuntimeException("Order not found"));
+            return ResponseEntity.ok(order.getStatus());
         }else{
             throw new RuntimeException("Token not valid");
         }

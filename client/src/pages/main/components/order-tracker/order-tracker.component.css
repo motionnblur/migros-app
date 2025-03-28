@@ -12,7 +12,7 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  z-index: 100;
+  z-index: 102;
   background-color: #fff;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
@@ -115,6 +115,20 @@
   background-color: white;
   color: #333;
 }
+#order-tracker-main {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 100;
+  width: 400px;
+  height: 600px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0px 0px 4px 4px rgba(0, 0, 0, 0.2);
+  padding: 32px;
+  box-sizing: border-box;
+}
 
 #order-tracker-component-bg {
   width: 100vw;
@@ -124,4 +138,29 @@
   top: 50%; /* Center vertically */
   left: 50%; /* Center horizontally */
   transform: translate(-50%, -50%);
+  z-index: 99;
+}
+
+.example-viewport {
+  height: 100%;
+  width: 100%;
+  border: 1px solid black;
+}
+
+.example-item {
+  height: 50px;
+  background-color: rgb(230, 230, 230);
+  margin: 8px;
+  box-sizing: border-box;
+}
+.example-item > div {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding-left: 10px;
+  box-sizing: border-box;
+}
+.example-item:hover {
+  background-color: rgb(216, 215, 215);
+  cursor: pointer;
 }

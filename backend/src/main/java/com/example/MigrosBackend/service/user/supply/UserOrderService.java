@@ -62,6 +62,7 @@ public class UserOrderService {
 
             productCounts.forEach((productId, count) -> {
                 OrderEntity order = new OrderEntity();
+                order.setUserEntity(user);
                 order.setUserId(user.getId());
                 order.setItemId(productId);
                 ProductEntity product = productEntityRepository.findById(productId).get();

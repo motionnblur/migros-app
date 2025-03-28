@@ -36,9 +36,10 @@ export class ActionPanelComponent {
   @Output() closeActionPanelEvent = new EventEmitter<void>();
   public userData!: IUserProfileTable;
   public status: Status[] = [
-    { value: 'pending', viewValue: 'Pending' },
-    { value: 'inProgress', viewValue: 'In Progress' },
-    { value: 'completed', viewValue: 'Completed' },
+    { value: 'Ordered', viewValue: 'Ordered' },
+    { value: 'Shipped', viewValue: 'Shipped' },
+    { value: 'Out for delivery', viewValue: 'Out for delivery' },
+    { value: 'Delivered', viewValue: 'Delivered' },
   ];
   public selectedStatus!: string;
 

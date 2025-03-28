@@ -30,4 +30,25 @@ public class UserEntity {
     private String userPostalCode;
 
     private List<Long> productsIdsInCart;
+
+    @OneToMany(cascade = CascadeType.ALL)
+    @JoinColumn(name = "user_entity_id", referencedColumnName = "user_entity_id")
+    @JsonManagedReference
+    private List<OrderEntity> orderEntities;
+
+    @Override
+    public String toString() {
+        return "UserEntity{" +
+                "id=" + id +
+                ", userMail='" + userMail + '\'' +
+                ", userName='" + userName + '\'' +
+                ", userLastName='" + userLastName + '\'' +
+                ", userPassword='" + userPassword + '\'' +
+                ", userAddress='" + userAddress + '\'' +
+                ", userAddress2='" + userAddress2 + '\'' +
+                ", userTown='" + userTown + '\'' +
+                ", userCountry='" + userCountry + '\'' +
+                ", userPostalCode='" + userPostalCode + '\'' +
+                '}';
+    }
 }

@@ -116,4 +116,20 @@ public class UserSupplyController {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
     }
+    @GetMapping("getAllOrderIds")
+    public ResponseEntity<?> getAllOrderIds(@RequestParam String token) {
+        try {
+            return userSupplyService.getAllOrderIds(token);
+        }catch (Exception e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+    @GetMapping("getOrderStatusByOrderId")
+    public ResponseEntity<?> getOrderStatusByOrderId(@RequestParam Long orderId, @RequestParam String token) {
+        try {
+            return userSupplyService.getOrderStatusByOrderId(orderId, token);
+        }catch (Exception e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
 }

@@ -289,4 +289,22 @@ export class RestService {
       })
       .pipe(map((response) => response as IUserProfileTable));
   }
+  getAllOrderIds() {
+    const token: string = localStorage.getItem('token') as string;
+    return this.http
+      .get(`http://localhost:8080/user/supply/getAllOrderIds`, {
+        params: { token },
+        responseType: 'json',
+      })
+      .pipe(map((response) => response as number[]));
+  }
+  getOrderStatusByOrderId(orderId: number) {
+    const token: string = localStorage.getItem('token') as string;
+    return this.http
+      .get(`http://localhost:8080/user/supply/getOrderStatusByOrderId`, {
+        params: { orderId, token },
+        responseType: 'text',
+      })
+      .pipe(map((response) => response as string));
+  }
 }
