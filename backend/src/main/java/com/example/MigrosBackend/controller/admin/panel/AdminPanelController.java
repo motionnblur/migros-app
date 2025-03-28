@@ -151,4 +151,13 @@ public class AdminPanelController {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
     }
+    @GetMapping("updateOrderStatus")
+    public ResponseEntity<?> updateOrderStatus(@RequestParam Long orderId, @RequestParam String status) {
+        try {
+            userOrderService.updateOrderStatus(orderId, status);
+            return new ResponseEntity<>(HttpStatus.OK);
+        } catch (Exception e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
 }

@@ -125,4 +125,10 @@ public class UserOrderService {
 
         return order;
     }
+
+    public void updateOrderStatus(Long orderId, String status) {
+        OrderEntity orderEntity = orderEntityRepository.findById(orderId).get();
+        orderEntity.setStatus(status);
+        orderEntityRepository.save(orderEntity);
+    }
 }

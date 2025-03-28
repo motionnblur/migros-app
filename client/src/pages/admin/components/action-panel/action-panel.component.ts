@@ -40,6 +40,7 @@ export class ActionPanelComponent {
     { value: 'inProgress', viewValue: 'In Progress' },
     { value: 'completed', viewValue: 'Completed' },
   ];
+  public selectedStatus!: string;
 
   constructor(private restService: RestService) {}
   ngOnChanges(changes: SimpleChanges) {
@@ -54,5 +55,14 @@ export class ActionPanelComponent {
 
   public closeActionPanel() {
     this.closeActionPanelEvent.emit();
+  }
+  public save() {
+    this.restService
+      .updateOrderStatus(this.orderId, this.selectedStatus)
+      .subscribe((data: boolean) => {
+        if (data) {
+          alert('Status updated');
+        }
+      });
   }
 }

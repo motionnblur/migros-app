@@ -125,6 +125,15 @@ export class RestService {
       })
       .pipe(map((response) => response.status === 200));
   }
+  updateOrderStatus(orderId: number, status: string) {
+    return this.http
+      .get(`http://localhost:8080/admin/panel/updateOrderStatus`, {
+        params: { orderId, status },
+        responseType: 'text',
+        observe: 'response',
+      })
+      .pipe(map((response) => response.status === 200));
+  }
   uploadUserProfileTableData(table: IUserProfileTable) {
     const formData = new FormData();
     formData.append('userFirstName', table.userFirstName);
