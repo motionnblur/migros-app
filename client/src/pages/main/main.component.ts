@@ -16,6 +16,7 @@ import { AuthService } from '../../services/auth/auth.service';
 import { MatMenuModule } from '@angular/material/menu';
 import { UserCartComponent } from './components/user-cart/user-cart.component';
 import { UserProfileComponent } from './components/user-profile/user-profile.component';
+import { OrderTrackerComponent } from './components/order-tracker/order-tracker.component';
 
 @Component({
   selector: 'app-main',
@@ -33,6 +34,7 @@ import { UserProfileComponent } from './components/user-profile/user-profile.com
     MatMenuModule,
     UserCartComponent,
     UserProfileComponent,
+    OrderTrackerComponent,
   ],
   templateUrl: './main.component.html',
   styleUrl: './main.component.css',
@@ -79,7 +81,7 @@ export class MainComponent {
       this.isLoginButtonClicked = true;
       return;
     }
-    this.isOrderButtonClicked = true;
+    this.isOrderButtonClicked = !this.isOrderButtonClicked;
   }
   public loginUser() {
     this.loginText = 'Can';
@@ -106,6 +108,9 @@ export class MainComponent {
   }
   public closeProfileComponent() {
     this.isProfileButtonClicked = false;
+  }
+  public closeOrderTrackerComponent() {
+    this.isOrderButtonClicked = false;
   }
 
   private setItemPageOpened(value: boolean) {

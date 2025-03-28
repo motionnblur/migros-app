@@ -1,110 +1,127 @@
 .order-tracker-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 20px;
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    width: 100%;
-    max-width: 600px;
-    box-sizing: border-box;
-  }
-  
-  .progress-bar {
-    display: flex;
-    align-items: center;
-    width: 100%;
-    margin-bottom: 20px;
-  }
-  
-  .step {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    flex: 1;
-    position: relative;
-  }
-  
-  .indicator {
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    background-color: #e0e0e0;
-    border: 2px solid #e0e0e0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1;
-  }
-  
-  .indicator.active {
-    background-color: #20a8d8;
-    border-color: #20a8d8;
-    color: white;
-  }
-  
-  .indicator.completed {
-    background-color: #20a8d8;
-    border-color: #20a8d8;
-    color: white;
-  }
-  
-  .indicator.active svg {
-    width: 16px;
-    height: 16px;
-  }
-  
-  .line {
-    flex: 1;
-    height: 2px;
-    background-color: #e0e0e0;
-  }
-  
-  .line.active {
-    background-color: #20a8d8;
-  }
-  
-  .step:first-child .line {
-    display: none;
-  }
-  
-  .label {
-    margin-top: 8px;
-    font-size: 12px;
-    color: #666;
-    text-align: center;
-  }
-  
-  .step.active .label {
-    color: #333;
-    font-weight: bold;
-  }
-  
-  .step.completed .label {
-    color: #333;
-  }
-  
-  .actions {
-    display: flex;
-    gap: 10px;
-    width: 100%;
-    justify-content: space-between;
-  }
-  
-  .actions button {
-    padding: 10px 15px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 14px;
-  }
-  
-  .actions button.update-delivery {
-    background-color: white;
-    color: #333;
-  }
-  
-  .actions button.cancel-order {
-    background-color: white;
-    color: #333;
-  }
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 600px;
+  box-sizing: border-box;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 100;
+  background-color: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.progress-bar {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  position: relative;
+}
+
+.indicator {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-color: #e0e0e0;
+  border: 2px solid #e0e0e0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1;
+}
+
+.indicator.active {
+  background-color: #20a8d8;
+  border-color: #20a8d8;
+  color: white;
+}
+
+.indicator.completed {
+  background-color: #20a8d8;
+  border-color: #20a8d8;
+  color: white;
+}
+
+.indicator.active svg {
+  width: 16px;
+  height: 16px;
+}
+
+.line {
+  flex: 1;
+  height: 2px;
+  background-color: #e0e0e0;
+}
+
+.line.active {
+  background-color: #20a8d8;
+}
+
+.step:first-child .line {
+  display: none;
+}
+
+.label {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #666;
+  text-align: center;
+}
+
+.step.active .label {
+  color: #333;
+  font-weight: bold;
+}
+
+.step.completed .label {
+  color: #333;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  justify-content: space-between;
+}
+
+.actions button {
+  padding: 10px 15px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.actions button.update-delivery {
+  background-color: white;
+  color: #333;
+}
+
+.actions button.cancel-order {
+  background-color: white;
+  color: #333;
+}
+
+#order-tracker-component-bg {
+  width: 100vw;
+  height: 100vh;
+  position: fixed;
+  background-color: rgba(0, 0, 0, 0.3);
+  top: 50%; /* Center vertically */
+  left: 50%; /* Center horizontally */
+  transform: translate(-50%, -50%);
+}

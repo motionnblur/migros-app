@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, EventEmitter, OnInit, Output } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 
 @Component({
@@ -8,14 +8,15 @@ import { BrowserModule } from '@angular/platform-browser';
   templateUrl: './order-tracker.component.html',
   styleUrls: ['./order-tracker.component.css'],
 })
-export class OrderTrackerComponent implements OnInit {
+export class OrderTrackerComponent {
+  @Output() closeOrderTrackerComponentEvent = new EventEmitter<void>();
+
   currentStatus: 'Ordered' | 'Shipped' | 'Out for delivery' | 'Delivered' =
     'Ordered'; // You can dynamically set this value
 
   constructor() {}
 
-  ngOnInit(): void {
-    // In a real application, you would fetch the order status from an API
-    // For now, we're hardcoding it based on the image you provided.
+  public closeOrderTrackerComponent() {
+    this.closeOrderTrackerComponentEvent.emit();
   }
 }

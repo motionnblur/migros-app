@@ -69,4 +69,9 @@
   <div *ngIf="isProfileButtonClicked">
     <app-user-profile (closeComponentEvent)="closeProfileComponent()" />
   </div>
+  <div *ngIf="isOrderButtonClicked">
+    <app-order-tracker
+      (closeOrderTrackerComponentEvent)="closeOrderTrackerComponent()"
+    />
+  </div>
 </div>
