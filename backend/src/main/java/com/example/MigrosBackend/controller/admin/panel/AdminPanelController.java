@@ -4,6 +4,7 @@ import com.example.MigrosBackend.dto.admin.panel.AdminAddItemDto;
 import com.example.MigrosBackend.dto.admin.panel.AdminProductPreviewDto;
 import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionListDto;
 import com.example.MigrosBackend.dto.order.OrderDto;
+import com.example.MigrosBackend.entity.user.OrderEntity;
 import com.example.MigrosBackend.service.admin.supply.AdminSupplyService;
 import com.example.MigrosBackend.service.user.supply.UserOrderService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -136,6 +137,15 @@ public class AdminPanelController {
         try {
             List<OrderDto> orderDtos = userOrderService.getAllOrders(page, productRange);
             return ResponseEntity.ok(orderDtos);
+        } catch (Exception e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+    @GetMapping("getUserProfileData")
+    public ResponseEntity<?> getUserProfileData(@RequestParam Long orderId) {
+        try {
+            OrderEntity order = userOrderService.getUserProfileData(orderId);
+            return ResponseEntity.ok(order);
         } catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }

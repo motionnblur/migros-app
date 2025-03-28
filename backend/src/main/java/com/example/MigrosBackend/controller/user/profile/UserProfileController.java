@@ -57,7 +57,7 @@ public class UserProfileController {
         userProfileTableDto.setUserTown(user.getUserTown());
         userProfileTableDto.setUserCountry(user.getUserCountry());
         userProfileTableDto.setUserPostalCode(user.getUserPostalCode());
-        
+
         return userProfileTableDto;
     }
 }

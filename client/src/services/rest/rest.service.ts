@@ -272,4 +272,12 @@ export class RestService {
       })
       .pipe(map((response) => response as IOrder[]));
   }
+  getUserProfileData(orderId: number) {
+    return this.http
+      .get(`http://localhost:8080/admin/panel/getUserProfileData`, {
+        params: { orderId },
+        responseType: 'json',
+      })
+      .pipe(map((response) => response as IUserProfileTable));
+  }
 }

@@ -23,7 +23,10 @@
       <ng-container matColumnDef="actions">
         <th mat-header-cell *matHeaderCellDef>Actions</th>
         <td mat-cell *matCellDef="let element">
-          <div class="order-actions"></div>
+          <div
+            class="order-actions"
+            (click)="openActionPanel(element.orderId)"
+          ></div>
         </td>
       </ng-container>
 
@@ -40,3 +43,8 @@
   </div>
 </div>
 <div *ngIf="isOrderComponentOpen" id="order-component">Open</div>
+<app-action-panel
+  *ngIf="isActionPanelOpen"
+  [orderId]="orderId"
+  (closeActionPanelEvent)="closeActionPanel()"
+/>

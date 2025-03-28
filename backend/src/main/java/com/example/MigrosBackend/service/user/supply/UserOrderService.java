@@ -11,6 +11,7 @@ import com.example.MigrosBackend.service.global.TokenService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -105,5 +106,10 @@ public class UserOrderService {
             orderDtos.add(orderDto);
         }
         return orderDtos;
+    }
+
+    public OrderEntity getUserProfileData(Long orderId) {
+        OrderEntity order = orderEntityRepository.findById(orderId).get();
+        return order;
     }
 }
