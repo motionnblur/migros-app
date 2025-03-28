@@ -1,2 +1,15 @@
-<div id="action-panel-main"></div>
+<div id="action-panel-main">
+  <div>{{ userData.userFirstName }} {{ userData.userLastName }}</div>
+  <div>{{ userData.userAddress }}</div>
+  <div>{{ userData.userAddress2 }}</div>
+  <mat-form-field>
+    <mat-label>Select status</mat-label>
+    <mat-select>
+      @for (s of status; track s) {
+      <mat-option [value]="s.value">{{ s.viewValue }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+  <button mat-raised-button>Save</button>
+</div>
 <div id="action-panel-bg" (click)="closeActionPanel()"></div>
