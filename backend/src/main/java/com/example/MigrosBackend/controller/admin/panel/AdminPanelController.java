@@ -4,6 +4,7 @@ import com.example.MigrosBackend.dto.admin.panel.AdminAddItemDto;
 import com.example.MigrosBackend.dto.admin.panel.AdminProductPreviewDto;
 import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionListDto;
 import com.example.MigrosBackend.dto.order.OrderDto;
+import com.example.MigrosBackend.dto.user.UserProfileTableDto;
 import com.example.MigrosBackend.entity.user.OrderEntity;
 import com.example.MigrosBackend.service.admin.supply.AdminSupplyService;
 import com.example.MigrosBackend.service.user.supply.UserOrderService;
@@ -144,7 +145,7 @@ public class AdminPanelController {
     @GetMapping("getUserProfileData")
     public ResponseEntity<?> getUserProfileData(@RequestParam Long orderId) {
         try {
-            OrderEntity order = userOrderService.getUserProfileData(orderId);
+            UserProfileTableDto order = userOrderService.getUserProfileData(orderId);
             return ResponseEntity.ok(order);
         } catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);

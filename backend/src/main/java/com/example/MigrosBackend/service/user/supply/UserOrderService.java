@@ -1,6 +1,7 @@
 package com.example.MigrosBackend.service.user.supply;
 
 import com.example.MigrosBackend.dto.order.OrderDto;
+import com.example.MigrosBackend.dto.user.UserProfileTableDto;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.user.OrderEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
@@ -8,6 +9,7 @@ import com.example.MigrosBackend.repository.product.ProductEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
+import org.apache.catalina.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -108,8 +110,19 @@ public class UserOrderService {
         return orderDtos;
     }
 
-    public OrderEntity getUserProfileData(Long orderId) {
-        OrderEntity order = orderEntityRepository.findById(orderId).get();
+    public UserProfileTableDto getUserProfileData(Long orderId) {
+        OrderEntity orderEntity = orderEntityRepository.findById(orderId).get();
+        UserEntity userEntity = userEntityRepository.findById(orderEntity.getUserId()).get();
+
+        UserProfileTableDto order = new UserProfileTableDto();
+        order.setUserFirstName(userEntity.getUserName());
+        order.setUserLastName(userEntity.getUserLastName());
+        order.setUserAddress(userEntity.getUserAddress());
+        order.setUserAddress2(userEntity.getUserAddress2());
+        order.setUserTown(userEntity.getUserTown());
+        order.setUserCountry(userEntity.getUserCountry());
+        order.setUserPostalCode(userEntity.getUserPostalCode());
+
         return order;
     }
 }
