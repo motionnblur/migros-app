@@ -11,16 +11,7 @@ It's a very basic migros clone that i built for my learning purposes. See: www.m
 - [Technologies Used](#technologies-used)
 - [Prerequisites](#prerequisites)
 - [Setup](#setup)
-  - [Backend Setup (Spring Boot)](#backend-setup-spring-boot)
-  - [Frontend Setup (Angular)](#frontend-setup-angular)
-  - [Database Setup (PostgreSQL)](#database-setup-postgresql)
 - [Running the Application](#running-the-application)
-  - [Running the Backend](#running-the-backend)
-  - [Running the Frontend](#running-the-frontend)
-- [API Endpoints](#api-endpoints) (Example - Adapt to your actual endpoints)
-- [Database Schema](#database-schema) (Optional - Provide a simplified overview)
-- [Contributing](#contributing)
-- [License](#license)
 
 ## Overview
 
@@ -86,6 +77,7 @@ POSTGRES_USER=postgres
 POSTGRES_PASSWORD=1
 POSTGRES_DB=migros_db
 ```
+## Running the application
 
 To start the development server, just type the command below in your favorite terminal.
 ```
