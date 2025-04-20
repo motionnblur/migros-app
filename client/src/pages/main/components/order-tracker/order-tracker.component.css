@@ -140,6 +140,16 @@
   transform: translate(-50%, -50%);
   z-index: 99;
 }
+#order-tracker-anim-bg {
+  width: 100vw;
+  height: 100vh;
+  position: fixed;
+  background-color: rgba(0, 0, 0, 0.3);
+  top: 50%; /* Center vertically */
+  left: 50%; /* Center horizontally */
+  transform: translate(-50%, -50%);
+  z-index: 100;
+}
 
 .example-viewport {
   height: 100%;

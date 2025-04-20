@@ -56,4 +56,7 @@ export class OrderTrackerComponent {
       },
     });
   }
+  public closeOrderTrackerAnim() {
+    this.showOrderTrackerComponent = false;
+  }
 }
