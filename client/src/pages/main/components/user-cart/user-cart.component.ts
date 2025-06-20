@@ -65,9 +65,19 @@ export class UserCartComponent {
   ngOnDestroy() {
     document.removeEventListener('keydown', (event) => {
       if (event.key === 'Escape') {
+        if (this.itemsToDelete.length > 0) {
+          this.itemsToDelete.forEach((productId) => {
+            this.restService.removeProductFromUserCart(productId).subscribe();
+          });
+        }
         this.closeCartComponent();
       }
     });
+    if (this.itemsToDelete.length > 0) {
+      this.itemsToDelete.forEach((productId) => {
+        this.restService.removeProductFromUserCart(productId).subscribe();
+      });
+    }
   }
   private saveCartItems() {
     if (this.itemsToDelete.length > 0) {
