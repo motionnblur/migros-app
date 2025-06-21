@@ -13,7 +13,8 @@ import { ScrollingModule } from '@angular/cdk/scrolling';
 export class OrderTrackerComponent {
   @Output() closeOrderTrackerComponentEvent = new EventEmitter<void>();
   public showOrderTrackerComponent = false;
-  items: number[] = [];
+  orderIds: number[] = [];
+  currentSelectedOrderId: number = 0;
 
   currentStatus: 'Ordered' | 'Shipped' | 'Out for delivery' | 'Delivered' =
     'Ordered'; // You can dynamically set this value
@@ -21,8 +22,7 @@ export class OrderTrackerComponent {
   constructor(private restService: RestService) {
     restService.getAllOrderIds().subscribe({
       next: (data: number[]) => {
-        this.items = data;
-        console.log(this.items);
+        this.orderIds = data;
       },
       error: (error: any) => {
         console.error(error);
@@ -51,6 +51,7 @@ export class OrderTrackerComponent {
             this.currentStatus = 'Delivered';
             break;
         }
+        this.currentSelectedOrderId = orderId;
       },
       error: (error: any) => {
         console.error(error);
@@ -61,7 +62,9 @@ export class OrderTrackerComponent {
     this.showOrderTrackerComponent = false;
   }
   public cancelOrder() {
-    this.restService.calcelOrder(this.items[0]).subscribe({
+    if (this.orderIds.length == 0) return;
+
+    this.restService.calcelOrder(this.currentSelectedOrderId).subscribe({
       next: (data: boolean) => {
         if (data) {
           this.closeOrderTrackerComponent();

@@ -1,11 +1,11 @@
 <div id="order-tracker-main">
   <cdk-virtual-scroll-viewport itemSize="50" class="example-viewport">
     <div
-      *cdkVirtualFor="let item of items"
+      *cdkVirtualFor="let id of orderIds"
       class="example-item"
-      (click)="openOrderTrackerComponent(item)"
+      (click)="openOrderTrackerComponent(id)"
     >
-      <div>{{ item }}</div>
+      <div>{{ id }}</div>
     </div>
   </cdk-virtual-scroll-viewport>
 </div>
