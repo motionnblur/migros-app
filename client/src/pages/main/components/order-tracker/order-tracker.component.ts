@@ -22,6 +22,7 @@ export class OrderTrackerComponent {
     restService.getAllOrderIds().subscribe({
       next: (data: number[]) => {
         this.items = data;
+        console.log(this.items);
       },
       error: (error: any) => {
         console.error(error);
@@ -58,5 +59,17 @@ export class OrderTrackerComponent {
   }
   public closeOrderTrackerAnim() {
     this.showOrderTrackerComponent = false;
+  }
+  public cancelOrder() {
+    this.restService.calcelOrder(this.items[0]).subscribe({
+      next: (data: boolean) => {
+        if (data) {
+          this.closeOrderTrackerComponent();
+        }
+      },
+      error: (error: any) => {
+        console.error(error);
+      },
+    });
   }
 }

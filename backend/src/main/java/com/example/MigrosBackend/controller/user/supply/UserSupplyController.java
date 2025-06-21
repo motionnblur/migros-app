@@ -124,6 +124,14 @@ public class UserSupplyController {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
     }
+    @DeleteMapping("cancelOrder")
+    public ResponseEntity<?> cancelOrder(@RequestParam Long orderId, @RequestParam String token) {
+        try {
+            return userSupplyService.cancelOrder(orderId, token);
+        }catch (Exception e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
     @GetMapping("getOrderStatusByOrderId")
     public ResponseEntity<?> getOrderStatusByOrderId(@RequestParam Long orderId, @RequestParam String token) {
         try {

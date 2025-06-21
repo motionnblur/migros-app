@@ -257,4 +257,18 @@ public class UserSupplyService {
             throw new RuntimeException("Token not valid");
         }
     }
+
+    public ResponseEntity<?> cancelOrder(Long orderId, String token) {
+        String userName = tokenService.extractUsername(token);
+        UserEntity user = userEntityRepository.findByUserMail(userName);
+
+        if(tokenService.validateToken(token, user.getUserMail()))
+        {
+            OrderEntity order = orderEntityRepository.findById(orderId).orElseThrow(() -> new RuntimeException("Order not found"));
+            orderEntityRepository.delete(order);
+            return ResponseEntity.ok("Order cancelled");
+        }else{
+            throw new RuntimeException("Token not valid");
+        }
+    }
 }
