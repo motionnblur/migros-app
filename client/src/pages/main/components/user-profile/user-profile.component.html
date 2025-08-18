@@ -1,93 +1,62 @@
 <div id="user-profile-component-bg" (click)="closeProfileComponent()"></div>
+
 <div id="user-profile-main">
   <div id="user-profile-panel">
-    <form class="example-form">
-      <table class="example-full-width" cellspacing="0">
-        <tr>
-          <td>
-            <mat-form-field class="example-full-width">
-              <mat-label>İsim</mat-label>
-              <input matInput [(ngModel)]="userFirstName" name="name" />
-            </mat-form-field>
-          </td>
-          <td>
-            <mat-form-field class="example-full-width">
-              <mat-label>Soy isim</mat-label>
-              <input matInput [(ngModel)]="userLastName" name="last-name" />
-            </mat-form-field>
-          </td>
-        </tr>
-      </table>
+    <h2>Kullanıcı Profili</h2>
+    <form class="profile-form">
+      <!-- Name Section -->
+      <div class="form-row">
+        <mat-form-field appearance="fill">
+          <mat-label>İsim</mat-label>
+          <input matInput [(ngModel)]="userFirstName" name="name" />
+        </mat-form-field>
+        <mat-form-field appearance="fill">
+          <mat-label>Soy İsim</mat-label>
+          <input matInput [(ngModel)]="userLastName" name="last-name" />
+        </mat-form-field>
+      </div>
 
-      <p>
-        <mat-form-field class="example-full-width">
+      <!-- Address Section -->
+      <div class="form-row">
+        <mat-form-field appearance="fill" class="full-width">
           <mat-label>Adres 1</mat-label>
-          <textarea
-            matInput
-            matInput
-            [(ngModel)]="userAddress"
-            name="address"
-          ></textarea>
+          <textarea matInput [(ngModel)]="userAddress" name="address"></textarea>
         </mat-form-field>
-        <mat-form-field class="example-full-width">
+      </div>
+      <div class="form-row">
+        <mat-form-field appearance="fill" class="full-width">
           <mat-label>Adres 2</mat-label>
-          <textarea
-            matInput
-            matInput
-            [(ngModel)]="userAddress2"
-            name="address2"
-          ></textarea>
+          <textarea matInput [(ngModel)]="userAddress2" name="address2"></textarea>
         </mat-form-field>
-      </p>
+      </div>
 
-      <table class="example-full-width" cellspacing="0">
-        <tr>
-          <td>
-            <mat-form-field class="example-full-width">
-              <mat-label>Şehir</mat-label>
-              <input
-                matInput
-                placeholder="Ex. San Francisco"
-                [(ngModel)]="userTown"
-                name="town"
-              />
-            </mat-form-field>
-          </td>
-          <td>
-            <mat-form-field class="example-full-width">
-              <mat-label>Ülke</mat-label>
-              <input
-                matInput
-                placeholder="Ex. California"
-                [(ngModel)]="userCountry"
-                name="country"
-              />
-            </mat-form-field>
-          </td>
-          <td>
-            <mat-form-field class="example-full-width">
-              <mat-label>Posta kodu</mat-label>
-              <input
-                matInput
-                #postalCode
-                maxlength="5"
-                placeholder="Ex. 94105"
-                value="94043"
-                [(ngModel)]="userPostalCode"
-                name="postal-code"
-              />
-              <mat-hint align="end">{{ postalCode.value.length }} / 5</mat-hint>
-            </mat-form-field>
-          </td>
-        </tr>
-      </table>
+      <!-- Location Section -->
+      <div class="form-row">
+        <mat-form-field appearance="fill">
+          <mat-label>Şehir</mat-label>
+          <input matInput [(ngModel)]="userTown" name="town" />
+        </mat-form-field>
+        <mat-form-field appearance="fill">
+          <mat-label>Ülke</mat-label>
+          <input matInput [(ngModel)]="userCountry" name="country" />
+        </mat-form-field>
+        <mat-form-field appearance="fill">
+          <mat-label>Posta Kodu</mat-label>
+          <input
+            matInput
+            maxlength="5"
+            #postalCode
+            [(ngModel)]="userPostalCode"
+            name="postal-code"
+          />
+          <mat-hint align="end">{{ postalCode.value?.length || 0 }} / 5</mat-hint>
+        </mat-form-field>
+      </div>
+
+      <!-- Save Button -->
+      <div class="form-actions">
+        <button mat-raised-button color="primary" (click)="uploadTableData()">Kaydet</button>
+      </div>
     </form>
-    <button
-      mat-raised-button
-      id="profile-save-button"
-      (click)="uploadTableData()"
-    >
-      Kaydet
-    </button>
   </div>
 </div>
