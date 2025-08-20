@@ -64,6 +64,7 @@ export class UserProfileComponent {
       next: () => {
         console.log('Table data uploaded successfully');
         this.baseTableData = table;
+        this.closeComponentEvent.emit();
       },
       error: (error) => {
         console.error('Error uploading table data');
