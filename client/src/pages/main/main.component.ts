@@ -51,6 +51,7 @@ export class MainComponent {
   loginText: string = 'Üye Ol veya Giriş Yap';
   isCartComponentOpened: boolean = false;
   isPaymentComponentOpened: boolean = false;
+  orderIds: number[] = [];
 
   constructor(
     private eventManager: EventService,
@@ -71,6 +72,14 @@ export class MainComponent {
       }
       this.loginText = 'Üye Ol veya Giriş Yap';
     }
+    this.restService.getAllOrderIds().subscribe({
+      next: (data: number[]) => {
+        this.orderIds = data;
+      },
+      error: (error: any) => {
+        console.error(error);
+      },
+    });
   }
 
   public openLoginComponent() {
@@ -81,6 +90,11 @@ export class MainComponent {
       this.isLoginButtonClicked = true;
       return;
     }
+    if (this.orderIds.length == 0) {
+      alert("You don't have any orders");
+      return;
+    }
+
     this.isOrderButtonClicked = !this.isOrderButtonClicked;
   }
   public loginUser() {

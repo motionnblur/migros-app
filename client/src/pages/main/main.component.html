@@ -71,6 +71,7 @@
   </div>
   <div *ngIf="isOrderButtonClicked">
     <app-order-tracker
+    [orderIds]="orderIds"
       (closeOrderTrackerComponentEvent)="closeOrderTrackerComponent()"
     />
   </div>

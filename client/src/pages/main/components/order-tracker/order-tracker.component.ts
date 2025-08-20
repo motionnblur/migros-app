@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, OnInit, Output } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { RestService } from '../../../../services/rest/rest.service';
 import { ScrollingModule } from '@angular/cdk/scrolling';
@@ -12,8 +12,8 @@ import { ScrollingModule } from '@angular/cdk/scrolling';
 })
 export class OrderTrackerComponent {
   @Output() closeOrderTrackerComponentEvent = new EventEmitter<void>();
+  @Input('orderIds') orderIds!: number[];
   public showOrderTrackerComponent = false;
-  orderIds: number[] = [];
   currentSelectedOrderId: number = 0;
 
   currentStatus: 'Ordered' | 'Shipped' | 'Out for delivery' | 'Delivered' =
