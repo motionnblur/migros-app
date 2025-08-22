@@ -13,10 +13,4 @@ export class SignService {
       adminPassword,
     });
   }
-  adminSignup(adminName: string, adminPassword: string) {
-    return this.http.post('http://localhost:8080/admin/signup', {
-      adminName,
-      adminPassword,
-    });
-  }
 }

@@ -1,7 +1,6 @@
 import { Component } from '@angular/core';
 import { AdminLoginComponent } from './components/admin-login/admin-login.component';
 import { CommonModule } from '@angular/common';
-import { AdminSignupComponent } from './components/admin-signup/admin-signup.component';
 import { AdminService } from './services/admin.service';
 import { AdminPanelComponent } from './components/admin-panel/admin-panel.component';
 
@@ -9,9 +8,7 @@ import { AdminPanelComponent } from './components/admin-panel/admin-panel.compon
   selector: 'app-admin',
   imports: [
     AdminLoginComponent,
-    AdminSignupComponent,
     CommonModule,
-    AdminSignupComponent,
     AdminPanelComponent,
   ],
   templateUrl: './admin.component.html',

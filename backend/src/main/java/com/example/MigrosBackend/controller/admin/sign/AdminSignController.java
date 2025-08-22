@@ -19,16 +19,7 @@ public class AdminSignController {
     public AdminSignController(AdminSignupService adminSignupService) {
         this.adminSupplyService = adminSignupService;
     }
-
-    @PostMapping("signup")
-    private ResponseEntity<?> addItem(@RequestBody AdminSignDto adminSignDto) throws Exception {
-        try{
-            adminSupplyService.signup(adminSignDto);
-            return new ResponseEntity<>(HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
-    }
+    
     @PostMapping("login")
     private ResponseEntity<?> login(@RequestBody AdminSignDto adminSignDto) throws Exception {
         try{

@@ -17,17 +17,6 @@ public class AdminSignupService {
         this.adminEntityRepository = adminEntityRepository;
         this.encryptService = encryptService;
     }
-
-    public void signup(AdminSignDto adminSignDto) {
-        AdminEntity adminEntityToCreate = new AdminEntity();
-        adminEntityToCreate.setAdminName(adminSignDto.getAdminName());
-        adminEntityToCreate.setAdminPassword(encryptService.getEncryptedPassword(adminSignDto.getAdminPassword()));
-
-        if(adminEntityRepository.existsByAdminName(adminSignDto.getAdminName()))
-            throw new RuntimeException("Admin with that name: "+ adminSignDto.getAdminName()+" already exists.");
-
-        adminEntityRepository.save(adminEntityToCreate);
-    }
     public void login(AdminSignDto adminSignDto) {
         AdminEntity adminEntity = adminEntityRepository.findByAdminName(adminSignDto.getAdminName());
         if (adminEntity == null) throw new RuntimeException("Admin with that name: " + adminSignDto.getAdminName() + " could not be found.");
