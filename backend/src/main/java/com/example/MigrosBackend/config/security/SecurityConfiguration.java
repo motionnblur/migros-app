@@ -38,8 +38,6 @@ public class SecurityConfiguration {
                         .requestMatchers("/admin/supply/**").authenticated()
                         .requestMatchers("/user/supply/**").authenticated()
                         .requestMatchers("/user/profile/**").authenticated()
-                        .requestMatchers("/payment/**").authenticated()
-                        .requestMatchers("/payment").authenticated()
                         .anyRequest().permitAll()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

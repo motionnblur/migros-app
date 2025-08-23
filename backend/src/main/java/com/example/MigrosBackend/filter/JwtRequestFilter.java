@@ -6,6 +6,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -14,20 +15,20 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 
 @Component
 public class JwtRequestFilter extends OncePerRequestFilter {
     private final TokenService tokenService;
-    private final UserDetailsService userDetailsService;
 
-    public JwtRequestFilter(TokenService tokenService, UserDetailsService userDetailsService) {
+    public JwtRequestFilter(TokenService tokenService) {
         this.tokenService = tokenService;
-        this.userDetailsService = userDetailsService;
     }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
-        return request.getServletPath().equals("/admin/login");
+        String servletPath = request.getServletPath();
+        return servletPath.equals("/admin/login") || servletPath.equals("/user/login");
     }
 
     @Override
@@ -43,11 +44,18 @@ public class JwtRequestFilter extends OncePerRequestFilter {
             username = tokenService.extractUsername(jwt);
         }
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
+            if (tokenService.validateToken(jwt, username)) {
+                List<SimpleGrantedAuthority> authorities;
 
-            if (tokenService.validateToken(jwt, userDetails.getUsername())) {
-                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                        userDetails, null, userDetails.getAuthorities());
+                if ("admin".equalsIgnoreCase(username)) {
+                    authorities = List.of(new SimpleGrantedAuthority("ROLE_ADMIN"));
+                } else {
+                    authorities = List.of(new SimpleGrantedAuthority("ROLE_USER"));
+                }
+
+                UsernamePasswordAuthenticationToken authToken =
+                        new UsernamePasswordAuthenticationToken(username, null, authorities);
+
                 SecurityContextHolder.getContext().setAuthentication(authToken);
             }
         }

@@ -10,7 +10,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   } else if (url.includes('/admin/supply/')) {
     token = localStorage.getItem('admin-token');
   } else if (url.includes('/user/')) {
-    token = localStorage.getItem('user-token');
+    token = localStorage.getItem('token');
   }
 
   if (token) {

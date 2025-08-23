@@ -49,17 +49,19 @@ export class ProductBodyComponent {
 
   private loadProducts() {
     const id = data.currentSelectedCategoryId;
-    this.restService.getProductPageData(id, 0, this.currentPageSize).subscribe({
-      next: (data: any) => {
-        this.productsData = data;
-      },
-      error: (error: any) => {
-        console.error(error);
-      },
-      complete: () => {
-        this.selectedCategoryName = this.categories[id - 1].name;
-      },
-    });
+    this.restService
+      .getProductPageDataAdmin(id, 0, this.currentPageSize)
+      .subscribe({
+        next: (data: any) => {
+          this.productsData = data;
+        },
+        error: (error: any) => {
+          console.error(error);
+        },
+        complete: () => {
+          this.selectedCategoryName = this.categories[id - 1].name;
+        },
+      });
   }
 
   public deleteProduct(productId: number) {
@@ -79,7 +81,7 @@ export class ProductBodyComponent {
     data.currentSelectedCategoryId = index;
 
     this.restService
-      .getProductPageData(index, 0, this.currentPageSize)
+      .getProductPageDataAdmin(index, 0, this.currentPageSize)
       .subscribe({
         next: (data: any) => {
           this.productsData = data;
@@ -93,7 +95,7 @@ export class ProductBodyComponent {
       });
 
     this.restService
-      .getProductCountsFromCategory(data.currentSelectedCategoryId)
+      .getProductCountsFromCategoryAdmin(data.currentSelectedCategoryId)
       .subscribe({
         next: (data: any) => {
           this.productPageLength = data;
@@ -110,7 +112,7 @@ export class ProductBodyComponent {
     this.currentPageSize = $event.pageSize;
 
     this.restService
-      .getProductPageData(
+      .getProductPageDataAdmin(
         data.currentSelectedCategoryId,
         $event.pageIndex,
         $event.pageSize

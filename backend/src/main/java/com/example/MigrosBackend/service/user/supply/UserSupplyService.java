@@ -154,17 +154,14 @@ public class UserSupplyService {
 
     public void addProductToInventory(Long productId, String token) {
         String userName = tokenService.extractUsername(token);
+        if(userName == null) throw new RuntimeException("Error");
         UserEntity user = userEntityRepository.findByUserMail(userName);
-        if(tokenService.validateToken(token, user.getUserMail()))
-        {
-            if (user.getProductsIdsInCart() == null) {
-                user.setProductsIdsInCart(new ArrayList<>()); // Initialize if null
-            }
-            user.getProductsIdsInCart().add(productId);
-            userEntityRepository.save(user);
-        }else{
-            throw new RuntimeException("Token not valid");
+
+        if (user.getProductsIdsInCart() == null) {
+            user.setProductsIdsInCart(new ArrayList<>()); // Initialize if null
         }
+        user.getProductsIdsInCart().add(productId);
+        userEntityRepository.save(user);
     }
 
     public List<UserCartItemDto> getProductData() {
