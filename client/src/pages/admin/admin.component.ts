@@ -6,18 +6,13 @@ import { AdminPanelComponent } from './components/admin-panel/admin-panel.compon
 
 @Component({
   selector: 'app-admin',
-  imports: [
-    AdminLoginComponent,
-    CommonModule,
-    AdminPanelComponent,
-  ],
+  imports: [AdminLoginComponent, CommonModule, AdminPanelComponent],
   templateUrl: './admin.component.html',
   styleUrl: './admin.component.css',
 })
 export class AdminComponent {
   isLoginPhaseActive: boolean = false;
-  isLoginCompleted: boolean =
-    localStorage.getItem('isLoginCompleted') === 'true';
+  isLoginCompleted: boolean = false;
 
   constructor(private adminService: AdminService) {}
   ngOnInit(): void {
@@ -25,7 +20,7 @@ export class AdminComponent {
       this.isLoginPhaseActive = status;
     });
     this.adminService.getLoginCompletedStatus().subscribe((status) => {
-      this.isLoginCompleted = status;
+      this.isLoginCompleted = true;
     });
   }
 
