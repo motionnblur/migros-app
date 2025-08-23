@@ -29,11 +29,6 @@ public class SecurityConfiguration {
     }
 
     @Bean
-    public JwtRequestFilter jwtRequestFilter(TokenService tokenService, UserDetailsService userDetailsService) {
-        return new JwtRequestFilter(tokenService, userDetailsService);
-    }
-
-    @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtRequestFilter jwtRequestFilter) throws Exception {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))

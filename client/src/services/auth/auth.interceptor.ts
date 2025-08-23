@@ -5,7 +5,9 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   let token: string | null = null;
 
-  if (url.includes('/admin/')) {
+  if (url.includes('/admin/panel/')) {
+    token = localStorage.getItem('admin-token');
+  } else if (url.includes('/admin/supply/')) {
     token = localStorage.getItem('admin-token');
   } else if (url.includes('/user/')) {
     token = localStorage.getItem('user-token');
