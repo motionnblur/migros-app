@@ -166,11 +166,14 @@ export class RestService {
     formData.append('userCountry', table.userCountry);
     formData.append('userPostalCode', table.userPostalCode);
 
+    const userToken = localStorage.getItem('token');
+
     return this.http
       .post(
         'http://localhost:8080/user/profile/uploadUserProfileTable',
         formData,
         {
+          params: { token: userToken! },
           responseType: 'text',
           observe: 'response',
         }
@@ -178,8 +181,10 @@ export class RestService {
       .pipe(map((response) => response.status === 200));
   }
   getUserProfileTableData() {
+    const userToken = localStorage.getItem('token');
     return this.http
       .get(`http://localhost:8080/user/profile/getUserProfileTable`, {
+        params: { token: userToken! },
         responseType: 'json',
       })
       .pipe(map((response) => response as IUserProfileTable));

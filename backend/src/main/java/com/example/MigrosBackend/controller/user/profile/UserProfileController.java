@@ -25,8 +25,13 @@ public class UserProfileController {
                                          @RequestParam("userAddress2") String userAddress2,
                                          @RequestParam("userTown") String userTown,
                                          @RequestParam("userCountry") String userCountry,
-                                         @RequestParam("userPostalCode") String userPostalCode) {
-        UserEntity user = userEntityRepository.findByUserMail(userFirstName);
+                                         @RequestParam("userPostalCode") String userPostalCode,
+                                         @RequestParam String token) {
+        String userName = tokenService.extractUsername(token);
+        if(!tokenService.validateToken(token, userName))
+            return "Invalid token";
+
+        UserEntity user = userEntityRepository.findByUserMail(userName);
         user.setUserName(userFirstName);
         user.setUserLastName(userLastName);
         user.setUserAddress(userAddress);
@@ -39,9 +44,11 @@ public class UserProfileController {
         return "User profile table uploaded";
     }
     @GetMapping("getUserProfileTable")
-    public UserProfileTableDto getUserProfileTable(@RequestParam("userName") String _userName) {
-        String userName = tokenService.extractUsername(_userName);
-
+    public UserProfileTableDto getUserProfileTable(@RequestParam String token) {
+        String userName = tokenService.extractUsername(token);
+        if(!tokenService.validateToken(token, userName))
+            return null;
+        
         UserEntity user = userEntityRepository.findByUserMail(userName);
         UserProfileTableDto userProfileTableDto = new UserProfileTableDto();
         userProfileTableDto.setUserFirstName(user.getUserName());
