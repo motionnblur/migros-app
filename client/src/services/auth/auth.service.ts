@@ -12,6 +12,14 @@ export class AuthService {
   public getToken() {
     return localStorage.getItem('token');
   }
+
+  public setAdminToken(token: string) {
+    localStorage.setItem('admin-token', token);
+  }
+  public getAdminToken() {
+    return localStorage.getItem('admin-token');
+  }
+
   public isLoggedIn() {
     const token = this.getToken();
     if (!token) return false;

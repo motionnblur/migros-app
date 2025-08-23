@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { map } from 'rxjs';
 import { IProductUploader } from '../../interfaces/IProductUploader';
@@ -274,8 +274,16 @@ export class RestService {
       .pipe(map((response) => response.body));
   }
   getAllOrders(page: number, productRange: number) {
+    const token = localStorage.getItem('admin-token');
+    const headers = new HttpHeaders({
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    });
+    console.log(token);
+
     return this.http
       .get(`http://localhost:8080/admin/panel/getAllOrders`, {
+        headers: headers,
         params: { page, productRange },
         responseType: 'json',
       })

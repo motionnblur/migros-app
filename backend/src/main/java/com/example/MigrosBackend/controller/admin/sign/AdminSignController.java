@@ -24,8 +24,8 @@ public class AdminSignController {
     @PostMapping("login")
     private ResponseEntity<?> login(@RequestBody AdminSignDto adminSignDto, HttpServletRequest request) throws Exception {
         try{
-            adminSupplyService.login(adminSignDto, request);
-            return new ResponseEntity<>(HttpStatus.OK);
+            String token = adminSupplyService.login(adminSignDto, request);
+            return ResponseEntity.ok(token);
         } catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }

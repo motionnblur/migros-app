@@ -5,6 +5,7 @@ import com.example.MigrosBackend.entity.admin.AdminEntity;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.service.global.EncryptService;
 import com.example.MigrosBackend.service.global.LogService;
+import com.example.MigrosBackend.service.global.TokenService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,16 +19,19 @@ public class AdminSignupService {
     private final AdminEntityRepository adminEntityRepository;
     private final EncryptService encryptService;
     private final LogService logService;
+    private final TokenService tokenService;
 
     @Autowired
     public AdminSignupService(AdminEntityRepository adminEntityRepository,
                               EncryptService encryptService,
-                              LogService logService) {
+                              LogService logService,
+                              TokenService tokenService) {
         this.adminEntityRepository = adminEntityRepository;
         this.encryptService = encryptService;
         this.logService = logService;
+        this.tokenService = tokenService;
     }
-    public void login(AdminSignDto adminSignDto, HttpServletRequest request) {
+    public String login(AdminSignDto adminSignDto, HttpServletRequest request) {
         AdminEntity adminEntity = adminEntityRepository.findByAdminName(adminSignDto.getAdminName());
         if (adminEntity == null)
         {
@@ -48,5 +52,7 @@ public class AdminSignupService {
 
             throw new RuntimeException("Wrong password.");
         }
+
+        return tokenService.generateToken(adminEntity.getAdminName());
     }
 }

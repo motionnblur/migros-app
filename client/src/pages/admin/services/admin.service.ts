@@ -24,7 +24,7 @@ export class AdminService {
   }
   setLoginCompleted(status: boolean): void {
     this.loginCompleted.next(status);
-    localStorage.setItem('isLoginCompleted', 'true');
+    //localStorage.setItem('isLoginCompleted', 'true');
   }
   setProductEditOpened(status: boolean): void {
     this.productEditOpened.next(status);
