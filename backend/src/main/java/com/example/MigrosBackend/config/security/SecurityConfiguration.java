@@ -35,6 +35,11 @@ public class SecurityConfiguration {
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/admin/panel/**").authenticated()
+                        .requestMatchers("/admin/supply/**").authenticated()
+                        .requestMatchers("/user/supply/**").authenticated()
+                        .requestMatchers("/user/profile/**").authenticated()
+                        .requestMatchers("/payment/**").authenticated()
+                        .requestMatchers("/payment").authenticated()
                         .anyRequest().permitAll()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
