@@ -1,5 +1,6 @@
 package com.example.MigrosBackend.controller.user.supply;
 
+import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionListDto;
 import com.example.MigrosBackend.dto.user.product.ProductDto;
 import com.example.MigrosBackend.dto.user.product.ProductPreviewDto;
 import com.example.MigrosBackend.dto.user.product.UserCartItemDto;
@@ -94,6 +95,23 @@ public class UserSupplyController {
         try{
             List<UserCartItemDto> dto = userSupplyService.getProductData();
             return ResponseEntity.ok(dto);
+        } catch (Exception e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+    @GetMapping("getProductDataWithProductId")
+    private ResponseEntity<?> getProductData(@RequestParam Long productId) throws Exception {
+        try{
+            return ResponseEntity.ok(userSupplyService.getProductData(productId));
+        } catch (Exception e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+    }
+    @GetMapping("getProductDescription")
+    private ResponseEntity<?> getProductDescription(@RequestParam Long productId) throws Exception {
+        try{
+            ProductDescriptionListDto productDescriptionDto = userSupplyService.getProductDescription(productId);
+            return ResponseEntity.ok(productDescriptionDto);
         } catch (Exception e) {
             return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
         }

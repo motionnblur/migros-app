@@ -75,7 +75,7 @@ export class RestService {
   }
   getProductData(productId: number) {
     return this.http
-      .get(`http://localhost:8080/admin/panel/getProductData`, {
+      .get(`http://localhost:8080/user/supply/getProductDataWithProductId`, {
         params: { productId },
         responseType: 'json',
       })
@@ -214,7 +214,7 @@ export class RestService {
   }
   getProductDescription(productId: number) {
     return this.http
-      .get(`http://localhost:8080/admin/panel/getProductDescription`, {
+      .get(`http://localhost:8080/user/supply/getProductDescription`, {
         params: { productId },
         responseType: 'json',
       })

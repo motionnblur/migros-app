@@ -1,15 +1,20 @@
 package com.example.MigrosBackend.service.user.supply;
 
+import com.example.MigrosBackend.dto.admin.panel.DescriptionsDto;
+import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionListDto;
+import com.example.MigrosBackend.dto.admin.panel.ProductDto2;
 import com.example.MigrosBackend.dto.user.product.ProductDto;
 import com.example.MigrosBackend.dto.user.product.ProductPreviewDto;
 import com.example.MigrosBackend.dto.user.category.SubCategoryDto;
 import com.example.MigrosBackend.dto.user.product.UserCartItemDto;
 import com.example.MigrosBackend.entity.category.CategoryEntity;
+import com.example.MigrosBackend.entity.product.ProductDescriptionEntity;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.product.ProductImageEntity;
 import com.example.MigrosBackend.entity.user.OrderEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.repository.category.CategoryEntityRepository;
+import com.example.MigrosBackend.repository.product.ProductDescriptionEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductImageEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderEntityRepository;
@@ -42,6 +47,7 @@ public class UserSupplyService {
     private final UserEntityRepository userEntityRepository;
     private final TokenService tokenService;
     private final OrderEntityRepository orderEntityRepository;
+    private final ProductDescriptionEntityRepository productDescriptionEntityRepository;
 
     @Autowired
     public UserSupplyService(
@@ -50,7 +56,8 @@ public class UserSupplyService {
             ProductImageEntityRepository productImageEntityRepository,
             UserEntityRepository userEntityRepository,
             TokenService tokenService,
-            OrderEntityRepository orderEntityRepository
+            OrderEntityRepository orderEntityRepository,
+            ProductDescriptionEntityRepository productDescriptionEntityRepository
     ) {
         this.categoryEntityRepository = categoryEntityRepository;
         this.productEntityRepository = productEntityRepository;
@@ -58,6 +65,7 @@ public class UserSupplyService {
         this.userEntityRepository = userEntityRepository;
         this.tokenService = tokenService;
         this.orderEntityRepository = orderEntityRepository;
+        this.productDescriptionEntityRepository = productDescriptionEntityRepository;
     }
 
     public List<String> getAllCategoryNames() {
@@ -189,6 +197,20 @@ public class UserSupplyService {
                     return dto;
                 }).toList();
     }
+    public ProductDto2 getProductData(Long productId) {
+        ProductEntity productEntity = productEntityRepository.findById(productId).orElseThrow(() -> new RuntimeException("Item with that id: " + productId + " could not be found."));
+
+        ProductDto2 productDto2 = new ProductDto2();
+        productDto2.setProductName(productEntity.getProductName());
+        productDto2.setSubCategoryName(productEntity.getSubcategoryName());
+        productDto2.setProductPrice(productEntity.getProductPrice());
+        productDto2.setProductCount(productEntity.getProductCount());
+        productDto2.setProductDiscount(productEntity.getProductDiscount());
+        productDto2.setProductDescription(productEntity.getProductDescription());
+        productDto2.setProductCategoryId(Math.toIntExact(productEntity.getCategoryEntity().getId()));
+
+        return productDto2;
+    }
 
     public void removeProductFromInventory(Long productId, String token) {
         String userName = tokenService.extractUsername(token);
@@ -267,5 +289,26 @@ public class UserSupplyService {
         }else{
             throw new RuntimeException("Token not valid");
         }
+    }
+
+    public ProductDescriptionListDto getProductDescription(Long productId) {
+        List<ProductDescriptionEntity> productDescriptionEntities = productDescriptionEntityRepository.findByProductEntityId(productId);
+        if(productDescriptionEntities == null)
+            throw new RuntimeException("Item with that id: " + productId + " could not be found.");
+
+        ProductDescriptionListDto productDescriptionDto = new ProductDescriptionListDto();
+        productDescriptionDto.setProductId(productId);
+        productDescriptionDto.setDescriptionList(new ArrayList<>());
+
+        for(ProductDescriptionEntity item : productDescriptionEntities) {
+            DescriptionsDto dto = new DescriptionsDto();
+            dto.setDescriptionId(item.getId());
+            dto.setDescriptionTabName(item.getDescriptionTabName());
+            dto.setDescriptionTabContent(item.getDescriptionTabContent());
+
+            productDescriptionDto.getDescriptionList().add(dto);
+        }
+
+        return productDescriptionDto;
     }
 }
