@@ -36,7 +36,12 @@ public class SecurityConfiguration {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/admin/panel/**").authenticated()
                         .requestMatchers("/admin/supply/**").authenticated()
-                        .requestMatchers("/user/supply/**").authenticated()
+                        .requestMatchers("/user/supply/addProductToUserCart").authenticated()
+                        .requestMatchers("/user/supply/removeProductFromUserCart").authenticated()
+                        .requestMatchers("/user/supply/updateProductCountInUserCart").authenticated()
+                        .requestMatchers("/user/supply/getAllOrderIds").authenticated()
+                        .requestMatchers("/user/supply/cancelOrder").authenticated()
+                        .requestMatchers("/user/supply/getOrderStatusByOrderId").authenticated()
                         .requestMatchers("/user/profile/**").authenticated()
                         .anyRequest().permitAll()
                 )
