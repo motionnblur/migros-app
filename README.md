@@ -12,6 +12,7 @@ It's a very basic migros clone that i built for my learning purposes. See: www.m
 - [Prerequisites](#prerequisites)
 - [Setup](#setup)
 - [Running the Application](#running-the-application)
+- [Screenshots](#screenshots)
 
 ## Overview
 
@@ -90,6 +91,8 @@ To start the development server, just type the command below in your favorite te
 ```
 docker compose --env-file configs/postgres.env --env-file configs/spring.env up
 ```
+
+## Screenshots
 
 <img width="1920" height="981" alt="migros-main-page" src="https://github.com/user-attachments/assets/6a01280c-282a-429c-b83e-897dc00cbdbc" />
 
