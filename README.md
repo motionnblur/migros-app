@@ -24,7 +24,8 @@ This application provides a basic platform for users to browse products, add the
 * **Product Details:** View detailed information about a specific product.
 * **Add to Cart:** Allow users to add products to their shopping cart.
 * **View Cart:** Display the items in the shopping cart.
-* **Basic Security** User Authentication and Authorization.
+* **Payment Processing:** By using Stripe's payment test api.
+* **Basic Security:** User Authentication and Authorization.
 
 ## Technologies Used
 
@@ -78,8 +79,11 @@ POSTGRES_PASSWORD=1
 POSTGRES_DB=migros_db
 ```
 ## Running the application
-
-To start the development server, just type the command below in your favorite terminal.
+Firstly you need to initialize node packages in order the client to run, go into client folder and type:
+```
+npm i
+```
+To start the development server, just type the command below in your favorite terminal:
 ```
 docker compose --env-file configs/postgres.env --env-file configs/spring.env up
 ```
