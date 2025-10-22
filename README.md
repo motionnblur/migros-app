@@ -78,6 +78,9 @@ POSTGRES_USER=postgres
 POSTGRES_PASSWORD=1
 POSTGRES_DB=migros_db
 ```
+* Default admin name: admin
+* Default admin password: admin
+
 ## Running the application
 Firstly you need to initialize node packages in order the client to run, go into client folder and type:
 ```
@@ -87,3 +90,31 @@ To start the development server, just type the command below in your favorite te
 ```
 docker compose --env-file configs/postgres.env --env-file configs/spring.env up
 ```
+
+<img width="1920" height="981" alt="migros-main-page" src="https://github.com/user-attachments/assets/6a01280c-282a-429c-b83e-897dc00cbdbc" />
+
+<img width="1914" height="934" alt="migros" src="https://github.com/user-attachments/assets/b2f7fde7-d8bd-4dc0-bb17-befd252f3a40" />
+
+<img width="1914" height="942" alt="migros" src="https://github.com/user-attachments/assets/7b96dfb6-c56b-42a1-92f1-68f38b5df847" />
+
+<img width="965" height="470" alt="migros" src="https://github.com/user-attachments/assets/4154b6d8-f1c1-4b62-9ee8-1d6b570f6084" />
+
+<img width="1916" height="979" alt="migros" src="https://github.com/user-attachments/assets/bf88288c-b0da-42ad-b7e5-366857ccb25f" />
+
+<img width="1916" height="976" alt="migros" src="https://github.com/user-attachments/assets/27eabaf4-b5ee-4494-8b1f-833caac9697b" />
+
+<img width="1920" height="975" alt="migros" src="https://github.com/user-attachments/assets/0dbb124b-4eb6-4011-8c82-6b8de99b0928" />
+
+<img width="1918" height="975" alt="migros" src="https://github.com/user-attachments/assets/c890668d-31f9-425e-8e7a-eea45d8ced80" />
+
+<img width="1912" height="974" alt="migros" src="https://github.com/user-attachments/assets/3ba7b422-f5c7-45f4-8fe4-7ab368d91db4" />
+
+<img width="1912" height="969" alt="migros" src="https://github.com/user-attachments/assets/51e1330c-daa8-4898-b0a8-49b63659e1b0" />
+
+<img width="1920" height="971" alt="migros" src="https://github.com/user-attachments/assets/b6aaa8d5-840d-4703-a126-506a2e66015b" />
+
+<img width="1918" height="975" alt="migros" src="https://github.com/user-attachments/assets/5c33f8f2-cfbf-43a1-ba8d-c5dad313e65a" />
+
+<img width="1912" height="977" alt="migros" src="https://github.com/user-attachments/assets/42025bb2-6203-4b0a-b789-b5cbd218f1bb" />
+
+<img width="1920" height="977" alt="migros" src="https://github.com/user-attachments/assets/85c20c50-194d-47b6-a56b-a9330b80e559" />
