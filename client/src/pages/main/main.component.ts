@@ -127,6 +127,12 @@ export class MainComponent {
     this.isOrderButtonClicked = false;
   }
 
+  public logoutUser() {
+    this.authService.logout();
+    this.isUserSigned = false;
+    this.loginText = 'Üye Ol veya Giriş Yap';
+  }
+
   private setItemPageOpened(value: boolean) {
     this.isItemPageOpened = value;
   }
