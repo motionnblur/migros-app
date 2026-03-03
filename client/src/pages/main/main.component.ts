@@ -91,7 +91,7 @@ export class MainComponent {
       return;
     }
     if (this.orderIds.length == 0) {
-      alert("You don't have any orders");
+      alert("Hiç siparişiniz yok");
       return;
     }
 
