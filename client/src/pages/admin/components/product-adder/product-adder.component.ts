@@ -16,7 +16,7 @@ export class ProductAdderComponent extends ProductAdderBase {
   override openEditor?(): void {
     throw new Error('Method not implemented.');
   }
-  buttonString: string = 'Add';
+  buttonString: string = 'Ekle';
 
   constructor(
     protected override restService: RestService,

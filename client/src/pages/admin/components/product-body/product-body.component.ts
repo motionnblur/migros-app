@@ -22,7 +22,7 @@ export class ProductBodyComponent {
   private productAddedCallback!: (data: any) => void;
   currentPageNumber: number = 0;
   categories = categories;
-  public selectedCategoryName: string = 'Please select a category';
+  public selectedCategoryName: string = 'Lütfen bir kategori seçin';
   public productPageLength: number = 1;
   currentPageSize: number = 5;
 

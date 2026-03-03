@@ -6,7 +6,7 @@
     (click)="openImageUploader()"
     *ngIf="!imageUrl"
   >
-    Add image
+    Resim ekle
   </div>
   <img
     #imageRef
@@ -17,19 +17,19 @@
   />
   <input
     class="product-adder-body__input"
-    placeholder="Product name"
+    placeholder="Ürün adı"
     type="text"
     [(ngModel)]="productName"
   />
   <input
     class="product-adder-body__input"
-    placeholder="Subcategory name"
+    placeholder="Alt kategori ismi"
     type="text"
     [(ngModel)]="subCategoryName"
   />
   <input
     class="product-adder-body__input"
-    placeholder="Price"
+    placeholder="Ürün fiyatı"
     type="number"
     [(ngModel)]="price"
     step="0.01"
@@ -37,14 +37,14 @@
   />
   <input
     class="product-adder-body__input"
-    placeholder="Count"
+    placeholder="Ürün miktarı"
     type="number"
     [(ngModel)]="count"
     min="0"
   />
   <input
     class="product-adder-body__input"
-    placeholder="Discount"
+    placeholder="Ürün indirimi (%)"
     type="number"
     [(ngModel)]="discount"
     step="0.01"
@@ -53,7 +53,7 @@
   />
   <input
     class="product-adder-body__input"
-    placeholder="Description"
+    placeholder="Ürün açıklaması"
     type="text"
     [(ngModel)]="description"
   />
@@ -71,7 +71,7 @@
       *ngIf="isUpdateMode"
       (click)="openEditor!()"
     >
-      Open Editor
+      Düzenle
     </button>
   </div>
 </div>

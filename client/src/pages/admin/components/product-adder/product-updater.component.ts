@@ -14,7 +14,7 @@ import { EventService } from '../../../../services/event/event.service';
 })
 export class ProductUpdaterComponent extends ProductAdderBase {
   @Input() id!: number;
-  buttonString: string = 'Update';
+  buttonString: string = 'Güncelle';
 
   constructor(
     protected override restService: RestService,
