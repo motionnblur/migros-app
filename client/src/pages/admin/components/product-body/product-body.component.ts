@@ -1,12 +1,12 @@
-import { Component, EventEmitter, Output } from '@angular/core';
-import { RestService } from '../../../../services/rest/rest.service';
-import { CommonModule } from '@angular/common';
-import { EventService } from '../../../../services/event/event.service';
-import { IAdminProductPreview } from '../../../../interfaces/IAdminProductPreview';
-import { MatButtonModule } from '@angular/material/button';
-import { MatMenuModule } from '@angular/material/menu';
-import { categories, data } from '../../../../memory/global-data';
-import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+import {Component, EventEmitter, Output} from '@angular/core';
+import {RestService} from '../../../../services/rest/rest.service';
+import {CommonModule} from '@angular/common';
+import {EventService} from '../../../../services/event/event.service';
+import {IAdminProductPreview} from '../../../../interfaces/IAdminProductPreview';
+import {MatButtonModule} from '@angular/material/button';
+import {MatMenuModule} from '@angular/material/menu';
+import {categories, data} from '../../../../memory/global-data';
+import {MatPaginatorModule, PageEvent} from '@angular/material/paginator';
 
 @Component({
   selector: 'app-product-body',
@@ -34,10 +34,12 @@ export class ProductBodyComponent {
       this.loadProducts();
     };
   }
+
   ngOnInit() {
     this.loadProducts();
     this.eventService.on('productAdded', this.productAddedCallback);
   }
+
   ngOnDestroy() {
     this.eventService.off('productAdded', this.productAddedCallback);
   }
@@ -66,7 +68,8 @@ export class ProductBodyComponent {
 
   public deleteProduct(productId: number) {
     this.restService.deleteProduct(productId).subscribe({
-      next: () => {},
+      next: () => {
+      },
       error: (error: any) => {
         console.error(error);
       },
@@ -77,6 +80,7 @@ export class ProductBodyComponent {
       },
     });
   }
+
   public onCategorySelected(index: number) {
     data.currentSelectedCategoryId = index;
 
@@ -85,12 +89,10 @@ export class ProductBodyComponent {
       .subscribe({
         next: (data: any) => {
           this.productsData = data;
+          this.selectedCategoryName = this.categories[index - 1].name;
         },
         error: (error: any) => {
           console.error(error);
-        },
-        complete: () => {
-          this.selectedCategoryName = this.categories[index - 1].name;
         },
       });
 
@@ -108,6 +110,7 @@ export class ProductBodyComponent {
         },
       });
   }
+
   pageEvent($event: PageEvent) {
     this.currentPageSize = $event.pageSize;
 
@@ -129,6 +132,7 @@ export class ProductBodyComponent {
         },
       });
   }
+
   public openProductAdder() {
     this.hasAddProductButtonClicked.emit();
   }
