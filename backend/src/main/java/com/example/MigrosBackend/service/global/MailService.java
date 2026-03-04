@@ -7,20 +7,30 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.Context;
 
 @Service
 public class MailService {
 
-    @Autowired
-    private JavaMailSender emailSender;
+    private final JavaMailSender emailSender;
+    private final TemplateEngine templateEngine;
 
-    public void sendMimeMessage(String to, String subject, String text) throws MessagingException {
+    @Autowired
+    public MailService(JavaMailSender emailSender, TemplateEngine templateEngine) {
+        this.emailSender = emailSender;
+        this.templateEngine = templateEngine;
+    }
+
+    public void sendMimeMessage(String to, String subject, String templateName, Context context) throws MessagingException {
+        String htmlContent = templateEngine.process(templateName, context);
+
         MimeMessage message = emailSender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(message);
+        MimeMessageHelper helper = new MimeMessageHelper(message, true);
         helper.setFrom("noreply@migros.com");
         helper.setTo(to);
         helper.setSubject(subject);
-        helper.setText(text, true);
+        helper.setText(htmlContent, true);
         emailSender.send(message);
     }
 }

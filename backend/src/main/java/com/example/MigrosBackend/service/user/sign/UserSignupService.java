@@ -11,6 +11,7 @@ import com.example.MigrosBackend.service.global.TokenService;
 import jakarta.mail.MessagingException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.thymeleaf.context.Context;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -58,10 +59,11 @@ public class UserSignupService {
             tokenToUserMap.remove(key);
         }, 5, TimeUnit.MINUTES);
 
-        String confirmationLinkHtml = "<a href=\"" + confirmationLink + "\">" + confirmationLink + "</a>";
+        Context context = new Context();
+        context.setVariable("confirmationLink", confirmationLink);
 
         try {
-            mailService.sendMimeMessage(userSignDto.getUserMail(), "Migros", "<html><h1>Welcome to Migros!</h1><br>Please confirm your email address by clicking the link below in 5 minutes:<br>" + confirmationLinkHtml + "<br><br>If you did not request this email, please ignore it.</html>");
+            mailService.sendMimeMessage(userSignDto.getUserMail(), "Welcome to Migros!", "confirmation-email", context);
         } catch (MessagingException e) {
             throw new MailSendingFailedException();
         }
