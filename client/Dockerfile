@@ -1,10 +1,11 @@
-FROM node:22-alpine
+FROM node:25-alpine3.22
 
 WORKDIR /App
 
-RUN npm i -g @angular/cli
 COPY package*.json ./
-RUN npm i
+
+RUN npm i -g @angular/cli
+RUN npm install
 
 COPY . .
 
