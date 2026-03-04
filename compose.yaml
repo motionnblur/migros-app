@@ -22,7 +22,7 @@ services:
     volumes:
       - ./backend:/App
   postgres:
-    image: postgres
+    image: postgres:18.3-alpine3.22
     restart: always
     expose:
       - "5432"
