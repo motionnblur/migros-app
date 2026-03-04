@@ -3,10 +3,7 @@ package com.example.MigrosBackend.config;
 import com.example.MigrosBackend.exception.admin.*;
 import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.exception.shared.TokenNotFoundException;
-import com.example.MigrosBackend.exception.user.MailSendingFailedException;
-import com.example.MigrosBackend.exception.user.UserAlreadyExistsException;
-import com.example.MigrosBackend.exception.user.UserMailNotFoundException;
-import com.example.MigrosBackend.exception.user.WeakPasswordException;
+import com.example.MigrosBackend.exception.user.*;
 import jakarta.mail.MessagingException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -82,6 +79,16 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(UserNotFoundException.class)
     public ResponseEntity<String> handleUserNotFound(UserNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
+    }
+
+    @ExceptionHandler(CategoryNotFoundException.class)
+    public ResponseEntity<String> handleCategoryNotFound(CategoryNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
+    }
+
+    @ExceptionHandler(CategoryHasNoProductException.class)
+    public ResponseEntity<String> handleCategoryHasNoProduct(CategoryHasNoProductException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
     }
 }

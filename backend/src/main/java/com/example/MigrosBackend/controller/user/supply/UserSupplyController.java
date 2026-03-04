@@ -1,7 +1,6 @@
 package com.example.MigrosBackend.controller.user.supply;
 
 import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionListDto;
-import com.example.MigrosBackend.dto.user.product.ProductDto;
 import com.example.MigrosBackend.dto.user.product.ProductPreviewDto;
 import com.example.MigrosBackend.dto.user.product.UserCartItemDto;
 import com.example.MigrosBackend.service.user.supply.UserSupplyService;
@@ -56,13 +55,8 @@ public class UserSupplyController {
         }
     }
     @GetMapping("getProductCountsFromCategory")
-    public ResponseEntity<?> getProductCountsFromCategory(@RequestParam Long categoryId) {
-        try {
-            return userSupplyService.getProductCountsFromCategory(categoryId);
-        }
-        catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
+    public int getProductCountsFromCategory(@RequestParam Long categoryId) {
+        return userSupplyService.getProductCountsFromCategory(categoryId);
     }
 
     @GetMapping("getProductImageNames")

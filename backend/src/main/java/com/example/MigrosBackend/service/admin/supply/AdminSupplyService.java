@@ -71,35 +71,15 @@ public class AdminSupplyService {
         adminEntityRepository.save(currentAdminEntity);
     }
 
-    public void addCategory(String categoryName) throws Exception {
+    public void addCategory(String categoryName) {
         CategoryEntity ce = categoryEntityRepository.findByCategoryName(categoryName);
-        if (ce != null) throw new Exception("Same category with that name: " + categoryName + " already exists.");
+        if (ce != null)
+            throw new GeneralException("Same category with that name: " + categoryName + " already exists.");
 
         CategoryEntity categoryEntity = new CategoryEntity();
         categoryEntity.setCategoryName(categoryName);
 
         categoryEntityRepository.save(categoryEntity);
-    }
-
-    public void addProduct(ProductDto productDto) throws Exception {
-//        CategoryEntity categoryEntity = categoryEntityRepository.findByCategoryName(productDto.getCategoryName());
-//        if(categoryEntity == null) throw new Exception("Category with that name: " +productDto.getCategoryName()+ " could not be found.");
-//
-//        ProductEntity itemEntity = new ProductEntity();
-//        itemEntity.setItemName(productDto.getItemName());
-//        itemEntity.setItemCount(productDto.getItemCount());
-//        itemEntity.setItemPrice(productDto.getItemPrice());
-//        itemEntity.setDiscount(productDto.getDiscount());
-//        itemEntity.setCategoryEntity(categoryEntity);
-//
-//        productEntityRepository.save(itemEntity);
-//
-//        for(String imageName : productDto.getItemImageNames()) {
-//            ProductImageEntity itemImageEntity = new ProductImageEntity();
-//            itemImageEntity.setImageName(imageName);
-//            itemImageEntity.setProductEntity(itemEntity);
-//            productImageEntityRepository.save(itemImageEntity);
-//        }
     }
 
     public void uploadProduct(Long adminId, String productName,

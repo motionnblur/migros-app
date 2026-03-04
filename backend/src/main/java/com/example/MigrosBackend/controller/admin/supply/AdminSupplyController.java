@@ -25,39 +25,18 @@ public class AdminSupplyController {
     }
 
     @GetMapping("addCategory")
-    private ResponseEntity<?> addCategory(@RequestParam String categoryName) throws Exception {
-        try{
-            adminSupplyService.addCategory(categoryName);
-            return new ResponseEntity<>(HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
+    private ResponseEntity<Void> addCategory(@RequestParam String categoryName) {
+        adminSupplyService.addCategory(categoryName);
+        return ResponseEntity.ok().build();
     }
+
     @GetMapping("getProductCountsFromCategory")
-    public ResponseEntity<?> getProductCountsFromCategory(@RequestParam Long categoryId) {
-        try {
-            return userSupplyService.getProductCountsFromCategory(categoryId);
-        }
-        catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
+    public int getProductCountsFromCategory(@RequestParam Long categoryId) {
+        return userSupplyService.getProductCountsFromCategory(categoryId);
     }
+
     @GetMapping("getProductsFromCategory")
-    public ResponseEntity<?> getProductsFromCategory(@RequestParam Long categoryId, @RequestParam int page, @RequestParam int productRange) {
-        try {
-            List<ProductPreviewDto> itemIDs = userSupplyService.getProductsFromCategory(categoryId, page, productRange);
-            return ResponseEntity.ok(itemIDs);
-        } catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
-    }
-    @PostMapping("addProduct")
-    private ResponseEntity<?> addItem(@RequestBody ProductDto productDto) throws Exception {
-        try{
-            adminSupplyService.addProduct(productDto);
-            return new ResponseEntity<>(HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
+    public ResponseEntity<List<ProductPreviewDto>> getProductsFromCategory(@RequestParam Long categoryId, @RequestParam int page, @RequestParam int productRange) {
+        return ResponseEntity.ok(userSupplyService.getProductsFromCategory(categoryId, page, productRange));
     }
 }

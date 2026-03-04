@@ -13,6 +13,9 @@ import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.product.ProductImageEntity;
 import com.example.MigrosBackend.entity.user.OrderEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
+import com.example.MigrosBackend.exception.shared.GeneralException;
+import com.example.MigrosBackend.exception.user.CategoryHasNoProductException;
+import com.example.MigrosBackend.exception.user.CategoryNotFoundException;
 import com.example.MigrosBackend.repository.category.CategoryEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductDescriptionEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
@@ -72,28 +75,28 @@ public class UserSupplyService {
         return categoryEntityRepository.findAll().stream().map(CategoryEntity::getCategoryName).toList();
     }
 
-    public List<ProductPreviewDto> getProductsFromCategory(Long categoryId, int page, int itemRange) throws Exception {
+    public List<ProductPreviewDto> getProductsFromCategory(Long categoryId, int page, int itemRange) {
         boolean b = categoryEntityRepository.existsById(categoryId);
-        if(!b) throw new Exception("Category with that ID: " +categoryId+ " could not be found.");
+        if (!b) throw new CategoryNotFoundException(categoryId.toString());
 
-        //Pageable pageable = PageRequest.of(page, itemRange, Sort.by("id").ascending());
         Pageable pageable = PageRequest.of(page, itemRange);
-        Page<ProductEntity> entities =  productEntityRepository.findByCategoryEntityId(categoryId, pageable);
-        if(entities.isEmpty()) throw new Exception("Category with that ID: " +categoryId+ " has no products.");
+        Page<ProductEntity> entities = productEntityRepository.findByCategoryEntityId(categoryId, pageable);
+        if (entities.isEmpty()) throw new CategoryHasNoProductException(categoryId.toString());
 
         return entities.stream().map(itemEntity -> {
             ProductPreviewDto itemDto = new ProductPreviewDto();
             itemDto.setProductId(itemEntity.getId());
             itemDto.setProductName(itemEntity.getProductName());
-            if(itemEntity.getProductDiscount() != 0){
+            if (itemEntity.getProductDiscount() != 0) {
                 itemDto.setProductPrice(itemEntity.getProductPrice() - (itemEntity.getProductPrice() * itemEntity.getProductDiscount() / 100));
-            }else{
+            } else {
                 itemDto.setProductPrice(itemEntity.getProductPrice());
             }
 
             return itemDto;
         }).collect(Collectors.toList());
     }
+
     public List<String> getProductImageNames(Long itemId) {
         List<ProductImageEntity> productImageEntity = productImageEntityRepository.findByProductEntityId(itemId);
         return productImageEntity.stream().map(ProductImageEntity::getImagePath).toList();
@@ -114,11 +117,11 @@ public class UserSupplyService {
         }
     }
 
-    public ResponseEntity<?> getProductCountsFromCategory(Long categoryId) {
+    public int getProductCountsFromCategory(Long categoryId) {
         boolean b = categoryEntityRepository.existsById(categoryId);
-        if(!b) return new ResponseEntity<>("Category with that ID: " +categoryId+ " could not be found.", HttpStatus.BAD_REQUEST);
+        if (!b) throw new CategoryNotFoundException(categoryId.toString());
 
-        return ResponseEntity.ok(productEntityRepository.countByCategoryEntityId(categoryId));
+        return productEntityRepository.countByCategoryEntityId(categoryId);
     }
 
     public ResponseEntity<?> getSubCategories(Long categoryId) {
@@ -141,14 +144,14 @@ public class UserSupplyService {
 
     public List<ProductPreviewDto> getProductsFromSubcategory(String subcategoryName, int page, int productRange) {
         Pageable pageable = PageRequest.of(page, productRange);
-        Page<ProductEntity> entities =  productEntityRepository.findBySubcategoryName(subcategoryName, pageable);
+        Page<ProductEntity> entities = productEntityRepository.findBySubcategoryName(subcategoryName, pageable);
         return entities.stream().map(itemEntity -> {
             ProductPreviewDto itemDto = new ProductPreviewDto();
             itemDto.setProductId(itemEntity.getId());
             itemDto.setProductName(itemEntity.getProductName());
-            if(itemEntity.getProductDiscount() != 0){
+            if (itemEntity.getProductDiscount() != 0) {
                 itemDto.setProductPrice(itemEntity.getProductPrice() - (itemEntity.getProductPrice() * itemEntity.getProductDiscount() / 100));
-            }else{
+            } else {
                 itemDto.setProductPrice(itemEntity.getProductPrice());
             }
 
@@ -162,7 +165,7 @@ public class UserSupplyService {
 
     public void addProductToInventory(Long productId, String token) {
         String userName = tokenService.extractUsername(token);
-        if(userName == null) throw new RuntimeException("Error");
+        if (userName == null) throw new RuntimeException("Error");
         UserEntity user = userEntityRepository.findByUserMail(userName);
 
         if (user.getProductsIdsInCart() == null) {
@@ -197,6 +200,7 @@ public class UserSupplyService {
                     return dto;
                 }).toList();
     }
+
     public ProductDto2 getProductData(Long productId) {
         ProductEntity productEntity = productEntityRepository.findById(productId).orElseThrow(() -> new RuntimeException("Item with that id: " + productId + " could not be found."));
 
@@ -215,39 +219,36 @@ public class UserSupplyService {
     public void removeProductFromInventory(Long productId, String token) {
         String userName = tokenService.extractUsername(token);
         UserEntity user = userEntityRepository.findByUserMail(userName);
-        if(tokenService.validateToken(token, user.getUserMail()))
-        {
+        if (tokenService.validateToken(token, user.getUserMail())) {
             if (user.getProductsIdsInCart() == null) {
                 user.setProductsIdsInCart(new ArrayList<>()); // Initialize if null
             }
             user.getProductsIdsInCart().removeAll(Collections.singleton(productId));
             userEntityRepository.save(user);
-        }else{
+        } else {
             throw new RuntimeException("Token not valid");
         }
     }
 
     public void updateProductCountInInventory(Long productId, int count, String token) {
-        if(count <= 0) throw new RuntimeException("Count can not be negative or zero");
+        if (count <= 0) throw new RuntimeException("Count can not be negative or zero");
 
         String userName = tokenService.extractUsername(token);
-        if(userName == null) throw new RuntimeException("User not found");
+        if (userName == null) throw new RuntimeException("User not found");
 
         UserEntity user = userEntityRepository.findByUserMail(userName);
-        if(user == null) throw new RuntimeException("User not found");
+        if (user == null) throw new RuntimeException("User not found");
 
-        if(tokenService.validateToken(token, user.getUserMail()))
-        {
+        if (tokenService.validateToken(token, user.getUserMail())) {
             if (user.getProductsIdsInCart() == null) {
                 user.setProductsIdsInCart(new ArrayList<>()); // Initialize if null
             }
             user.getProductsIdsInCart().removeAll(Collections.singleton(productId));
-            for(int i = 0; i < count; i++)
-            {
+            for (int i = 0; i < count; i++) {
                 user.getProductsIdsInCart().add(productId);
             }
             userEntityRepository.save(user);
-        }else{
+        } else {
             throw new RuntimeException("Token not valid");
         }
     }
@@ -255,12 +256,11 @@ public class UserSupplyService {
     public ResponseEntity<?> getAllOrderIds(String token) {
         String userName = tokenService.extractUsername(token);
         UserEntity user = userEntityRepository.findByUserMail(userName);
-        if(tokenService.validateToken(token, user.getUserMail()))
-        {
+        if (tokenService.validateToken(token, user.getUserMail())) {
             List<OrderEntity> orders = user.getOrderEntities();
             List<Long> orderIds = orders.stream().map(OrderEntity::getId).toList();
             return ResponseEntity.ok(orderIds);
-        }else{
+        } else {
             throw new RuntimeException("Token not valid");
         }
     }
@@ -268,11 +268,10 @@ public class UserSupplyService {
     public ResponseEntity<?> getOrderStatusByOrderId(Long orderId, String token) {
         String userName = tokenService.extractUsername(token);
         UserEntity user = userEntityRepository.findByUserMail(userName);
-        if(tokenService.validateToken(token, user.getUserMail()))
-        {
+        if (tokenService.validateToken(token, user.getUserMail())) {
             OrderEntity order = orderEntityRepository.findById(orderId).orElseThrow(() -> new RuntimeException("Order not found"));
             return ResponseEntity.ok(order.getStatus());
-        }else{
+        } else {
             throw new RuntimeException("Token not valid");
         }
     }
@@ -281,26 +280,25 @@ public class UserSupplyService {
         String userName = tokenService.extractUsername(token);
         UserEntity user = userEntityRepository.findByUserMail(userName);
 
-        if(tokenService.validateToken(token, user.getUserMail()))
-        {
+        if (tokenService.validateToken(token, user.getUserMail())) {
             OrderEntity order = orderEntityRepository.findById(orderId).orElseThrow(() -> new RuntimeException("Order not found"));
             orderEntityRepository.delete(order);
             return ResponseEntity.ok("Order cancelled");
-        }else{
+        } else {
             throw new RuntimeException("Token not valid");
         }
     }
 
     public ProductDescriptionListDto getProductDescription(Long productId) {
         List<ProductDescriptionEntity> productDescriptionEntities = productDescriptionEntityRepository.findByProductEntityId(productId);
-        if(productDescriptionEntities == null)
+        if (productDescriptionEntities == null)
             throw new RuntimeException("Item with that id: " + productId + " could not be found.");
 
         ProductDescriptionListDto productDescriptionDto = new ProductDescriptionListDto();
         productDescriptionDto.setProductId(productId);
         productDescriptionDto.setDescriptionList(new ArrayList<>());
 
-        for(ProductDescriptionEntity item : productDescriptionEntities) {
+        for (ProductDescriptionEntity item : productDescriptionEntities) {
             DescriptionsDto dto = new DescriptionsDto();
             dto.setDescriptionId(item.getId());
             dto.setDescriptionTabName(item.getDescriptionTabName());
