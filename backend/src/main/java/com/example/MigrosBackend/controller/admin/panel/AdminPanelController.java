@@ -1,8 +1,6 @@
 package com.example.MigrosBackend.controller.admin.panel;
 
-import com.example.MigrosBackend.dto.admin.panel.AdminAddItemDto;
-import com.example.MigrosBackend.dto.admin.panel.AdminProductPreviewDto;
-import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionListDto;
+import com.example.MigrosBackend.dto.admin.panel.*;
 import com.example.MigrosBackend.dto.order.OrderDto;
 import com.example.MigrosBackend.dto.user.UserProfileTableDto;
 import com.example.MigrosBackend.entity.user.OrderEntity;
@@ -13,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
 import java.util.List;
 
 @RestController
@@ -22,142 +21,95 @@ public class AdminPanelController {
     private final UserOrderService userOrderService;
 
     @Autowired
-    public AdminPanelController(AdminSupplyService adminSupplyService,
-                                UserOrderService userOrderService) {
+    public AdminPanelController(AdminSupplyService adminSupplyService, UserOrderService userOrderService) {
         this.adminSupplyService = adminSupplyService;
         this.userOrderService = userOrderService;
     }
 
     @PostMapping("addProductDescription")
-    private ResponseEntity<?> addProductDescription(@RequestBody ProductDescriptionListDto productDescriptions) throws Exception {
-        try{
-            adminSupplyService.addProductDescription(productDescriptions);
-            return new ResponseEntity<>(HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
-    }
-    @DeleteMapping("deleteProductDescription")
-    private ResponseEntity<?> deleteProductDescription(@RequestParam Long descriptionId) throws Exception {
-        try{
-            adminSupplyService.deleteProductDescription(descriptionId);
-            return new ResponseEntity<>(HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
-    }
-    @GetMapping("getProductDescription")
-    private ResponseEntity<?> getProductDescription(@RequestParam Long productId) throws Exception {
-        try{
-            ProductDescriptionListDto productDescriptionDto = adminSupplyService.getProductDescription(productId);
-            return ResponseEntity.ok(productDescriptionDto);
-        } catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
-    }
-    @GetMapping("getAllAdminProducts")
-    private ResponseEntity<?> getAllAdminProducts(@RequestParam Long adminId, @RequestParam int page, @RequestParam int productRange) throws Exception {
-        // Process the product data here
-        try{
-            List<AdminProductPreviewDto> allAdminProducts = adminSupplyService.getAllAdminProducts(adminId, page, productRange);
-            return ResponseEntity.ok(allAdminProducts);
-        } catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
-    }
-    @GetMapping("getProductData")
-    private ResponseEntity<?> getProductData(@RequestParam Long productId) throws Exception {
-        try{
-            return ResponseEntity.ok(adminSupplyService.getProductData(productId));
-        } catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
-    }
-    @PostMapping("addProduct")
-    private ResponseEntity<?> addProduct(@RequestBody AdminAddItemDto adminAddItemDto) throws Exception {
-        try{
-            adminSupplyService.addProduct(adminAddItemDto);
-            return new ResponseEntity<>(HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
-    }
-    @PostMapping("uploadProduct")
-    private ResponseEntity<String> uploadProduct(@RequestParam("adminId") Long adminId,
-                                               @RequestParam("productName") String productName,
-                                               @RequestParam("subCategoryName") String subCategoryName,
-                                               @RequestParam("productPrice") float productPrice,
-                                               @RequestParam("productCount") int productCount,
-                                               @RequestParam("productDiscount") float productDiscount,
-                                               @RequestParam("productDescription") String productDescription,
-                                               @RequestParam("selectedImage") MultipartFile selectedImage,
-                                               @RequestParam("categoryValue") int categoryValue) {
-        // Save the file to your desired location
-        try {
-            adminSupplyService.uploadProduct(adminId, productName, subCategoryName, productPrice,
-                    productCount, productDiscount, productDescription,
-                    categoryValue, selectedImage);
-            return ResponseEntity.ok("File uploaded successfully");
-        } catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
-    }
-    @PostMapping("updateProduct")
-    private ResponseEntity<String> updateProduct(@RequestParam("adminId") Long adminId,
-                                               @RequestParam("productId") Long productId,
-                                               @RequestParam("productName") String productName,
-                                               @RequestParam("subCategoryName") String subCategoryName,
-                                               @RequestParam("productPrice") float productPrice,
-                                               @RequestParam("productCount") int productCount,
-                                               @RequestParam("productDiscount") float productDiscount,
-                                               @RequestParam("productDescription") String productDescription,
-                                               @RequestParam("selectedImage") MultipartFile selectedImage,
-                                               @RequestParam("categoryValue") int categoryValue) {
-        // Save the file to your desired location
-        try {
-            adminSupplyService.updateProduct(adminId, productId, productName, subCategoryName,
-                    productPrice, productCount, productDiscount,
-                    productDescription, categoryValue, selectedImage);
-            return ResponseEntity.ok("File uploaded successfully");
-        } catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
-    }
-    @DeleteMapping("deleteProduct")
-    private ResponseEntity<?> deleteProduct(@RequestParam Long productId) throws Exception {
-        try{
-            adminSupplyService.deleteProduct(productId);
-            return new ResponseEntity<>(HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
+    private ResponseEntity<Void> addProductDescription(@RequestBody ProductDescriptionListDto productDescriptions) {
+        adminSupplyService.addProductDescription(productDescriptions);
+        return ResponseEntity.ok().build();
     }
 
-    @GetMapping("getAllOrders") //For testing purposes
-    public ResponseEntity<?> getOrder(@RequestParam int page, @RequestParam int productRange) {
-        try {
-            List<OrderDto> orderDtos = userOrderService.getAllOrders(page, productRange);
-            return ResponseEntity.ok(orderDtos);
-        } catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
+    @DeleteMapping("deleteProductDescription")
+    private ResponseEntity<Void> deleteProductDescription(@RequestParam Long descriptionId) {
+        adminSupplyService.deleteProductDescription(descriptionId);
+        return ResponseEntity.ok().build();
     }
+
+    @GetMapping("getProductDescription")
+    private ResponseEntity<ProductDescriptionListDto> getProductDescription(@RequestParam Long productId) {
+        return ResponseEntity.ok(adminSupplyService.getProductDescription(productId));
+    }
+
+    @GetMapping("getAllAdminProducts")
+    private ResponseEntity<List<AdminProductPreviewDto>> getAllAdminProducts(@RequestParam Long adminId, @RequestParam int page, @RequestParam int productRange) {
+        return ResponseEntity.ok(adminSupplyService.getAllAdminProducts(adminId, page, productRange));
+    }
+
+    @GetMapping("getProductData")
+    private ResponseEntity<ProductDto2> getProductData(@RequestParam Long productId) {
+        return ResponseEntity.ok(adminSupplyService.getProductData(productId));
+    }
+
+    @PostMapping("addProduct")
+    private ResponseEntity<Void> addProduct(@RequestBody AdminAddItemDto adminAddItemDto) {
+        adminSupplyService.addProduct(adminAddItemDto);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("uploadProduct")
+    private ResponseEntity<String> uploadProduct(@RequestParam("adminId") Long adminId,
+                                                 @RequestParam("productName") String productName,
+                                                 @RequestParam("subCategoryName") String subCategoryName,
+                                                 @RequestParam("productPrice") float productPrice,
+                                                 @RequestParam("productCount") int productCount,
+                                                 @RequestParam("productDiscount") float productDiscount,
+                                                 @RequestParam("productDescription") String productDescription,
+                                                 @RequestParam("selectedImage") MultipartFile selectedImage,
+                                                 @RequestParam("categoryValue") int categoryValue) {
+        adminSupplyService.uploadProduct(
+                adminId, productName, subCategoryName,
+                productPrice, productCount, productDiscount,
+                productDescription, categoryValue, selectedImage);
+        return ResponseEntity.ok("File uploaded successfully");
+    }
+
+    @PostMapping("updateProduct")
+    private ResponseEntity<String> updateProduct(@RequestParam("adminId") Long adminId,
+                                                 @RequestParam("productId") Long productId,
+                                                 @RequestParam("productName") String productName,
+                                                 @RequestParam("subCategoryName") String subCategoryName,
+                                                 @RequestParam("productPrice") float productPrice,
+                                                 @RequestParam("productCount") int productCount,
+                                                 @RequestParam("productDiscount") float productDiscount,
+                                                 @RequestParam("productDescription") String productDescription,
+                                                 @RequestParam("selectedImage") MultipartFile selectedImage,
+                                                 @RequestParam("categoryValue") int categoryValue) {
+        adminSupplyService.updateProduct(adminId, productId, productName, subCategoryName, productPrice, productCount, productDiscount, productDescription, categoryValue, selectedImage);
+        return ResponseEntity.ok("File uploaded successfully");
+    }
+
+    @DeleteMapping("deleteProduct")
+    private ResponseEntity<Void> deleteProduct(@RequestParam Long productId) {
+        adminSupplyService.deleteProduct(productId);
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("getAllOrders")
+    public ResponseEntity<List<OrderDto>> getOrder(@RequestParam int page, @RequestParam int productRange) {
+        return ResponseEntity.ok(userOrderService.getAllOrders(page, productRange));
+    }
+
     @GetMapping("getUserProfileData")
-    public ResponseEntity<?> getUserProfileData(@RequestParam Long orderId) {
-        try {
-            UserProfileTableDto order = userOrderService.getUserProfileData(orderId);
-            return ResponseEntity.ok(order);
-        } catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
+    public ResponseEntity<UserProfileTableDto> getUserProfileData(@RequestParam Long orderId) {
+        return ResponseEntity.ok(userOrderService.getUserProfileData(orderId));
     }
+
     @GetMapping("updateOrderStatus")
-    public ResponseEntity<?> updateOrderStatus(@RequestParam Long orderId, @RequestParam String status) {
-        try {
-            userOrderService.updateOrderStatus(orderId, status);
-            return new ResponseEntity<>(HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
+    public ResponseEntity<Void> updateOrderStatus(@RequestParam Long orderId, @RequestParam String status) {
+        userOrderService.updateOrderStatus(orderId, status);
+        return ResponseEntity.ok().build();
     }
 }

@@ -5,6 +5,8 @@ import com.example.MigrosBackend.dto.user.UserProfileTableDto;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.user.OrderEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
+import com.example.MigrosBackend.exception.admin.OrderNotFoundException;
+import com.example.MigrosBackend.exception.admin.UserNotFoundException;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
@@ -29,6 +31,7 @@ public class UserOrderService {
     private final UserEntityRepository userEntityRepository;
     private final OrderEntityRepository orderEntityRepository;
     private final ProductEntityRepository productEntityRepository;
+
     public UserOrderService(TokenService tokenService,
                             UserEntityRepository userEntityRepository,
                             OrderEntityRepository orderEntityRepository,
@@ -43,8 +46,7 @@ public class UserOrderService {
     public void clearUserCart(String userToken) {
         String userName = tokenService.extractUsername(userToken);
         UserEntity user = userEntityRepository.findByUserMail(userName);
-        if(tokenService.validateToken(userToken, user.getUserMail()))
-        {
+        if (tokenService.validateToken(userToken, user.getUserMail())) {
             user.setProductsIdsInCart(new ArrayList<>());
             userEntityRepository.save(user);
         }
@@ -54,8 +56,7 @@ public class UserOrderService {
     public void createOrder(String userToken) {
         String userName = tokenService.extractUsername(userToken);
         UserEntity user = userEntityRepository.findByUserMail(userName);
-        if(tokenService.validateToken(userToken, user.getUserMail()))
-        {
+        if (tokenService.validateToken(userToken, user.getUserMail())) {
             List<Long> productsInCart = user.getProductsIdsInCart();
             Map<Long, Integer> productCounts = productsInCart.stream()
                     .collect(Collectors.groupingBy(Function.identity(), Collectors.summingInt(e -> 1)));
@@ -80,8 +81,7 @@ public class UserOrderService {
     public float getOrderPrice(String userToken) {
         String userName = tokenService.extractUsername(userToken);
         UserEntity user = userEntityRepository.findByUserMail(userName);
-        if(tokenService.validateToken(userToken, user.getUserMail()))
-        {
+        if (tokenService.validateToken(userToken, user.getUserMail())) {
             List<Long> productsInCart = user.getProductsIdsInCart();
             Map<Long, Integer> productCounts = productsInCart.stream()
                     .collect(Collectors.groupingBy(Function.identity(), Collectors.summingInt(e -> 1)));
@@ -112,8 +112,11 @@ public class UserOrderService {
     }
 
     public UserProfileTableDto getUserProfileData(Long orderId) {
-        OrderEntity orderEntity = orderEntityRepository.findById(orderId).get();
-        UserEntity userEntity = userEntityRepository.findById(orderEntity.getUserId()).get();
+        OrderEntity orderEntity = orderEntityRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(orderId.toString()));
+
+        UserEntity userEntity = userEntityRepository.findById(orderEntity.getUserId())
+                .orElseThrow(() -> new UserNotFoundException(orderEntity.getUserId().toString()));
 
         UserProfileTableDto order = new UserProfileTableDto();
         order.setUserFirstName(userEntity.getUserName());
@@ -128,7 +131,9 @@ public class UserOrderService {
     }
 
     public void updateOrderStatus(Long orderId, String status) {
-        OrderEntity orderEntity = orderEntityRepository.findById(orderId).get();
+        OrderEntity orderEntity = orderEntityRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(orderId.toString()));
+
         orderEntity.setStatus(status);
         orderEntityRepository.save(orderEntity);
     }

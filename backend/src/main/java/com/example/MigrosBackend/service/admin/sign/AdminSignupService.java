@@ -2,8 +2,8 @@ package com.example.MigrosBackend.service.admin.sign;
 
 import com.example.MigrosBackend.dto.admin.sign.AdminSignDto;
 import com.example.MigrosBackend.entity.admin.AdminEntity;
-import com.example.MigrosBackend.exception.AdminNotFoundException;
-import com.example.MigrosBackend.exception.WrongPasswordException;
+import com.example.MigrosBackend.exception.admin.AdminNotFoundException;
+import com.example.MigrosBackend.exception.shared.WrongPasswordException;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.service.global.EncryptService;
 import com.example.MigrosBackend.service.global.LogService;
@@ -42,6 +42,7 @@ public class AdminSignupService {
 
             loginLogger.warn("Failed login attempt - User: {} | Password Hash: {} | IP: {} | Reason: User not found",
                     adminSignDto.getAdminName(), attemptedPassword, userIpAddress);
+            
             throw new AdminNotFoundException(adminSignDto.getAdminName());
         }
         if (!encryptService.checkIfPasswordMatches(adminSignDto.getAdminPassword(), adminEntity.getAdminPassword())) {

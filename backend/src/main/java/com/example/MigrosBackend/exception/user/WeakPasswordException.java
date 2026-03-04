@@ -1,4 +1,4 @@
-package com.example.MigrosBackend.exception;
+package com.example.MigrosBackend.exception.user;
 
 public class WeakPasswordException extends RuntimeException {
     public WeakPasswordException() {

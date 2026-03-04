@@ -7,6 +7,11 @@ import com.example.MigrosBackend.entity.category.CategoryEntity;
 import com.example.MigrosBackend.entity.product.ProductDescriptionEntity;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.product.ProductImageEntity;
+import com.example.MigrosBackend.exception.admin.AdminHasNoProductException;
+import com.example.MigrosBackend.exception.admin.AdminNotFoundException;
+import com.example.MigrosBackend.exception.admin.FileUploadFailedException;
+import com.example.MigrosBackend.exception.admin.ProductNotFoundException;
+import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.repository.category.CategoryEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductDescriptionEntityRepository;
@@ -20,6 +25,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,14 +43,7 @@ public class AdminSupplyService {
     private final FileService fileService;
 
     @Autowired
-    public AdminSupplyService(
-            CategoryEntityRepository categoryEntityRepository,
-            ProductEntityRepository productEntityRepository,
-            ProductImageEntityRepository productImageEntityRepository,
-            AdminEntityRepository adminEntityRepository,
-            ProductDescriptionEntityRepository productDescriptionEntityRepository,
-            FileService fileService
-    ) {
+    public AdminSupplyService(CategoryEntityRepository categoryEntityRepository, ProductEntityRepository productEntityRepository, ProductImageEntityRepository productImageEntityRepository, AdminEntityRepository adminEntityRepository, ProductDescriptionEntityRepository productDescriptionEntityRepository, FileService fileService) {
         this.categoryEntityRepository = categoryEntityRepository;
         this.productEntityRepository = productEntityRepository;
         this.productImageEntityRepository = productImageEntityRepository;
@@ -53,9 +52,8 @@ public class AdminSupplyService {
         this.fileService = fileService;
     }
 
-    public void addProduct(AdminAddItemDto adminAddItemDto) throws Exception {
-        AdminEntity currentAdminEntity = adminEntityRepository.findById(adminAddItemDto
-                .getAdminId()).orElseThrow(() -> new Exception("Admin with that id: " + adminAddItemDto.getAdminId()+ " could not be found."));
+    public void addProduct(AdminAddItemDto adminAddItemDto) {
+        AdminEntity currentAdminEntity = adminEntityRepository.findById(adminAddItemDto.getAdminId()).orElseThrow(() -> new AdminNotFoundException(adminAddItemDto.getAdminId().toString()));
 
         ProductEntity newProductEntity = new ProductEntity();
         newProductEntity.setProductName(adminAddItemDto.getProductDto().getProductName());
@@ -72,15 +70,17 @@ public class AdminSupplyService {
 
         adminEntityRepository.save(currentAdminEntity);
     }
+
     public void addCategory(String categoryName) throws Exception {
         CategoryEntity ce = categoryEntityRepository.findByCategoryName(categoryName);
-        if(ce != null) throw new Exception("Same category with that name: "+categoryName+" already exists.");
+        if (ce != null) throw new Exception("Same category with that name: " + categoryName + " already exists.");
 
         CategoryEntity categoryEntity = new CategoryEntity();
         categoryEntity.setCategoryName(categoryName);
 
         categoryEntityRepository.save(categoryEntity);
     }
+
     public void addProduct(ProductDto productDto) throws Exception {
 //        CategoryEntity categoryEntity = categoryEntityRepository.findByCategoryName(productDto.getCategoryName());
 //        if(categoryEntity == null) throw new Exception("Category with that name: " +productDto.getCategoryName()+ " could not be found.");
@@ -102,29 +102,27 @@ public class AdminSupplyService {
 //        }
     }
 
-    public void uploadProduct(Long adminId,
-                              String productName,
-                              String subCategoryName,
-                              float productPrice,
-                              int productCount,
-                              float productDiscount,
-                              String productDescription,
-                              int categoryValue,
-                              MultipartFile selectedImage) throws Exception {
+    public void uploadProduct(Long adminId, String productName,
+                              String subCategoryName, float productPrice,
+                              int productCount, float productDiscount,
+                              String productDescription, int categoryValue,
+                              MultipartFile selectedImage) {
         if (!Objects.equals(selectedImage.getContentType(), "image/png")) {
-            throw new Exception("Only PNG files are allowed");
+            throw new GeneralException("Only PNG files are allowed");
         }
-        String fileNameToSave = "image_" + System.currentTimeMillis() + ".png";
-        Path savedFilePath = fileService.writeFileToDisk(selectedImage.getBytes(),
-                fileNameToSave,
-                "UploadFolder"); // Save the file to hard coded "UploadFolder"
 
-        // Process the product data here
+        String fileNameToSave = "image_" + System.currentTimeMillis() + ".png";
+        Path savedFilePath;
+        try {
+            savedFilePath = fileService.writeFileToDisk(selectedImage.getBytes(), fileNameToSave, "UploadFolder");
+        } catch (IOException e) {
+            throw new FileUploadFailedException("Failed to read file bytes");
+        }
+
         System.out.println("Product data: " + productName + ", " + productPrice + ", " + productCount + ", " + productDiscount + ", " + productDescription + "," + categoryValue);
 
         CategoryEntity categoryEntity = categoryEntityRepository.findByCategoryId(categoryValue);
-        AdminEntity adminEntity = adminEntityRepository.findById(adminId)
-                .orElseThrow(() -> new RuntimeException("Admin with that id: " + adminId + " could not be found."));
+        AdminEntity adminEntity = adminEntityRepository.findById(adminId).orElseThrow(() -> new RuntimeException("Admin with that id: " + adminId + " could not be found."));
 
         ProductEntity productEntity = new ProductEntity();
         productEntity.setAdminEntity(adminEntity);
@@ -142,23 +140,29 @@ public class AdminSupplyService {
         productImageEntity.setProductEntity(productEntity);
         productImageEntityRepository.save(productImageEntity);
     }
-    public void updateProduct(Long adminId, Long productId, String productName, String subCategoryName,
-                              float productPrice, int productCount, float productDiscount,
-                              String productDescription, int categoryValue, MultipartFile selectedImage) throws Exception {
+
+    public void updateProduct(Long adminId, Long productId, String productName,
+                              String subCategoryName, float productPrice,
+                              int productCount, float productDiscount,
+                              String productDescription, int categoryValue,
+                              MultipartFile selectedImage) {
         if (!Objects.equals(selectedImage.getContentType(), "image/png")) {
-            throw new Exception("Only PNG files are allowed");
+            throw new GeneralException("Only PNG files are allowed");
         }
+
         String fileNameToSave = "image_" + System.currentTimeMillis() + ".png";
-        Path savedFilePath = fileService.writeFileToDisk(selectedImage.getBytes(),
-                fileNameToSave,
-                "UploadFolder"); // Save the file to hard coded "UploadFolder"
+        Path savedFilePath;
+        try {
+            savedFilePath = fileService.writeFileToDisk(selectedImage.getBytes(), fileNameToSave, "UploadFolder");
+        } catch (IOException e) {
+            throw new FileUploadFailedException("Failed to read file bytes");
+        }
 
         // Process the product data here
         System.out.println("Product data: " + productName + ", " + productPrice + ", " + productCount + ", " + productDiscount + ", " + productDescription + "," + categoryValue);
 
         CategoryEntity categoryEntity = categoryEntityRepository.findByCategoryId(categoryValue);
-        AdminEntity adminEntity = adminEntityRepository.findById(adminId)
-                .orElseThrow(() -> new RuntimeException("Admin with that id: " + adminId + " could not be found."));
+        AdminEntity adminEntity = adminEntityRepository.findById(adminId).orElseThrow(() -> new RuntimeException("Admin with that id: " + adminId + " could not be found."));
 
         ProductEntity productEntity = productEntityRepository.findById(productId).orElseThrow(() -> new RuntimeException("Product with that id: " + productId + " could not be found."));
         productEntity.setAdminEntity(adminEntity);
@@ -176,10 +180,10 @@ public class AdminSupplyService {
         productImageEntityRepository.save(productImageEntity);
     }
 
-    public List<AdminProductPreviewDto> getAllAdminProducts(Long adminId, int page, int productRange) throws Exception {
+    public List<AdminProductPreviewDto> getAllAdminProducts(Long adminId, int page, int productRange) {
         Pageable pageable = PageRequest.of(page, productRange);
-        Page<ProductEntity> entities =  productEntityRepository.findByAdminEntityId(adminId, pageable);
-        if(entities.isEmpty()) throw new Exception("Admin with that ID: " +adminId+ " has no products.");
+        Page<ProductEntity> entities = productEntityRepository.findByAdminEntityId(adminId, pageable);
+        if (entities.isEmpty()) throw new AdminHasNoProductException(adminId.toString());
 
         return entities.stream().map(productEntity -> {
             AdminProductPreviewDto productPreviewDto = new AdminProductPreviewDto();
@@ -195,7 +199,7 @@ public class AdminSupplyService {
     }
 
     public ProductDto2 getProductData(Long productId) {
-        ProductEntity productEntity = productEntityRepository.findById(productId).orElseThrow(() -> new RuntimeException("Item with that id: " + productId + " could not be found."));
+        ProductEntity productEntity = productEntityRepository.findById(productId).orElseThrow(() -> new ProductNotFoundException(productId.toString()));
 
         ProductDto2 productDto2 = new ProductDto2();
         productDto2.setProductName(productEntity.getProductName());
@@ -210,12 +214,11 @@ public class AdminSupplyService {
     }
 
     public void addProductDescription(ProductDescriptionListDto productDescriptions) {
-        ProductEntity productEntity = productEntityRepository.findById(productDescriptions.getProductId())
-                .orElseThrow(() -> new RuntimeException("Item with that id: " + productDescriptions.getProductId() + " could not be found."));
+        ProductEntity productEntity = productEntityRepository.findById(productDescriptions.getProductId()).orElseThrow(() -> new ProductNotFoundException(productDescriptions.getProductId().toString()));
 
         List<ProductDescriptionEntity> productDescriptionEntities = productDescriptionEntityRepository.findByProductEntityId(productEntity.getId());
-        if(productDescriptionEntities.isEmpty()) {
-            for(DescriptionsDto item : productDescriptions.getDescriptionList()) {
+        if (productDescriptionEntities.isEmpty()) {
+            for (DescriptionsDto item : productDescriptions.getDescriptionList()) {
                 ProductDescriptionEntity productDescriptionEntity = new ProductDescriptionEntity();
                 productDescriptionEntity.setDescriptionTabName(item.getDescriptionTabName());
                 productDescriptionEntity.setDescriptionTabContent(item.getDescriptionTabContent());
@@ -227,15 +230,15 @@ public class AdminSupplyService {
         }
 
         List<DescriptionsDto> descriptionsDtoList = productDescriptions.getDescriptionList();
-        for(int i = 0; i < descriptionsDtoList.size(); i++) {
+        for (int i = 0; i < descriptionsDtoList.size(); i++) {
             Optional<ProductDescriptionEntity> pE = productDescriptionEntityRepository.findById(descriptionsDtoList.get(i).getDescriptionId());
-            if(pE.isPresent()) {
+            if (pE.isPresent()) {
                 ProductDescriptionEntity productDescriptionEntity = pE.get();
                 productDescriptionEntity.setDescriptionTabName(descriptionsDtoList.get(i).getDescriptionTabName());
                 productDescriptionEntity.setDescriptionTabContent(descriptionsDtoList.get(i).getDescriptionTabContent());
 
                 productDescriptionEntityRepository.save(productDescriptionEntity);
-            }else{
+            } else {
                 ProductDescriptionEntity productDescriptionEntity = new ProductDescriptionEntity();
                 productDescriptionEntity.setDescriptionTabName(descriptionsDtoList.get(i).getDescriptionTabName());
                 productDescriptionEntity.setDescriptionTabContent(descriptionsDtoList.get(i).getDescriptionTabContent());
@@ -257,14 +260,13 @@ public class AdminSupplyService {
 
     public ProductDescriptionListDto getProductDescription(Long productId) {
         List<ProductDescriptionEntity> productDescriptionEntities = productDescriptionEntityRepository.findByProductEntityId(productId);
-        if(productDescriptionEntities == null)
-            throw new RuntimeException("Item with that id: " + productId + " could not be found.");
+        if (productDescriptionEntities == null) throw new ProductNotFoundException(productId.toString());
 
         ProductDescriptionListDto productDescriptionDto = new ProductDescriptionListDto();
         productDescriptionDto.setProductId(productId);
         productDescriptionDto.setDescriptionList(new ArrayList<>());
 
-        for(ProductDescriptionEntity item : productDescriptionEntities) {
+        for (ProductDescriptionEntity item : productDescriptionEntities) {
             DescriptionsDto dto = new DescriptionsDto();
             dto.setDescriptionId(item.getId());
             dto.setDescriptionTabName(item.getDescriptionTabName());

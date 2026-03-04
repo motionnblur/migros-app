@@ -1,4 +1,4 @@
-package com.example.MigrosBackend.exception;
+package com.example.MigrosBackend.exception.shared;
 
 public class WrongPasswordException extends RuntimeException {
     public WrongPasswordException() {

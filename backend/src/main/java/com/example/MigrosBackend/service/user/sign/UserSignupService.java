@@ -2,7 +2,12 @@ package com.example.MigrosBackend.service.user.sign;
 
 import com.example.MigrosBackend.dto.user.sign.UserSignDto;
 import com.example.MigrosBackend.entity.user.UserEntity;
-import com.example.MigrosBackend.exception.*;
+import com.example.MigrosBackend.exception.shared.TokenNotFoundException;
+import com.example.MigrosBackend.exception.shared.WrongPasswordException;
+import com.example.MigrosBackend.exception.user.MailSendingFailedException;
+import com.example.MigrosBackend.exception.user.UserAlreadyExistsException;
+import com.example.MigrosBackend.exception.user.UserMailNotFoundException;
+import com.example.MigrosBackend.exception.user.WeakPasswordException;
 import com.example.MigrosBackend.helper.PasswordValidator;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
 import com.example.MigrosBackend.service.global.EncryptService;
@@ -71,7 +76,7 @@ public class UserSignupService {
 
     public String login(UserSignDto userSignDto) {
         UserEntity userEntity = userEntityRepository.findByUserMail(userSignDto.getUserMail());
-        if (userEntity == null) throw new UserMailCouldNotFoundException(userSignDto.getUserMail());
+        if (userEntity == null) throw new UserMailNotFoundException(userSignDto.getUserMail());
 
         if (!encryptService.checkIfPasswordMatches(userSignDto.getUserPassword(), userEntity.getUserPassword()))
             throw new WrongPasswordException();

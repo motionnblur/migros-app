@@ -1,4 +1,4 @@
-package com.example.MigrosBackend.exception;
+package com.example.MigrosBackend.exception.shared;
 
 public class TokenNotFoundException extends RuntimeException {
     public TokenNotFoundException() {

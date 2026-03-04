@@ -1,4 +1,4 @@
-package com.example.MigrosBackend.exception;
+package com.example.MigrosBackend.exception.admin;
 
 public class AdminNotFoundException extends RuntimeException {
     public AdminNotFoundException(String adminName) {
