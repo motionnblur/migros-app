@@ -2,6 +2,8 @@ package com.example.MigrosBackend.service.admin.sign;
 
 import com.example.MigrosBackend.dto.admin.sign.AdminSignDto;
 import com.example.MigrosBackend.entity.admin.AdminEntity;
+import com.example.MigrosBackend.exception.AdminNotFoundException;
+import com.example.MigrosBackend.exception.WrongPasswordException;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.service.global.EncryptService;
 import com.example.MigrosBackend.service.global.LogService;
@@ -31,26 +33,25 @@ public class AdminSignupService {
         this.logService = logService;
         this.tokenService = tokenService;
     }
+
     public String login(AdminSignDto adminSignDto, HttpServletRequest request) {
         AdminEntity adminEntity = adminEntityRepository.findByAdminName(adminSignDto.getAdminName());
-        if (adminEntity == null)
-        {
+        if (adminEntity == null) {
             String userIpAddress = logService.getClientIp(request);
             String attemptedPassword = encryptService.getEncryptedPassword(adminSignDto.getAdminPassword());
 
             loginLogger.warn("Failed login attempt - User: {} | Password Hash: {} | IP: {} | Reason: User not found",
                     adminSignDto.getAdminName(), attemptedPassword, userIpAddress);
-            throw new RuntimeException("Admin with that name: " + adminSignDto.getAdminName() + " could not be found.");
+            throw new AdminNotFoundException(adminSignDto.getAdminName());
         }
-        if(!encryptService.checkIfPasswordMatches(adminSignDto.getAdminPassword(), adminEntity.getAdminPassword()))
-        {
+        if (!encryptService.checkIfPasswordMatches(adminSignDto.getAdminPassword(), adminEntity.getAdminPassword())) {
             String userIpAddress = logService.getClientIp(request);
             String attemptedPassword = encryptService.getEncryptedPassword(adminSignDto.getAdminPassword());
 
             loginLogger.warn("Failed login attempt - User: {} | Password Hash: {} | IP: {} | Reason: Wrong password",
                     adminSignDto.getAdminName(), attemptedPassword, userIpAddress);
 
-            throw new RuntimeException("Wrong password.");
+            throw new WrongPasswordException();
         }
 
         return tokenService.generateToken(adminEntity.getAdminName());

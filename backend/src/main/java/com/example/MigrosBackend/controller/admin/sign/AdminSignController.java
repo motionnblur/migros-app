@@ -20,14 +20,9 @@ public class AdminSignController {
     public AdminSignController(AdminSignupService adminSignupService) {
         this.adminSupplyService = adminSignupService;
     }
-    
+
     @PostMapping("login")
-    private ResponseEntity<?> login(@RequestBody AdminSignDto adminSignDto, HttpServletRequest request) throws Exception {
-        try{
-            String token = adminSupplyService.login(adminSignDto, request);
-            return ResponseEntity.ok(token);
-        } catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
+    private ResponseEntity<String> login(@RequestBody AdminSignDto adminSignDto, HttpServletRequest request) {
+        return ResponseEntity.ok(adminSupplyService.login(adminSignDto, request));
     }
 }
