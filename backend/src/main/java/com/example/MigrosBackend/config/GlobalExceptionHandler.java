@@ -3,6 +3,7 @@ package com.example.MigrosBackend.config;
 import com.example.MigrosBackend.exception.admin.*;
 import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.exception.shared.TokenNotFoundException;
+import com.example.MigrosBackend.exception.shared.WrongPasswordException;
 import com.example.MigrosBackend.exception.user.*;
 import jakarta.mail.MessagingException;
 import org.springframework.http.HttpStatus;
@@ -47,8 +48,8 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(ex.getMessage());
     }
 
-    @ExceptionHandler(WeakPasswordException.class)
-    public ResponseEntity<String> handleWrongPassword(WeakPasswordException ex) {
+    @ExceptionHandler(WrongPasswordException.class)
+    public ResponseEntity<String> handleWrongPassword(WrongPasswordException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ex.getMessage());
     }
 

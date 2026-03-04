@@ -1,10 +1,12 @@
 package com.example.MigrosBackend.controller.user.payment;
 
+import com.example.MigrosBackend.service.user.payment.UserPaymentService;
 import com.example.MigrosBackend.service.user.supply.UserOrderService;
 import com.stripe.Stripe;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Charge;
 import com.stripe.param.ChargeCreateParams;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,10 +18,10 @@ import java.util.Map;
 @RestController
 @RequestMapping("/payment")
 public class PaymentController {
-    private final UserOrderService userOrderService;
+    private final UserPaymentService userPaymentService;
 
-    public PaymentController(UserOrderService userOrderService) {
-        this.userOrderService = userOrderService;
+    public PaymentController(UserPaymentService userPaymentService) {
+        this.userPaymentService = userPaymentService;
     }
 
     static {
@@ -28,47 +30,7 @@ public class PaymentController {
     }
 
     @PostMapping("/create-charge")
-    public Map<String, Object> createCharge(@RequestBody Map<String, Object> payload) {
-        String token = (String) payload.get("token");
-        String userToken = (String) payload.get("userToken");
-        float amount = userOrderService.getOrderPrice(userToken); // Amount in cents
-        if(amount == 0)
-            return null;
-
-        Map<String, Object> response = new HashMap<>();
-
-        try {
-            ChargeCreateParams params = ChargeCreateParams.builder()
-                    .setAmount((long) amount)
-                    .setCurrency("usd")
-                    .setDescription("Example charge")
-                    .setSource(token)
-                    .build();
-
-            Charge charge = Charge.create(params);
-
-            // Manually extract relevant data from the charge object to return in the response
-            Map<String, Object> chargeDetails = new HashMap<>();
-            chargeDetails.put("id", charge.getId());
-            chargeDetails.put("amount", charge.getAmount());
-            chargeDetails.put("currency", charge.getCurrency());
-            chargeDetails.put("status", charge.getStatus());
-            chargeDetails.put("description", charge.getDescription());
-
-            response.put("success", true);
-            response.put("charge", chargeDetails);
-
-            userOrderService.createOrder(userToken);
-        } catch (StripeException e) {
-            e.printStackTrace();
-            response.put("success", false);
-            response.put("error", "Stripe error: " + e.getMessage());
-        } catch (Exception e) {
-            e.printStackTrace();
-            response.put("success", false);
-            response.put("error", "Unexpected error: " + e.getMessage());
-        }
-
-        return response;
+    public ResponseEntity<Map<String, Object>> createCharge(@RequestBody Map<String, Object> payload) {
+        return ResponseEntity.ok(userPaymentService.processCharge(payload));
     }
 }
