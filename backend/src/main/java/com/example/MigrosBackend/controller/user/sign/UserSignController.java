@@ -19,30 +19,19 @@ public class UserSignController {
     }
 
     @PostMapping("signup")
-    private ResponseEntity<?> addItem(@RequestBody UserSignDto userSignDto) throws Exception {
-        try{
-            userSignupService.signup(userSignDto);
-            return new ResponseEntity<>(HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
+    private ResponseEntity<Void> addItem(@RequestBody UserSignDto userSignDto) {
+        userSignupService.signup(userSignDto);
+        return ResponseEntity.ok().build();
     }
+
     @GetMapping("signup/confirm")
-    private ResponseEntity<?> confirm(@RequestParam String token) throws Exception {
-        try{
-            userSignupService.confirm(token);
-            return new ResponseEntity<>("Your account has been created successfully, you can close this page now.",HttpStatus.OK);
-        } catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
+    private ResponseEntity<String> confirm(@RequestParam String token) {
+        userSignupService.confirm(token);
+        return ResponseEntity.ok("Your account has been created successfully, you can close this page now.");
     }
+
     @PostMapping("login")
-    private ResponseEntity<?> login(@RequestBody UserSignDto userSignDto) throws Exception {
-        try{
-            String token = userSignupService.login(userSignDto);
-            return ResponseEntity.ok(token);
-        } catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
+    private ResponseEntity<String> login(@RequestBody UserSignDto userSignDto) {
+        return ResponseEntity.ok(userSignupService.login(userSignDto));
     }
 }
