@@ -13,7 +13,12 @@ import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.product.ProductImageEntity;
 import com.example.MigrosBackend.entity.user.OrderEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
+import com.example.MigrosBackend.exception.admin.ProductNotFoundException;
+import com.example.MigrosBackend.exception.admin.UserNotFoundException;
+import com.example.MigrosBackend.exception.shared.FileNotFoundException;
 import com.example.MigrosBackend.exception.shared.GeneralException;
+import com.example.MigrosBackend.exception.shared.InvalidTokenException;
+import com.example.MigrosBackend.exception.shared.TokenNotFoundException;
 import com.example.MigrosBackend.exception.user.CategoryHasNoProductException;
 import com.example.MigrosBackend.exception.user.CategoryNotFoundException;
 import com.example.MigrosBackend.repository.category.CategoryEntityRepository;
@@ -102,18 +107,19 @@ public class UserSupplyService {
         return productImageEntity.stream().map(ProductImageEntity::getImagePath).toList();
     }
 
-    public ResponseEntity<Resource> getProductImage(Long itemId) throws Exception {
+    public Resource getProductImage(Long itemId) {
         ProductImageEntity productImageEntity = productImageEntityRepository.findByProductEntityId(itemId).get(0);
         String filename = productImageEntity.getImagePath();
 
-        Resource resource = new UrlResource(Paths.get(filename).toUri());
-
-        if (resource.exists() && resource.isReadable()) {
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
-                    .body(resource);
-        } else {
-            throw new Exception("File not found");
+        try {
+            Resource resource = new UrlResource(Paths.get(filename).toUri());
+            if (resource.exists() && resource.isReadable()) {
+                return resource;
+            } else {
+                throw new FileNotFoundException();
+            }
+        } catch (Exception e) {
+            throw new GeneralException("Error while loading image");
         }
     }
 
@@ -124,7 +130,7 @@ public class UserSupplyService {
         return productEntityRepository.countByCategoryEntityId(categoryId);
     }
 
-    public ResponseEntity<?> getSubCategories(Long categoryId) {
+    public List<SubCategoryDto> getSubCategories(Long categoryId) {
         CategoryEntity categoryEntity = categoryEntityRepository.findById(categoryId).get();
 
         List<SubCategoryDto> subCategoryDto = categoryEntity.getItemEntities().stream()
@@ -139,7 +145,7 @@ public class UserSupplyService {
                     return dto;
                 }).collect(Collectors.toList());
 
-        return ResponseEntity.ok(subCategoryDto);
+        return subCategoryDto;
     }
 
     public List<ProductPreviewDto> getProductsFromSubcategory(String subcategoryName, int page, int productRange) {
@@ -159,13 +165,13 @@ public class UserSupplyService {
         }).collect(Collectors.toList());
     }
 
-    public ResponseEntity<?> getProductCountsFromSubcategory(String subcategoryName) {
-        return ResponseEntity.ok(productEntityRepository.countBySubcategoryName(subcategoryName));
+    public int getProductCountsFromSubcategory(String subcategoryName) {
+        return productEntityRepository.countBySubcategoryName(subcategoryName);
     }
 
     public void addProductToInventory(Long productId, String token) {
         String userName = tokenService.extractUsername(token);
-        if (userName == null) throw new RuntimeException("Error");
+        if (userName == null) throw new TokenNotFoundException();
         UserEntity user = userEntityRepository.findByUserMail(userName);
 
         if (user.getProductsIdsInCart() == null) {
@@ -176,7 +182,7 @@ public class UserSupplyService {
     }
 
     public List<UserCartItemDto> getProductData() {
-        UserEntity user = userEntityRepository.findById(1L).orElseThrow(() -> new RuntimeException("User not found"));
+        UserEntity user = userEntityRepository.findById(1L).orElseThrow(() -> new UserNotFoundException("User not found"));
         List<Long> productIds = user.getProductsIdsInCart();
 
         Map<Long, Long> productIdCounts = productIds.stream()
@@ -202,7 +208,8 @@ public class UserSupplyService {
     }
 
     public ProductDto2 getProductData(Long productId) {
-        ProductEntity productEntity = productEntityRepository.findById(productId).orElseThrow(() -> new RuntimeException("Item with that id: " + productId + " could not be found."));
+        ProductEntity productEntity = productEntityRepository.findById(productId)
+                .orElseThrow(() -> new ProductNotFoundException(productId.toString()));
 
         ProductDto2 productDto2 = new ProductDto2();
         productDto2.setProductName(productEntity.getProductName());
@@ -231,13 +238,13 @@ public class UserSupplyService {
     }
 
     public void updateProductCountInInventory(Long productId, int count, String token) {
-        if (count <= 0) throw new RuntimeException("Count can not be negative or zero");
+        if (count <= 0) throw new GeneralException("Count can not be negative or zero");
 
         String userName = tokenService.extractUsername(token);
-        if (userName == null) throw new RuntimeException("User not found");
+        if (userName == null) throw new InvalidTokenException();
 
         UserEntity user = userEntityRepository.findByUserMail(userName);
-        if (user == null) throw new RuntimeException("User not found");
+        if (user == null) throw new UserNotFoundException(userName);
 
         if (tokenService.validateToken(token, user.getUserMail())) {
             if (user.getProductsIdsInCart() == null) {
@@ -249,50 +256,51 @@ public class UserSupplyService {
             }
             userEntityRepository.save(user);
         } else {
-            throw new RuntimeException("Token not valid");
+            throw new InvalidTokenException();
         }
     }
 
-    public ResponseEntity<?> getAllOrderIds(String token) {
+    public List<Long> getAllOrderIds(String token) {
         String userName = tokenService.extractUsername(token);
         UserEntity user = userEntityRepository.findByUserMail(userName);
+
         if (tokenService.validateToken(token, user.getUserMail())) {
             List<OrderEntity> orders = user.getOrderEntities();
-            List<Long> orderIds = orders.stream().map(OrderEntity::getId).toList();
-            return ResponseEntity.ok(orderIds);
+            return orders.stream().map(OrderEntity::getId).toList();
         } else {
-            throw new RuntimeException("Token not valid");
+            throw new InvalidTokenException();
         }
     }
 
-    public ResponseEntity<?> getOrderStatusByOrderId(Long orderId, String token) {
-        String userName = tokenService.extractUsername(token);
-        UserEntity user = userEntityRepository.findByUserMail(userName);
-        if (tokenService.validateToken(token, user.getUserMail())) {
-            OrderEntity order = orderEntityRepository.findById(orderId).orElseThrow(() -> new RuntimeException("Order not found"));
-            return ResponseEntity.ok(order.getStatus());
-        } else {
-            throw new RuntimeException("Token not valid");
-        }
-    }
-
-    public ResponseEntity<?> cancelOrder(Long orderId, String token) {
+    public String getOrderStatusByOrderId(Long orderId, String token) {
         String userName = tokenService.extractUsername(token);
         UserEntity user = userEntityRepository.findByUserMail(userName);
 
         if (tokenService.validateToken(token, user.getUserMail())) {
-            OrderEntity order = orderEntityRepository.findById(orderId).orElseThrow(() -> new RuntimeException("Order not found"));
+            OrderEntity order = orderEntityRepository.findById(orderId).orElseThrow(() -> new GeneralException("Order not found"));
+            return order.getStatus();
+        } else {
+            throw new InvalidTokenException();
+        }
+    }
+
+    public void cancelOrder(Long orderId, String token) {
+        String userName = tokenService.extractUsername(token);
+        UserEntity user = userEntityRepository.findByUserMail(userName);
+
+        if (tokenService.validateToken(token, user.getUserMail())) {
+            OrderEntity order = orderEntityRepository.findById(orderId)
+                    .orElseThrow(() -> new GeneralException("Order not found"));
             orderEntityRepository.delete(order);
-            return ResponseEntity.ok("Order cancelled");
         } else {
-            throw new RuntimeException("Token not valid");
+            throw new InvalidTokenException();
         }
     }
 
     public ProductDescriptionListDto getProductDescription(Long productId) {
         List<ProductDescriptionEntity> productDescriptionEntities = productDescriptionEntityRepository.findByProductEntityId(productId);
         if (productDescriptionEntities == null)
-            throw new RuntimeException("Item with that id: " + productId + " could not be found.");
+            throw new ProductNotFoundException(productId.toString());
 
         ProductDescriptionListDto productDescriptionDto = new ProductDescriptionListDto();
         productDescriptionDto.setProductId(productId);

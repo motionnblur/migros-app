@@ -1,10 +1,7 @@
 package com.example.MigrosBackend.config;
 
 import com.example.MigrosBackend.exception.admin.*;
-import com.example.MigrosBackend.exception.shared.GeneralException;
-import com.example.MigrosBackend.exception.shared.InvalidTokenException;
-import com.example.MigrosBackend.exception.shared.TokenNotFoundException;
-import com.example.MigrosBackend.exception.shared.WrongPasswordException;
+import com.example.MigrosBackend.exception.shared.*;
 import com.example.MigrosBackend.exception.user.*;
 import jakarta.mail.MessagingException;
 import org.springframework.http.HttpStatus;
@@ -97,5 +94,10 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidTokenException.class)
     public ResponseEntity<String> handleInvalidToken(InvalidTokenException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ex.getMessage());
+    }
+
+    @ExceptionHandler(FileNotFoundException.class)
+    public ResponseEntity<String> handleFileNotFound(FileNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
     }
 }

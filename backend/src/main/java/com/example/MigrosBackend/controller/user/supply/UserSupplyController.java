@@ -1,11 +1,14 @@
 package com.example.MigrosBackend.controller.user.supply;
 
 import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionListDto;
+import com.example.MigrosBackend.dto.admin.panel.ProductDto2;
+import com.example.MigrosBackend.dto.user.category.SubCategoryDto;
 import com.example.MigrosBackend.dto.user.product.ProductPreviewDto;
 import com.example.MigrosBackend.dto.user.product.UserCartItemDto;
 import com.example.MigrosBackend.service.user.supply.UserSupplyService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,133 +26,98 @@ public class UserSupplyController {
     }
 
     @GetMapping("getAllCategoryNames")
-    public List<String> getAllCategoryNames() {
-        return userSupplyService.getAllCategoryNames();
+    public ResponseEntity<List<String>> getAllCategoryNames() {
+        return ResponseEntity.ok(userSupplyService.getAllCategoryNames());
     }
 
     @GetMapping("getProductsFromCategory")
-    public ResponseEntity<?> getProductsFromCategory(@RequestParam Long categoryId, @RequestParam int page, @RequestParam int productRange) {
-        try {
-            List<ProductPreviewDto> itemIDs = userSupplyService.getProductsFromCategory(categoryId, page, productRange);
-            return ResponseEntity.ok(itemIDs);
-        } catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
+    public ResponseEntity<List<ProductPreviewDto>> getProductsFromCategory(@RequestParam Long categoryId,
+                                                                           @RequestParam int page,
+                                                                           @RequestParam int productRange) {
+        return ResponseEntity.ok(userSupplyService.getProductsFromCategory(categoryId, page, productRange));
     }
+
     @GetMapping("getProductsFromSubcategory")
-    public ResponseEntity<?> getSubProductsFromCategory(@RequestParam String subcategoryName, @RequestParam int page, @RequestParam int productRange) {
-        try {
-            List<ProductPreviewDto> itemIDs = userSupplyService.getProductsFromSubcategory(subcategoryName, page, productRange);
-            return ResponseEntity.ok(itemIDs);
-        } catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
+    public ResponseEntity<List<ProductPreviewDto>> getSubProductsFromCategory(@RequestParam String subcategoryName,
+                                                                              @RequestParam int page,
+                                                                              @RequestParam int productRange) {
+        return ResponseEntity.ok(userSupplyService.getProductsFromSubcategory(subcategoryName, page, productRange));
     }
+
     @GetMapping("getProductCountsFromSubcategory")
-    public ResponseEntity<?> getProductCountsFromSubcategory(@RequestParam String subcategoryName) {
-        try {
-            return userSupplyService.getProductCountsFromSubcategory(subcategoryName);
-        }
-        catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
+    public ResponseEntity<Integer> getProductCountsFromSubcategory(@RequestParam String subcategoryName) {
+        return ResponseEntity.ok(userSupplyService.getProductCountsFromSubcategory(subcategoryName));
     }
+
     @GetMapping("getProductCountsFromCategory")
-    public int getProductCountsFromCategory(@RequestParam Long categoryId) {
-        return userSupplyService.getProductCountsFromCategory(categoryId);
+    public ResponseEntity<Integer> getProductCountsFromCategory(@RequestParam Long categoryId) {
+        return ResponseEntity.ok(userSupplyService.getProductCountsFromCategory(categoryId));
     }
 
     @GetMapping("getProductImageNames")
-    public List<String> getProductImageNames(@RequestParam Long productId) {
-        return userSupplyService.getProductImageNames(productId);
+    public ResponseEntity<List<String>> getProductImageNames(@RequestParam Long productId) {
+        return ResponseEntity.ok(userSupplyService.getProductImageNames(productId));
     }
+
     @GetMapping("getProductImage")
-    public ResponseEntity<Resource> getProductImage(@RequestParam Long productId) throws Exception {
-        return userSupplyService.getProductImage(productId);
+    public ResponseEntity<Resource> getProductImage(@RequestParam Long productId) {
+        Resource resource = userSupplyService.getProductImage(productId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
+                .body(resource);
     }
+
     @GetMapping("getSubCategories")
-    public ResponseEntity<?> getSubCategories(@RequestParam Long categoryId) {
-        try {
-            return userSupplyService.getSubCategories(categoryId);
-        }catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
+    public ResponseEntity<List<SubCategoryDto>> getSubCategories(@RequestParam Long categoryId) {
+        return ResponseEntity.ok(userSupplyService.getSubCategories(categoryId));
     }
+
     @GetMapping("addProductToUserCart")
-    public ResponseEntity<?> addProductToUserCart(@RequestParam Long productId, @RequestParam String token) {
-        try {
-            userSupplyService.addProductToInventory(productId, token);
-            return new ResponseEntity<>("Product added to inventory", HttpStatus.OK);
-        }catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
+    public ResponseEntity<Void> addProductToUserCart(@RequestParam Long productId, @RequestParam String token) {
+        userSupplyService.addProductToInventory(productId, token);
+        return ResponseEntity.ok().build();
     }
+
     @GetMapping("getProductData")
-    public ResponseEntity<?> getProductData() throws Exception {
-        try{
-            List<UserCartItemDto> dto = userSupplyService.getProductData();
-            return ResponseEntity.ok(dto);
-        } catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
+    public ResponseEntity<List<UserCartItemDto>> getProductData() {
+        return ResponseEntity.ok(userSupplyService.getProductData());
     }
+
     @GetMapping("getProductDataWithProductId")
-    private ResponseEntity<?> getProductData(@RequestParam Long productId) throws Exception {
-        try{
-            return ResponseEntity.ok(userSupplyService.getProductData(productId));
-        } catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
+    private ResponseEntity<ProductDto2> getProductData(@RequestParam Long productId) {
+        return ResponseEntity.ok(userSupplyService.getProductData(productId));
     }
+
     @GetMapping("getProductDescription")
-    private ResponseEntity<?> getProductDescription(@RequestParam Long productId) throws Exception {
-        try{
-            ProductDescriptionListDto productDescriptionDto = userSupplyService.getProductDescription(productId);
-            return ResponseEntity.ok(productDescriptionDto);
-        } catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
+    private ResponseEntity<ProductDescriptionListDto> getProductDescription(@RequestParam Long productId) {
+        return ResponseEntity.ok(userSupplyService.getProductDescription(productId));
     }
+
     @DeleteMapping("removeProductFromUserCart")
-    public ResponseEntity<?> removeProductFromUserCart(@RequestParam Long productId, @RequestParam String token) {
-        try {
-            userSupplyService.removeProductFromInventory(productId, token);
-            return new ResponseEntity<>("Product removed from inventory", HttpStatus.OK);
-        }catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
+    public ResponseEntity<Void> removeProductFromUserCart(@RequestParam Long productId, @RequestParam String token) {
+        userSupplyService.removeProductFromInventory(productId, token);
+        return ResponseEntity.ok().build();
     }
+
     @GetMapping("updateProductCountInUserCart")
-    public ResponseEntity<?> updateProductCountInUserCart(@RequestParam Long productId, @RequestParam int count, @RequestParam String token) {
-        try {
-            userSupplyService.updateProductCountInInventory(productId, count, token);
-            return new ResponseEntity<>("Product count updated in inventory", HttpStatus.OK);
-        }catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
+    public ResponseEntity<Void> updateProductCountInUserCart(@RequestParam Long productId, @RequestParam int count, @RequestParam String token) {
+        userSupplyService.updateProductCountInInventory(productId, count, token);
+        return ResponseEntity.ok().build();
     }
+
     @GetMapping("getAllOrderIds")
-    public ResponseEntity<?> getAllOrderIds(@RequestParam String token) {
-        try {
-            return userSupplyService.getAllOrderIds(token);
-        }catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
+    public ResponseEntity<List<Long>> getAllOrderIds(@RequestParam String token) {
+        return ResponseEntity.ok(userSupplyService.getAllOrderIds(token));
     }
+
     @DeleteMapping("cancelOrder")
-    public ResponseEntity<?> cancelOrder(@RequestParam Long orderId, @RequestParam String token) {
-        try {
-            return userSupplyService.cancelOrder(orderId, token);
-        }catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
+    public ResponseEntity<Void> cancelOrder(@RequestParam Long orderId, @RequestParam String token) {
+        userSupplyService.cancelOrder(orderId, token);
+        return ResponseEntity.ok().build();
     }
+
     @GetMapping("getOrderStatusByOrderId")
-    public ResponseEntity<?> getOrderStatusByOrderId(@RequestParam Long orderId, @RequestParam String token) {
-        try {
-            return userSupplyService.getOrderStatusByOrderId(orderId, token);
-        }catch (Exception e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
+    public ResponseEntity<String> getOrderStatusByOrderId(@RequestParam Long orderId, @RequestParam String token) {
+        return ResponseEntity.ok(userSupplyService.getOrderStatusByOrderId(orderId, token));
     }
 }
