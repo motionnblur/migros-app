@@ -4,6 +4,7 @@ import com.example.MigrosBackend.dto.user.sign.UserSignDto;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.exception.shared.TokenNotFoundException;
 import com.example.MigrosBackend.exception.shared.WrongPasswordException;
+import com.example.MigrosBackend.exception.user.MailSendingFailedException;
 import com.example.MigrosBackend.exception.user.UserAlreadyExistsException;
 import com.example.MigrosBackend.exception.user.WeakPasswordException;
 import com.example.MigrosBackend.helper.PasswordValidator;
@@ -18,7 +19,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.thymeleaf.context.Context;
+
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -85,6 +89,23 @@ class UserSignupServiceTest {
     }
 
     @Test
+    void signup_ThrowsException_WhenMailServiceFails() throws MessagingException {
+        // Arrange
+        when(userEntityRepository.existsByUserMail(signupDto.getUserMail())).thenReturn(false);
+        when(passwordValidator.isPasswordStrongEnough(signupDto.getUserPassword())).thenReturn(true);
+        when(encryptService.getEncryptedPassword(anyString())).thenReturn("hashed_password");
+
+        doThrow(new MessagingException("SMTP error"))
+                .when(mailService)
+                .sendMimeMessage(anyString(), anyString(), anyString(), any());
+
+        // Act & Assert
+        assertThrows(MailSendingFailedException.class, () -> {
+            userSignupService.signup(signupDto);
+        });
+    }
+
+    @Test
     void login_Success_ReturnsToken() {
         // Arrange
         UserEntity existingUser = new UserEntity();
@@ -117,5 +138,35 @@ class UserSignupServiceTest {
     void confirm_ThrowsException_WhenTokenInvalid() {
         // Act & Assert
         assertThrows(TokenNotFoundException.class, () -> userSignupService.confirm("invalid-token-123"));
+    }
+
+    @Test
+    void confirm_Success_Coverage() {
+        // 1. Setup dummy data
+        String testToken = "test-token-123";
+        UserEntity dummyUser = new UserEntity();
+        dummyUser.setUserMail("test@mail.com");
+
+        // 2. USE REFLECTION to access the private map
+        ConcurrentHashMap<String, UserEntity> map = (ConcurrentHashMap<String, UserEntity>)
+                ReflectionTestUtils.getField(userSignupService, "tokenToUserMap");
+
+        // 3. Manually put the user in the map so 'confirm' finds it
+        map.put(testToken, dummyUser);
+
+        // 4. Act
+        userSignupService.confirm(testToken);
+
+        // 5. Assert (This ensures the 'if' block is covered)
+        verify(userEntityRepository, times(1)).save(dummyUser);
+        assertFalse(map.containsKey(testToken));
+    }
+
+    @Test
+    void confirm_TokenNotFound_Coverage() {
+        // Act & Assert (This ensures the 'else' block is covered)
+        assertThrows(TokenNotFoundException.class, () -> {
+            userSignupService.confirm("wrong-token");
+        });
     }
 }
