@@ -1,25 +1,26 @@
-import { Component } from '@angular/core';
-import { EventService } from '../../services/event/event.service';
-import { ProductPageComponent } from './components/product-page/product-page.component';
-import { CommonModule } from '@angular/common';
-import { DiscoverComponent } from './components/discover-area/parent/discover-area.component';
-import { data } from '../../memory/global-data';
-import { LoginComponent } from './components/login/login.component';
-import { MatSelectModule } from '@angular/material/select';
-import { MatInputModule } from '@angular/material/input';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatButtonModule } from '@angular/material/button';
-import { RestService } from '../../services/rest/rest.service';
-import { FormsModule } from '@angular/forms';
-import { SignUserComponent } from './components/sign-user/sign-user.component';
-import { AuthService } from '../../services/auth/auth.service';
-import { MatMenuModule } from '@angular/material/menu';
-import { UserCartComponent } from './components/user-cart/user-cart.component';
-import { UserProfileComponent } from './components/user-profile/user-profile.component';
-import { OrderTrackerComponent } from './components/order-tracker/order-tracker.component';
+import {Component, HostListener} from '@angular/core'; // Added HostListener
+import {EventService} from '../../services/event/event.service';
+import {ProductPageComponent} from './components/product-page/product-page.component';
+import {CommonModule} from '@angular/common';
+import {DiscoverComponent} from './components/discover-area/parent/discover-area.component';
+import {data} from '../../memory/global-data';
+import {LoginComponent} from './components/login/login.component';
+import {MatSelectModule} from '@angular/material/select';
+import {MatInputModule} from '@angular/material/input';
+import {MatFormFieldModule} from '@angular/material/form-field';
+import {MatButtonModule} from '@angular/material/button';
+import {RestService} from '../../services/rest/rest.service';
+import {FormsModule} from '@angular/forms';
+import {SignUserComponent} from './components/sign-user/sign-user.component';
+import {AuthService} from '../../services/auth/auth.service';
+import {MatMenuModule} from '@angular/material/menu';
+import {UserCartComponent} from './components/user-cart/user-cart.component';
+import {UserProfileComponent} from './components/user-profile/user-profile.component';
+import {OrderTrackerComponent} from './components/order-tracker/order-tracker.component';
 
 @Component({
   selector: 'app-main',
+  standalone: true, // Assuming standalone based on previous context
   imports: [
     DiscoverComponent,
     ProductPageComponent,
@@ -53,6 +54,10 @@ export class MainComponent {
   isPaymentComponentOpened: boolean = false;
   orderIds: number[] = [];
 
+  // --- BOOTSTRAP STATE HANDLERS ---
+  public isMenuOpen: boolean = false;
+  public isNavbarCollapsed: boolean = true;
+
   constructor(
     private eventManager: EventService,
     private restService: RestService,
@@ -62,6 +67,7 @@ export class MainComponent {
       data.currentSelectedCategoryId = categoryId;
       this.setItemPageOpened(true);
     });
+
     if (this.authService.isLoggedIn()) {
       this.loginText = 'Can';
       this.isUserSigned = true;
@@ -72,6 +78,7 @@ export class MainComponent {
       }
       this.loginText = 'Üye Ol veya Giriş Yap';
     }
+
     this.restService.getAllOrderIds().subscribe({
       next: (data: number[]) => {
         this.orderIds = data;
@@ -82,9 +89,27 @@ export class MainComponent {
     });
   }
 
+  // Toggle Dropdown
+  public toggleMenu(event: Event) {
+    event.stopPropagation();
+    this.isMenuOpen = !this.isMenuOpen;
+  }
+
+  // Close dropdown when clicking outside
+  @HostListener('document:click')
+  public closeMenu() {
+    this.isMenuOpen = false;
+  }
+
+  // Toggle Mobile Navbar
+  public toggleNavbar() {
+    this.isNavbarCollapsed = !this.isNavbarCollapsed;
+  }
+
   public openLoginComponent() {
     this.isLoginButtonClicked = true;
   }
+
   public openOrderComponent() {
     if (!this.authService.isLoggedIn()) {
       this.isLoginButtonClicked = true;
@@ -94,13 +119,15 @@ export class MainComponent {
       alert("Hiç siparişiniz yok");
       return;
     }
-
     this.isOrderButtonClicked = !this.isOrderButtonClicked;
   }
+
   public loginUser() {
     this.loginText = 'Can';
     this.isUserSigned = true;
+    this.isLoginButtonClicked = false; // Close login modal on success
   }
+
   public isUserLoggedIn() {
     return this.isUserSigned;
   }
@@ -108,29 +135,40 @@ export class MainComponent {
   public closeLoginComponent() {
     this.isLoginButtonClicked = false;
   }
+
   public hasItemPageOpened(): boolean {
     return this.isItemPageOpened;
   }
+
   public openCartComponent() {
     this.isCartComponentOpened = true;
+    this.isMenuOpen = false; // Close menu after selection
   }
+
   public openProfileComponent() {
     this.isProfileButtonClicked = true;
+    this.isMenuOpen = false; // Close menu after selection
   }
+
   public closeCartComponent() {
     this.isCartComponentOpened = false;
   }
+
   public closeProfileComponent() {
     this.isProfileButtonClicked = false;
   }
+
   public closeOrderTrackerComponent() {
     this.isOrderButtonClicked = false;
   }
 
   public logoutUser() {
     this.authService.logout();
-    this.isUserSigned = false;
+    this.isUserSigned = false; // This triggers the *ngIf switch back to the login button
+    this.isMenuOpen = false;
     this.loginText = 'Üye Ol veya Giriş Yap';
+    // If you are on a private page (like Profile), navigate home
+    this.setItemPageOpened(false);
   }
 
   public setItemPageOpened(value: boolean) {

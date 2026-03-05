@@ -53,3 +53,37 @@ app-sign-user, app-user-cart, app-user-profile, app-order-tracker {
   position: relative;
   z-index: 2000; /* Ensure they appear over the header */
 }
+
+::ng-deep .bootstrap-style-menu.mat-mdc-menu-panel {
+  border-radius: 12px !important;
+  margin-top: 10px;
+  border: none !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1) !important;
+}
+
+.user-auth-area {
+  display: flex;
+  align-items: center;
+  min-width: 120px; /* Prevents layout shift when text changes */
+  justify-content: flex-end;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Ensure the dropdown menu doesn't get cut off by parent overflow */
+.navbar {
+  overflow: visible !important;
+}
