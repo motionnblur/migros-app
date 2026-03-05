@@ -24,11 +24,6 @@ public class PaymentController {
         this.userPaymentService = userPaymentService;
     }
 
-    static {
-        // Set your secret key (from Stripe dashboard)
-        Stripe.apiKey = "sk_test_51R5GK1RpCkckemuqtK5XI8QJxHsbBSGrRrnbDflhRsGruY72jTXPwn4loYYIIFiXN090DwSm174SEi3OMVCzZp0J00NtCoHtU0";
-    }
-
     @PostMapping("/create-charge")
     public ResponseEntity<Map<String, Object>> createCharge(@RequestBody Map<String, Object> payload) {
         return ResponseEntity.ok(userPaymentService.processCharge(payload));
