@@ -1,21 +1,27 @@
-app-admin {
-  padding: 0;
-  margin: 0;
+:host {
+  display: block;
   width: 100%;
   height: 100%;
 }
 
+/* Ensure child components like admin-panel can take full height */
 app-admin-panel {
-  padding: 0;
-  margin: 0;
+  display: block;
   width: 100%;
   height: 100%;
 }
 
-.admin-page-main {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

@@ -1,34 +1,41 @@
-<div class="admin-page__content">
-  <div class="admin-page__title">
-    <img class="admin-page__logo" src="migroslogo.png" />
-    <div class="admin-page__title__text">Admin</div>
-  </div>
-  <div class="admin-page__body">
-    <div class="admin-page__mail">
-      <div class="admin-page__text">İsim</div>
-      <input class="admin-page__input" type="text" [(ngModel)]="adminName" />
+<div class="card shadow border-0 overflow-hidden" style="border-radius: 12px;">
+  <div class="card-header bg-white border-0 pt-4 pb-2 text-center">
+    <div class="d-flex align-items-center justify-content-center gap-2">
+      <img src="migroslogo.png" alt="Logo" height="50" style="object-fit: contain;">
+      <h1 class="h3 mb-0 fw-bold text-dark">Admin</h1>
     </div>
-    <div class="admin-page__pass">
-      <div class="admin-page__text">Şifre</div>
-      <div class="admin-page__pass_body">
-        <input
-          class="admin-page__pass_input"
-          [type]="passwordVisible ? 'text' : 'password'"
-          [(ngModel)]="adminPassword"
-        />
-        <div class="admin-page__password_show">
-          <img
-            class="admin-page__password_show__button"
-            src="eye.png"
-            (click)="showPassword()"
-          />
-        </div>
+  </div>
+
+  <div class="card-body p-4">
+    <div class="mb-3">
+      <label class="form-label fw-bold small text-muted text-uppercase">İsim</label>
+      <input type="text"
+             class="form-control bg-light border-0 py-2"
+             [(ngModel)]="adminName"
+             placeholder="Admin adınızı girin">
+    </div>
+
+    <div class="mb-4">
+      <label class="form-label fw-bold small text-muted text-uppercase">Şifre</label>
+      <div class="input-group">
+        <input [type]="passwordVisible ? 'text' : 'password'"
+               class="form-control bg-light border-0 py-2"
+               [(ngModel)]="adminPassword"
+               placeholder="••••••••">
+        <button class="btn btn-light border-0 bg-light" type="button" (click)="showPassword()">
+          <i class="bi" [ngClass]="passwordVisible ? 'bi-eye-slash' : 'bi-eye'"></i>
+        </button>
       </div>
     </div>
+
+    <button class="btn btn-orange w-100 py-2 fw-bold shadow-sm"
+            [disabled]="!adminName || !adminPassword"
+            (click)="login(adminName, adminPassword)">
+      Giriş Yap
+    </button>
   </div>
-  <div class="admin-page__footer">
-    <div class="admin-page__button" (click)="login(adminName, adminPassword)">
-      Giriş
-    </div>
+
+  <div class="card-footer bg-light border-0 py-3 text-center">
+    <small class="text-muted">Güvenli Yönetim Paneli</small>
   </div>
 </div>

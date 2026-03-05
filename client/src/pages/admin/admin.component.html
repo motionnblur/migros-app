@@ -1,4 +1,19 @@
-<div class="admin-page-main">
-  <app-admin-login *ngIf="!isLoginCompleted && !isLoginPhaseActive" />
-  <app-admin-panel *ngIf="isLoginCompleted" />
+<div class="admin-page-main d-flex flex-column min-vh-100 bg-light">
+
+  <div *ngIf="!isLoginCompleted" class="flex-grow-1 d-flex align-items-center justify-content-center p-3">
+    <div class="w-100" style="max-width: 450px;">
+      <app-admin-login *ngIf="!isLoginPhaseActive" class="animate-fade-in"/>
+
+      <div *ngIf="isLoginPhaseActive && !isLoginCompleted" class="text-center">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Yükleniyor...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="isLoginCompleted" class="w-100 h-100 flex-grow-1 animate-fade-in">
+    <app-admin-panel/>
+  </div>
+
 </div>

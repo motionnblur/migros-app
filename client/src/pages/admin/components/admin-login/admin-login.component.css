@@ -1,130 +1,33 @@
-.admin-page__content {
-  width: 284px;
-  height: 426px;
-  border: 1px solid gainsboro;
-  border-radius: 8px;
-  padding: 30px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  background-color: rgb(238, 238, 238);
+/* Ensure the card feels like it belongs to the brand */
+.btn-orange {
+  background-color: #ff7f00 !important;
+  border-color: #ff7f00 !important;
+  color: white !important;
+  transition: transform 0.2s ease, background-color 0.2s ease;
 }
-.admin-page__logo {
-  width: 80px;
-  object-fit: contain;
+
+.btn-orange:hover {
+  background-color: #e67200 !important;
+  transform: translateY(-1px);
 }
-.admin-page__title__text {
-  font-size: 40px;
-  font-weight: bold;
-  margin-left: 5px;
+
+.btn-orange:active {
+  transform: translateY(0);
 }
-.admin-page__title {
-  width: 100%;
-  height: 150px;
-  display: flex;
-  flex-direction: row;
-  justify-content: center;
-  align-items: center;
+
+/* Subtle styling for the form controls */
+.form-control:focus {
+  background-color: #fff !important;
+  box-shadow: 0 0 0 0.25rem rgba(255, 127, 0, 0.25);
+  border-color: #ff7f00;
 }
-.admin-page__body {
-  width: 100%;
-  height: 400px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
+
+/* Material-like transitions */
+.card {
+  transition: box-shadow 0.3s ease;
 }
-.admin-page__footer {
-  width: 100%;
-  flex: auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: 5px;
-}
-.admin-page__button {
-  width: 120px;
-  height: 50px;
-  border: 1px solid gainsboro;
-  border-radius: 8px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  cursor: pointer;
-  background-color: rgb(211, 211, 211);
-}
-.admin-page__button__signup {
-  cursor: pointer;
-  font-size: small;
-}
-.admin-page__mail {
-  width: 100%;
-  height: 100px;
-}
-.admin-page__pass_body {
-  width: 100%;
-  height: 50%;
-  display: flex;
-  align-items: center;
-  flex-direction: row;
-  border: 1px solid gainsboro;
-}
-.admin-page__text {
-  width: 100%;
-  height: 50%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-.admin-page__input {
-  padding: 0;
-  margin: 0;
-  width: 100%;
-  height: 50%;
-  border: none;
-  outline: none;
-  text-indent: 10px;
-  border: 1px solid gainsboro;
-  border-radius: 4px;
-  background-color: rgb(224, 224, 224);
-}
-.admin-page__pass_input {
-  padding: 0;
-  margin: 0;
-  width: 100%;
-  height: 100%;
-  border: none;
-  outline: none;
-  text-indent: 10px;
-  border-radius: 4px;
-  background-color: rgb(224, 224, 224);
-}
-.admin-page__password_show {
-  width: 35px;
-  height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background-color: rgb(224, 224, 224);
-}
-.admin-page__password_show__button {
-  width: 25px;
-  height: 25px;
-  cursor: pointer;
-  margin-right: 6px;
-}
-.admin-page__pass {
-  width: 100%;
-  height: 100px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-.admin-page__forgot {
-  width: 100%;
-  height: 100px;
-  display: flex;
-  align-items: center;
-  font-weight: 500;
+
+/* Icon centering */
+.bi {
+  vertical-align: middle;
 }
