@@ -33,6 +33,7 @@ This application provides a basic platform for users to browse products, add the
 * **Frontend:**
     * [Angular](https://angular.io/)  (19.0.5)
     * [Material UI](https://material.angularjs.org/latest/) (19.0.5)
+    * [Bootstrap](https://getbootstrap.com/)
     * [TypeScript](https://www.typescriptlang.org/)
     * [HTML](https://developer.mozilla.org/en-US/docs/Web/HTML)
     * [CSS](https://developer.mozilla.org/en-US/docs/Web/CSS)
@@ -41,7 +42,9 @@ This application provides a basic platform for users to browse products, add the
     * [Java](https://www.java.com/) (21)
     * [Maven](https://maven.apache.org/)
 * **Database:**
-    * [PostgreSQL](https://www.postgresql.org/) (latest)
+    * [PostgreSQL](https://www.postgresql.org/) (postgres:18.3-alpine3.22)
+* **Docker:**
+    * [Docker](https://www.docker.com/)
 
 ## Prerequisites
 
