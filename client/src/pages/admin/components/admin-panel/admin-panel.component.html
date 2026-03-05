@@ -1,48 +1,67 @@
-<div class="admin-panel-main">
-  <div class="admin-panel-header">
-    <div class="admin-panel-header__left"></div>
-    <div class="admin-panel-header__right">
-      <div
-        class="admin-panel-header__button-field__button"
-        (click)="open_close_Products()"
-      >
-        Ürünler
+<div class="admin-panel-main d-flex flex-column min-vh-100 bg-light">
+
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm px-4 py-2 sticky-top">
+    <a class="navbar-brand d-flex align-items-center" href="#">
+      <img src="migroslogo.png" height="30" class="me-2" alt="Admin Logo">
+      <span class="fw-bold small text-uppercase tracking-wider">Yönetim Paneli</span>
+    </a>
+
+    <div class="ms-auto d-flex gap-2">
+      <button class="btn btn-sm px-3 rounded-pill transition-all"
+              [ngClass]="hasProductsOpened ? 'btn-orange' : 'btn-outline-light'"
+              (click)="open_close_Products()">
+        <i class="bi bi-box-seam me-1"></i> Ürünler
+      </button>
+      <button class="btn btn-sm px-3 rounded-pill transition-all"
+              [ngClass]="hasOrdersOpened ? 'btn-orange' : 'btn-outline-light'"
+              (click)="open_close_Orders()">
+        <i class="bi bi-receipt me-1"></i> Siparişler
+      </button>
+    </div>
+  </nav>
+
+  <div class="admin-panel-body flex-grow-1 position-relative p-4">
+
+    <div class="admin-overlay-container"
+         *ngIf="hasProductAdderOpened || hasProductUpdaterOpened || hasProductEditOpened">
+
+      <div class="admin-modal-box shadow-lg animate-fade-in">
+        <app-product-adder
+          *ngIf="hasProductAdderOpened"
+          (hasProductAdded)="productAddedEventHandler($event)"
+          (hasEscapePressed)="closeProductAdder()"
+        />
+        <app-product-updater
+          *ngIf="hasProductUpdaterOpened"
+          [id]="productId"
+          (hasProductAdded)="productAddedEventHandler($event)"
+          (hasEscapePressed)="closeProductUpdater()"
+        />
+        <app-product-edit
+          *ngIf="hasProductEditOpened"
+          [productId]="productId"
+          (hasEscapePressed)="closeProductEdit()"
+        />
       </div>
-      <div
-        class="admin-panel-header__button-field__button"
-        (click)="open_close_Orders()"
-      >
-        Siparişler
+
+      <app-wall
+        class="admin-backdrop"
+        (hasWallOnClicked)="hasWallOnClickedEventAdder($event)"
+      />
+    </div>
+
+    <div class="container-fluid h-100">
+      <app-product-body
+        *ngIf="hasProductsOpened && !hasOrdersOpened"
+        (hasAddProductButtonClicked)="openProductAdder()"
+      />
+      <app-order-panel *ngIf="hasOrdersOpened && !hasProductsOpened"/>
+
+      <div *ngIf="!hasProductsOpened && !hasOrdersOpened" class="text-center mt-5 py-5">
+        <i class="bi bi-speedometer2 display-1 text-muted"></i>
+        <h2 class="text-muted mt-3">Admin Paneline Hoş Geldiniz</h2>
+        <p class="text-secondary">Yönetmek istediğiniz bölümü yukarıdan seçin.</p>
       </div>
     </div>
   </div>
-  <div class="admin-panel-body">
-    <app-product-adder
-      *ngIf="hasProductAdderOpened"
-      (hasProductAdded)="productAddedEventHandler($event)"
-      (hasEscapePressed)="closeProductAdder()"
-    />
-    <app-product-updater
-      *ngIf="hasProductUpdaterOpened"
-      [id]="productId"
-      (hasProductAdded)="productAddedEventHandler($event)"
-      (hasEscapePressed)="closeProductUpdater()"
-    />
-    <app-product-body
-      *ngIf="hasProductsOpened && !hasOrdersOpened"
-      (hasAddProductButtonClicked)="openProductAdder()"
-    />
-    <app-product-edit
-      *ngIf="hasProductEditOpened"
-      [productId]="productId"
-      (hasEscapePressed)="closeProductEdit()"
-    />
-    <app-order-panel *ngIf="hasOrdersOpened && !hasProductsOpened" />
-  </div>
 </div>
-<app-wall
-  *ngIf="
-    hasProductAdderOpened || hasProductUpdaterOpened || hasProductEditOpened
-  "
-  (hasWallOnClicked)="hasWallOnClickedEventAdder($event)"
-/>

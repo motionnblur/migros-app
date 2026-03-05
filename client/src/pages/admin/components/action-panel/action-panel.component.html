@@ -1,15 +1,45 @@
-<div id="action-panel-main">
-  <div>{{ userData.userFirstName }} {{ userData.userLastName }}</div>
-  <div>{{ userData.userAddress }}</div>
-  <div>{{ userData.userAddress2 }}</div>
-  <mat-form-field>
-    <mat-label>Select status</mat-label>
-    <mat-select [(ngModel)]="selectedStatus">
-      @for (s of status; track s) {
-      <mat-option [value]="s.value">{{ s.viewValue }}</mat-option>
-      }
-    </mat-select>
-  </mat-form-field>
-  <button mat-raised-button (click)="save()">Save</button>
-</div>
 <div id="action-panel-bg" (click)="closeActionPanel()"></div>
+
+<div id="action-panel-main" class="card shadow-lg border-0 animate-fade-in" *ngIf="userData">
+
+  <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-3">
+    <h5 class="mb-0 fw-bold"><i class="bi bi-gear-fill me-2"></i>Sipariş İşlemi</h5>
+    <button type="button" class="btn-close btn-close-white" (click)="closeActionPanel()"></button>
+  </div>
+
+  <div class="card-body p-4">
+    <div class="user-details mb-4 p-3 bg-light rounded border">
+      <h6 class="text-muted small fw-bold text-uppercase mb-3">Müşteri Bilgileri</h6>
+      <div class="d-flex align-items-center mb-2">
+        <i class="bi bi-person-circle fs-4 me-2 text-primary"></i>
+        <span class="fw-bold fs-5">{{ userData.userFirstName }} {{ userData.userLastName }}</span>
+      </div>
+      <div class="small text-secondary mb-1">
+        <i class="bi bi-geo-alt-fill me-1"></i> {{ userData.userAddress }}
+      </div>
+      <div class="small text-secondary" *ngIf="userData.userAddress2">
+        <i class="bi bi-info-circle me-1"></i> {{ userData.userAddress2 }}
+      </div>
+    </div>
+
+    <div class="mb-4">
+      <label class="form-label fw-bold text-muted small text-uppercase">Sipariş Durumunu Güncelle</label>
+      <select class="form-select form-select-lg border-2" [(ngModel)]="selectedStatus">
+        <option value="" disabled selected>Durum seçiniz...</option>
+        <option *ngFor="let s of status" [value]="s.value">
+          {{ s.viewValue }}
+        </option>
+      </select>
+    </div>
+
+    <button class="btn btn-orange w-100 py-3 fw-bold shadow-sm"
+            [disabled]="!selectedStatus"
+            (click)="save()">
+      <i class="bi bi-check-circle-fill me-2"></i>Değişiklikleri Kaydet
+    </button>
+  </div>
+
+  <div class="card-footer bg-white py-3 text-center border-0">
+    <small class="text-muted italic">Sipariş ID: #{{ orderId }}</small>
+  </div>
+</div>

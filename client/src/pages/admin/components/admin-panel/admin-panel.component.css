@@ -1,73 +1,72 @@
-.admin-panel-main {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
+/* Brand colors to match the rest of the app */
+.btn-orange {
+  background-color: #ff7f00 !important;
+  border-color: #ff7f00 !important;
+  color: white !important;
 }
 
-.admin-panel-header {
-  width: 100%;
-  height: 56px;
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid rgb(235, 235, 235);
-  box-sizing: border-box;
-  padding: 8px;
+.transition-all {
+  transition: all 0.2s ease-in-out;
 }
-.admin-panel-header__left {
-  width: 200px;
-  height: 100%;
-}
-.admin-panel-header__right {
-  width: 200px;
-  height: 100%;
-  display: flex;
-  flex-direction: row;
-  gap: 10px;
-  align-items: center;
-  justify-content: flex-end;
-}
-.admin-panel-header__button-field__button {
-  box-sizing: border-box;
-  padding: 5px;
-  width: 120px;
-  height: 32px;
-  background-color: rgb(73, 73, 73);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  cursor: pointer;
-  color: white;
-  font-weight: 500;
-  border-radius: 8px;
-  margin-right: 5px;
-}
-.admin-panel-body {
+
+/* Modal Overlay System */
+.admin-overlay-container {
+  position: fixed;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
-  margin-bottom: 54px;
+  z-index: 1050; /* Higher than sticky-top */
 }
 
+.admin-modal-box {
+  position: relative;
+  z-index: 1060;
+  background: white;
+  border-radius: 12px;
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* Specific sizing for your internal components */
 app-product-adder,
 app-product-updater {
-  position: absolute;
-  width: 300px;
-  height: 500px;
-  background-color: rgb(228, 228, 228);
-  border: 1px solid rgb(197, 197, 197);
-  border-radius: 7px;
-  z-index: 100;
+  display: block;
+  width: 350px;
+  min-height: 500px;
 }
 
 app-product-edit {
+  display: block;
+  width: 1100px;
+  max-width: 95vw;
+}
+
+.admin-backdrop {
   position: absolute;
-  background-color: #fafafa;
-  width: 1200px;
-  height: 900px;
-  z-index: 100;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

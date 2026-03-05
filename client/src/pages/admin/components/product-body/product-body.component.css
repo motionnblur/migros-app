@@ -1,95 +1,75 @@
-#product-body {
-  width: 600px;
-  height: 700px;
-  background-color: rgb(241, 241, 241);
-  border: 1px solid gainsboro;
-  display: flex;
-  flex-direction: column;
-}
-#product-body-menu {
-  width: 100%;
-  height: 42px;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-}
-#product-body-menu__category-name {}
-
-#product-body-item {
-  width: 100%;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  flex-direction: row;
-  background-color: rgb(231, 231, 231);
-  box-sizing: border-box;
+.text-orange {
+  color: #ff7f00 !important;
 }
 
-#product-body-item-data {
-  width: 95%;
-  height: 100%;
-  padding-left: 10px;
-  display: flex;
-  align-items: center;
-}
-#product-body-item-data:hover {
-  background-color: rgb(216, 216, 216);
-  cursor: pointer;
-}
-#product-body-item-delete {
-  width: 40px;
-  height: 40px;
-  cursor: pointer;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-#product-body-item-delete:hover {
-  background-color: rgb(216, 216, 216);
+.btn-orange {
+  background-color: #ff7f00 !important;
+  border-color: #ff7f00 !important;
+  color: white !important;
 }
 
-#product-body-item-delete__img {
-  width: 25px;
-  height: 25px;
+.btn-orange:hover {
+  background-color: #e67200 !important;
+  transform: translateY(-1px);
 }
 
-#product-body-content {
-  width: 100%;
-  height: 95%;
-}
-#product-body-pageswitcher {
-  width: 100%;
-  height: 5%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 10px;
-}
-.product-body-pageswitcher-arrow {
-  height: 34px;
-  width: 34px;
+.cursor-pointer {
   cursor: pointer;
 }
 
-.rotate-left {
-  transform: rotate(90deg);
+/* Table Hover Effect */
+.table-hover tbody tr:hover {
+  background-color: #fff9f2 !important;
 }
-.rotate-right {
-  transform: rotate(-90deg);
+
+/* Using the newer syntax or just targeting the class directly */
+:host ::ng-deep .mat-mdc-paginator {
+  background: transparent !important;
+  font-family: inherit !important;
 }
-#product-body-menu__add-button{
-  box-sizing: border-box;
-  padding: 5px;
-  width: 120px;
-  height: 32px;
-  background-color: rgb(73, 73, 73);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  cursor: pointer;
-  color: white;
-  font-weight: 500;
-  border-radius: 8px;
-  margin-right: 4px;
+
+/* Ensure the container of the paginator also has no background */
+:host ::ng-deep .mat-mdc-paginator-container {
+  background: transparent !important;
+}
+
+.card-body {
+  min-height: 400px;
+}
+
+/* Limit height and enable scrolling */
+.dropdown-menu {
+  max-height: 300px; /* Adjust based on how many categories you want to see at once */
+  overflow-y: auto;
+  min-width: 200px;
+}
+
+/* Custom Scrollbar for the Dropdown */
+.dropdown-menu::-webkit-scrollbar {
+  width: 6px;
+}
+
+.dropdown-menu::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.dropdown-menu::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 10px;
+}
+
+.dropdown-menu::-webkit-scrollbar-thumb:hover {
+  background: #ff7f00; /* Matches your brand color */
+}
+
+/* Ensure the dropdown list items don't wrap strangely */
+.dropdown-item {
+  white-space: nowrap;
+  padding: 8px 16px;
+}
+
+/* Optional: Make the active/hover state match your theme */
+.dropdown-item:hover {
+  background-color: #fff4e6;
+  color: #d96c00;
 }

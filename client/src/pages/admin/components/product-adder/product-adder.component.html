@@ -1,87 +1,83 @@
-<div class="product-adder-main">
-  <div
-    class="product-adder-body__img"
-    #addImageRef
-    id="add-image"
-    (click)="openImageUploader()"
-    *ngIf="!imageUrl"
-  >
-    Resim ekle
+<div class="product-adder-container h-100 d-flex flex-column">
+  <div class="px-4 py-3 border-bottom bg-white rounded-top">
+    <h5 class="mb-0 fw-bold text-dark">
+      <i class="bi bi-plus-circle-fill me-2 text-orange"></i>Yeni Ürün Ekle
+    </h5>
   </div>
-  <img
-    #imageRef
-    id="image"
-    [src]="imageUrl"
-    *ngIf="imageUrl"
-    (click)="openImageUploader()"
-  />
-  <input
-    class="product-adder-body__input"
-    placeholder="Ürün adı"
-    type="text"
-    [(ngModel)]="productName"
-  />
-  <input
-    class="product-adder-body__input"
-    placeholder="Alt kategori ismi"
-    type="text"
-    [(ngModel)]="subCategoryName"
-  />
-  <input
-    class="product-adder-body__input"
-    placeholder="Ürün fiyatı (TL)"
-    type="number"
-    [(ngModel)]="price"
-    step="0.01"
-    min="0"
-  />
-  <input
-    class="product-adder-body__input"
-    placeholder="Ürün miktarı"
-    type="number"
-    [(ngModel)]="count"
-    min="0"
-  />
-  <input
-    class="product-adder-body__input"
-    placeholder="Ürün indirimi (%)"
-    type="number"
-    [(ngModel)]="discount"
-    step="0.01"
-    min="0"
-    max="100"
-  />
-  <input
-    class="product-adder-body__input"
-    placeholder="Ürün açıklaması"
-    type="text"
-    [(ngModel)]="description"
-  />
-  <select [formControl]="categoryControl">
-    <option *ngFor="let category of categories" [value]="category.value">
-      {{ category.name }}
-    </option>
-  </select>
-  <div class="product-adder-body__button-container">
-    <button class="product-adder-body__button" (click)="uploadProductData()">
-      {{ buttonString }}
-    </button>
-    <button
-      class="product-adder-body__button"
-      *ngIf="isUpdateMode"
-      (click)="openEditor!()"
-    >
-      Düzenle
-    </button>
+
+  <div class="product-adder-main p-4 overflow-auto">
+    <div class="mb-4 d-flex justify-content-center">
+      <div class="image-upload-wrapper" (click)="openImageUploader()">
+        <div *ngIf="!imageUrl"
+             class="upload-placeholder d-flex flex-column align-items-center justify-content-center border border-dashed rounded">
+          <i class="bi bi-camera fs-2 text-muted"></i>
+          <span class="small fw-medium text-muted">Resim Ekle</span>
+        </div>
+        <img *ngIf="imageUrl" [src]="imageUrl" class="img-thumbnail shadow-sm rounded"
+             style="width: 120px; height: 120px; object-fit: contain;"/>
+        <div class="upload-hover-overlay rounded">
+          <i class="bi bi-pencil-square text-white fs-4"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-12">
+        <label class="form-label small fw-bold text-muted text-uppercase">Ürün Adı</label>
+        <input type="text" class="form-control" placeholder="Örn: Süt 1L" [(ngModel)]="productName"/>
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label small fw-bold text-muted text-uppercase">Kategori</label>
+        <select class="form-select" [formControl]="categoryControl">
+          <option *ngFor="let category of categories" [value]="category.value">
+            {{ category.name }}
+          </option>
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-bold text-muted text-uppercase">Alt Kategori</label>
+        <input type="text" class="form-control" placeholder="Örn: Günlük Süt" [(ngModel)]="subCategoryName"/>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label small fw-bold text-muted text-uppercase">Fiyat (TL)</label>
+        <div class="input-group">
+          <input type="number" class="form-control" [(ngModel)]="price" step="0.01" min="0"/>
+          <span class="input-group-text text-muted">₺</span>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small fw-bold text-muted text-uppercase">Miktar</label>
+        <input type="number" class="form-control" [(ngModel)]="count" min="0"/>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small fw-bold text-muted text-uppercase">İndirim</label>
+        <div class="input-group">
+          <input type="number" class="form-control" [(ngModel)]="discount" min="0" max="100"/>
+          <span class="input-group-text text-muted">%</span>
+        </div>
+      </div>
+
+      <div class="col-12">
+        <label class="form-label small fw-bold text-muted text-uppercase">Açıklama</label>
+        <textarea class="form-control" rows="3" placeholder="Ürün detaylarını girin..."
+                  [(ngModel)]="description"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="p-4 border-top bg-light rounded-bottom mt-auto">
+    <div class="d-flex gap-2">
+      <button class="btn btn-orange flex-grow-1 py-2 fw-bold shadow-sm" (click)="uploadProductData()">
+        <i class="bi bi-cloud-arrow-up-fill me-2"></i>{{ buttonString }}
+      </button>
+      <button class="btn btn-outline-secondary py-2 px-4 fw-bold" *ngIf="isUpdateMode" (click)="openEditor!()">
+        Düzenle
+      </button>
+    </div>
   </div>
 </div>
 
-<input
-  type="file"
-  name="file"
-  accept="image/png"
-  class="file-upload"
-  #imageUploaderRef
-  id="imageUploader"
-  (change)="onImageSelected($event)"
-/>
+<input type="file" name="file" accept="image/png, image/jpeg" class="d-none" #imageUploaderRef
+       (change)="onImageSelected($event)"/>

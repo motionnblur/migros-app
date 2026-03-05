@@ -1,18 +1,8 @@
-import {
-  Component,
-  EventEmitter,
-  Input,
-  Output,
-  SimpleChanges,
-  ViewChild,
-} from '@angular/core';
-import { RestService } from '../../../../services/rest/rest.service';
-import { IUserProfileTable } from '../../../../interfaces/IUserProfileTable';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { FormsModule } from '@angular/forms';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
-import { MatButtonModule } from '@angular/material/button';
+import {Component, EventEmitter, Input, Output, OnChanges, SimpleChanges} from '@angular/core';
+import {CommonModule} from '@angular/common'; // Use CommonModule for *ngFor and *ngIf
+import {FormsModule} from '@angular/forms';
+import {RestService} from '../../../../services/rest/rest.service';
+import {IUserProfileTable} from '../../../../interfaces/IUserProfileTable';
 
 interface Status {
   value: string;
@@ -21,49 +11,55 @@ interface Status {
 
 @Component({
   selector: 'app-action-panel',
-  imports: [
-    MatFormFieldModule,
-    MatSelectModule,
-    MatInputModule,
-    FormsModule,
-    MatButtonModule,
-  ],
+  standalone: true,
+  imports: [CommonModule, FormsModule], // Cleaned up Material imports
   templateUrl: './action-panel.component.html',
   styleUrl: './action-panel.component.css',
 })
-export class ActionPanelComponent {
-  @Input('orderId') orderId!: number;
+export class ActionPanelComponent implements OnChanges {
+  @Input() orderId!: number;
   @Output() closeActionPanelEvent = new EventEmitter<void>();
-  public userData!: IUserProfileTable;
-  public status: Status[] = [
-    { value: 'Ordered', viewValue: 'Ordered' },
-    { value: 'Shipped', viewValue: 'Shipped' },
-    { value: 'Out for delivery', viewValue: 'Out for delivery' },
-    { value: 'Delivered', viewValue: 'Delivered' },
-  ];
-  public selectedStatus!: string;
 
-  constructor(private restService: RestService) {}
+  public userData!: IUserProfileTable;
+  public selectedStatus: string = '';
+
+  public status: Status[] = [
+    {value: 'Ordered', viewValue: 'Sipariş Alındı'},
+    {value: 'Shipped', viewValue: 'Kargoya Verildi'},
+    {value: 'Out for delivery', viewValue: 'Dağıtımda'},
+    {value: 'Delivered', viewValue: 'Teslim Edildi'},
+  ];
+
+  constructor(private restService: RestService) {
+  }
+
   ngOnChanges(changes: SimpleChanges) {
-    if (changes['orderId']) {
-      this.restService
-        .getUserProfileData(this.orderId)
-        .subscribe((data: IUserProfileTable) => {
+    if (changes['orderId'] && this.orderId) {
+      this.restService.getUserProfileData(this.orderId).subscribe({
+        next: (data: IUserProfileTable) => {
           this.userData = data;
-        });
+        },
+        error: (err) => console.error('Error fetching user profile', err)
+      });
     }
   }
 
   public closeActionPanel() {
     this.closeActionPanelEvent.emit();
   }
+
   public save() {
-    this.restService
-      .updateOrderStatus(this.orderId, this.selectedStatus)
-      .subscribe((data: boolean) => {
-        if (data) {
-          alert('Status updated');
+    if (!this.selectedStatus) return;
+
+    this.restService.updateOrderStatus(this.orderId, this.selectedStatus).subscribe({
+      next: (success: boolean) => {
+        if (success) {
+          // You could use a toast here later!
+          alert('Sipariş durumu güncellendi: ' + this.selectedStatus);
+          this.closeActionPanel();
         }
-      });
+      },
+      error: (err) => console.error('Update failed', err)
+    });
   }
 }

@@ -1,43 +1,92 @@
-<div id="product-body">
-  <div id="product-body-menu">
-    <button mat-button [matMenuTriggerFor]="menu">Kategoriler</button>
-    <div id="product-body-menu__category-name">{{ selectedCategoryName }}</div>
-    <div id="product-body-menu__add-button" (click)="openProductAdder()">
-      Ürün ekle
-    </div>
-    <mat-menu #menu="matMenu">
-      <button
-        mat-menu-item
-        *ngFor="let item of categories"
-        (click)="onCategorySelected(item.value)"
-      >
-        {{ item.name }}
-      </button>
-    </mat-menu>
-  </div>
-  <div id="product-body-content">
-    <div
-      *ngFor="let item of productsData"
-      id="product-body-item"
-      class="line-bottom"
-    >
-      <div id="product-body-item-data" (click)="onBodyClick(item.productId)">
-        {{ item.productName }}
+<div class="card shadow-sm border-0 h-100 overflow-hidden">
+
+  <div class="card-header bg-white py-3 border-bottom">
+    <div class="row align-items-center g-3">
+      <div class="col-auto">
+        <div class="dropdown">
+          <button
+            class="btn btn-outline-secondary dropdown-toggle fw-bold"
+            type="button"
+            (click)="isDropdownOpen = !isDropdownOpen">
+            <i class="bi bi-filter me-1"></i> Kategoriler
+          </button>
+
+          <ul class="dropdown-menu shadow" [class.show]="isDropdownOpen">
+            <li *ngFor="let item of categories">
+              <a class="dropdown-item cursor-pointer"
+                 (click)="onCategorySelected(item.value); isDropdownOpen = false">
+                {{ item.name }}
+              </a>
+            </li>
+          </ul>
+        </div>
       </div>
-      <div
-        id="product-body-item-delete"
-        (click)="deleteProduct(item.productId)"
-      >
-        <img id="product-body-item-delete__img" src="delete.png" />
+
+      <div class="col">
+        <span class="badge bg-light text-dark border p-2 px-3 fs-6 fw-medium">
+          <i class="bi bi-tag-fill text-orange me-2"></i>{{ selectedCategoryName }}
+        </span>
+      </div>
+
+      <div class="col-auto">
+        <button class="btn btn-orange text-white fw-bold px-4 shadow-sm" (click)="openProductAdder()">
+          <i class="bi bi-plus-lg me-2"></i>Ürün Ekle
+        </button>
       </div>
     </div>
   </div>
-  <mat-paginator
-    [length]="productPageLength"
-    [pageSize]="5"
-    [pageSizeOptions]="[5, 10, 15]"
-    aria-label="Select page"
-    (page)="pageEvent($event)"
-  >
-  </mat-paginator>
+
+  <div class="card-body p-0 overflow-auto">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+      <tr>
+        <th class="ps-4" style="width: 80px;">ID</th>
+        <th>Ürün İsmi</th>
+        <th class="text-end pe-4">İşlemler</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr *ngFor="let item of productsData" class="cursor-pointer">
+        <td class="ps-4 text-muted small" (click)="onBodyClick(item.productId)">
+          #{{ item.productId }}
+        </td>
+        <td class="fw-medium text-dark" (click)="onBodyClick(item.productId)">
+          {{ item.productName }}
+        </td>
+        <td class="text-end pe-4">
+          <div class="btn-group btn-group-sm shadow-sm">
+            <button class="btn btn-outline-primary border-0" (click)="onBodyClick(item.productId)" title="Düzenle">
+              <i class="bi bi-pencil-square"></i>
+            </button>
+            <button class="btn btn-outline-danger border-0" (click)="deleteProduct(item.productId)" title="Sil">
+              <i class="bi bi-trash3"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+
+      <tr *ngIf="productsData.length === 0">
+        <td colspan="3" class="text-center py-5 text-muted">
+          <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+          Bu kategoride henüz ürün bulunmuyor.
+        </td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card-footer bg-white border-top py-3">
+    <div class="d-flex justify-content-between align-items-center">
+      <small class="text-muted">Toplam {{ productPageLength }} ürün bulundu</small>
+      <mat-paginator
+        [length]="productPageLength"
+        [pageSize]="currentPageSize"
+        [pageSizeOptions]="[5, 10, 15, 25]"
+        aria-label="Select page"
+        (page)="pageEvent($event)"
+        class="border-0 bg-transparent"
+      >
+      </mat-paginator>
+    </div>
+  </div>
 </div>

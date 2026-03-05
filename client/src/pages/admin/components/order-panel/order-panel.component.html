@@ -1,50 +1,65 @@
-<div id="order-panel-main">
-  <div id="order-panel-body">
-    <table mat-table [dataSource]="dataSource" class="mat-elevation-z8">
-      <!--- Note that these columns can be defined in any order.
-          The actual rendered columns are set as a property on the row definition" -->
+<div class="card shadow-sm border-0 h-100 overflow-hidden">
+  <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+    <h5 class="mb-0 fw-bold text-dark">
+      <i class="bi bi-receipt me-2 text-primary"></i>Sipariş Yönetimi
+    </h5>
+    <span class="badge bg-light text-dark border px-3">Toplam: {{ tableData.length }} Sipariş</span>
+  </div>
 
-      <!-- Position Column -->
-      <ng-container matColumnDef="orderId">
-        <th mat-header-cell *matHeaderCellDef>Ürün id</th>
-        <td mat-cell *matCellDef="let element">{{ element.orderId }}</td>
-      </ng-container>
-
-      <ng-container matColumnDef="totalPrice">
-        <th mat-header-cell *matHeaderCellDef>Toplam fiyat</th>
-        <td mat-cell *matCellDef="let element">{{ element.totalPrice }}</td>
-      </ng-container>
-
-      <ng-container matColumnDef="status">
-        <th mat-header-cell *matHeaderCellDef>Sipariş durumu</th>
-        <td mat-cell *matCellDef="let element">{{ element.status }}</td>
-      </ng-container>
-
-      <ng-container matColumnDef="actions">
-        <th mat-header-cell *matHeaderCellDef>Eylemler</th>
-        <td mat-cell *matCellDef="let element">
-          <div
-            class="order-actions"
-            (click)="openActionPanel(element.orderId)"
-          ></div>
+  <div class="card-body p-0 overflow-auto" style="min-height: 400px;">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+      <tr>
+        <th class="ps-4">Sipariş ID</th>
+        <th>Toplam Fiyat</th>
+        <th>Durum</th>
+        <th class="text-end pe-4">İşlem</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr *ngFor="let element of dataSource">
+        <td class="ps-4 fw-medium text-muted">#{{ element.orderId }}</td>
+        <td class="fw-bold text-dark">{{ element.totalPrice | number:'1.2-2' }} TL</td>
+        <td>
+            <span class="badge rounded-pill" [ngClass]="getStatusClass(element.status)">
+              {{ element.status }}
+            </span>
         </td>
-      </ng-container>
+        <td class="text-end pe-4">
+          <button class="btn btn-sm btn-action rounded-circle shadow-sm"
+                  (click)="openActionPanel(element.orderId)"
+                  title="İşlemleri Görüntüle">
+            <i class="bi bi-three-dots-vertical"></i>
+          </button>
+        </td>
+      </tr>
 
-      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-      <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+      <tr *ngIf="dataSource.length === 0">
+        <td colspan="4" class="text-center py-5 text-muted">
+          <i class="bi bi-box-seam fs-1 d-block mb-2"></i>
+          Henüz sipariş bulunmuyor.
+        </td>
+      </tr>
+      </tbody>
     </table>
   </div>
-  <div id="order-panel-bottom">
-    <mat-paginator
-      [length]="1"
-      [pageSize]="5"
-      [pageSizeOptions]="[5, 10, 15]"
-    />
+
+  <div class="card-footer bg-white border-top py-2">
+    <div class="d-flex justify-content-end align-items-center">
+      <mat-paginator
+        [length]="tableData.length"
+        [pageSize]="5"
+        [pageSizeOptions]="[5, 10, 15]"
+        class="bg-transparent border-0"
+      >
+      </mat-paginator>
+    </div>
   </div>
 </div>
-<div *ngIf="isOrderComponentOpen" id="order-component">Open</div>
-<app-action-panel
-  *ngIf="isActionPanelOpen"
-  [orderId]="orderId"
-  (closeActionPanelEvent)="closeActionPanel()"
-/>
+
+<div class="action-panel-overlay" *ngIf="isActionPanelOpen">
+  <app-action-panel
+    [orderId]="orderId"
+    (closeActionPanelEvent)="closeActionPanel()"
+  />
+</div>
