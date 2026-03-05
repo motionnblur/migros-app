@@ -20,13 +20,14 @@ This application provides a basic platform for users to browse products, add the
 
 ## Features
 
+* **Registering:** User registering using mail protocol (spring-boot-starter-mail)
 * **Admin Dashboard:** For managing orders and products.
 * **Product Listing:** Display a list of available products.
 * **Product Details:** View detailed information about a specific product.
 * **Add to Cart:** Allow users to add products to their shopping cart.
 * **View Cart:** Display the items in the shopping cart.
 * **Payment Processing:** By using Stripe's payment test api.
-* **Basic Security:** User Authentication and Authorization.
+* **Basic Security:** User Authentication and Authorization using JWT tokens
 
 ## Technologies Used
 
