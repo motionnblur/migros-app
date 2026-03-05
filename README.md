@@ -97,30 +97,34 @@ docker compose --env-file configs/postgres.env --env-file configs/spring.env up
 * Current code coverage
 <img width="791" height="367" alt="Screenshot 2026-03-05 124449" src="https://github.com/user-attachments/assets/34abb1eb-5424-4434-89bb-2131b45742ae" />
 
-<img width="1920" height="981" alt="migros-main-page" src="https://github.com/user-attachments/assets/6a01280c-282a-429c-b83e-897dc00cbdbc" />
+<img width="1890" height="944" alt="Screenshot 2026-03-05 195555" src="https://github.com/user-attachments/assets/ee61d7ca-6e80-4e10-99b4-2a80ccf6921e" />
 
-<img width="1914" height="934" alt="migros" src="https://github.com/user-attachments/assets/b2f7fde7-d8bd-4dc0-bb17-befd252f3a40" />
+<img width="1886" height="940" alt="Screenshot 2026-03-05 195657" src="https://github.com/user-attachments/assets/41366479-6ba0-4666-bb06-6ba8e8965cd9" />
 
-<img width="1914" height="942" alt="migros" src="https://github.com/user-attachments/assets/7b96dfb6-c56b-42a1-92f1-68f38b5df847" />
+<img width="1883" height="941" alt="Screenshot 2026-03-05 201407" src="https://github.com/user-attachments/assets/fba0f37b-1c3d-4799-b878-1e871708d472" />
 
-<img width="965" height="470" alt="migros" src="https://github.com/user-attachments/assets/4154b6d8-f1c1-4b62-9ee8-1d6b570f6084" />
+<img width="1889" height="942" alt="Screenshot 2026-03-05 201004" src="https://github.com/user-attachments/assets/42386dd7-8569-4dca-8825-8325d45992a3" />
 
-<img width="1916" height="979" alt="migros" src="https://github.com/user-attachments/assets/bf88288c-b0da-42ad-b7e5-366857ccb25f" />
+<img width="1888" height="942" alt="Screenshot 2026-03-05 201023" src="https://github.com/user-attachments/assets/7bc4cfc5-0a45-4af1-b68e-bcb4a6309bc2" />
 
-<img width="1916" height="976" alt="migros" src="https://github.com/user-attachments/assets/27eabaf4-b5ee-4494-8b1f-833caac9697b" />
+<img width="1903" height="940" alt="Screenshot 2026-03-05 195825" src="https://github.com/user-attachments/assets/2400b7ae-d72e-476a-8bb8-2126535d567d" />
 
-<img width="1920" height="975" alt="migros" src="https://github.com/user-attachments/assets/0dbb124b-4eb6-4011-8c82-6b8de99b0928" />
+<img width="1902" height="938" alt="Screenshot 2026-03-05 195842" src="https://github.com/user-attachments/assets/b2dd9ac1-be5a-438c-8b10-8c215f6e0e53" />
 
-<img width="1918" height="975" alt="migros" src="https://github.com/user-attachments/assets/c890668d-31f9-425e-8e7a-eea45d8ced80" />
+<img width="1897" height="936" alt="Screenshot 2026-03-05 200848" src="https://github.com/user-attachments/assets/435ed628-2f1e-4bd3-baa2-3b44afda3887" />
 
-<img width="1912" height="974" alt="migros" src="https://github.com/user-attachments/assets/3ba7b422-f5c7-45f4-8fe4-7ab368d91db4" />
+<img width="1898" height="938" alt="Screenshot 2026-03-05 200930" src="https://github.com/user-attachments/assets/559cca7f-2907-404f-b0c2-2f8d72ec7a04" />
 
-<img width="1912" height="969" alt="migros" src="https://github.com/user-attachments/assets/51e1330c-daa8-4898-b0a8-49b63659e1b0" />
+<img width="1897" height="939" alt="Screenshot 2026-03-05 195927" src="https://github.com/user-attachments/assets/b0471ed9-a66a-4fea-ae46-91119b3051e2" />
 
-<img width="1920" height="971" alt="migros" src="https://github.com/user-attachments/assets/b6aaa8d5-840d-4703-a126-506a2e66015b" />
+<img width="1897" height="934" alt="Screenshot 2026-03-05 200001" src="https://github.com/user-attachments/assets/4ee131c8-69f1-4a1d-ac32-d0a47c6d3cbd" />
 
-<img width="1918" height="975" alt="migros" src="https://github.com/user-attachments/assets/5c33f8f2-cfbf-43a1-ba8d-c5dad313e65a" />
+<img width="1885" height="941" alt="Screenshot 2026-03-05 202031" src="https://github.com/user-attachments/assets/184d33a4-3432-4638-8ffc-4e4b6fc72b48" />
 
-<img width="1912" height="977" alt="migros" src="https://github.com/user-attachments/assets/42025bb2-6203-4b0a-b789-b5cbd218f1bb" />
+<img width="1884" height="943" alt="Screenshot 2026-03-05 202157" src="https://github.com/user-attachments/assets/afdcfb3a-cd98-4733-99d6-8cf72e84f49b" />
 
-<img width="1920" height="977" alt="migros" src="https://github.com/user-attachments/assets/85c20c50-194d-47b6-a56b-a9330b80e559" />
+<img width="1896" height="939" alt="Screenshot 2026-03-05 202641" src="https://github.com/user-attachments/assets/af39c798-1bfe-4ead-8e36-f3bbef2cb069" />
+
+<img width="1896" height="937" alt="Screenshot 2026-03-05 202658" src="https://github.com/user-attachments/assets/bc67a44b-5504-492a-acd4-921ef9c8310d" />
+
+<img width="1884" height="943" alt="Screenshot 2026-03-05 202718" src="https://github.com/user-attachments/assets/a752d917-0444-4a87-80d9-f43b16ca6616" />
