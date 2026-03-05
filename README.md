@@ -127,4 +127,6 @@ docker compose --env-file configs/postgres.env --env-file configs/spring.env up
 
 <img width="1896" height="937" alt="Screenshot 2026-03-05 202658" src="https://github.com/user-attachments/assets/bc67a44b-5504-492a-acd4-921ef9c8310d" />
 
+<img width="1881" height="943" alt="Screenshot 2026-03-05 203236" src="https://github.com/user-attachments/assets/6d87cb4f-d431-4d72-a0b0-3b939300f442" />
+
 <img width="1884" height="943" alt="Screenshot 2026-03-05 202718" src="https://github.com/user-attachments/assets/a752d917-0444-4a87-80d9-f43b16ca6616" />
