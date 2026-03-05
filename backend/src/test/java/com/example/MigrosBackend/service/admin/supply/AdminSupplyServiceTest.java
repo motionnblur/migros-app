@@ -1,15 +1,13 @@
 package com.example.MigrosBackend.service.admin.supply;
 
-import com.example.MigrosBackend.dto.admin.panel.AdminAddItemDto;
-import com.example.MigrosBackend.dto.admin.panel.DescriptionsDto;
-import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionListDto;
-import com.example.MigrosBackend.dto.admin.panel.ProductDto2;
+import com.example.MigrosBackend.dto.admin.panel.*;
 import com.example.MigrosBackend.dto.user.product.ProductDto;
 import com.example.MigrosBackend.entity.admin.AdminEntity;
 import com.example.MigrosBackend.entity.category.CategoryEntity;
 import com.example.MigrosBackend.entity.product.ProductDescriptionEntity;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.product.ProductImageEntity;
+import com.example.MigrosBackend.exception.admin.AdminHasNoProductException;
 import com.example.MigrosBackend.exception.admin.FileUploadFailedException;
 import com.example.MigrosBackend.exception.admin.ProductNotFoundException;
 import com.example.MigrosBackend.exception.shared.GeneralException;
@@ -25,12 +23,17 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -334,5 +337,54 @@ class AdminSupplyServiceTest {
         // Should be called twice: once for the update, once for the new creation
         verify(productDescriptionEntityRepository, times(2)).save(any(ProductDescriptionEntity.class));
         assertEquals("Updated Name", existingEntity.getDescriptionTabName());
+    }
+
+    @Test
+    void getAllAdminProducts_Success() {
+        // Arrange
+        Long adminId = 1L;
+        int page = 0;
+        int range = 5;
+        Pageable pageable = PageRequest.of(page, range);
+
+        ProductEntity product = new ProductEntity();
+        product.setId(101L);
+        product.setProductName("Organic Apples");
+
+        Page<ProductEntity> productPage = new PageImpl<>(List.of(product));
+
+        when(productEntityRepository.findByAdminEntityId(adminId, pageable))
+                .thenReturn(productPage);
+
+        // Act
+        List<AdminProductPreviewDto> result = adminSupplyService.getAllAdminProducts(adminId, page, range);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals(101L, result.get(0).getProductId());
+        assertEquals("Organic Apples", result.get(0).getProductName());
+
+        verify(productEntityRepository, times(1)).findByAdminEntityId(adminId, pageable);
+    }
+
+    @Test
+    void getAllAdminProducts_ThrowsException_WhenPageIsEmpty() {
+        // Arrange
+        Long adminId = 99L;
+        int page = 0;
+        int range = 5;
+        Pageable pageable = PageRequest.of(page, range);
+
+        when(productEntityRepository.findByAdminEntityId(adminId, pageable))
+                .thenReturn(Page.empty());
+
+        // Act & Assert
+        AdminHasNoProductException exception = assertThrows(AdminHasNoProductException.class, () -> {
+            adminSupplyService.getAllAdminProducts(adminId, 0, 5);
+        });
+
+        assertEquals("Admin with id 99 has no products.", exception.getMessage());
+        verify(productEntityRepository, times(1)).findByAdminEntityId(adminId, pageable);
     }
 }
