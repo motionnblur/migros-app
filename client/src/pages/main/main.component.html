@@ -1,79 +1,98 @@
-<div class="main-page">
-  <div class="header line-bottom">
-    <div class="header__top">
-      <!-- <img src="migros_header.png" /> -->
-      <div class="header-left-area"></div>
-      <div class="header-button-area">
-        <div class="button_order" (click)="openOrderComponent()">
-          Sipariş Takibi
-        </div>
-        <!-- <div class="button_login" (click)="openLoginComponent()">
-          {{ loginText }}
-        </div> -->
-        <div *ngIf="!isUserLoggedIn()">
-          <button mat-button (click)="openLoginComponent()">
-            {{ loginText }}
-          </button>
-        </div>
-        <div *ngIf="isUserLoggedIn()">
-          <button
-            mat-button
-            [matMenuTriggerFor]="menu"
-            (click)="openLoginComponent()"
-          >
-            {{ loginText }}
-          </button>
-          <mat-menu #menu="matMenu">
-            <button mat-menu-item (click)="openCartComponent()">Sepetim</button>
-            <button mat-menu-item (click)="openProfileComponent()">
-              Profilim
+<div class="main-page d-flex flex-column min-vh-100 bg-light">
+
+  <header class="bg-white shadow-sm sticky-top">
+    <nav class="navbar navbar-expand-lg navbar-light py-3">
+      <div class="container">
+        <a class="navbar-brand py-0" href="#" (click)="setItemPageOpened(false)">
+          <img src="migros_header.png" height="40" alt="Logo" class="d-inline-block align-top">
+        </a>
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navContent">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navContent">
+          <div class="ms-auto d-flex align-items-center gap-3">
+
+            <button class="btn btn-outline-secondary rounded-pill px-4 fw-medium btn-sm" (click)="openOrderComponent()">
+              <i class="bi bi-truck me-2"></i>Sipariş Takibi
             </button>
-            <button mat-menu-item (click)="logoutUser()">Çıkış Yap</button>
-          </mat-menu>
+
+            <div class="dropdown">
+              <button *ngIf="!isUserLoggedIn()"
+                      class="btn btn-primary rounded-pill px-4 fw-bold btn-sm shadow-sm"
+                      (click)="openLoginComponent()">
+                {{ loginText }}
+              </button>
+
+              <ng-container *ngIf="isUserLoggedIn()">
+                <button class="btn btn-light border rounded-pill px-4 fw-bold btn-sm dropdown-toggle"
+                        type="button" id="userMenu" data-bs-toggle="dropdown" aria-expanded="false">
+                  <i class="bi bi-person-circle me-2"></i>{{ loginText }}
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2" aria-labelledby="userMenu">
+                  <li><a class="dropdown-item py-2" (click)="openCartComponent()"><i class="bi bi-cart3 me-2"></i>Sepetim</a>
+                  </li>
+                  <li><a class="dropdown-item py-2" (click)="openProfileComponent()"><i class="bi bi-person me-2"></i>Profilim</a>
+                  </li>
+                  <li>
+                    <hr class="dropdown-divider">
+                  </li>
+                  <li><a class="dropdown-item py-2 text-danger" (click)="logoutUser()"><i
+                    class="bi bi-box-arrow-right me-2"></i>Çıkış Yap</a></li>
+                </ul>
+              </ng-container>
+            </div>
+
+          </div>
         </div>
       </div>
-    </div>
-    <div class="header__line"></div>
-    <div class="header__bottom">
-      <img src="migros_header2.png" />
-    </div>
-    <div class="header__bottom-2">
-      <img src="migros_header_bottom.png" />
-    </div>
-  </div>
-  <div class="content">
-    <app-discover *ngIf="!hasItemPageOpened()" />
-    <app-product-page *ngIf="hasItemPageOpened()" />
-  </div>
-  <div class="footer">
-    <div class="footer_1 line-top">
-      <div class="flex center-width width-66 height-100">
-        <img id="migros-footer_main" src="footer/migros-footer-main.png" />
+    </nav>
+
+    <div class="bg-orange" style="height: 4px;"></div>
+
+    <div class="bg-light-gray border-bottom overflow-hidden">
+      <div class="container-fluid p-0">
+        <img src="migros_header2.png" class="img-fluid w-100 d-block" style="max-height: 80px; object-fit: cover;">
+      </div>
+      <div class="bg-white py-2 text-center border-bottom shadow-sm">
+        <img src="migros_header_bottom.png" class="img-fluid" style="max-height: 40px;">
       </div>
     </div>
-    <div class="footer_2 line-top-bold">
-      <div id="footer_2" class="flex center-width width-66">
-        <img id="migros-footer_1" src="footer/migros-footer.png" alt="" />
-        <img id="migros-footer_2" src="footer/migros-footer2.png" alt="" />
+  </header>
+
+  <main class="flex-grow-1">
+    <div class="container py-4">
+      <app-discover *ngIf="!hasItemPageOpened()"/>
+      <app-product-page *ngIf="hasItemPageOpened()"/>
+    </div>
+  </main>
+
+  <footer class="bg-white border-top mt-auto py-5">
+    <div class="container">
+      <div class="text-center mb-5">
+        <img src="footer/migros-footer-main.png" class="img-fluid rounded shadow-sm" alt="Footer Content">
+      </div>
+
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-center border-top pt-4 gap-3">
+        <img src="footer/migros-footer.png" class="img-fluid" style="max-height: 40px;">
+        <img src="footer/migros-footer2.png" class="img-fluid" style="max-height: 35px;">
       </div>
     </div>
-  </div>
-  <div *ngIf="isLoginButtonClicked && !this.isUserSigned">
-    <app-sign-user
-      (closeComponentEvent)="closeLoginComponent()"
-      (userLoginEvent)="loginUser()"
-    />
-  </div>
-  <div *ngIf="isCartComponentOpened">
-    <app-user-cart (closeComponentEvent)="closeCartComponent()" />
-  </div>
-  <div *ngIf="isProfileButtonClicked">
-    <app-user-profile (closeComponentEvent)="closeProfileComponent()" />
-  </div>
-  <div *ngIf="isOrderButtonClicked">
-    <app-order-tracker
-    [orderIds]="orderIds"
-      (closeOrderTrackerComponentEvent)="closeOrderTrackerComponent()"
-    />
-  </div>
+  </footer>
+
+  <app-sign-user *ngIf="isLoginButtonClicked && !isUserSigned"
+                 (closeComponentEvent)="closeLoginComponent()"
+                 (userLoginEvent)="loginUser()"/>
+
+  <app-user-cart *ngIf="isCartComponentOpened"
+                 (closeComponentEvent)="closeCartComponent()"/>
+
+  <app-user-profile *ngIf="isProfileButtonClicked"
+                    (closeComponentEvent)="closeProfileComponent()"/>
+
+  <app-order-tracker *ngIf="isOrderButtonClicked"
+                     [orderIds]="orderIds"
+                     (closeOrderTrackerComponentEvent)="closeOrderTrackerComponent()"/>
+
 </div>

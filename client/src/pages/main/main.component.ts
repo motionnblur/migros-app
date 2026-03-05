@@ -133,7 +133,7 @@ export class MainComponent {
     this.loginText = 'Üye Ol veya Giriş Yap';
   }
 
-  private setItemPageOpened(value: boolean) {
+  public setItemPageOpened(value: boolean) {
     this.isItemPageOpened = value;
   }
 }

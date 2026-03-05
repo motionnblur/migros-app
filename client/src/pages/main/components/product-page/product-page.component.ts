@@ -1,18 +1,19 @@
-import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
-import { RestService } from '../../../../services/rest/rest.service';
-import { ProductPreviewComponent } from '../product-preview/product-preview.component';
-import { CommonModule } from '@angular/common';
-import { IProductPreview } from '../../../../interfaces/IProductPreview';
-import { categories, data } from '../../../../memory/global-data';
-import { EventService } from '../../../../services/event/event.service';
-import { ProductBuyComponent } from '../product-buy/product-buy.component';
-import { ProductPageSwitcherComponent } from '../product-page-switcher/product-page-switcher.component';
-import { ISubCategory } from '../../../../interfaces/ISubCategory';
+import {Component, ElementRef, OnInit, ViewChild, OnDestroy} from '@angular/core';
+import {RestService} from '../../../../services/rest/rest.service';
+import {EventService} from '../../../../services/event/event.service';
+import {categories, data} from '../../../../memory/global-data';
+import {IProductPreview} from '../../../../interfaces/IProductPreview';
+import {ISubCategory} from '../../../../interfaces/ISubCategory';
+import {ProductPreviewComponent} from '../product-preview/product-preview.component';
+import {CommonModule} from '@angular/common';
+import {ProductBuyComponent} from '../product-buy/product-buy.component';
+import {ProductPageSwitcherComponent} from '../product-page-switcher/product-page-switcher.component';
 
 @Component({
   selector: 'app-product-page',
+  standalone: true, // or check if this exists
   imports: [
-    ProductPreviewComponent,
+    ProductPreviewComponent, // 2. Add it here!
     CommonModule,
     ProductBuyComponent,
     ProductPageSwitcherComponent,
@@ -20,181 +21,88 @@ import { ISubCategory } from '../../../../interfaces/ISubCategory';
   templateUrl: './product-page.component.html',
   styleUrl: './product-page.component.css',
 })
-export class ProductPageComponent {
+export class ProductPageComponent implements OnInit, OnDestroy {
   items: IProductPreview[] = [];
   hasProductPreviewOpened: boolean = true;
   hasProductBuyViewOpened: boolean = false;
   selectedProductId!: number;
-  categoryName: string = 'Test';
+  categoryName: string = '';
   subCategories: ISubCategory[] = [];
   totalProductCount: number = 0;
 
   private onProductPreviewClickedCallback: (productId: number) => void;
-
-  @ViewChild('product_image') productImageRef!: ElementRef<HTMLImageElement>;
-  @ViewChild('product_page_ref') productPageRef!: ElementRef<HTMLDivElement>;
 
   constructor(
     public restService: RestService,
     private eventService: EventService
   ) {
     this.onProductPreviewClickedCallback = this.openProductBuyView.bind(this);
-    this.categoryName = categories[data.currentSelectedCategoryId - 1].name;
 
-    this.subCategories = [
-      { subCategoryId: 1, subCategoryName: 'Meyve', productCount: 0 },
-      { subCategoryId: 2, subCategoryName: 'Sebze', productCount: 0 },
-      { subCategoryId: 3, subCategoryName: 'Tohum', productCount: 0 },
-    ];
+    // Check if category index is valid
+    const catIndex = data.currentSelectedCategoryId - 1;
+    this.categoryName = categories[catIndex] ? categories[catIndex].name : 'Kategori';
   }
+
   ngOnInit(): void {
-    this.restService
-      .getProductPageData(data.currentSelectedCategoryId, 0, 10)
-      .subscribe((data: any) => {
-        console.log(data);
-        data.forEach((productData: IProductPreview) => {
-          this.items.push(productData);
-        });
-      });
-
-    this.restService
-      .getSubCategories(data.currentSelectedCategoryId)
-      .subscribe({
-        next: (data: any) => {
-          this.subCategories = data;
-          console.log(data);
-        },
-        error: (error: any) => {
-          console.error(error);
-        },
-        complete: () => {
-          console.log('completed');
-        },
-      });
-
-    this.restService
-      .getProductCountsFromCategory(data.currentSelectedCategoryId)
-      .subscribe({
-        next: (data: any) => {
-          this.totalProductCount = data;
-        },
-        error: (error: any) => {
-          console.error(error);
-        },
-        complete: () => {
-          console.log('completed');
-        },
-      });
-
-    this.eventService.on(
-      'onProductPreviewClicked',
-      this.onProductPreviewClickedCallback
-    );
+    this.loadInitialData();
+    this.eventService.on('onProductPreviewClicked', this.onProductPreviewClickedCallback);
   }
+
   ngOnDestroy(): void {
-    this.eventService.off(
-      'onProductPreviewClicked',
-      this.onProductPreviewClickedCallback
-    );
+    this.eventService.off('onProductPreviewClicked', this.onProductPreviewClickedCallback);
+  }
+
+  private loadInitialData() {
+    // Fetch products
+    this.restService.getProductPageData(data.currentSelectedCategoryId, 0, 10)
+      .subscribe((res: any) => this.items = res);
+
+    // Fetch subcategories
+    this.restService.getSubCategories(data.currentSelectedCategoryId)
+      .subscribe((res: any) => this.subCategories = res);
+
+    // Fetch count
+    this.restService.getProductCountsFromCategory(data.currentSelectedCategoryId)
+      .subscribe((res: any) => this.totalProductCount = res);
   }
 
   private openProductBuyView(productId: number) {
-    this.productPageRef.nativeElement.style.border = 'none';
     this.selectedProductId = productId;
     this.hasProductBuyViewOpened = true;
     this.hasProductPreviewOpened = false;
+    // Window scroll to top so user sees the top of the product details
+    window.scrollTo({top: 0, behavior: 'smooth'});
+  }
+
+  public onSubCategoryClicked(subCategoryName: string) {
+    this.eventService.trigger('resetPageSwitcher');
+    this.restService.getProducstFromSubCategory(subCategoryName, 0, 10).subscribe({
+      next: (res: any) => {
+        this.items = res;
+        this.eventService.trigger('setProductCount', res.length + 1);
+        data.currentSelectedSubCategoryName = subCategoryName;
+      }
+    });
+  }
+
+  // Common pagination logic helper
+  private updateProductList(obs: any) {
+    obs.subscribe((res: any) => this.items = res);
   }
 
   public changePage(pageNumber: number) {
-    if (data.currentSelectedSubCategoryName !== '') {
-      this.restService
-        .getProducstFromSubCategory(
-          data.currentSelectedSubCategoryName,
-          pageNumber - 1,
-          10
-        )
-        .subscribe((data: any) => {
-          this.items = [];
-          data.forEach((productData: IProductPreview) => {
-            this.items.push(productData);
-          });
-        });
-    } else {
-      this.restService
-        .getProductPageData(data.currentSelectedCategoryId, pageNumber - 1, 10)
-        .subscribe((data: any) => {
-          this.items = [];
-          data.forEach((productData: IProductPreview) => {
-            this.items.push(productData);
-          });
-        });
-    }
+    const subCat = data.currentSelectedSubCategoryName;
+    const obs = subCat !== ''
+      ? this.restService.getProducstFromSubCategory(subCat, pageNumber - 1, 10)
+      : this.restService.getProductPageData(data.currentSelectedCategoryId, pageNumber - 1, 10);
+    this.updateProductList(obs);
   }
-  public changePageToFirst() {
-    if (data.currentSelectedSubCategoryName !== '') {
-      this.restService
-        .getProducstFromSubCategory(data.currentSelectedSubCategoryName, 0, 10)
-        .subscribe((data: any) => {
-          this.items = [];
-          data.forEach((productData: IProductPreview) => {
-            this.items.push(productData);
-          });
-        });
-    } else {
-      this.restService
-        .getProductPageData(data.currentSelectedCategoryId, 0, 10)
-        .subscribe((data: any) => {
-          this.items = [];
-          data.forEach((productData: IProductPreview) => {
-            this.items.push(productData);
-          });
-        });
-    }
-  }
-  public changePageToLast(pageCount: number) {
-    if (data.currentSelectedSubCategoryName !== '') {
-      this.restService
-        .getProducstFromSubCategory(
-          data.currentSelectedSubCategoryName,
-          pageCount - 1,
-          10
-        )
-        .subscribe((data: any) => {
-          this.items = [];
-          data.forEach((productData: IProductPreview) => {
-            this.items.push(productData);
-          });
-        });
-    } else {
-      this.restService
-        .getProductPageData(data.currentSelectedCategoryId, pageCount - 1, 10)
-        .subscribe((data: any) => {
-          this.items = [];
-          data.forEach((productData: IProductPreview) => {
-            this.items.push(productData);
-          });
-        });
-    }
-  }
-  public onSubCategoryClicked(subCategoryName: string) {
-    this.eventService.trigger('resetPageSwitcher');
 
-    this.restService
-      .getProducstFromSubCategory(subCategoryName, 0, 10)
-      .subscribe({
-        next: (data: any) => {
-          this.items = [];
-          data.forEach((productData: IProductPreview) => {
-            this.items.push(productData);
-          });
-          this.eventService.trigger('setProductCount', data.length + 1);
-        },
-        error: (error: any) => {
-          console.error(error);
-        },
-        complete: () => {
-          data.currentSelectedSubCategoryName = subCategoryName;
-        },
-      });
+  public changePageToFirst() {
+    this.changePage(1);
+  }
+
+  public changePageToLast(pageCount: number) {
+    this.changePage(pageCount);
   }
 }

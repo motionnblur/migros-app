@@ -1,39 +1,54 @@
-<div class="product-page-container">
-  <div class="product-page__category">
-    <div class="line-bottom padding-20">
-      <div>{{ categoryName }}</div>
-      <div>{{ totalProductCount }} ürün</div>
-    </div>
-    <div class="line-bottom padding-20">
-      <div id="subcategories">Alt Kategoriler</div>
-      <div id="subcategory-items">
-        <div
-          *ngFor="let item of subCategories"
-          (click)="onSubCategoryClicked(item.subCategoryName)"
-        >
-          {{ item.subCategoryName + " " + "(" + item.productCount + ")" }}
+<div class="container py-4">
+  <div class="row g-4">
+
+    <div class="col-12 col-lg-4 col-xl-3 col-xxl-2">
+      <div class="card shadow-sm border-0 sticky-top" style="top: 20px; z-index: 100;">
+        <div class="card-body p-0">
+          <div class="p-3 border-bottom bg-white">
+            <h6 class="fw-bold mb-1">{{ categoryName }}</h6>
+            <span class="badge bg-primary-soft text-primary">{{ totalProductCount }} Ürün</span>
+          </div>
+          <div class="p-2">
+            <div class="list-group list-group-flush">
+              <button *ngFor="let item of subCategories"
+                      (click)="onSubCategoryClicked(item.subCategoryName)"
+                      class="list-group-item list-group-item-action border-0 rounded-2 mb-1 d-flex justify-content-between align-items-center small">
+                {{ item.subCategoryName }}
+                <span class="badge bg-light text-dark border">{{ item.productCount }}</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
-    <div class="padding-20"></div>
-  </div>
-  <div #product_page_ref class="product-page padding-10">
-    <div *ngIf="hasProductPreviewOpened">
-      <app-product-preview
-        *ngFor="let item of items"
-        [productId]="item.productId"
-        [productName]="item.productName"
-        [productPrice]="item.productPrice"
-      />
+
+    <div class="col-12 col-lg-8 col-xl-9 col-xxl-10">
+      <div #product_page_ref class="product-content-area">
+
+        <div *ngIf="hasProductPreviewOpened"
+             class="row g-3 row-cols-2 row-cols-md-3 row-cols-lg-4 row-cols-xl-5 row-cols-xxl-6 animate-fade-in">
+          <div class="col" *ngFor="let item of items">
+            <app-product-preview
+              [productId]="item.productId"
+              [productName]="item.productName"
+              [productPrice]="item.productPrice"
+            />
+          </div>
+        </div>
+
+        <div class="product-buy-view" *ngIf="hasProductBuyViewOpened">
+          <app-product-buy [productId]="selectedProductId"/>
+        </div>
+
+        <div class="mt-5 d-flex justify-content-center" *ngIf="!hasProductBuyViewOpened">
+          <app-product-page-switcher
+            (changePageEvent)="changePage($event)"
+            (changePageToFirstEvent)="changePageToFirst()"
+            (changePageToLastEvent)="changePageToLast($event)"
+          />
+        </div>
+      </div>
     </div>
-    <app-product-page-switcher
-      *ngIf="!hasProductBuyViewOpened"
-      (changePageEvent)="changePage($event)"
-      (changePageToFirstEvent)="changePageToFirst()"
-      (changePageToLastEvent)="changePageToLast($event)"
-    />
-    <div class="product-buy-container" *ngIf="hasProductBuyViewOpened">
-      <app-product-buy [productId]="selectedProductId" />
-    </div>
+
   </div>
 </div>

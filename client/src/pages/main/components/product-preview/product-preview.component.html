@@ -1,29 +1,30 @@
-<div class="product-preview">
-  <div
-    class="product-preview__image-container"
-    (click)="onProductViewClicked()"
-  >
-    <img class="product-preview__image" [src]="imageUrl" />
+<div class="card h-100 product-card shadow-sm border-0 transition-hover">
+  <div class="product-img-wrapper p-3" (click)="onProductViewClicked()">
+    <img
+      [src]="imageUrl || 'assets/placeholder.png'"
+      class="card-img-top img-fluid"
+      [alt]="productName"
+    />
   </div>
-  <div class="product-preview__name_container" (click)="onProductViewClicked()">
-    <div class="product-preview__title">
+
+  <div class="card-body d-flex flex-column pt-0">
+    <h6 class="card-title text-dark mb-1 text-truncate" (click)="onProductViewClicked()" title="{{ productName }}">
       {{ productName }}
+    </h6>
+
+    <div class="mt-auto d-flex justify-content-between align-items-center">
+      <div class="product-price">
+        <span class="fs-5 fw-bold text-orange">{{ productPrice }}</span>
+        <span class="ms-1 small text-orange fw-semibold">TL</span>
+      </div>
+
+      <button
+        type="button"
+        class="btn btn-orange-action rounded-circle d-flex align-items-center justify-content-center shadow-sm"
+        (click)="addProductToUserCart()"
+        title="Sepete Ekle">
+        <i class="bi bi-plus-lg text-white"></i>
+      </button>
     </div>
   </div>
-  <div class="product-preview__price_container">
-    <div class="product-preview__price">
-      {{ productPrice
-      }}<span class="product-preview__price__currency"> TL</span>
-    </div>
-  </div>
-  <div class="product-preview__button_container">
-    <div class="product-preview__buybutton" (click)="addProductToUserCart()">
-      <img class="product-preview__buybutton__image" src="plus.png" />
-    </div>
-  </div>
-  <!--
-  <div class="product-preview__buybutton">
-    <img class="product-preview__buybutton__image" src="plus.png" />
-  </div>
-  -->
 </div>

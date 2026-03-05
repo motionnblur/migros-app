@@ -1,83 +1,86 @@
-.product-preview {
-  width: 180px;
-  height: 340px;
-  background-color: white;
-  border: 1px solid gainsboro;
-  border-radius: 3%;
+/* Color Palette */
+.text-orange {
+  color: #ff7f00 !important;
+}
+
+.btn-orange-action {
+  background-color: #ff7f00;
+  width: 36px;
+  height: 36px;
+  border: none;
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.btn-orange-action:hover {
+  background-color: #e67200;
+  transform: scale(1.1);
+}
+
+/* Card Improvements */
+.product-card {
+  cursor: pointer;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+
+  /* FIX: Ensure the card has a consistent height regardless of content */
+  height: 320px !important;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 7px;
-  box-sizing: border-box;
+  background: #fff;
 }
-.product-preview__image {
-  width: 120px;
-  height: 120px;
+
+.product-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Image Container */
+.product-img-wrapper {
+  /* FIX: Give the image container a fixed percentage of the card height */
+  height: 180px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #fff;
+  overflow: hidden;
+}
+
+.product-img-wrapper img {
+  max-height: 90%;
+  max-width: 90%;
   object-fit: contain;
-}
-.product-preview__title {
-  width: 100%;
-  height: 20px;
-  cursor: pointer;
-  font-size: 17px;
-}
-.product-preview__title:hover {
-  color: orange;
+  transition: transform 0.3s ease;
 }
 
-.product-preview__price {
-  width: 100%;
-  height: 20px;
-  font-weight: 400;
-  font-size: 25px;
-  color: orange;
-}
-.product-preview__price__currency {
-  font-size: 16px;
-}
-.product-preview__buybutton {
-  margin-top: 8px;
-  width: 34px;
-  height: 34px;
-  background-color: #ff7f00;
-  border-radius: 10px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  cursor: pointer;
-}
-.product-preview__buybutton__image {
-  width: 18px;
-  height: 18px;
+.product-card:hover .product-img-wrapper img {
+  transform: scale(1.05);
 }
 
-.product-preview__image-container {
-  width: 150px;
-  height: 150px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+/* Body and Text Styling */
+.card-body {
+  padding: 1rem;
+  flex-grow: 1; /* Pushes the price section to the bottom */
+}
+
+.card-title {
+  font-size: 0.95rem;
+  font-weight: 600;
   cursor: pointer;
+  transition: color 0.2s;
+  /* FIX: Ensure title only takes up 2 lines maximum */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: normal;
+  height: 2.4rem;
 }
-.product-preview__name_container {
-  width: 100%;
-  height: 50px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+
+.card-title:hover {
+  color: #ff7f00 !important;
 }
-.product-preview__price_container {
-  width: 100%;
-  height: 50px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-.product-preview__button_container {
-  width: 100%;
-  flex: auto;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+
+.product-price {
+  line-height: 1;
 }
