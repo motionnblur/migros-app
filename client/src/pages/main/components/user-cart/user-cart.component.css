@@ -6,6 +6,7 @@
 .btn-orange {
   background-color: #ff7f00 !important;
   border-color: #ff7f00 !important;
+  color: white !important;
 }
 
 .btn-orange:hover {
@@ -20,33 +21,55 @@
   width: 100vw;
   height: 100vh;
   background-color: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(2px); /* Modern touch */
+  backdrop-filter: blur(4px);
   z-index: 1040;
 }
 
-/* Cart Container */
+/* Cart Container Fix */
 #cart-container {
   position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 400px;
-  max-width: 95vw; /* Mobile friendly */
-  max-height: 90vh;
+  width: 450px; /* Slightly wider for better layout */
+  max-width: 95vw;
+  height: 650px; /* Set a fixed height for the modal */
+  max-height: 85vh;
   z-index: 1050;
   background-color: #fff;
-  border-radius: 12px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column; /* Vital for footer pinning */
   overflow: hidden;
 }
 
-/* Custom Scrollbar for the items list */
-.overflow-auto::-webkit-scrollbar {
+/* Card Body Scroll Fix */
+.card-body {
+  flex: 1 1 auto; /* Grow to fill space, shrink if needed */
+  overflow-y: auto; /* Enable vertical scrolling */
+  overflow-x: hidden;
+}
+
+/* Scrollbar Styling */
+.card-body::-webkit-scrollbar {
   width: 6px;
 }
 
-.overflow-auto::-webkit-scrollbar-thumb {
-  background: #e0e0e0;
+.card-body::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.card-body::-webkit-scrollbar-thumb {
+  background: #ccc;
   border-radius: 10px;
+}
+
+.card-body::-webkit-scrollbar-thumb:hover {
+  background: #ff7f00;
+}
+
+.cart-item {
+  transition: background-color 0.2s ease;
 }
 
 .cart-item:hover {
