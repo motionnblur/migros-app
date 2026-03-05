@@ -4,7 +4,7 @@ This is a basic e-commerce mvp application i built using Angular for the fronten
 
 It's a very basic migros clone that i built for my learning purposes. See: www.migros.com.tr
 
-## Table of Contents
+## :clipboard: Table of Contents
 
 - [Overview](#overview)
 - [Features](#features)
@@ -14,11 +14,11 @@ It's a very basic migros clone that i built for my learning purposes. See: www.m
 - [Running the Application](#running-the-application)
 - [Screenshots](#screenshots)
 
-## Overview
+## :eyes: Overview
 
 This application provides a basic platform for users to browse products, add them to a shopping cart, and potentially simulate a checkout process (depending on the level of implementation). It serves as a foundation for a more comprehensive e-commerce solution.
 
-## Features
+## :star: Features
 
 * **Registering:** User registering using mail protocol (spring-boot-starter-mail)
 * **Admin Dashboard:** For managing orders and products.
@@ -29,7 +29,7 @@ This application provides a basic platform for users to browse products, add the
 * **Payment Processing:** By using Stripe's payment test api.
 * **Basic Security:** User Authentication and Authorization using JWT tokens
 
-## Technologies Used
+## :computer: Technologies Used
 
 * **Frontend:**
     * [Angular](https://angular.io/)  (19.0.5)
@@ -47,13 +47,13 @@ This application provides a basic platform for users to browse products, add the
 * **Docker:**
     * [Docker](https://www.docker.com/)
 
-## Prerequisites
+## :page_with_curl: Prerequisites
 
 Before you begin, ensure you have the following installed:
 
 * **Docker**
 
-## Setup
+## :airplane: Setup
 
 Before getting started, you need __configs__ folder (migros-app/configs). It's a secret folder that should't be available for the public, so you'll need to create your own.
 1. Create an empty folder named __configs__
@@ -86,7 +86,7 @@ POSTGRES_DB=migros_db
 * Default admin name: admin
 * Default admin password: admin
 
-## Running the application
+## :rocket: Running the application
 Firstly you need to initialize node packages in order the client to run, go into client folder and type:
 ```
 npm i
@@ -96,7 +96,7 @@ To start the development server, just type the command below in your favorite te
 docker compose --env-file configs/postgres.env --env-file configs/spring.env up
 ```
 
-## Screenshots
+## :camera: Screenshots
 
 * Current code coverage
 <img width="791" height="367" alt="Screenshot 2026-03-05 124449" src="https://github.com/user-attachments/assets/34abb1eb-5424-4434-89bb-2131b45742ae" />
