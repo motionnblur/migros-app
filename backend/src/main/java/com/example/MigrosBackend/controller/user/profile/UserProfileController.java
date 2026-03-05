@@ -2,63 +2,42 @@ package com.example.MigrosBackend.controller.user.profile;
 
 import com.example.MigrosBackend.dto.user.UserProfileTableDto;
 import com.example.MigrosBackend.entity.user.UserEntity;
+import com.example.MigrosBackend.exception.shared.InvalidTokenException;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
+import com.example.MigrosBackend.service.user.profile.UserProfileService;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("user/profile")
 public class UserProfileController {
-    private final TokenService tokenService;
-    private final UserEntityRepository userEntityRepository;
+    private final UserProfileService userProfileService;
 
-    public UserProfileController(UserEntityRepository userEntityRepository,
-                                 TokenService tokenService) {
-        this.userEntityRepository = userEntityRepository;
-        this.tokenService = tokenService;
+    public UserProfileController(UserProfileService userProfileService) {
+        this.userProfileService = userProfileService;
     }
 
     @PostMapping("uploadUserProfileTable")
-    public String uploadUserProfileTable(@RequestParam("userFirstName") String userFirstName,
-                                         @RequestParam("userLastName") String userLastName,
-                                         @RequestParam("userAddress") String userAddress,
-                                         @RequestParam("userAddress2") String userAddress2,
-                                         @RequestParam("userTown") String userTown,
-                                         @RequestParam("userCountry") String userCountry,
-                                         @RequestParam("userPostalCode") String userPostalCode,
-                                         @RequestParam String token) {
-        String userName = tokenService.extractUsername(token);
-        if(!tokenService.validateToken(token, userName))
-            return "Invalid token";
-
-        UserEntity user = userEntityRepository.findByUserMail(userName);
-        user.setUserName(userFirstName);
-        user.setUserLastName(userLastName);
-        user.setUserAddress(userAddress);
-        user.setUserAddress2(userAddress2);
-        user.setUserTown(userTown);
-        user.setUserCountry(userCountry);
-        user.setUserPostalCode(userPostalCode);
-        userEntityRepository.save(user);
-
-        return "User profile table uploaded";
+    public ResponseEntity<Void> uploadUserProfileTable(@RequestParam("userFirstName") String userFirstName,
+                                                       @RequestParam("userLastName") String userLastName,
+                                                       @RequestParam("userAddress") String userAddress,
+                                                       @RequestParam("userAddress2") String userAddress2,
+                                                       @RequestParam("userTown") String userTown,
+                                                       @RequestParam("userCountry") String userCountry,
+                                                       @RequestParam("userPostalCode") String userPostalCode,
+                                                       @RequestParam String token) {
+        userProfileService.uploadUserProfileTable(
+                userFirstName, userLastName,
+                userAddress, userAddress2,
+                userTown, userCountry,
+                userPostalCode, token
+        );
+        return ResponseEntity.ok().build();
     }
-    @GetMapping("getUserProfileTable")
-    public UserProfileTableDto getUserProfileTable(@RequestParam String token) {
-        String userName = tokenService.extractUsername(token);
-        if(!tokenService.validateToken(token, userName))
-            return null;
-        
-        UserEntity user = userEntityRepository.findByUserMail(userName);
-        UserProfileTableDto userProfileTableDto = new UserProfileTableDto();
-        userProfileTableDto.setUserFirstName(user.getUserName());
-        userProfileTableDto.setUserLastName(user.getUserLastName());
-        userProfileTableDto.setUserAddress(user.getUserAddress());
-        userProfileTableDto.setUserAddress2(user.getUserAddress2());
-        userProfileTableDto.setUserTown(user.getUserTown());
-        userProfileTableDto.setUserCountry(user.getUserCountry());
-        userProfileTableDto.setUserPostalCode(user.getUserPostalCode());
 
-        return userProfileTableDto;
+    @GetMapping("getUserProfileTable")
+    public ResponseEntity<UserProfileTableDto> getUserProfileTable(@RequestParam String token) {
+        return ResponseEntity.ok(userProfileService.getUserProfileTable(token));
     }
 }
