@@ -227,15 +227,6 @@ public class AdminSupplyService {
                 productDescriptionEntityRepository.save(productDescriptionEntity);
             }
         }
-//        for (int i = 0; i < productDescriptionEntities.size(); i++) {
-//            ProductDescriptionEntity productDescriptionEntity = productDescriptionEntities.get(i);
-//            DescriptionsDto descriptionsDto = descriptionsDtoList.get(i);
-//
-//            productDescriptionEntity.setDescriptionTabName(descriptionsDto.getDescriptionTabName());
-//            productDescriptionEntity.setDescriptionTabContent(descriptionsDto.getDescriptionTabContent());
-//
-//            productDescriptionEntityRepository.save(productDescriptionEntity);
-//        }
     }
 
     public ProductDescriptionListDto getProductDescription(Long productId) {

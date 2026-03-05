@@ -81,7 +81,7 @@ class AdminSignupServiceTest {
         AdminSignDto dto = new AdminSignDto();
         dto.setAdminName("nonexistentUser");
         dto.setAdminPassword("password");
-        
+
         AdminEntity entity = new AdminEntity();
         entity.setAdminName("adminUser");
         entity.setAdminPassword("correctHashedPassword");
