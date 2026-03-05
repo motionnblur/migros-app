@@ -1,105 +1,63 @@
-<div id="order-tracker-main">
-  <cdk-virtual-scroll-viewport itemSize="50" class="example-viewport">
-    <div
-      *cdkVirtualFor="let id of orderIds"
-      class="example-item"
-      (click)="openOrderTrackerComponent(id)"
-    >
-      <div>#{{ id }}</div>
-    </div>
-  </cdk-virtual-scroll-viewport>
-</div>
-<div class="order-tracker-container" *ngIf="showOrderTrackerComponent">
-  <div class="progress-bar">
-    <div
-      class="step"
-      [ngClass]="{
-        active: currentStatus === 'Ordered',
-        completed: currentStatus !== 'Ordered'
-      }"
-    >
-      <span
-        class="indicator"
-        [ngClass]="{
-          active: currentStatus === 'Ordered',
-          completed: currentStatus !== 'Ordered'
-        }"
-      >
-        <ng-container *ngIf="currentStatus === 'Ordered'">
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            <path
-              fill-rule="evenodd"
-              d="M19.916 4.641a2 2 0 010 2.828l-11.049 11.048a2 2 0 01-2.828 0l-5.869-5.869a2 2 0 012.828-2.828L9.97 16.636l10.03-10.03a2 2 0 012.828 0z"
-              clip-rule="evenodd"
-            />
-          </svg>
-        </ng-container>
-      </span>
-      <span class="label">Ordered</span>
-    </div>
-    <div class="line" [ngClass]="{ active: currentStatus !== 'Ordered' }"></div>
-    <div
-      class="step"
-      [ngClass]="{
-        active: currentStatus === 'Shipped',
-        completed: currentStatus !== 'Shipped' && currentStatus !== 'Ordered'
-      }"
-    >
-      <span
-        class="indicator"
-        [ngClass]="{
-          active: currentStatus === 'Shipped',
-          completed: currentStatus !== 'Shipped' && currentStatus !== 'Ordered'
-        }"
-      ></span>
-      <span class="label">Shipped</span>
-    </div>
-    <div
-      class="line"
-      [ngClass]="{
-        active:
-          currentStatus === 'Out for delivery' || currentStatus === 'Delivered'
-      }"
-    ></div>
-    <div
-      class="step"
-      [ngClass]="{
-        active: currentStatus === 'Out for delivery',
-        completed: currentStatus === 'Delivered'
-      }"
-    >
-      <span
-        class="indicator"
-        [ngClass]="{
-          active: currentStatus === 'Out for delivery',
-          completed: currentStatus === 'Delivered'
-        }"
-      ></span>
-      <span class="label">Out for delivery</span>
-    </div>
-    <div
-      class="line"
-      [ngClass]="{ active: currentStatus === 'Delivered' }"
-    ></div>
-    <div class="step" [ngClass]="{ active: currentStatus === 'Delivered' }">
-      <span
-        class="indicator"
-        [ngClass]="{ active: currentStatus === 'Delivered' }"
-      ></span>
-      <span class="label">Delivered</span>
-    </div>
-  </div>
-  <div class="actions">
-    <button class="cancel-order" (click)="cancelOrder()">İptal et</button>
-  </div>
-</div>
+<div id="order-tracker-overlay" (click)="closeOrderTrackerComponent()"></div>
 
-<div
-  id="order-tracker-component-bg"
-  (click)="closeOrderTrackerComponent()"
-></div>
-<div
-  *ngIf="showOrderTrackerComponent"
-  id="order-tracker-anim-bg"
-  (click)="closeOrderTrackerAnim()"
-></div>
+<div id="order-tracker-container" class="card shadow-lg border-0">
+
+  <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
+    <h5 class="mb-0 fw-bold text-primary">Sipariş Takibi</h5>
+    <button type="button" class="btn-close" (click)="closeOrderTrackerComponent()"></button>
+  </div>
+
+  <div class="card-body p-0 d-flex flex-column" style="height: 500px;">
+
+    <div class="order-list-area flex-grow-1 overflow-auto p-3" *ngIf="!showOrderTrackerComponent">
+      <p class="text-muted small mb-3">Takip etmek istediğiniz siparişi seçin:</p>
+      <cdk-virtual-scroll-viewport itemSize="60" class="viewport-bootstrap">
+        <div *cdkVirtualFor="let id of orderIds"
+             class="order-list-item d-flex align-items-center p-3 mb-2 rounded border shadow-sm"
+             (click)="openOrderTrackerComponent(id)">
+          <i class="bi bi-box-seam me-3 text-primary fs-4"></i>
+          <div>
+            <div class="fw-bold">Sipariş #{{ id }}</div>
+            <small class="text-muted">Detayları görüntülemek için tıklayın</small>
+          </div>
+          <i class="bi bi-chevron-right ms-auto text-muted"></i>
+        </div>
+      </cdk-virtual-scroll-viewport>
+    </div>
+
+    <div class="tracker-detail-area p-4 animate-fade-in" *ngIf="showOrderTrackerComponent">
+      <button class="btn btn-sm btn-link text-decoration-none p-0 mb-4" (click)="closeOrderTrackerAnim()">
+        <i class="bi bi-arrow-left"></i> Listeye Dön
+      </button>
+
+      <h6 class="fw-bold mb-4 text-center">Sipariş Durumu: #{{ currentSelectedOrderId }}</h6>
+
+      <div class="stepper-wrapper mb-5">
+        <div class="stepper-item" [ngClass]="getStatusClass('Ordered')">
+          <div class="step-counter"><i class="bi bi-check-lg"></i></div>
+          <div class="step-name">Sipariş</div>
+        </div>
+        <div class="stepper-item" [ngClass]="getStatusClass('Shipped')">
+          <div class="step-counter"><i class="bi bi-truck"></i></div>
+          <div class="step-name">Yolda</div>
+        </div>
+        <div class="stepper-item" [ngClass]="getStatusClass('Out for delivery')">
+          <div class="step-counter"><i class="bi bi-bicycle"></i></div>
+          <div class="step-name">Dağıtımda</div>
+        </div>
+        <div class="stepper-item" [ngClass]="getStatusClass('Delivered')">
+          <div class="step-counter"><i class="bi bi-house-check"></i></div>
+          <div class="step-name">Teslim Edildi</div>
+        </div>
+      </div>
+
+      <div class="d-grid gap-2 mt-5">
+        <button class="btn btn-outline-danger"
+                [disabled]="currentStatus === 'Delivered'"
+                (click)="cancelOrder()">
+          <i class="bi bi-x-circle me-2"></i>Siparişi İptal Et
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
