@@ -1,62 +1,48 @@
-import { Component } from '@angular/core';
-import { RestService } from '../../../../services/rest/rest.service';
-import { CommonModule } from '@angular/common';
-import { DomSanitizer } from '@angular/platform-browser';
-import { ProductBuyBase } from '../../../../base-components/product-buy.base';
-import { EventService } from '../../../../services/event/event.service';
+// ... imports stay the same
+
+import {EventService} from '../../../../services/event/event.service';
+import {DomSanitizer} from '@angular/platform-browser';
+import {ProductBuyBase} from '../../../../base-components/product-buy.base';
+import {RestService} from '../../../../services/rest/rest.service';
+import {CommonModule} from '@angular/common';
+import {Component} from '@angular/core';
 
 @Component({
   selector: 'app-product-buy',
-  imports: [CommonModule],
+  standalone: true, // <--- ADD THIS LINE
+  imports: [CommonModule], // Ensure CommonModule is here if you use *ngIf or *ngFor
   templateUrl: './product-buy.component.html',
   styleUrl: './product-buy.component.css',
 })
 export class ProductBuyComponent extends ProductBuyBase {
+  public selectedTabIndex: number = 0; // Track which tab is active
+
   constructor(
     protected override restService: RestService,
     protected sanitizer: DomSanitizer,
-    protected override eventManager: EventService // Add the eventManager parameter
+    protected override eventManager: EventService
   ) {
-    super(restService, eventManager); // Call the base class constructor
+    super(restService, eventManager);
   }
 
-  override changeTab(index: number, tabRef: HTMLDivElement) {
-    this.updateProductDescriptionBody(
-      this.productDescriptions.descriptionList[index].descriptionTabContent
-    );
-    this.currentProductDescriptionBody =
-      this.productDescriptions.descriptionList[index].descriptionTabContent;
-
-    if (this.currentTabRef) {
-      if (this.currentTabRef !== tabRef) {
-        tabRef.style.color = 'orange';
-        this.currentTabRef.style.color = '#696969'; // Set previous tab to default color
-
-        (tabRef.children[1] as HTMLElement).style.display = 'block';
-        (this.currentTabRef.children[1] as HTMLElement).style.display = 'none';
-
-        this.currentTabRef = tabRef;
-      }
-    } else {
-      this.currentTabRef = tabRef;
-    }
+  // Simplified Tab Switching Logic
+  public onTabClick(index: number) {
+    this.selectedTabIndex = index;
+    const content = this.productDescriptions.descriptionList[index].descriptionTabContent;
+    this.updateProductDescriptionBody(content);
   }
 
   private updateProductDescriptionBody(description: string) {
-    this.currentProductDescriptionBody =
-      this.sanitizer.bypassSecurityTrustHtml(description);
+    this.currentProductDescriptionBody = this.sanitizer.bypassSecurityTrustHtml(description);
   }
+
   public addProductToUserCart() {
     this.restService.addProductToUserCart(this.productId).subscribe({
       next: () => {
-        // // Emit the event
+        // You could emit a global event here to refresh the cart count in the header
       },
-      error: (error) => {
-        console.error('Error adding product to user cart');
-      },
-      complete: () => {
-        alert('Product added to cart');
-      },
+      error: (error) => console.error('Error adding product', error),
+      complete: () => alert('Ürün sepete eklendi!'),
     });
   }
 }
