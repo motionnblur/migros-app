@@ -95,7 +95,7 @@ docker compose --env-file configs/postgres.env --env-file configs/spring.env up
 ## Screenshots
 
 * Current code coverage
-<img width="772" height="261" alt="Screenshot 2026-03-05 122252" src="https://github.com/user-attachments/assets/7da7d1d4-6ba4-4d8c-8f69-da4fa0c4ea85" />
+<img width="791" height="367" alt="Screenshot 2026-03-05 124449" src="https://github.com/user-attachments/assets/34abb1eb-5424-4434-89bb-2131b45742ae" />
 
 <img width="1920" height="981" alt="migros-main-page" src="https://github.com/user-attachments/assets/6a01280c-282a-429c-b83e-897dc00cbdbc" />
 
