@@ -1,64 +1,31 @@
-#user-profile-component-bg {
+#user-profile-overlay {
   position: fixed;
   top: 0;
   left: 0;
   width: 100vw;
   height: 100vh;
-  background-color: rgba(0, 0, 0, 0.4);
-  z-index: 99;
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(3px);
+  z-index: 1050;
 }
 
-#user-profile-main {
+#user-profile-container {
   position: fixed;
   top: 50%;
   left: 50%;
-  width: 90%;
-  max-width: 700px;
-  background-color: #fff;
   transform: translate(-50%, -50%);
-  z-index: 100;
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
-  padding: 24px;
-  box-sizing: border-box;
-}
-
-#user-profile-panel {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 20px;
-}
-
-#user-profile-panel h2 {
-  margin-top: 0;
-  text-align: center;
-  color: #3f51b5;
-  font-weight: 500;
-}
-
-.profile-form {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.form-row {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-mat-form-field {
-  flex: 1;
-  min-width: 120px;
-}
-
-.full-width {
   width: 100%;
+  max-width: 650px;
+  z-index: 1060;
+  border-radius: 12px;
 }
 
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
+.form-control:focus {
+  border-color: #3f51b5;
+  box-shadow: 0 0 0 0.25rem rgba(63, 81, 181, 0.15);
+}
+
+.form-label {
+  color: #444;
+  font-size: 0.9rem;
 }

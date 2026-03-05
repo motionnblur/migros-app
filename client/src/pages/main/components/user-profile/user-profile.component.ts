@@ -1,40 +1,46 @@
-import { Component, EventEmitter, Output } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { RestService } from '../../../../services/rest/rest.service';
-import { IUserProfileTable } from '../../../../interfaces/IUserProfileTable';
+import {Component, EventEmitter, HostListener, Output} from '@angular/core';
+import {FormsModule} from '@angular/forms'; // Only need FormsModule and CommonModule
+import {CommonModule} from '@angular/common';
+import {RestService} from '../../../../services/rest/rest.service';
+import {IUserProfileTable} from '../../../../interfaces/IUserProfileTable';
 
 @Component({
   selector: 'app-user-profile',
-  imports: [FormsModule, MatFormFieldModule, MatInputModule, MatButtonModule],
+  standalone: true, // Assuming you are using standalone components
+  imports: [FormsModule, CommonModule], // Removed Mat-related imports
   templateUrl: './user-profile.component.html',
   styleUrl: './user-profile.component.css',
 })
 export class UserProfileComponent {
   @Output() closeComponentEvent = new EventEmitter<void>();
-  public userFirstName: string = '';
-  public userLastName: string = '';
-  public userAddress: string = '';
-  public userAddress2: string = '';
-  public userTown: string = '';
-  public userCountry: string = '';
-  public userPostalCode: string = '';
+
+  @HostListener('document:keydown.escape', ['$event'])
+  onKeydownHandler(event: KeyboardEvent) {
+    this.closeProfileComponent();
+  }
+
+  public userFirstName = '';
+  public userLastName = '';
+  public userAddress = '';
+  public userAddress2 = '';
+  public userTown = '';
+  public userCountry = '';
+  public userPostalCode = '';
   private baseTableData: IUserProfileTable | null = null;
 
   constructor(private restService: RestService) {
-    restService.getUserProfileTableData().subscribe({
+    this.restService.getUserProfileTableData().subscribe({
       next: (data: IUserProfileTable) => {
-        this.userFirstName = data.userFirstName;
-        this.userLastName = data.userLastName;
-        this.userAddress = data.userAddress;
-        this.userAddress2 = data.userAddress2;
-        this.userTown = data.userTown;
-        this.userCountry = data.userCountry;
-        this.userPostalCode = data.userPostalCode;
-
-        this.baseTableData = data;
+        if (data) {
+          this.userFirstName = data.userFirstName || '';
+          this.userLastName = data.userLastName || '';
+          this.userAddress = data.userAddress || '';
+          this.userAddress2 = data.userAddress2 || '';
+          this.userTown = data.userTown || '';
+          this.userCountry = data.userCountry || '';
+          this.userPostalCode = data.userPostalCode || '';
+          this.baseTableData = {...data};
+        }
       },
     });
   }
@@ -42,6 +48,7 @@ export class UserProfileComponent {
   public closeProfileComponent() {
     this.closeComponentEvent.emit();
   }
+
   public uploadTableData() {
     const table: IUserProfileTable = {
       userFirstName: this.userFirstName,
@@ -53,25 +60,19 @@ export class UserProfileComponent {
       userPostalCode: this.userPostalCode,
     };
 
-    if (
-      this.baseTableData &&
-      JSON.stringify(this.baseTableData) === JSON.stringify(table)
-    ) {
+    // Prevent redundant API calls
+    if (this.baseTableData && JSON.stringify(this.baseTableData) === JSON.stringify(table)) {
+      this.closeProfileComponent();
       return;
     }
 
     this.restService.uploadUserProfileTableData(table).subscribe({
       next: () => {
-        console.log('Table data uploaded successfully');
-        this.baseTableData = table;
-        this.closeComponentEvent.emit();
+        this.baseTableData = {...table};
+        alert('Profil başarıyla güncellendi.');
+        this.closeProfileComponent();
       },
-      error: (error) => {
-        console.error('Error uploading table data');
-      },
-      complete: () => {
-        alert('Kaydedildi');
-      },
+      error: (err) => console.error('Error:', err)
     });
   }
 }
