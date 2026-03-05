@@ -231,7 +231,8 @@ public class AdminSupplyService {
 
     public ProductDescriptionListDto getProductDescription(Long productId) {
         List<ProductDescriptionEntity> productDescriptionEntities = productDescriptionEntityRepository.findByProductEntityId(productId);
-        if (productDescriptionEntities == null) throw new ProductNotFoundException(productId.toString());
+        if (productDescriptionEntities == null || productDescriptionEntities.isEmpty())
+            throw new ProductNotFoundException(productId.toString());
 
         ProductDescriptionListDto productDescriptionDto = new ProductDescriptionListDto();
         productDescriptionDto.setProductId(productId);

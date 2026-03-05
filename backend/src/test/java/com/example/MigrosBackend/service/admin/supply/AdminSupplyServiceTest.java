@@ -138,6 +138,20 @@ class AdminSupplyServiceTest {
     }
 
     @Test
+    void uploadProduct_ThrowsException_WhenFileUploadFails() throws IOException {
+        // Arrange
+        MockMultipartFile file = new MockMultipartFile(
+                "selectedImage", "test.png", "image/png", "data".getBytes());
+
+        when(fileService.writeFileToDisk(any(), anyString(), anyString())).thenThrow(new IOException());
+
+        // Act & Assert
+        assertThrows(FileUploadFailedException.class, () ->
+                adminSupplyService.uploadProduct(1L, "Water", "Still", 5.0f, 100, 0.1f, "Fresh", 10, file)
+        );
+    }
+
+    @Test
     void updateProduct_Success() throws IOException {
         // Arrange
         Long adminId = 1L;
@@ -386,5 +400,54 @@ class AdminSupplyServiceTest {
 
         assertEquals("Admin with id 99 has no products.", exception.getMessage());
         verify(productEntityRepository, times(1)).findByAdminEntityId(adminId, pageable);
+    }
+
+    @Test
+    void getProductDescription_Success() {
+        // Arrange
+        Long productId = 10L;
+
+        ProductDescriptionEntity desc = new ProductDescriptionEntity();
+        desc.setId(101L);
+        desc.setDescriptionTabName("Specs");
+        desc.setDescriptionTabContent("100% Cotton");
+
+        when(productDescriptionEntityRepository.findByProductEntityId(productId))
+                .thenReturn(List.of(desc));
+
+        // Act
+        ProductDescriptionListDto result = adminSupplyService.getProductDescription(productId);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(productId, result.getProductId());
+        assertEquals(1, result.getDescriptionList().size());
+        assertEquals("Specs", result.getDescriptionList().get(0).getDescriptionTabName());
+    }
+
+    @Test
+    void getProductDescription_ThrowsException_WhenNoDescriptionsFound() {
+        // Arrange
+        Long productId = 99L;
+
+        // Mocking an EMPTY list, which is what actually happens when no data is found
+        when(productDescriptionEntityRepository.findByProductEntityId(productId))
+                .thenReturn(Collections.emptyList());
+
+        // Act & Assert
+        assertThrows(ProductNotFoundException.class, () -> {
+            adminSupplyService.getProductDescription(productId);
+        });
+    }
+
+    @Test
+    void deleteProductDescription_ShouldInvokeRepositoryDelete() {
+        // Arrange
+        Long descriptionId = 500L;
+
+        // Act
+        adminSupplyService.deleteProductDescription(descriptionId);
+
+        verify(productDescriptionEntityRepository, times(1)).deleteById(descriptionId);
     }
 }

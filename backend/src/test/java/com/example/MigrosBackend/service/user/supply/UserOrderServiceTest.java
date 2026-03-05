@@ -1,8 +1,12 @@
 package com.example.MigrosBackend.service.user.supply;
 
+import com.example.MigrosBackend.dto.order.OrderDto;
+import com.example.MigrosBackend.dto.user.UserProfileTableDto;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.user.OrderEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
+import com.example.MigrosBackend.exception.admin.OrderNotFoundException;
+import com.example.MigrosBackend.exception.admin.UserNotFoundException;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
@@ -13,6 +17,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -122,5 +130,135 @@ class UserOrderServiceTest {
         // Assert
         assertEquals("Shipped", order.getStatus());
         verify(orderEntityRepository).save(order);
+    }
+
+    @Test
+    void getAllOrders_ShouldReturnMappedDtoList() {
+        // Arrange
+        int page = 0;
+        int size = 5;
+        Pageable pageable = PageRequest.of(page, size);
+
+        OrderEntity order1 = new OrderEntity();
+        order1.setId(10L);
+        order1.setTotalPrice(150.50f);
+        order1.setStatus("PENDING");
+
+        OrderEntity order2 = new OrderEntity();
+        order2.setId(11L);
+        order2.setTotalPrice(200.00f);
+        order2.setStatus("COMPLETED");
+
+        // Create a Page object containing our mock entities
+        Page<OrderEntity> orderPage = new PageImpl<>(List.of(order1, order2));
+
+        when(orderEntityRepository.findAll(pageable)).thenReturn(orderPage);
+
+        // Act
+        List<OrderDto> result = userOrderService.getAllOrders(page, size);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(2, result.size());
+
+        // Verify mapping for the first item
+        OrderDto dto1 = result.get(0);
+        assertEquals(10L, dto1.getOrderId());
+        assertEquals(150.50f, dto1.getTotalPrice());
+        assertEquals("PENDING", dto1.getStatus());
+
+        // Verify mapping for the second item
+        OrderDto dto2 = result.get(1);
+        assertEquals(11L, dto2.getOrderId());
+        assertEquals("COMPLETED", dto2.getStatus());
+
+        verify(orderEntityRepository, times(1)).findAll(pageable);
+    }
+
+    @Test
+    void getAllOrders_ShouldReturnEmptyList_WhenNoOrdersExist() {
+        // Arrange
+        Pageable pageable = PageRequest.of(0, 5);
+        when(orderEntityRepository.findAll(pageable)).thenReturn(Page.empty());
+
+        // Act
+        List<OrderDto> result = userOrderService.getAllOrders(0, 5);
+
+        // Assert
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void getUserProfileData_Success() {
+        // Arrange
+        Long orderId = 100L;
+        Long userId = 1L;
+
+        // 1. Mock the Order
+        OrderEntity order = new OrderEntity();
+        order.setId(orderId);
+        order.setUserId(userId); // The link to the user
+
+        // 2. Mock the User
+        UserEntity user = new UserEntity();
+        user.setUserName("John");
+        user.setUserLastName("Doe");
+        user.setUserAddress("123 Java St");
+        user.setUserAddress2("Apt 4B");
+        user.setUserTown("Springfield");
+        user.setUserCountry("USA");
+        user.setUserPostalCode("12345");
+
+        when(orderEntityRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(userEntityRepository.findById(userId)).thenReturn(Optional.of(user));
+
+        // Act
+        UserProfileTableDto result = userOrderService.getUserProfileData(orderId);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals("John", result.getUserFirstName());
+        assertEquals("Doe", result.getUserLastName());
+        assertEquals("123 Java St", result.getUserAddress());
+        assertEquals("Springfield", result.getUserTown());
+        assertEquals("12345", result.getUserPostalCode());
+
+        // Verify both repositories were called
+        verify(orderEntityRepository).findById(orderId);
+        verify(userEntityRepository).findById(userId);
+    }
+
+    @Test
+    void getUserProfileData_ThrowsOrderNotFound() {
+        // Arrange
+        Long orderId = 999L;
+        when(orderEntityRepository.findById(orderId)).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(OrderNotFoundException.class, () -> {
+            userOrderService.getUserProfileData(orderId);
+        });
+
+        // Verify the second repo was NEVER called
+        verify(userEntityRepository, never()).findById(anyLong());
+    }
+
+    @Test
+    void getUserProfileData_ThrowsUserNotFound() {
+        // Arrange
+        Long orderId = 100L;
+        Long userId = 1L;
+        OrderEntity order = new OrderEntity();
+        order.setUserId(userId);
+
+        when(orderEntityRepository.findById(orderId)).thenReturn(Optional.of(order));
+        // Mocking the scenario where order exists but user doesn't
+        when(userEntityRepository.findById(userId)).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(UserNotFoundException.class, () -> {
+            userOrderService.getUserProfileData(orderId);
+        });
     }
 }
