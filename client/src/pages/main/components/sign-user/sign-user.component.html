@@ -1,93 +1,116 @@
 <div id="login-component" (click)="closeComponent($event)">
-  <div *ngIf="isSignPhaseActive" id="login-component-content">
-    <div>Üye Ol</div>
-    <div>
-      <mat-form-field>
-        <mat-label>E-Posta</mat-label>
-        <input matInput type="email" [(ngModel)]="userMail" />
-      </mat-form-field>
-      <mat-form-field>
-        <mat-label>Şifre Oluştur</mat-label>
+  <!-- Sign Up Phase -->
+  <div *ngIf="isSignPhaseActive" id="login-component-content" class="p-4 border rounded shadow-sm bg-light">
+    <h4 class="mb-3">Üye Ol</h4>
+    <form>
+      <!-- Email -->
+      <div class="mb-3">
+        <label for="loginEmail" class="form-label">E-Posta</label>
         <input
-          matInput
+          type="email"
+          class="form-control"
+          id="loginEmail"
+          placeholder="Enter email"
+          required
+          [(ngModel)]="userMail"
+          name="email"
+        />
+      </div>
+
+      <!-- Password -->
+      <div class="mb-3">
+        <label for="loginPassword" class="form-label">Şifre Oluştur</label>
+        <input
           [type]="passwordVisible ? 'text' : 'password'"
+          class="form-control"
+          id="loginPassword"
           [(ngModel)]="userPassword"
+          name="password"
         />
         <button
-          mat-icon-button
-          matSuffix
+          type="button"
+          class="btn btn-sm btn-outline-secondary position-absolute top-0 end-0 mt-4 me-2"
           (click)="passwordVisible = !passwordVisible"
         >
-          <mat-icon>{{
-            passwordVisible ? "visibility_off" : "visibility"
-          }}</mat-icon>
+          <i class="bi" [ngClass]="passwordVisible ? 'bi-eye-slash' : 'bi-eye'"></i>
         </button>
-      </mat-form-field>
-      <mat-form-field>
-        <mat-label>Şifreyi Onayla</mat-label>
+      </div>
+
+      <!-- Confirm Password -->
+      <div class="mb-3">
+        <label for="loginPasswordConfirm" class="form-label">Şifreyi Onayla</label>
         <input
-          matInput
           [type]="passwordVisible ? 'text' : 'password'"
+          class="form-control"
+          id="loginPasswordConfirm"
           [(ngModel)]="userPasswordConfirm"
+          name="passwordConfirm"
         />
         <button
-          mat-icon-button
-          matSuffix
+          type="button"
+          class="btn btn-sm btn-outline-secondary position-absolute top-0 end-0 mt-4 me-2"
           (click)="passwordVisible = !passwordVisible"
         >
-          <mat-icon>{{
-            passwordVisible ? "visibility_off" : "visibility"
-          }}</mat-icon>
+          <i class="bi" [ngClass]="passwordVisible ? 'bi-eye-slash' : 'bi-eye'"></i>
         </button>
-      </mat-form-field>
-    </div>
-    <div>
-      <button id="login-button" mat-raised-button (click)="signUser()">
+      </div>
+
+      <!-- Submit -->
+      <button id="login-button" type="button" class="btn btn-primary w-100" (click)="signUser()">
         Üye Ol
       </button>
-      <div id="login-text">
+
+      <div id="login-text" class="mt-3 text-center">
         Zaten üyeysen
-        <span style="color: orange; cursor: pointer" (click)="openSign()"
-          >Giriş Yap</span
-        >
+        <span class="text-warning fw-bold" style="cursor: pointer" (click)="openSign()">Giriş Yap</span>
       </div>
-    </div>
+    </form>
   </div>
-  <div *ngIf="!isSignPhaseActive" id="login-component-content">
-    <div>Giriş Yap</div>
-    <div>
-      <mat-form-field>
-        <mat-label>E-Posta</mat-label>
-        <input matInput type="email" [(ngModel)]="userMail" />
-      </mat-form-field>
-      <mat-form-field>
-        <mat-label>Şifre</mat-label>
+
+  <!-- Login Phase -->
+  <div *ngIf="!isSignPhaseActive" id="login-component-content" class="p-4 border rounded shadow-sm bg-light">
+    <h4 class="mb-3">Giriş Yap</h4>
+    <form>
+      <!-- Email -->
+      <div class="mb-3">
+        <label for="loginEmail2" class="form-label">E-Posta</label>
         <input
-          matInput
+          type="email"
+          class="form-control"
+          id="loginEmail2"
+          [(ngModel)]="userMail"
+          name="emailLogin"
+        />
+      </div>
+
+      <!-- Password -->
+      <div class="mb-3">
+        <label for="loginPassword2" class="form-label">Şifre</label>
+        <input
           [type]="passwordVisible ? 'text' : 'password'"
+          class="form-control"
+          id="loginPassword2"
           [(ngModel)]="userPassword"
+          name="passwordLogin"
         />
         <button
-          mat-icon-button
-          matSuffix
+          type="button"
+          class="btn btn-sm btn-outline-secondary position-absolute top-0 end-0 mt-4 me-2"
           (click)="passwordVisible = !passwordVisible"
         >
-          <mat-icon>{{
-            passwordVisible ? "visibility_off" : "visibility"
-          }}</mat-icon>
+          <i class="bi" [ngClass]="passwordVisible ? 'bi-eye-slash' : 'bi-eye'"></i>
         </button>
-      </mat-form-field>
-    </div>
-    <div>
-      <button id="login-button" mat-raised-button (click)="loginUser()">
+      </div>
+
+      <!-- Submit -->
+      <button id="login-button" type="button" class="btn btn-success w-100" (click)="loginUser()">
         Giriş Yap
       </button>
-      <div id="login-text">
+
+      <div id="login-text" class="mt-3 text-center">
         Üye değilsen
-        <span style="color: orange; cursor: pointer" (click)="openLogin()"
-          >Üye Ol</span
-        >
+        <span class="text-warning fw-bold" style="cursor: pointer" (click)="openLogin()">Üye Ol</span>
       </div>
-    </div>
+    </form>
   </div>
 </div>

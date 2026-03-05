@@ -1,63 +1,51 @@
+/* The dark overlay background */
 #login-component {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    top: 0px;
-    left: 0px;
-    background-color: rgba(0, 0, 0, 0.5);
-    z-index: 100;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  }
-  #login-component-content {
-    width: 360px;
-    height: 500px;
-    background-color: white;
-    border-radius: 8px;
-    display: flex;
-    flex-direction: column;
-    padding: 10px;
-    box-sizing: border-box;
-  }
-  
-  #login-component-content > :nth-child(1) {
-    width: 100%;
-    height: 20%;
-    font-size: 30px;
-    font-weight: bold;
-    color: #ff7f00;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  }
-  #login-component-content > :nth-child(2) {
-    width: 100%;
-    height: 40%;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-  #login-component-content > :nth-child(2) > :nth-child(1) {
-    width: 100%;
-  }
-  #login-component-content > :nth-child(2) > :nth-child(2) {
-    width: 100%;
-  }
-  #login-component-content > :nth-child(3) {
-    width: 100%;
-    height: 40%;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    gap: 8px;
-  }
-  #login-button {
-    width: 100%;
-    height: 60px;
-  }
-  #login-text > span {
-    color: orange;
-    cursor: pointer;
-  }
+  position: fixed; /* Fixed is better for overlays to cover the whole screen */
+  width: 100vw;
+  height: 100vh;
+  top: 0;
+  left: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* The actual white box */
+#login-component-content {
+  width: 100%;
+  max-width: 360px; /* Standard login width */
+  background-color: white !important; /* Ensure it stays white */
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  /* Remove fixed height to allow the form to grow/shrink based on fields */
+  height: auto;
+}
+
+/* Eye icon button positioning fix */
+.position-absolute {
+  /* This ensures the toggle button stays inside the input field area */
+  margin-top: 32px !important;
+}
+
+/* Header styling */
+h4 {
+  color: #ff7f00;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+/* Button height */
+#login-button {
+  padding: 12px;
+  font-weight: 600;
+  margin-top: 10px;
+}
+
+#login-text {
+  font-size: 0.9rem;
+  color: #666;
+}
