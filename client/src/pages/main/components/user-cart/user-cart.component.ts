@@ -20,7 +20,7 @@ import { data } from '../../../../memory/global-data';
   styleUrl: './user-cart.component.css',
 })
 export class UserCartComponent {
-  @ViewChild('buyButton') buyButtonRef!: ElementRef<HTMLDivElement>;
+  @ViewChild('buyButton') buyButtonRef!: ElementRef<HTMLButtonElement>;
   @Output() closeComponentEvent = new EventEmitter<void>();
 
   items: IUserCartItemDto[] = [];

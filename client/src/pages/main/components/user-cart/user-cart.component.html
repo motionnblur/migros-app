@@ -1,73 +1,70 @@
-<div id="cart-component-bg" (click)="closeCartComponent()"></div>
-<div id="cart-component">
-  <!--   <img
-    class="cart-component__image"
-    *ngFor="let url of imageUrls"
-    src="{{ url }}"
-  /> -->
-  <div id="user-cart__head">
-    <div *ngFor="let item of items; let i = index">
-      <div class="cart-component__item">
-        <div>
-          <img
-            class="cart-component__item-image"
-            src="{{ item.productImageUrl }}"
-          />
-          <div class="cart-component__item-name">{{ item.productName }}</div>
+<div id="cart-overlay" (click)="closeCartComponent()"></div>
 
-          <div class="cart-component__item-price">
-            {{ item.productPrice }} ₺
-          </div>
-          <div
-            class="cart-component__item-remove"
-            (click)="removeProductFromUserCart(item.productId)"
-          >
-            <img src="delete.png" />
-          </div>
+<div id="cart-container" class="card shadow-lg border-0">
+
+  <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+    <h5 class="mb-0 fw-bold text-orange">Sepetim</h5>
+    <button type="button" class="btn-close" (click)="closeCartComponent()"></button>
+  </div>
+
+  <div class="card-body p-0 overflow-auto" style="max-height: 450px;">
+    <div *ngIf="items.length === 0" class="text-center py-5 text-muted">
+      <i class="bi bi-cart-x fs-1 d-block mb-2"></i>
+      Sepetiniz henüz boş.
+    </div>
+
+    <div *ngFor="let item of items; let i = index" class="cart-item p-3 border-bottom">
+      <div class="row align-items-center g-2">
+
+        <div class="col-auto">
+          <img [src]="item.productImageUrl" class="rounded border" width="70" height="70" style="object-fit: cover;">
         </div>
-        <div>
-          <div class="cart-component__item-count">
-            <div
-              class="cart-component__item-count__button"
-              (click)="decreaseProductCount(item.productId)"
-            >
-              <img [src]="item.deleteState ? 'delete.png' : 'minus.png'" />
-            </div>
-            <div class="cart-component__item-count__text">
-              {{ item.productCount + " adet" }}
-            </div>
-            <div
-              class="cart-component__item-count__button"
-              (click)="increaseProductCount(item.productId)"
-            >
-              <img src="plus.png" />
-            </div>
+
+        <div class="col">
+          <div class="fw-bold text-truncate" style="max-width: 150px;">{{ item.productName }}</div>
+          <div class="text-orange fw-bold">{{ item.productPrice }} ₺</div>
+        </div>
+
+        <div class="col-auto">
+          <button class="btn btn-link text-danger p-0" (click)="removeProductFromUserCart(item.productId)">
+            <i class="bi bi-trash3 fs-5"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="row mt-2 align-items-center">
+        <div class="col d-flex align-items-center justify-content-end">
+          <div class="input-group input-group-sm w-auto">
+            <button class="btn btn-orange text-white" (click)="decreaseProductCount(item.productId)">
+              <i class="bi" [ngClass]="item.deleteState ? 'bi-trash' : 'bi-dash-lg'"></i>
+            </button>
+            <span class="input-group-text bg-light px-3 fw-medium">{{ item.productCount }} adet</span>
+            <button class="btn btn-orange text-white" (click)="increaseProductCount(item.productId)">
+              <i class="bi bi-plus-lg"></i>
+            </button>
           </div>
         </div>
       </div>
     </div>
   </div>
-  <div id="user-cart__bottom">
-    <div class="user-cart__left-field">
-      <div id="user-cart__total-text">Toplam Tutar</div>
-      <div id="user-cart__total-price">{{ totalPrice + " ₺" }}</div>
-    </div>
-    <div class="user-cart__right-field">
-      <div
-        #buyButton
-        id="user-cart__buy-button"
-        (click)="openPaymentComponent()"
-      >
-        {{
-          items.length > 0
-            ? !this.isCartConfirmed
-              ? "Sepeti onayla"
-              : "Öde"
-            : "Sepetiniz boş"
-        }}
+
+  <div class="card-footer bg-white p-3">
+    <div class="d-flex justify-content-between align-items-center mb-3 px-1">
+      <div>
+        <small class="text-muted d-block">Toplam Tutar</small>
+        <span class="fs-4 fw-bold text-dark">{{ totalPrice }} ₺</span>
       </div>
     </div>
+
+    <button
+      #buyButton
+      class="btn btn-orange w-100 py-3 fw-bold text-white shadow-sm"
+      [disabled]="items.length === 0"
+      (click)="openPaymentComponent()">
+      {{ items.length > 0 ? (isCartConfirmed ? 'Öde' : 'Sepeti Onayla') : 'Sepetiniz Boş' }}
+    </button>
   </div>
+
   <app-payment
     *ngIf="isPaymentPhaseActive"
     (closePaymentComponentEvent)="closePaymentComponent()"
