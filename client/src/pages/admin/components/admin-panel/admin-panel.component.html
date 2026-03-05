@@ -32,7 +32,7 @@
           (hasEscapePressed)="closeProductAdder()"
         />
         <app-product-updater
-          *ngIf="hasProductUpdaterOpened"
+          *ngIf="hasProductUpdaterOpened && !hasProductEditOpened"
           [id]="productId"
           (hasProductAdded)="productAddedEventHandler($event)"
           (hasEscapePressed)="closeProductUpdater()"
