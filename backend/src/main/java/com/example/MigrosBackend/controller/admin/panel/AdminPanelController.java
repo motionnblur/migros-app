@@ -85,7 +85,7 @@ public class AdminPanelController {
                                                  @RequestParam("productCount") int productCount,
                                                  @RequestParam("productDiscount") float productDiscount,
                                                  @RequestParam("productDescription") String productDescription,
-                                                 @RequestParam("selectedImage") MultipartFile selectedImage,
+                                                 @RequestParam(value = "selectedImage", required = false) MultipartFile selectedImage,
                                                  @RequestParam("categoryValue") int categoryValue) {
         adminSupplyService.updateProduct(adminId, productId, productName, subCategoryName, productPrice, productCount, productDiscount, productDescription, categoryValue, selectedImage);
         return ResponseEntity.ok("File uploaded successfully");

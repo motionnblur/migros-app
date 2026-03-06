@@ -1,10 +1,10 @@
-import { Component, Input } from '@angular/core';
-import { FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { CommonModule } from '@angular/common';
-import { IProductUpdater } from '../../../../interfaces/IProductUpdater';
-import { ProductAdderBase } from '../../../../base-components/product-adder.base';
-import { RestService } from '../../../../services/rest/rest.service';
-import { EventService } from '../../../../services/event/event.service';
+import {Component, Input} from '@angular/core';
+import {FormsModule, ReactiveFormsModule} from '@angular/forms';
+import {CommonModule} from '@angular/common';
+import {IProductUpdater} from '../../../../interfaces/IProductUpdater';
+import {ProductAdderBase} from '../../../../base-components/product-adder.base';
+import {RestService} from '../../../../services/rest/rest.service';
+import {EventService} from '../../../../services/event/event.service';
 
 @Component({
   selector: 'app-product-updater',
@@ -15,6 +15,7 @@ import { EventService } from '../../../../services/event/event.service';
 export class ProductUpdaterComponent extends ProductAdderBase {
   @Input() id!: number;
   buttonString: string = 'Güncelle';
+  isImageChanged: boolean = false;
 
   constructor(
     protected override restService: RestService,
@@ -46,6 +47,17 @@ export class ProductUpdaterComponent extends ProductAdderBase {
     });
   }
 
+  override onImageSelected(event: any) {
+    if (event.target.files && event.target.files.length > 0) {
+      this.isImageChanged = true; // User has uploaded a new image!
+      super.onImageSelected(event); // Let the base class handle the preview URL
+    }
+  }
+
+  override openEditor() {
+    this.eventManager.trigger('editorOpened');
+  }
+
   uploadProductData(): void {
     const productData: IProductUpdater = {
       adminId: 1,
@@ -56,7 +68,7 @@ export class ProductUpdaterComponent extends ProductAdderBase {
       productCount: this.count,
       productDiscount: this.discount,
       productDescription: this.description,
-      selectedImage: this.selectedImage,
+      selectedImage: this.isImageChanged ? this.selectedImage : undefined, // Only send new image if changed
       categoryValue: this.selectedFormValue,
     };
     this.restService
@@ -67,8 +79,5 @@ export class ProductUpdaterComponent extends ProductAdderBase {
           this.eventManager.trigger('productAdded');
         }
       });
-  }
-  override openEditor() {
-    this.eventManager.trigger('editorOpened');
   }
 }

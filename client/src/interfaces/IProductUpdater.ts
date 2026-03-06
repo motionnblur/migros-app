@@ -7,6 +7,6 @@ export interface IProductUpdater {
   productCount: number;
   productDiscount: number;
   productDescription: string;
-  selectedImage: File | null;
+  selectedImage: File | null | undefined;
   categoryValue: number;
 }

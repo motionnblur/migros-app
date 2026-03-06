@@ -126,21 +126,6 @@ public class AdminSupplyService {
                               int productCount, float productDiscount,
                               String productDescription, int categoryValue,
                               MultipartFile selectedImage) {
-        if (!Objects.equals(selectedImage.getContentType(), "image/png")) {
-            throw new GeneralException("Only PNG files are allowed");
-        }
-
-        String fileNameToSave = "image_" + System.currentTimeMillis() + ".png";
-        Path savedFilePath;
-        try {
-            savedFilePath = fileService.writeFileToDisk(selectedImage.getBytes(), fileNameToSave, "UploadFolder");
-        } catch (IOException e) {
-            throw new FileUploadFailedException("Failed to read file bytes");
-        }
-
-        // Process the product data here
-        System.out.println("Product data: " + productName + ", " + productPrice + ", " + productCount + ", " + productDiscount + ", " + productDescription + "," + categoryValue);
-
         CategoryEntity categoryEntity = categoryEntityRepository.findByCategoryId(categoryValue);
         AdminEntity adminEntity = adminEntityRepository.findById(adminId).orElseThrow(() -> new RuntimeException("Admin with that id: " + adminId + " could not be found."));
 
@@ -155,9 +140,27 @@ public class AdminSupplyService {
         productEntity.setProductDescription(productDescription);
         productEntityRepository.save(productEntity);
 
-        ProductImageEntity productImageEntity = productImageEntityRepository.findByProductEntityId(productEntity.getId()).get(0);
-        productImageEntity.setImagePath(savedFilePath.toString());
-        productImageEntityRepository.save(productImageEntity);
+        if (selectedImage != null && !selectedImage.isEmpty()) {
+            if (!Objects.equals(selectedImage.getContentType(), "image/png")) {
+                throw new GeneralException("Only PNG files are allowed");
+            }
+
+            String fileNameToSave = "image_" + System.currentTimeMillis() + ".png";
+            Path savedFilePath;
+            try {
+                savedFilePath = fileService.writeFileToDisk(selectedImage.getBytes(), fileNameToSave, "UploadFolder");
+            } catch (IOException e) {
+                throw new FileUploadFailedException("Failed to read file bytes");
+            }
+
+            // Update the image entity only if a new file was provided
+            List<ProductImageEntity> images = productImageEntityRepository.findByProductEntityId(productEntity.getId());
+            if (!images.isEmpty()) {
+                ProductImageEntity productImageEntity = images.get(0);
+                productImageEntity.setImagePath(savedFilePath.toString());
+                productImageEntityRepository.save(productImageEntity);
+            }
+        }
     }
 
     public List<AdminProductPreviewDto> getAllAdminProducts(Long adminId, int page, int productRange) {

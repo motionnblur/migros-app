@@ -69,7 +69,7 @@
 
   <div class="p-4 border-top bg-light rounded-bottom mt-auto">
     <div class="d-flex gap-2">
-      <button class="btn btn-orange flex-grow-1 py-2 fw-bold shadow-sm" (click)="uploadProductData()">
+      <button class="btn btn-orange flex-grow-1 py-2 fw-bold shadow-sm" (click)="this.uploadProductData()">
         <i class="bi bi-cloud-arrow-up-fill me-2"></i>{{ buttonString }}
       </button>
       <button class="btn btn-outline-secondary py-2 px-4 fw-bold" *ngIf="isUpdateMode" (click)="openEditor!()">
