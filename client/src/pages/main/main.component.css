@@ -1,6 +1,5 @@
 /* Core Layout */
 .main-page {
-  /* min-vh-100 ensures footer stays at bottom even on empty pages */
   min-height: 100vh;
 }
 
@@ -12,19 +11,44 @@
   background-color: #fafafa;
 }
 
-/* Navbar Tuning */
-.navbar-brand img {
+/* Logo Styling */
+.logo-link {
+  text-decoration: none;
+}
+
+.logo-link img {
   transition: transform 0.3s ease;
 }
 
-.navbar-brand:hover img {
+.logo-link:hover img {
   transform: scale(1.05);
 }
 
-/* Dropdown Styling */
+/* User Text Handling */
+.user-name-text {
+  max-width: 120px;
+  display: inline-block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* Custom Dropdown (Angular Controlled) */
+.dropdown {
+  position: relative;
+}
+
 .dropdown-menu {
+  display: none;
   border-radius: 12px;
   min-width: 200px;
+  z-index: 1050;
+}
+
+.dropdown-menu.show {
+  display: block;
+  animation: fadeIn 0.2s ease-in-out;
 }
 
 .dropdown-item {
@@ -38,36 +62,7 @@
   color: #ff7f00;
 }
 
-/* Responsive Image Handling */
-main .container {
-  max-width: 1300px; /* Limits the max spread on ultra-wide screens */
-}
-
-footer img {
-  max-width: 100%;
-  height: auto;
-}
-
-/* Smooth Transitions for Modals */
-app-sign-user, app-user-cart, app-user-profile, app-order-tracker {
-  position: relative;
-  z-index: 2000; /* Ensure they appear over the header */
-}
-
-::ng-deep .bootstrap-style-menu.mat-mdc-menu-panel {
-  border-radius: 12px !important;
-  margin-top: 10px;
-  border: none !important;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1) !important;
-}
-
-.user-auth-area {
-  display: flex;
-  align-items: center;
-  min-width: 120px; /* Prevents layout shift when text changes */
-  justify-content: flex-end;
-}
-
+/* Animations */
 .animate-fade-in {
   animation: fadeIn 0.2s ease-in-out;
 }
@@ -75,15 +70,21 @@ app-sign-user, app-user-cart, app-user-profile, app-order-tracker {
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: scale(0.95);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: translateY(0);
   }
 }
 
-/* Ensure the dropdown menu doesn't get cut off by parent overflow */
-.navbar {
-  overflow: visible !important;
+/* Responsive Container */
+main .container {
+  max-width: 1300px;
+}
+
+/* Modal Z-Index */
+app-sign-user, app-user-cart, app-user-profile, app-order-tracker {
+  position: relative;
+  z-index: 2000;
 }

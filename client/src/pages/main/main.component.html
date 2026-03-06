@@ -1,72 +1,67 @@
 <div class="main-page d-flex flex-column min-vh-100 bg-light">
 
   <header class="bg-white shadow-sm sticky-top">
-    <nav class="navbar navbar-expand-lg navbar-light py-3">
-      <div class="container">
-        <a class="navbar-brand py-0" href="#" (click)="setItemPageOpened(false)">
-          <img src="migros_header.png" height="40" alt="Logo" class="d-inline-block align-top">
+    <div class="container py-3">
+      <div class="d-flex flex-column flex-md-row align-items-center justify-content-between gap-3">
+
+        <a class="logo-link" href="#" (click)="setItemPageOpened(false); $event.preventDefault()">
+          <img src="migros_header.png" height="40" alt="Logo" class="d-block">
         </a>
 
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navContent">
-          <span class="navbar-toggler-icon"></span>
-        </button>
+        <div class="d-flex align-items-center gap-2 gap-md-3">
 
-        <div class="collapse navbar-collapse" id="navContent">
-          <div class="ms-auto d-flex align-items-center gap-2 gap-md-3">
+          <button class="btn btn-outline-secondary rounded-pill px-3 px-md-4 fw-medium btn-sm"
+                  (click)="openOrderComponent()">
+            <i class="bi bi-truck me-1 me-md-2"></i>
+            <span class="d-none d-sm-inline">Sipariş Takibi</span>
+          </button>
 
-            <button class="btn btn-outline-secondary rounded-pill px-3 px-md-4 fw-medium btn-sm"
-                    (click)="openOrderComponent()">
-              <i class="bi bi-truck me-1 me-md-2"></i>
-              <span class="d-none d-sm-inline">Sipariş Takibi</span>
+          <div class="user-auth-area">
+            <button *ngIf="!isUserLoggedIn()"
+                    class="btn btn-primary rounded-pill px-4 fw-bold btn-sm shadow-sm animate-fade-in"
+                    (click)="openLoginComponent()">
+              <i class="bi bi-box-arrow-in-right me-1"></i> {{ loginText }}
             </button>
 
-            <div class="user-auth-area">
-
-              <button *ngIf="!isUserLoggedIn()"
-                      class="btn btn-primary rounded-pill px-4 fw-bold btn-sm shadow-sm animate-fade-in"
-                      (click)="openLoginComponent()">
-                <i class="bi bi-box-arrow-in-right me-1"></i> {{ loginText }}
+            <div class="dropdown" *ngIf="isUserLoggedIn()">
+              <button
+                class="btn btn-light border rounded-pill px-3 px-md-4 fw-bold btn-sm dropdown-toggle animate-fade-in"
+                type="button" (click)="toggleMenu($event)">
+                <i class="bi bi-person-circle me-1 me-md-2 text-primary"></i>
+                <span class="user-name-text">{{ loginText }}</span>
               </button>
 
-              <div class="dropdown" *ngIf="isUserLoggedIn()">
-                <button class="btn btn-light border rounded-pill px-4 fw-bold btn-sm dropdown-toggle animate-fade-in"
-                        type="button" (click)="toggleMenu($event)">
-                  <i class="bi bi-person-circle me-2 text-primary"></i>{{ loginText }}
-                </button>
-
-                <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2"
-                    [ngClass]="{ 'show': isMenuOpen }"
-                    style="position: absolute; right: 0; min-width: 180px;">
-                  <li>
-                    <a class="dropdown-item py-2 d-flex align-items-center" (click)="openCartComponent()">
-                      <i class="bi bi-cart3 me-2 text-muted"></i>Sepetim
-                    </a>
-                  </li>
-                  <li>
-                    <a class="dropdown-item py-2 d-flex align-items-center" (click)="openProfileComponent()">
-                      <i class="bi bi-person me-2 text-muted"></i>Profilim
-                    </a>
-                  </li>
-                  <li>
-                    <hr class="dropdown-divider">
-                  </li>
-                  <li>
-                    <a class="dropdown-item py-2 text-danger d-flex align-items-center" (click)="logoutUser()">
-                      <i class="bi bi-box-arrow-right me-2"></i>Çıkış Yap
-                    </a>
-                  </li>
-                </ul>
-              </div>
-
+              <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2"
+                  [ngClass]="{ 'show': isMenuOpen }"
+                  style="position: absolute; right: 0; min-width: 180px;">
+                <li>
+                  <a class="dropdown-item py-2 d-flex align-items-center" (click)="openCartComponent()">
+                    <i class="bi bi-cart3 me-2 text-muted"></i>Sepetim
+                  </a>
+                </li>
+                <li>
+                  <a class="dropdown-item py-2 d-flex align-items-center" (click)="openProfileComponent()">
+                    <i class="bi bi-person me-2 text-muted"></i>Profilim
+                  </a>
+                </li>
+                <li>
+                  <hr class="dropdown-divider">
+                </li>
+                <li>
+                  <a class="dropdown-item py-2 text-danger d-flex align-items-center" (click)="logoutUser()">
+                    <i class="bi bi-box-arrow-right me-2"></i>Çıkış Yap
+                  </a>
+                </li>
+              </ul>
             </div>
           </div>
         </div>
       </div>
-    </nav>
+    </div>
 
     <div class="bg-orange" style="height: 4px;"></div>
 
-    <div class="bg-light-gray border-bottom overflow-hidden">
+    <div class="bg-light-gray border-bottom overflow-hidden d-none d-md-block">
       <div class="container-fluid p-0">
         <img src="migros_header2.png" class="img-fluid w-100 d-block" style="max-height: 80px; object-fit: cover;">
       </div>
@@ -88,7 +83,6 @@
       <div class="text-center mb-5">
         <img src="footer/migros-footer-main.png" class="img-fluid rounded shadow-sm" alt="Footer Content">
       </div>
-
       <div class="d-flex flex-column flex-md-row justify-content-between align-items-center border-top pt-4 gap-3">
         <img src="footer/migros-footer.png" class="img-fluid" style="max-height: 40px;">
         <img src="footer/migros-footer2.png" class="img-fluid" style="max-height: 35px;">
@@ -109,5 +103,4 @@
   <app-order-tracker *ngIf="isOrderButtonClicked"
                      [orderIds]="orderIds"
                      (closeOrderTrackerComponentEvent)="closeOrderTrackerComponent()"/>
-
 </div>
