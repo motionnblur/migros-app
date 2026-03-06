@@ -182,3 +182,35 @@ app-sign-user, app-user-cart, app-user-profile, app-order-tracker {
   border-top: 1px solid #ececec;
   background: #fff;
 }
+
+@media (max-width: 767.98px) {
+  .dropdown-menu {
+    min-width: 160px;
+    right: 0;
+    left: auto;
+  }
+
+  .live-support-btn {
+    right: 12px;
+    bottom: 12px;
+    padding: 0.45rem 0.75rem;
+    font-size: 0.75rem;
+  }
+
+  .live-support-chat {
+    right: 10px;
+    left: 10px;
+    bottom: 58px;
+    width: auto;
+    max-width: none;
+    height: min(58vh, 420px);
+  }
+
+  .chat-footer {
+    flex-direction: column;
+  }
+
+  .chat-footer .btn {
+    width: 100%;
+  }
+}

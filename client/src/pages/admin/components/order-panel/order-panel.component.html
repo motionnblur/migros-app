@@ -1,47 +1,49 @@
 <div class="card shadow-sm border-0 h-100 overflow-hidden">
   <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
     <h5 class="mb-0 fw-bold text-dark">
-      <i class="bi bi-receipt me-2 text-primary"></i>Sipariş Yönetimi
+      <i class="bi bi-receipt me-2 text-primary"></i>Siparis Yonetimi
     </h5>
-    <span class="badge bg-light text-dark border px-3">Toplam: {{ tableData.length }} Sipariş</span>
+    <span class="badge bg-light text-dark border px-3">Toplam: {{ tableData.length }} Siparis</span>
   </div>
 
-  <div class="card-body p-0 overflow-auto" style="min-height: 400px;">
-    <table class="table table-hover align-middle mb-0">
-      <thead class="table-light">
-      <tr>
-        <th class="ps-4">Sipariş ID</th>
-        <th>Toplam Fiyat</th>
-        <th>Durum</th>
-        <th class="text-end pe-4">İşlem</th>
-      </tr>
-      </thead>
-      <tbody>
-      <tr *ngFor="let element of dataSource">
-        <td class="ps-4 fw-medium text-muted">#{{ element.orderId }}</td>
-        <td class="fw-bold text-dark">{{ element.totalPrice | number:'1.2-2' }} TL</td>
-        <td>
+  <div class="card-body p-0" style="min-height: 400px;">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+        <tr>
+          <th class="ps-4">Siparis ID</th>
+          <th>Toplam Fiyat</th>
+          <th>Durum</th>
+          <th class="text-end pe-4">Islem</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr *ngFor="let element of dataSource">
+          <td class="ps-4 fw-medium text-muted">#{{ element.orderId }}</td>
+          <td class="fw-bold text-dark">{{ element.totalPrice | number:'1.2-2' }} TL</td>
+          <td>
             <span class="badge rounded-pill" [ngClass]="getStatusClass(element.status)">
               {{ element.status }}
             </span>
-        </td>
-        <td class="text-end pe-4">
-          <button class="btn btn-sm btn-action rounded-circle shadow-sm"
-                  (click)="openActionPanel(element.orderId)"
-                  title="İşlemleri Görüntüle">
-            <i class="bi bi-three-dots-vertical"></i>
-          </button>
-        </td>
-      </tr>
+          </td>
+          <td class="text-end pe-4">
+            <button class="btn btn-sm btn-action rounded-circle shadow-sm"
+                    (click)="openActionPanel(element.orderId)"
+                    title="Islemleri Goruntule">
+              <i class="bi bi-three-dots-vertical"></i>
+            </button>
+          </td>
+        </tr>
 
-      <tr *ngIf="dataSource.length === 0">
-        <td colspan="4" class="text-center py-5 text-muted">
-          <i class="bi bi-box-seam fs-1 d-block mb-2"></i>
-          Henüz sipariş bulunmuyor.
-        </td>
-      </tr>
-      </tbody>
-    </table>
+        <tr *ngIf="dataSource.length === 0">
+          <td colspan="4" class="text-center py-5 text-muted">
+            <i class="bi bi-box-seam fs-1 d-block mb-2"></i>
+            Henuz siparis bulunmuyor.
+          </td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <div class="card-footer bg-white border-top py-2">

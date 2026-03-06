@@ -73,3 +73,17 @@
   background-color: #fff4e6;
   color: #d96c00;
 }
+
+@media (max-width: 767.98px) {
+  .table {
+    min-width: 520px;
+  }
+
+  .card-header .row {
+    row-gap: 10px;
+  }
+
+  .card-header .btn {
+    width: 100%;
+  }
+}

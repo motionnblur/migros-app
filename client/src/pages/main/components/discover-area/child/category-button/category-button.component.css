@@ -30,3 +30,33 @@
   justify-content: center;
   align-items: center;
 }
+.category-button {
+  width: clamp(112px, 30vw, 144px);
+  height: auto;
+  min-height: 155px;
+}
+
+.category-button__image__container {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  height: auto;
+}
+
+.category-button__image {
+  width: clamp(60px, 18vw, 88px);
+  height: clamp(60px, 18vw, 88px);
+}
+
+.category-button__title {
+  padding: 4px;
+  font-size: 12px;
+  text-align: center;
+  align-items: flex-start;
+}
+
+@media (max-width: 575.98px) {
+  .category-button {
+    width: calc(33.333% - 8px);
+    min-width: 96px;
+  }
+}

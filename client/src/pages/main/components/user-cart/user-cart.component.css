@@ -75,3 +75,20 @@
 .cart-item:hover {
   background-color: #fffaf5;
 }
+
+@media (max-width: 767.98px) {
+  #cart-container {
+    width: calc(100vw - 16px);
+    height: calc(100vh - 16px);
+    max-height: calc(100vh - 16px);
+    top: 8px;
+    left: 8px;
+    transform: none;
+    border-radius: 12px;
+  }
+
+  .card-footer .btn {
+    padding-top: 0.8rem !important;
+    padding-bottom: 0.8rem !important;
+  }
+}

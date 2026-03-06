@@ -84,3 +84,27 @@
 .product-price {
   line-height: 1;
 }
+
+@media (max-width: 575.98px) {
+  .product-card {
+    height: 280px !important;
+  }
+
+  .product-img-wrapper {
+    height: 145px;
+  }
+
+  .card-body {
+    padding: 0.75rem;
+  }
+
+  .card-title {
+    font-size: 0.85rem;
+    height: 2.2rem;
+  }
+
+  .btn-orange-action {
+    width: 32px;
+    height: 32px;
+  }
+}

@@ -127,3 +127,26 @@
     transform: translateY(0);
   }
 }
+
+@media (max-width: 767.98px) {
+  #order-tracker-container {
+    width: calc(100vw - 16px);
+    max-width: none;
+    top: 8px;
+    left: 8px;
+    transform: none;
+    max-height: calc(100vh - 16px);
+  }
+
+  #order-tracker-container .card-body {
+    height: calc(100vh - 130px) !important;
+  }
+
+  .viewport-bootstrap {
+    height: 320px;
+  }
+
+  .step-name {
+    font-size: 10px;
+  }
+}

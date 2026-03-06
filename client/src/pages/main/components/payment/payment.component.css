@@ -99,3 +99,27 @@
     text-decoration: underline;
   }
   
+@media (max-width: 767.98px) {
+  .payment-container {
+    width: calc(100vw - 16px);
+    max-width: none;
+    top: 8px;
+    left: 8px;
+    transform: none;
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
+    border-radius: 12px;
+    padding: 14px;
+  }
+
+  #payment-component-bg {
+    top: 0;
+    left: 0;
+    transform: none;
+  }
+
+  .payment-title {
+    font-size: 20px;
+    margin-bottom: 14px;
+  }
+}

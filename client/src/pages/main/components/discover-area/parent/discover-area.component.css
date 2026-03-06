@@ -8,3 +8,16 @@
   gap: 12px;
   margin-top: 15px;
 }
+.discover {
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  justify-content: center;
+}
+
+@media (max-width: 767.98px) {
+  .discover {
+    gap: 8px;
+    margin-top: 10px;
+  }
+}
