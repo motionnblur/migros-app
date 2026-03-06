@@ -1,22 +1,23 @@
-import {Component, HostListener} from '@angular/core';
-import {CommonModule} from '@angular/common';
-import {FormsModule} from '@angular/forms';
+import { Component, HostListener, OnDestroy } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 
 // Services
-import {EventService} from '../../services/event/event.service';
-import {RestService} from '../../services/rest/rest.service';
-import {AuthService} from '../../services/auth/auth.service';
+import { EventService } from '../../services/event/event.service';
+import { RestService } from '../../services/rest/rest.service';
+import { AuthService } from '../../services/auth/auth.service';
 
 // Data
-import {data} from '../../memory/global-data';
+import { data } from '../../memory/global-data';
 
 // Components
-import {DiscoverComponent} from './components/discover-area/parent/discover-area.component';
-import {ProductPageComponent} from './components/product-page/product-page.component';
-import {SignUserComponent} from './components/sign-user/sign-user.component';
-import {UserCartComponent} from './components/user-cart/user-cart.component';
-import {UserProfileComponent} from './components/user-profile/user-profile.component';
-import {OrderTrackerComponent} from './components/order-tracker/order-tracker.component';
+import { DiscoverComponent } from './components/discover-area/parent/discover-area.component';
+import { ProductPageComponent } from './components/product-page/product-page.component';
+import { SignUserComponent } from './components/sign-user/sign-user.component';
+import { UserCartComponent } from './components/user-cart/user-cart.component';
+import { UserProfileComponent } from './components/user-profile/user-profile.component';
+import { OrderTrackerComponent } from './components/order-tracker/order-tracker.component';
+import { IChatMessage } from '../../interfaces/IChatMessage';
 
 @Component({
   selector: 'app-main',
@@ -29,26 +30,35 @@ import {OrderTrackerComponent} from './components/order-tracker/order-tracker.co
     SignUserComponent,
     UserCartComponent,
     UserProfileComponent,
-    OrderTrackerComponent
+    OrderTrackerComponent,
   ],
   templateUrl: './main.component.html',
   styleUrl: './main.component.css',
 })
-export class MainComponent {
+export class MainComponent implements OnDestroy {
   // Page State
-  isItemPageOpened: boolean = false;
-  isLoginButtonClicked: boolean = false;
-  isOrderButtonClicked: boolean = false;
-  isProfileButtonClicked: boolean = false;
-  isCartComponentOpened: boolean = false;
+  isItemPageOpened = false;
+  isLoginButtonClicked = false;
+  isOrderButtonClicked = false;
+  isProfileButtonClicked = false;
+  isCartComponentOpened = false;
 
   // Auth State
-  isUserSigned: boolean = false;
-  loginText: string = 'Üye Ol veya Giriş Yap';
+  isUserSigned = false;
+  loginText = 'Uye Ol veya Giris Yap';
 
   // Data State
   orderIds: number[] = [];
-  isMenuOpen: boolean = false;
+  isMenuOpen = false;
+
+  // Support Chat State
+  isSupportChatOpen = false;
+  supportMessages: IChatMessage[] = [];
+  supportMessageInput = '';
+  isSupportLoading = false;
+  isSupportSending = false;
+  supportErrorMessage = '';
+  private supportPollingIntervalId: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     private eventManager: EventService,
@@ -66,18 +76,22 @@ export class MainComponent {
 
     // Load Orders
     this.restService.getAllOrderIds().subscribe({
-      next: (ids: number[]) => this.orderIds = ids,
+      next: (ids: number[]) => (this.orderIds = ids),
       error: (err) => console.error('Order fetch failed', err),
     });
   }
 
+  ngOnDestroy(): void {
+    this.stopSupportMessagePolling();
+  }
+
   private checkAuthStatus() {
     if (this.authService.isLoggedIn()) {
-      this.loginText = 'Can'; // Or fetch actual user name
+      this.loginText = 'Can';
       this.isUserSigned = true;
     } else {
       this.isUserSigned = false;
-      this.loginText = 'Üye Ol veya Giriş Yap';
+      this.loginText = 'Uye Ol veya Giris Yap';
     }
   }
 
@@ -125,8 +139,12 @@ export class MainComponent {
     this.authService.logout();
     this.isUserSigned = false;
     this.isMenuOpen = false;
-    this.loginText = 'Üye Ol veya Giriş Yap';
+    this.loginText = 'Uye Ol veya Giris Yap';
     this.setItemPageOpened(false);
+    this.isSupportChatOpen = false;
+    this.supportMessages = [];
+    this.supportErrorMessage = '';
+    this.stopSupportMessagePolling();
   }
 
   public openCartComponent() {
@@ -153,7 +171,7 @@ export class MainComponent {
       return;
     }
     if (this.orderIds.length === 0) {
-      alert("Hiç siparişiniz yok");
+      alert('Hic siparisiniz yok');
       return;
     }
     this.isOrderButtonClicked = true;
@@ -161,5 +179,78 @@ export class MainComponent {
 
   public closeOrderTrackerComponent() {
     this.isOrderButtonClicked = false;
+  }
+
+  // --- SUPPORT CHAT ---
+
+  public toggleSupportChat() {
+    if (!this.isUserSigned) {
+      this.openLoginComponent();
+      return;
+    }
+
+    this.isSupportChatOpen = !this.isSupportChatOpen;
+
+    if (this.isSupportChatOpen) {
+      this.loadSupportMessages();
+      this.startSupportMessagePolling();
+      return;
+    }
+
+    this.stopSupportMessagePolling();
+  }
+
+  public sendSupportMessage() {
+    const message = this.supportMessageInput.trim();
+    if (!message || this.isSupportSending) {
+      return;
+    }
+
+    this.isSupportSending = true;
+    this.restService.sendSupportMessage(message).subscribe({
+      next: () => {
+        this.supportMessageInput = '';
+        this.isSupportSending = false;
+        this.loadSupportMessages();
+      },
+      error: () => {
+        this.isSupportSending = false;
+        this.supportErrorMessage =
+          'Mesaj gonderilemedi. Lutfen tekrar deneyin.';
+      },
+    });
+  }
+
+  private loadSupportMessages() {
+    this.isSupportLoading = true;
+    this.supportErrorMessage = '';
+
+    this.restService.getSupportMessages().subscribe({
+      next: (messages: IChatMessage[]) => {
+        this.supportMessages = messages;
+        this.isSupportLoading = false;
+      },
+      error: () => {
+        this.isSupportLoading = false;
+        this.supportErrorMessage =
+          'Mesajlar yuklenemedi. Lutfen tekrar deneyin.';
+      },
+    });
+  }
+
+  private startSupportMessagePolling() {
+    this.stopSupportMessagePolling();
+    this.supportPollingIntervalId = setInterval(() => {
+      if (this.isSupportChatOpen) {
+        this.loadSupportMessages();
+      }
+    }, 5000);
+  }
+
+  private stopSupportMessagePolling() {
+    if (this.supportPollingIntervalId) {
+      clearInterval(this.supportPollingIntervalId);
+      this.supportPollingIntervalId = null;
+    }
   }
 }

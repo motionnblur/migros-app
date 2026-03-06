@@ -3,19 +3,24 @@
   <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm px-4 py-2 sticky-top">
     <a class="navbar-brand d-flex align-items-center" href="#">
       <img src="migroslogo.png" height="30" class="me-2" alt="Admin Logo">
-      <span class="fw-bold small text-uppercase tracking-wider">Yönetim Paneli</span>
+      <span class="fw-bold small text-uppercase tracking-wider">Yonetim Paneli</span>
     </a>
 
     <div class="ms-auto d-flex gap-2">
       <button class="btn btn-sm px-3 rounded-pill transition-all"
               [ngClass]="hasProductsOpened ? 'btn-orange' : 'btn-outline-light'"
               (click)="open_close_Products()">
-        <i class="bi bi-box-seam me-1"></i> Ürünler
+        <i class="bi bi-box-seam me-1"></i> Urunler
       </button>
       <button class="btn btn-sm px-3 rounded-pill transition-all"
               [ngClass]="hasOrdersOpened ? 'btn-orange' : 'btn-outline-light'"
               (click)="open_close_Orders()">
-        <i class="bi bi-receipt me-1"></i> Siparişler
+        <i class="bi bi-receipt me-1"></i> Siparisler
+      </button>
+      <button class="btn btn-sm px-3 rounded-pill transition-all"
+              [ngClass]="hasSupportOpened ? 'btn-orange' : 'btn-outline-light'"
+              (click)="open_close_Support()">
+        <i class="bi bi-chat-dots me-1"></i> Canli Destek
       </button>
     </div>
   </nav>
@@ -52,15 +57,71 @@
 
     <div class="container-fluid h-100">
       <app-product-body
-        *ngIf="hasProductsOpened && !hasOrdersOpened"
+        *ngIf="hasProductsOpened && !hasOrdersOpened && !hasSupportOpened"
         (hasAddProductButtonClicked)="openProductAdder()"
       />
-      <app-order-panel *ngIf="hasOrdersOpened && !hasProductsOpened"/>
+      <app-order-panel *ngIf="hasOrdersOpened && !hasProductsOpened && !hasSupportOpened"/>
 
-      <div *ngIf="!hasProductsOpened && !hasOrdersOpened" class="text-center mt-5 py-5">
+      <div *ngIf="hasSupportOpened" class="support-chat-layout">
+        <aside class="support-user-list">
+          <div class="support-list-title">Bekleyen Sohbetler</div>
+
+          <div class="support-empty" *ngIf="!supportUsers.length">
+            Henuz mesaj yok.
+          </div>
+
+          <button
+            type="button"
+            class="support-user-item"
+            *ngFor="let userMail of supportUsers"
+            [ngClass]="{ 'active': userMail === selectedSupportUserMail }"
+            (click)="selectSupportUser(userMail)">
+            {{ userMail }}
+          </button>
+        </aside>
+
+        <section class="support-conversation" *ngIf="selectedSupportUserMail; else noConversationTemplate">
+          <div class="support-conversation-header">
+            <strong>{{ selectedSupportUserMail }}</strong>
+          </div>
+
+          <div class="support-conversation-body">
+            <div class="support-info" *ngIf="isSupportLoading">Yukleniyor...</div>
+            <div class="support-info text-danger" *ngIf="supportError">{{ supportError }}</div>
+
+            <div class="support-message"
+                 *ngFor="let message of supportMessages"
+                 [ngClass]="{ 'admin': message.sender === 'MANAGEMENT' }">
+              <div class="support-message-meta">{{ message.sender === 'MANAGEMENT' ? 'Yonetim' : 'Kullanici' }}</div>
+              <div class="support-message-content">{{ message.message }}</div>
+            </div>
+          </div>
+
+          <div class="support-conversation-footer">
+            <input
+              type="text"
+              class="form-control form-control-sm"
+              [(ngModel)]="supportReplyInput"
+              placeholder="Yanitinizi yazin..."
+              (keydown.enter)="sendSupportReply()"
+            />
+            <button type="button" class="btn btn-warning btn-sm" [disabled]="isSupportSending" (click)="sendSupportReply()">
+              Gonder
+            </button>
+          </div>
+        </section>
+
+        <ng-template #noConversationTemplate>
+          <section class="support-conversation support-placeholder">
+            Kullanici secerek sohbeti acin.
+          </section>
+        </ng-template>
+      </div>
+
+      <div *ngIf="!hasProductsOpened && !hasOrdersOpened && !hasSupportOpened" class="text-center mt-5 py-5">
         <i class="bi bi-speedometer2 display-1 text-muted"></i>
-        <h2 class="text-muted mt-3">Admin Paneline Hoş Geldiniz</h2>
-        <p class="text-secondary">Yönetmek istediğiniz bölümü yukarıdan seçin.</p>
+        <h2 class="text-muted mt-3">Admin Paneline Hos Geldiniz</h2>
+        <p class="text-secondary">Yonetmek istediginiz bolumu yukaridan secin.</p>
       </div>
     </div>
   </div>

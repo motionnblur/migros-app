@@ -11,6 +11,7 @@ import { ISignDto } from '../../interfaces/ISignDto';
 import { IUserCartItemDto } from '../../interfaces/IUserCartItemDto';
 import { IOrder } from '../../interfaces/IOrder';
 import { IUserProfileTable } from '../../interfaces/IUserProfileTable';
+import { IChatMessage } from '../../interfaces/IChatMessage';
 
 @Injectable({
   providedIn: 'root',
@@ -339,4 +340,58 @@ export class RestService {
       })
       .pipe(map((response) => response.status === 200));
   }
+  getSupportMessages() {
+    const token: string = localStorage.getItem('token') as string;
+    return this.http
+      .get(`http://localhost:8080/user/support/messages`, {
+        params: { token },
+        responseType: 'json',
+      })
+      .pipe(map((response) => response as IChatMessage[]));
+  }
+
+  sendSupportMessage(message: string) {
+    const token: string = localStorage.getItem('token') as string;
+    return this.http
+      .post(
+        `http://localhost:8080/user/support/send`,
+        { message },
+        {
+          params: { token },
+          responseType: 'text',
+          observe: 'response',
+        }
+      )
+      .pipe(map((response) => response.status === 200));
+  }
+  getSupportUsersForAdmin() {
+    return this.http
+      .get(`http://localhost:8080/admin/panel/support/users`, {
+        responseType: 'json',
+      })
+      .pipe(map((response) => response as string[]));
+  }
+
+  getSupportMessagesForAdmin(userMail: string) {
+    return this.http
+      .get(`http://localhost:8080/admin/panel/support/messages`, {
+        params: { userMail },
+        responseType: 'json',
+      })
+      .pipe(map((response) => response as IChatMessage[]));
+  }
+
+  sendSupportReplyFromAdmin(userMail: string, message: string) {
+    return this.http
+      .post(
+        `http://localhost:8080/admin/panel/support/reply`,
+        { userMail, message },
+        {
+          responseType: 'text',
+          observe: 'response',
+        }
+      )
+      .pipe(map((response) => response.status === 200));
+  }
 }
+
