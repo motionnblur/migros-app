@@ -13,6 +13,7 @@ import { IChatMessage } from '../../../../interfaces/IChatMessage';
 import { SupportRealtimeService } from '../../../../services/support-realtime/support-realtime.service';
 import { ISupportRealtimeEvent } from '../../../../interfaces/support/ISupportRealtimeEvent';
 import { Subscription } from 'rxjs';
+import { RouterLink } from '@angular/router';
 
 @Component({
   selector: 'app-admin-panel',
@@ -25,6 +26,7 @@ import { Subscription } from 'rxjs';
     ProductEditComponent,
     OrderPanelComponent,
     FormsModule,
+    RouterLink,
   ],
   templateUrl: './admin-panel.component.html',
   styleUrl: './admin-panel.component.css',
