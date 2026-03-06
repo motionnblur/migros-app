@@ -28,6 +28,7 @@ This application provides a basic platform for users to browse products, add the
 * **View Cart:** Display the items in the shopping cart.
 * **Payment Processing:** By using Stripe's payment test api.
 * **Basic Security:** User Authentication and Authorization using JWT tokens
+* **Live Support:** Basic live support system using websockets and storing them as a fallback
 
 ## :computer: Technologies Used
 
@@ -46,6 +47,10 @@ This application provides a basic platform for users to browse products, add the
     * [PostgreSQL](https://www.postgresql.org/) (postgres:18.3-alpine3.22)
 * **Docker:**
     * [Docker](https://www.docker.com/)
+* **Gemini:**
+    * For writing backend tests
+* **CODEX (by OpenAI):**
+    * For implementing live support system
 
 ## :page_with_curl: Prerequisites
 
@@ -100,6 +105,8 @@ docker compose --env-file configs/postgres.env --env-file configs/spring.env up
 
 * Current code coverage
 <img width="791" height="367" alt="Screenshot 2026-03-05 124449" src="https://github.com/user-attachments/assets/34abb1eb-5424-4434-89bb-2131b45742ae" />
+
+<img width="1913" height="984" alt="Screenshot 2026-03-06 144805" src="https://github.com/user-attachments/assets/ccb0027d-d0d3-491a-b283-0131a959c96f" />
 
 <img width="1890" height="944" alt="Screenshot 2026-03-05 195555" src="https://github.com/user-attachments/assets/ee61d7ca-6e80-4e10-99b4-2a80ccf6921e" />
 
