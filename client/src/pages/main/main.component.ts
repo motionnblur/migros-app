@@ -64,6 +64,7 @@ export class MainComponent implements OnInit, OnDestroy {
   private supportPollingIntervalId: ReturnType<typeof setInterval> | null = null;
   private currentUserMail = '';
   private supportRealtimeSub: Subscription | null = null;
+  private tokenExpiryIntervalId: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     private eventManager: EventService,
@@ -85,6 +86,8 @@ export class MainComponent implements OnInit, OnDestroy {
       this.loadOrderIds();
     }
 
+    this.startTokenExpiryPolling();
+
     this.supportRealtimeService.connect();
     this.supportRealtimeSub = this.supportRealtimeService.events$.subscribe(
       (event: ISupportRealtimeEvent) => {
@@ -101,6 +104,7 @@ export class MainComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.stopSupportMessagePolling();
+    this.stopTokenExpiryPolling();
     this.supportRealtimeSub?.unsubscribe();
   }
 
@@ -130,6 +134,26 @@ export class MainComponent implements OnInit, OnDestroy {
       next: (ids: number[]) => (this.orderIds = ids),
       error: (err) => console.error('Order fetch failed', err),
     });
+  }
+
+  private startTokenExpiryPolling() {
+    this.stopTokenExpiryPolling();
+    this.tokenExpiryIntervalId = setInterval(() => {
+      const token = this.authService.getToken();
+      if (!token) {
+        return;
+      }
+      if (this.authService.isTokenExpired(token)) {
+        window.location.reload();
+      }
+    }, 15000);
+  }
+
+  private stopTokenExpiryPolling() {
+    if (this.tokenExpiryIntervalId) {
+      clearInterval(this.tokenExpiryIntervalId);
+      this.tokenExpiryIntervalId = null;
+    }
   }
 
   public toggleMenu(event: Event) {
