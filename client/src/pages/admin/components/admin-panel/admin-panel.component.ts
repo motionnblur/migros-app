@@ -10,6 +10,9 @@ import { OrderPanelComponent } from '../order-panel/order-panel.component';
 import { RestService } from '../../../../services/rest/rest.service';
 import { FormsModule } from '@angular/forms';
 import { IChatMessage } from '../../../../interfaces/IChatMessage';
+import { SupportRealtimeService } from '../../../../services/support-realtime/support-realtime.service';
+import { ISupportRealtimeEvent } from '../../../../interfaces/support/ISupportRealtimeEvent';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-admin-panel',
@@ -44,13 +47,15 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
   isSupportSending = false;
   supportError = '';
   private supportPollingIntervalId: ReturnType<typeof setInterval> | null = null;
+  private supportRealtimeSub: Subscription | null = null;
 
   private productChangedCallback!: (data: any) => void;
   private editorOpenedCallback!: (id: number) => void;
 
   constructor(
     private eventManager: EventService,
-    private restService: RestService
+    private restService: RestService,
+    private supportRealtimeService: SupportRealtimeService
   ) {
     this.productChangedCallback = (data: any) => {
       this.productChangedEventHandler(data);
@@ -63,12 +68,32 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.eventManager.on('productChanged', this.productChangedCallback);
     this.eventManager.on('editorOpened', this.editorOpenedCallback);
+
+    this.supportRealtimeService.connect();
+    this.supportRealtimeSub = this.supportRealtimeService.events$.subscribe(
+      (event: ISupportRealtimeEvent) => {
+        if (!this.hasSupportOpened) {
+          return;
+        }
+
+        this.loadSupportUsers();
+        this.loadBannedUsers();
+
+        if (
+          this.selectedSupportUserMail &&
+          this.selectedSupportUserMail === event.userMail
+        ) {
+          this.loadSupportMessages();
+        }
+      }
+    );
   }
 
   ngOnDestroy(): void {
     this.eventManager.off('productChanged', this.productChangedCallback);
     this.eventManager.off('editorOpened', this.editorOpenedCallback);
     this.stopSupportPolling();
+    this.supportRealtimeSub?.unsubscribe();
   }
 
   productAddedEventHandler(event: boolean) {
@@ -245,24 +270,26 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.restService.closeSupportChatForAdmin(this.selectedSupportUserMail).subscribe({
-      next: () => {
-        const closedUser = this.selectedSupportUserMail;
-        this.supportUsers = this.supportUsers.filter((u) => u !== closedUser);
-        this.selectedSupportUserMail = this.supportUsers.length
-          ? this.supportUsers[0]
-          : '';
-        this.supportMessages = [];
-        this.supportReplyInput = '';
+    this.restService
+      .closeSupportChatForAdmin(this.selectedSupportUserMail)
+      .subscribe({
+        next: () => {
+          const closedUser = this.selectedSupportUserMail;
+          this.supportUsers = this.supportUsers.filter((u) => u !== closedUser);
+          this.selectedSupportUserMail = this.supportUsers.length
+            ? this.supportUsers[0]
+            : '';
+          this.supportMessages = [];
+          this.supportReplyInput = '';
 
-        if (this.selectedSupportUserMail) {
-          this.loadSupportMessages();
-        }
-      },
-      error: () => {
-        this.supportError = 'Sohbet kapatilamadi.';
-      },
-    });
+          if (this.selectedSupportUserMail) {
+            this.loadSupportMessages();
+          }
+        },
+        error: () => {
+          this.supportError = 'Sohbet kapatilamadi.';
+        },
+      });
   }
 
   banSupportUser() {
@@ -277,17 +304,18 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.restService.banSupportUserFromAdmin(this.selectedSupportUserMail).subscribe({
-      next: () => {
-        this.supportError = 'Kullanici banlandi.';
-        this.loadBannedUsers();
-      },
-      error: () => {
-        this.supportError = 'Kullanici banlanamadi.';
-      },
-    });
+    this.restService
+      .banSupportUserFromAdmin(this.selectedSupportUserMail)
+      .subscribe({
+        next: () => {
+          this.supportError = 'Kullanici banlandi.';
+          this.loadBannedUsers();
+        },
+        error: () => {
+          this.supportError = 'Kullanici banlanamadi.';
+        },
+      });
   }
-
 
   isSelectedUserBanned(): boolean {
     if (!this.selectedSupportUserMail) {
@@ -295,7 +323,9 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     }
 
     return this.bannedUsers.includes(this.selectedSupportUserMail);
-  }  unbanSupportUser() {
+  }
+
+  unbanSupportUser() {
     if (!this.selectedSupportUserMail) {
       return;
     }
@@ -337,4 +367,3 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     }
   }
 }
-

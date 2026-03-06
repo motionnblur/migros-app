@@ -1,11 +1,13 @@
-import { Component, HostListener, OnDestroy } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Subscription } from 'rxjs';
 
 // Services
 import { EventService } from '../../services/event/event.service';
 import { RestService } from '../../services/rest/rest.service';
 import { AuthService } from '../../services/auth/auth.service';
+import { SupportRealtimeService } from '../../services/support-realtime/support-realtime.service';
 
 // Data
 import { data } from '../../memory/global-data';
@@ -18,6 +20,7 @@ import { UserCartComponent } from './components/user-cart/user-cart.component';
 import { UserProfileComponent } from './components/user-profile/user-profile.component';
 import { OrderTrackerComponent } from './components/order-tracker/order-tracker.component';
 import { IChatMessage } from '../../interfaces/IChatMessage';
+import { ISupportRealtimeEvent } from '../../interfaces/support/ISupportRealtimeEvent';
 
 @Component({
   selector: 'app-main',
@@ -35,7 +38,7 @@ import { IChatMessage } from '../../interfaces/IChatMessage';
   templateUrl: './main.component.html',
   styleUrl: './main.component.css',
 })
-export class MainComponent implements OnDestroy {
+export class MainComponent implements OnInit, OnDestroy {
   // Page State
   isItemPageOpened = false;
   isLoginButtonClicked = false;
@@ -59,30 +62,47 @@ export class MainComponent implements OnDestroy {
   isSupportSending = false;
   supportErrorMessage = '';
   private supportPollingIntervalId: ReturnType<typeof setInterval> | null = null;
+  private currentUserMail = '';
+  private supportRealtimeSub: Subscription | null = null;
 
   constructor(
     private eventManager: EventService,
     private restService: RestService,
-    private authService: AuthService
+    private authService: AuthService,
+    private supportRealtimeService: SupportRealtimeService
   ) {
-    // Listen for category navigation
     this.eventManager.on('openItemPage', (categoryId: number) => {
       data.currentSelectedCategoryId = categoryId;
       this.setItemPageOpened(true);
     });
 
-    // Initial Auth Check
     this.checkAuthStatus();
 
-    // Load Orders
     this.restService.getAllOrderIds().subscribe({
       next: (ids: number[]) => (this.orderIds = ids),
       error: (err) => console.error('Order fetch failed', err),
     });
   }
 
+  ngOnInit(): void {
+    this.updateCurrentUserMailFromToken();
+    this.supportRealtimeService.connect();
+    this.supportRealtimeSub = this.supportRealtimeService.events$.subscribe(
+      (event: ISupportRealtimeEvent) => {
+        if (!this.isSupportChatOpen || !this.currentUserMail) {
+          return;
+        }
+
+        if (event.userMail === this.currentUserMail) {
+          this.loadSupportMessages();
+        }
+      }
+    );
+  }
+
   ngOnDestroy(): void {
     this.stopSupportMessagePolling();
+    this.supportRealtimeSub?.unsubscribe();
   }
 
   private checkAuthStatus() {
@@ -95,7 +115,16 @@ export class MainComponent implements OnDestroy {
     }
   }
 
-  // --- UI CONTROLS ---
+  private updateCurrentUserMailFromToken() {
+    const token = this.authService.getToken();
+    if (!token) {
+      this.currentUserMail = '';
+      return;
+    }
+
+    const decoded = this.authService.decodeToken(token);
+    this.currentUserMail = decoded?.sub ?? '';
+  }
 
   public toggleMenu(event: Event) {
     event.stopPropagation();
@@ -110,8 +139,6 @@ export class MainComponent implements OnDestroy {
   public isUserLoggedIn() {
     return this.isUserSigned;
   }
-
-  // --- NAVIGATION & MODALS ---
 
   public setItemPageOpened(value: boolean) {
     this.isItemPageOpened = value;
@@ -133,6 +160,7 @@ export class MainComponent implements OnDestroy {
     this.isUserSigned = true;
     this.loginText = 'Can';
     this.isLoginButtonClicked = false;
+    this.updateCurrentUserMailFromToken();
   }
 
   public logoutUser() {
@@ -144,6 +172,7 @@ export class MainComponent implements OnDestroy {
     this.isSupportChatOpen = false;
     this.supportMessages = [];
     this.supportErrorMessage = '';
+    this.currentUserMail = '';
     this.stopSupportMessagePolling();
   }
 
@@ -180,8 +209,6 @@ export class MainComponent implements OnDestroy {
   public closeOrderTrackerComponent() {
     this.isOrderButtonClicked = false;
   }
-
-  // --- SUPPORT CHAT ---
 
   public toggleSupportChat() {
     if (!this.isUserSigned) {
@@ -258,4 +285,3 @@ export class MainComponent implements OnDestroy {
     }
   }
 }
-

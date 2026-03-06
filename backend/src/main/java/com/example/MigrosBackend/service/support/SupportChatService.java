@@ -9,6 +9,7 @@ import com.example.MigrosBackend.exception.shared.InvalidTokenException;
 import com.example.MigrosBackend.repository.user.SupportMessageEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
+import com.example.MigrosBackend.websocket.SupportChatWebSocketHandler;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,14 +21,17 @@ public class SupportChatService {
     private final SupportMessageEntityRepository supportMessageEntityRepository;
     private final UserEntityRepository userEntityRepository;
     private final TokenService tokenService;
+    private final SupportChatWebSocketHandler supportChatWebSocketHandler;
 
     @Autowired
     public SupportChatService(SupportMessageEntityRepository supportMessageEntityRepository,
                               UserEntityRepository userEntityRepository,
-                              TokenService tokenService) {
+                              TokenService tokenService,
+                              SupportChatWebSocketHandler supportChatWebSocketHandler) {
         this.supportMessageEntityRepository = supportMessageEntityRepository;
         this.userEntityRepository = userEntityRepository;
         this.tokenService = tokenService;
+        this.supportChatWebSocketHandler = supportChatWebSocketHandler;
     }
 
     public List<SupportMessageDto> getMessagesForUser(String token) {
@@ -56,6 +60,7 @@ public class SupportChatService {
         entity.setSender("USER");
         entity.setMessage(trimmedMessage);
         supportMessageEntityRepository.save(entity);
+        supportChatWebSocketHandler.broadcastSupportUpdate(userMail);
     }
 
     public List<SupportMessageDto> getMessagesForUserMail(String userMail) {
@@ -96,6 +101,7 @@ public class SupportChatService {
         entity.setSender("MANAGEMENT");
         entity.setMessage(trimmedMessage);
         supportMessageEntityRepository.save(entity);
+        supportChatWebSocketHandler.broadcastSupportUpdate(userMail);
     }
 
     @Transactional
@@ -108,6 +114,7 @@ public class SupportChatService {
         List<SupportMessageEntity> messages = supportMessageEntityRepository.findByUserMailOrderByCreatedAtAscIdAsc(userMail);
         if (!messages.isEmpty()) {
             supportMessageEntityRepository.deleteAllInBatch(messages);
+            supportChatWebSocketHandler.broadcastSupportUpdate(userMail);
         }
     }
 
@@ -119,6 +126,7 @@ public class SupportChatService {
 
         user.setBanned(true);
         userEntityRepository.save(user);
+        supportChatWebSocketHandler.broadcastSupportUpdate(userMail);
     }
 
     public void unbanUser(String userMail) {
@@ -129,6 +137,7 @@ public class SupportChatService {
 
         user.setBanned(false);
         userEntityRepository.save(user);
+        supportChatWebSocketHandler.broadcastSupportUpdate(userMail);
     }
 
     private String getValidUserMailFromToken(String token) {
