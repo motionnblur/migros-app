@@ -13,4 +13,6 @@ public interface SupportMessageEntityRepository extends JpaRepository<SupportMes
 
     @Query("SELECT DISTINCT s.userMail FROM SupportMessageEntity s ORDER BY s.userMail ASC")
     List<String> findDistinctUserMails();
+
+    void deleteByUserMail(String userMail);
 }

@@ -364,9 +364,18 @@ export class RestService {
       )
       .pipe(map((response) => response.status === 200));
   }
+
   getSupportUsersForAdmin() {
     return this.http
       .get(`http://localhost:8080/admin/panel/support/users`, {
+        responseType: 'json',
+      })
+      .pipe(map((response) => response as string[]));
+  }
+
+  getBannedSupportUsersForAdmin() {
+    return this.http
+      .get(`http://localhost:8080/admin/panel/support/banned-users`, {
         responseType: 'json',
       })
       .pipe(map((response) => response as string[]));
@@ -380,7 +389,6 @@ export class RestService {
       })
       .pipe(map((response) => response as IChatMessage[]));
   }
-
   sendSupportReplyFromAdmin(userMail: string, message: string) {
     return this.http
       .post(
@@ -393,5 +401,51 @@ export class RestService {
       )
       .pipe(map((response) => response.status === 200));
   }
+  closeSupportChatForAdmin(userMail: string) {
+    return this.http
+      .post(
+        `http://localhost:8080/admin/panel/support/close`,
+        null,
+        {
+          params: { userMail },
+          responseType: 'text',
+          observe: 'response',
+        }
+      )
+      .pipe(map((response) => response.status === 200));
+  }
+  banSupportUserFromAdmin(userMail: string) {
+    return this.http
+      .post(
+        `http://localhost:8080/admin/panel/support/ban`,
+        null,
+        {
+          params: { userMail },
+          responseType: 'text',
+          observe: 'response',
+        }
+      )
+      .pipe(map((response) => response.status === 200));
+  }
+  unbanSupportUserFromAdmin(userMail: string) {
+    return this.http
+      .post(
+        `http://localhost:8080/admin/panel/support/unban`,
+        null,
+        {
+          params: { userMail },
+          responseType: 'text',
+          observe: 'response',
+        }
+      )
+      .pipe(map((response) => response.status === 200));
+  }
 }
+
+
+
+
+
+
+
 

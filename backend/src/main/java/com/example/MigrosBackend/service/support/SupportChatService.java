@@ -11,6 +11,7 @@ import com.example.MigrosBackend.repository.user.UserEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -31,6 +32,8 @@ public class SupportChatService {
 
     public List<SupportMessageDto> getMessagesForUser(String token) {
         String userMail = getValidUserMailFromToken(token);
+        UserEntity user = userEntityRepository.findByUserMail(userMail);
+        assertNotBanned(user);
 
         return supportMessageEntityRepository.findByUserMailOrderByCreatedAtAscIdAsc(userMail)
                 .stream()
@@ -40,8 +43,10 @@ public class SupportChatService {
 
     public void addUserMessage(String token, String message) {
         String userMail = getValidUserMailFromToken(token);
-        String trimmedMessage = message == null ? "" : message.trim();
+        UserEntity user = userEntityRepository.findByUserMail(userMail);
+        assertNotBanned(user);
 
+        String trimmedMessage = message == null ? "" : message.trim();
         if (trimmedMessage.isEmpty()) {
             throw new GeneralException("Message cannot be empty");
         }
@@ -69,6 +74,12 @@ public class SupportChatService {
         return supportMessageEntityRepository.findDistinctUserMails();
     }
 
+    public List<String> getBannedUserMails() {
+        return userEntityRepository.findByBannedTrueOrderByUserMailAsc().stream()
+                .map(UserEntity::getUserMail)
+                .toList();
+    }
+
     public void addManagementMessage(String userMail, String message) {
         UserEntity user = userEntityRepository.findByUserMail(userMail);
         if (user == null) {
@@ -87,6 +98,39 @@ public class SupportChatService {
         supportMessageEntityRepository.save(entity);
     }
 
+    @Transactional
+    public void closeChat(String userMail) {
+        UserEntity user = userEntityRepository.findByUserMail(userMail);
+        if (user == null) {
+            throw new UserNotFoundException(userMail);
+        }
+
+        List<SupportMessageEntity> messages = supportMessageEntityRepository.findByUserMailOrderByCreatedAtAscIdAsc(userMail);
+        if (!messages.isEmpty()) {
+            supportMessageEntityRepository.deleteAllInBatch(messages);
+        }
+    }
+
+    public void banUser(String userMail) {
+        UserEntity user = userEntityRepository.findByUserMail(userMail);
+        if (user == null) {
+            throw new UserNotFoundException(userMail);
+        }
+
+        user.setBanned(true);
+        userEntityRepository.save(user);
+    }
+
+    public void unbanUser(String userMail) {
+        UserEntity user = userEntityRepository.findByUserMail(userMail);
+        if (user == null) {
+            throw new UserNotFoundException(userMail);
+        }
+
+        user.setBanned(false);
+        userEntityRepository.save(user);
+    }
+
     private String getValidUserMailFromToken(String token) {
         String userMail = tokenService.extractUsername(token);
         UserEntity user = userEntityRepository.findByUserMail(userMail);
@@ -100,6 +144,12 @@ public class SupportChatService {
         }
 
         return userMail;
+    }
+
+    private void assertNotBanned(UserEntity user) {
+        if (Boolean.TRUE.equals(user.getBanned())) {
+            throw new GeneralException("You are banned from live support.");
+        }
     }
 
     private SupportMessageDto mapToDto(SupportMessageEntity entity) {

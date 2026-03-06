@@ -213,10 +213,12 @@ export class MainComponent implements OnDestroy {
         this.isSupportSending = false;
         this.loadSupportMessages();
       },
-      error: () => {
+      error: (err) => {
         this.isSupportSending = false;
         this.supportErrorMessage =
-          'Mesaj gonderilemedi. Lutfen tekrar deneyin.';
+          typeof err?.error === 'string' && err.error
+            ? err.error
+            : 'Mesaj gonderilemedi. Lutfen tekrar deneyin.';
       },
     });
   }
@@ -230,10 +232,12 @@ export class MainComponent implements OnDestroy {
         this.supportMessages = messages;
         this.isSupportLoading = false;
       },
-      error: () => {
+      error: (err) => {
         this.isSupportLoading = false;
         this.supportErrorMessage =
-          'Mesajlar yuklenemedi. Lutfen tekrar deneyin.';
+          typeof err?.error === 'string' && err.error
+            ? err.error
+            : 'Mesajlar yuklenemedi. Lutfen tekrar deneyin.';
       },
     });
   }
@@ -254,3 +258,4 @@ export class MainComponent implements OnDestroy {
     }
   }
 }
+

@@ -36,6 +36,7 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
   hasSupportOpened = false;
 
   supportUsers: string[] = [];
+  bannedUsers: string[] = [];
   selectedSupportUserMail = '';
   supportMessages: IChatMessage[] = [];
   supportReplyInput = '';
@@ -137,6 +138,7 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
       this.hasProductsOpened = false;
       this.hasOrdersOpened = false;
       this.loadSupportUsers();
+      this.loadBannedUsers();
       this.startSupportPolling();
       return;
     }
@@ -155,7 +157,10 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
           return;
         }
 
-        if (!this.selectedSupportUserMail || !users.includes(this.selectedSupportUserMail)) {
+        if (
+          !this.selectedSupportUserMail ||
+          !users.includes(this.selectedSupportUserMail)
+        ) {
           this.selectedSupportUserMail = users[0];
         }
 
@@ -163,6 +168,17 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
       },
       error: () => {
         this.supportError = 'Kullanici sohbetleri yuklenemedi.';
+      },
+    });
+  }
+
+  loadBannedUsers() {
+    this.restService.getBannedSupportUsersForAdmin().subscribe({
+      next: (users: string[]) => {
+        this.bannedUsers = users;
+      },
+      error: () => {
+        this.supportError = 'Banli kullanicilar yuklenemedi.';
       },
     });
   }
@@ -181,16 +197,18 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     this.isSupportLoading = true;
     this.supportError = '';
 
-    this.restService.getSupportMessagesForAdmin(this.selectedSupportUserMail).subscribe({
-      next: (messages: IChatMessage[]) => {
-        this.supportMessages = messages;
-        this.isSupportLoading = false;
-      },
-      error: () => {
-        this.isSupportLoading = false;
-        this.supportError = 'Mesajlar yuklenemedi.';
-      },
-    });
+    this.restService
+      .getSupportMessagesForAdmin(this.selectedSupportUserMail)
+      .subscribe({
+        next: (messages: IChatMessage[]) => {
+          this.supportMessages = messages;
+          this.isSupportLoading = false;
+        },
+        error: () => {
+          this.isSupportLoading = false;
+          this.supportError = 'Mesajlar yuklenemedi.';
+        },
+      });
   }
 
   sendSupportReply() {
@@ -215,11 +233,99 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
       });
   }
 
+  closeSupportChat() {
+    if (!this.selectedSupportUserMail) {
+      return;
+    }
+
+    const approved = confirm(
+      `Sohbet kapatilacak: ${this.selectedSupportUserMail}`
+    );
+    if (!approved) {
+      return;
+    }
+
+    this.restService.closeSupportChatForAdmin(this.selectedSupportUserMail).subscribe({
+      next: () => {
+        const closedUser = this.selectedSupportUserMail;
+        this.supportUsers = this.supportUsers.filter((u) => u !== closedUser);
+        this.selectedSupportUserMail = this.supportUsers.length
+          ? this.supportUsers[0]
+          : '';
+        this.supportMessages = [];
+        this.supportReplyInput = '';
+
+        if (this.selectedSupportUserMail) {
+          this.loadSupportMessages();
+        }
+      },
+      error: () => {
+        this.supportError = 'Sohbet kapatilamadi.';
+      },
+    });
+  }
+
+  banSupportUser() {
+    if (!this.selectedSupportUserMail) {
+      return;
+    }
+
+    const approved = confirm(
+      `Kullanici banlanacak: ${this.selectedSupportUserMail}`
+    );
+    if (!approved) {
+      return;
+    }
+
+    this.restService.banSupportUserFromAdmin(this.selectedSupportUserMail).subscribe({
+      next: () => {
+        this.supportError = 'Kullanici banlandi.';
+        this.loadBannedUsers();
+      },
+      error: () => {
+        this.supportError = 'Kullanici banlanamadi.';
+      },
+    });
+  }
+
+
+  isSelectedUserBanned(): boolean {
+    if (!this.selectedSupportUserMail) {
+      return false;
+    }
+
+    return this.bannedUsers.includes(this.selectedSupportUserMail);
+  }  unbanSupportUser() {
+    if (!this.selectedSupportUserMail) {
+      return;
+    }
+
+    this.unbanUserByMail(this.selectedSupportUserMail);
+  }
+
+  unbanUserByMail(userMail: string) {
+    const approved = confirm(`Kullanici bani kaldirilacak: ${userMail}`);
+    if (!approved) {
+      return;
+    }
+
+    this.restService.unbanSupportUserFromAdmin(userMail).subscribe({
+      next: () => {
+        this.supportError = 'Kullanici bani kaldirildi.';
+        this.loadBannedUsers();
+      },
+      error: () => {
+        this.supportError = 'Kullanici ban kaldirma islemi basarisiz.';
+      },
+    });
+  }
+
   private startSupportPolling() {
     this.stopSupportPolling();
     this.supportPollingIntervalId = setInterval(() => {
       if (this.hasSupportOpened) {
         this.loadSupportUsers();
+        this.loadBannedUsers();
       }
     }, 5000);
   }
@@ -231,3 +337,4 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     }
   }
 }
+

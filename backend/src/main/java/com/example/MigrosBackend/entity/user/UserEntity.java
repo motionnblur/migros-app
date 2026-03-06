@@ -1,6 +1,5 @@
 package com.example.MigrosBackend.entity.user;
 
-import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
@@ -31,6 +30,8 @@ public class UserEntity {
 
     private List<Long> productsIdsInCart;
 
+    private Boolean banned = false;
+
     @OneToMany(cascade = CascadeType.ALL)
     @JoinColumn(name = "user_entity_id", referencedColumnName = "user_entity_id")
     @JsonManagedReference
@@ -49,6 +50,7 @@ public class UserEntity {
                 ", userTown='" + userTown + '\'' +
                 ", userCountry='" + userCountry + '\'' +
                 ", userPostalCode='" + userPostalCode + '\'' +
+                ", banned=" + banned +
                 '}';
     }
 }

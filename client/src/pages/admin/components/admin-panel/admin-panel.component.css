@@ -74,7 +74,7 @@ app-product-edit {
 /* Support chat */
 .support-chat-layout {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 260px 260px 1fr;
   gap: 16px;
   height: 75vh;
   min-height: 500px;
@@ -130,6 +130,9 @@ app-product-edit {
   padding: 10px 12px;
   background: #fff4e6;
   border-bottom: 1px solid #ffe0bf;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .support-conversation-body {
@@ -199,4 +202,35 @@ app-product-edit {
   .support-conversation {
     min-height: 380px;
   }
+}
+
+.support-actions {
+  display: flex;
+  gap: 8px;
+}
+
+
+
+
+.banned-list {
+  border-color: #ffd7d7;
+  background: #fff9f9;
+}
+
+.banned-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid #f0d6d6;
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 8px;
+}
+
+.banned-mail {
+  font-size: 0.78rem;
+  color: #7a2d2d;
+  word-break: break-word;
 }

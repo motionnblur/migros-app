@@ -80,9 +80,32 @@
           </button>
         </aside>
 
+        <aside class="support-user-list banned-list">
+          <div class="support-list-title">Banli Kullanicilar</div>
+
+          <div class="support-empty" *ngIf="!bannedUsers.length">
+            Banli kullanici yok.
+          </div>
+
+          <div class="banned-item" *ngFor="let userMail of bannedUsers">
+            <span class="banned-mail">{{ userMail }}</span>
+            <button
+              type="button"
+              class="btn btn-sm btn-success"
+              (click)="unbanUserByMail(userMail)">
+              Ban Kaldir
+            </button>
+          </div>
+        </aside>
+
         <section class="support-conversation" *ngIf="selectedSupportUserMail; else noConversationTemplate">
           <div class="support-conversation-header">
             <strong>{{ selectedSupportUserMail }}</strong>
+            <div class="support-actions">
+              <button type="button" class="btn btn-sm btn-outline-secondary" (click)="closeSupportChat()">Sohbeti Kapat</button>
+              <button *ngIf="!isSelectedUserBanned()" type="button" class="btn btn-sm btn-danger" (click)="banSupportUser()">Kullaniciyi Banla</button>
+              <button *ngIf="isSelectedUserBanned()" type="button" class="btn btn-sm btn-success" (click)="unbanSupportUser()">Ban Kaldir</button>
+            </div>
           </div>
 
           <div class="support-conversation-body">
@@ -126,3 +149,4 @@
     </div>
   </div>
 </div>
+
