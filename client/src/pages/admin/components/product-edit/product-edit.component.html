@@ -4,7 +4,7 @@
       <div class="product-edit__buy-view__head-left">
         <img
           #product_image_ref
-          [src]="imageUrl"
+          [src]="productImageUrl || 'assets/placeholder.png'"
           class="product-edit__buy-view__head-left__image"
         />
       </div>
@@ -86,3 +86,5 @@
     <div (click)="updateButtonClick()">Güncelle</div>
   </div>
 </div>
+
+

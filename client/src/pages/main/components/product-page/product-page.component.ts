@@ -76,6 +76,8 @@ export class ProductPageComponent implements OnInit, OnDestroy {
 
   public onSubCategoryClicked(subCategoryName: string) {
     this.eventService.trigger('resetPageSwitcher');
+    this.hasProductBuyViewOpened = false;
+    this.hasProductPreviewOpened = true;
     this.restService.getProducstFromSubCategory(subCategoryName, 0, 10).subscribe({
       next: (res: any) => {
         this.items = res;
@@ -106,3 +108,4 @@ export class ProductPageComponent implements OnInit, OnDestroy {
     this.changePage(pageCount);
   }
 }
+

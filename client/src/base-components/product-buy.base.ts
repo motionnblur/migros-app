@@ -9,17 +9,18 @@ import { SafeHtml } from '@angular/platform-browser';
 export abstract class ProductBuyBase {
   @Input() productId!: number;
 
-  @ViewChild('product_image_ref')
-  productImageRef!: ElementRef<HTMLImageElement>;
   @ViewChild('product_addbutton_ref')
   productAddButtonRef!: ElementRef<HTMLDivElement>;
   @ViewChild('product_money_ref')
   productMoneyRef!: ElementRef<HTMLDivElement>;
+  @ViewChild('product_image_ref')
+  productImageRef!: ElementRef<HTMLImageElement>;
 
   productData!: IProductData;
   productDescriptions!: IProductDescription;
   currentProductDescriptionBody!: SafeHtml;
   currentTabRef: HTMLDivElement | null = null;
+  productImageUrl: string | null = null;
 
   protected restService: RestService;
   protected eventManager: EventService;
@@ -43,7 +44,8 @@ export abstract class ProductBuyBase {
         this.onProductDescritptionUpdate(data);
       });
     this.restService.getProductImage(this.productId).subscribe((data: Blob) => {
-      this.productImageRef.nativeElement.src = URL.createObjectURL(data);
+      this.releaseProductImageUrl();
+      this.productImageUrl = URL.createObjectURL(data);
     });
   }
   ngAfterViewInit() {
@@ -63,6 +65,11 @@ export abstract class ProductBuyBase {
       }
     }, 50);
   }
+
+  ngOnDestroy() {
+    this.releaseProductImageUrl();
+  }
+
   protected onProductDescritptionUpdate(data: IProductDescription) {
     console.log('onProductDescritptionUpdate');
   }
@@ -82,6 +89,13 @@ export abstract class ProductBuyBase {
       }
     } else {
       this.currentTabRef = tabRef;
+    }
+  }
+
+  private releaseProductImageUrl() {
+    if (this.productImageUrl) {
+      URL.revokeObjectURL(this.productImageUrl);
+      this.productImageUrl = null;
     }
   }
 }

@@ -22,7 +22,6 @@ export class ProductEditComponent extends ProductBuyBase {
   localProductDescriptions: IProductDescription | null = null;
 
   private boundKeyDownEvent!: (event: KeyboardEvent) => void;
-  imageUrl: string | null = null;
   isEditing = false;
 
   constructor(
@@ -46,7 +45,7 @@ export class ProductEditComponent extends ProductBuyBase {
     }, 200);
   }
 
-  ngOnDestroy() {
+  override ngOnDestroy() {
     document.removeEventListener('keydown', this.boundKeyDownEvent);
   }
 
