@@ -17,6 +17,19 @@ import {Component} from '@angular/core';
 export class ProductBuyComponent extends ProductBuyBase {
   public selectedTabIndex: number = 0; // Track which tab is active
 
+  public get discountedPrice(): number {
+    if (!this.productData) return 0;
+
+    const price = this.productData.productPrice ?? 0;
+    const discount = this.productData.productDiscount ?? 0;
+
+    if (discount <= 0) {
+      return price;
+    }
+
+    return +(price - (price * discount) / 100).toFixed(2);
+  }
+
   constructor(
     protected override restService: RestService,
     protected sanitizer: DomSanitizer,

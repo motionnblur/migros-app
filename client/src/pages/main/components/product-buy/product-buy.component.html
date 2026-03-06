@@ -17,9 +17,15 @@
 
           <div class="mb-4 pb-3 border-bottom">
             <h2 class="fw-bold text-dark mb-2">{{ productData.productName }}</h2>
-            <div class="d-flex align-items-baseline">
-              <span class="display-5 fw-bold text-orange me-1">{{ productData.productPrice }}</span>
-              <span class="fs-4 text-orange fw-medium">TL</span>
+            <div class="d-flex align-items-baseline flex-wrap">
+              <span class="display-5 fw-bold text-orange me-2">{{ discountedPrice }}</span>
+              <span class="fs-4 text-orange fw-medium me-2">TL</span>
+              <span *ngIf="(productData.productDiscount ?? 0) > 0" class="text-muted text-decoration-line-through fs-6">
+                {{ productData.productPrice }} TL
+              </span>
+              <span *ngIf="(productData.productDiscount ?? 0) > 0" class="badge bg-danger-subtle text-danger-emphasis ms-2">
+                %{{ productData.productDiscount }} indirim
+              </span>
             </div>
           </div>
 
