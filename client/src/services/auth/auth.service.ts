@@ -25,6 +25,11 @@ export class AuthService {
     if (!token) return false;
     return !this.isTokenExpired(token);
   }
+  public isAdminLoggedIn() {
+    const token = this.getAdminToken();
+    if (!token) return false;
+    return !this.isTokenExpired(token);
+  }
   public isTokenExists() {
     const token = this.getToken();
     return token !== null;
@@ -48,3 +53,4 @@ export class AuthService {
     return expirationDate < new Date();
   }
 }
+

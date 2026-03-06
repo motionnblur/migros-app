@@ -3,6 +3,7 @@ import {AdminLoginComponent} from './components/admin-login/admin-login.componen
 import {CommonModule} from '@angular/common';
 import {AdminService} from './services/admin.service';
 import {AdminPanelComponent} from './components/admin-panel/admin-panel.component';
+import {AuthService} from '../../services/auth/auth.service';
 
 @Component({
   selector: 'app-admin',
@@ -15,10 +16,16 @@ export class AdminComponent implements OnInit {
   isLoginPhaseActive: boolean = false;
   isLoginCompleted: boolean = false;
 
-  constructor(private adminService: AdminService) {
+  constructor(private adminService: AdminService, private authService: AuthService) {
   }
 
   ngOnInit(): void {
+    const isAdminLoggedIn = this.authService.isAdminLoggedIn();
+    if (isAdminLoggedIn) {
+      this.isLoginCompleted = true;
+      this.isLoginPhaseActive = false;
+    }
+
     // Subscribe to login phase (e.g., while checking credentials)
     this.adminService.getLoginPhaseStatus().subscribe((status) => {
       this.isLoginPhaseActive = status;
@@ -37,3 +44,4 @@ export class AdminComponent implements OnInit {
     this.adminService.setLoginPhase(true);
   }
 }
+
