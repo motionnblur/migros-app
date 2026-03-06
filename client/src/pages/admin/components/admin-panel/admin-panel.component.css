@@ -282,3 +282,17 @@ app-product-edit {
     align-items: stretch;
   }
 }
+.admin-brand-logo {
+  height: 30px;
+  width: auto;
+  max-width: min(32vw, 140px);
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+@media (max-width: 767.98px) {
+  .admin-brand-logo {
+    height: 24px;
+    max-width: 40vw;
+  }
+}

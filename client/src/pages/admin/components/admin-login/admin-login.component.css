@@ -31,3 +31,17 @@
 .bi {
   vertical-align: middle;
 }
+.brand-logo {
+  height: 50px;
+  width: auto;
+  max-width: min(40vw, 180px);
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+@media (max-width: 767.98px) {
+  .brand-logo {
+    height: 32px;
+    max-width: 45vw;
+  }
+}
