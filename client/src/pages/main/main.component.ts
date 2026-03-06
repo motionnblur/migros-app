@@ -77,15 +77,14 @@ export class MainComponent implements OnInit, OnDestroy {
     });
 
     this.checkAuthStatus();
-
-    this.restService.getAllOrderIds().subscribe({
-      next: (ids: number[]) => (this.orderIds = ids),
-      error: (err) => console.error('Order fetch failed', err),
-    });
   }
 
   ngOnInit(): void {
     this.updateCurrentUserMailFromToken();
+    if (this.isUserSigned) {
+      this.loadOrderIds();
+    }
+
     this.supportRealtimeService.connect();
     this.supportRealtimeSub = this.supportRealtimeService.events$.subscribe(
       (event: ISupportRealtimeEvent) => {
@@ -126,6 +125,13 @@ export class MainComponent implements OnInit, OnDestroy {
     this.currentUserMail = decoded?.sub ?? '';
   }
 
+  private loadOrderIds() {
+    this.restService.getAllOrderIds().subscribe({
+      next: (ids: number[]) => (this.orderIds = ids),
+      error: (err) => console.error('Order fetch failed', err),
+    });
+  }
+
   public toggleMenu(event: Event) {
     event.stopPropagation();
     this.isMenuOpen = !this.isMenuOpen;
@@ -161,6 +167,7 @@ export class MainComponent implements OnInit, OnDestroy {
     this.loginText = 'Can';
     this.isLoginButtonClicked = false;
     this.updateCurrentUserMailFromToken();
+    this.loadOrderIds();
   }
 
   public logoutUser() {
@@ -173,6 +180,7 @@ export class MainComponent implements OnInit, OnDestroy {
     this.supportMessages = [];
     this.supportErrorMessage = '';
     this.currentUserMail = '';
+    this.orderIds = [];
     this.stopSupportMessagePolling();
   }
 
@@ -199,11 +207,18 @@ export class MainComponent implements OnInit, OnDestroy {
       this.openLoginComponent();
       return;
     }
-    if (this.orderIds.length === 0) {
-      alert('Hic siparisiniz yok');
-      return;
-    }
-    this.isOrderButtonClicked = true;
+
+    this.restService.getAllOrderIds().subscribe({
+      next: (ids: number[]) => {
+        this.orderIds = ids;
+        if (this.orderIds.length === 0) {
+          alert('Hic siparisiniz yok');
+          return;
+        }
+        this.isOrderButtonClicked = true;
+      },
+      error: (err) => console.error('Order fetch failed', err),
+    });
   }
 
   public closeOrderTrackerComponent() {
