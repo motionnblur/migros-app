@@ -45,6 +45,11 @@
                   </a>
                 </li>
                 <li>
+                  <a class="dropdown-item py-2 d-flex align-items-center" (click)="openOrderHistoryComponent()">
+                    <i class="bi bi-receipt me-2 text-muted"></i>Siparislerim
+                  </a>
+                </li>
+                <li>
                   <hr class="dropdown-divider">
                 </li>
                 <li>
@@ -137,4 +142,12 @@
   <app-order-tracker *ngIf="isOrderButtonClicked"
                      [orderIds]="orderIds"
                      (closeOrderTrackerComponentEvent)="closeOrderTrackerComponent()"/>
+
+  <app-order-history *ngIf='isOrderHistoryOpened'
+                     (closeOrderHistoryComponentEvent)='closeOrderHistoryComponent()'/>
 </div>
+
+
+
+
+

@@ -6,7 +6,6 @@ import {
   ViewChild,
 } from '@angular/core';
 import { RestService } from '../../../../services/rest/rest.service';
-import { IProductData } from '../../../../interfaces/IProductData';
 import { IUserCartItemDto } from '../../../../interfaces/IUserCartItemDto';
 import { CommonModule } from '@angular/common';
 import { PaymentComponent } from '../payment/payment.component';
@@ -48,7 +47,7 @@ export class UserCartComponent {
           this.restService
             .getProductImage(item.productId)
             .subscribe((blob: Blob) => {
-              const url: string = window.URL.createObjectURL(blob); // Create a URL for the blob
+              const url: string = window.URL.createObjectURL(blob);
               item.productImageUrl = url;
             });
         });
@@ -167,4 +166,3 @@ export class UserCartComponent {
     this.closeCartComponent();
   }
 }
-

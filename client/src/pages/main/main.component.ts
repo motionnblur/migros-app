@@ -19,6 +19,7 @@ import { SignUserComponent } from './components/sign-user/sign-user.component';
 import { UserCartComponent } from './components/user-cart/user-cart.component';
 import { UserProfileComponent } from './components/user-profile/user-profile.component';
 import { OrderTrackerComponent } from './components/order-tracker/order-tracker.component';
+import { OrderHistoryComponent } from './components/order-history/order-history.component';
 import { IChatMessage } from '../../interfaces/IChatMessage';
 import { ISupportRealtimeEvent } from '../../interfaces/support/ISupportRealtimeEvent';
 
@@ -34,6 +35,7 @@ import { ISupportRealtimeEvent } from '../../interfaces/support/ISupportRealtime
     UserCartComponent,
     UserProfileComponent,
     OrderTrackerComponent,
+    OrderHistoryComponent,
   ],
   templateUrl: './main.component.html',
   styleUrl: './main.component.css',
@@ -45,6 +47,7 @@ export class MainComponent implements OnInit, OnDestroy {
   isOrderButtonClicked = false;
   isProfileButtonClicked = false;
   isCartComponentOpened = false;
+  isOrderHistoryOpened = false;
 
   // Auth State
   isUserSigned = false;
@@ -217,6 +220,7 @@ export class MainComponent implements OnInit, OnDestroy {
     this.loginText = 'Uye Ol veya Giris Yap';
     this.setItemPageOpened(false);
     this.isSupportChatOpen = false;
+    this.isOrderHistoryOpened = false;
     this.supportMessages = [];
     this.supportErrorMessage = '';
     this.currentUserMail = '';
@@ -339,5 +343,23 @@ export class MainComponent implements OnInit, OnDestroy {
       this.supportPollingIntervalId = null;
     }
   }
+  public openOrderHistoryComponent() {
+    if (!this.isUserSigned) {
+      this.openLoginComponent();
+      return;
+    }
+
+    this.isOrderHistoryOpened = true;
+    this.isMenuOpen = false;
+  }
+
+  public closeOrderHistoryComponent() {
+    this.isOrderHistoryOpened = false;
+  }
 }
+
+
+
+
+
 

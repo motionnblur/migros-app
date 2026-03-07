@@ -45,6 +45,8 @@ public class UserOrderService {
         String userName = tokenService.extractUsername(userToken);
         UserEntity user = userEntityRepository.findByUserMail(userName);
         if (tokenService.validateToken(userToken, user.getUserMail())) {
+            long orderGroupId = System.currentTimeMillis();
+            java.time.LocalDateTime createdAt = java.time.LocalDateTime.now();
             user.setProductsIdsInCart(new ArrayList<>());
             userEntityRepository.save(user);
         }
@@ -55,6 +57,8 @@ public class UserOrderService {
         String userName = tokenService.extractUsername(userToken);
         UserEntity user = userEntityRepository.findByUserMail(userName);
         if (tokenService.validateToken(userToken, user.getUserMail())) {
+            long orderGroupId = System.currentTimeMillis();
+            java.time.LocalDateTime createdAt = java.time.LocalDateTime.now();
             List<Long> productsInCart = user.getProductsIdsInCart();
             Map<Long, Integer> productCounts = productsInCart.stream()
                     .collect(Collectors.groupingBy(Function.identity(), Collectors.summingInt(e -> 1)));
@@ -62,6 +66,8 @@ public class UserOrderService {
             productCounts.forEach((productId, count) -> {
                 OrderEntity order = new OrderEntity();
                 order.setUserEntity(user);
+                order.setOrderGroupId(orderGroupId);
+                order.setCreatedAt(createdAt);
                 order.setUserId(user.getId());
                 order.setItemId(productId);
                 ProductEntity product = productEntityRepository.findById(productId).get();
@@ -80,6 +86,8 @@ public class UserOrderService {
         String userName = tokenService.extractUsername(userToken);
         UserEntity user = userEntityRepository.findByUserMail(userName);
         if (tokenService.validateToken(userToken, user.getUserMail())) {
+            long orderGroupId = System.currentTimeMillis();
+            java.time.LocalDateTime createdAt = java.time.LocalDateTime.now();
             List<Long> productsInCart = user.getProductsIdsInCart();
             Map<Long, Integer> productCounts = productsInCart.stream()
                     .collect(Collectors.groupingBy(Function.identity(), Collectors.summingInt(e -> 1)));
@@ -143,3 +151,5 @@ public class UserOrderService {
         orderEntityRepository.delete(orderEntity);
     }
 }
+
+

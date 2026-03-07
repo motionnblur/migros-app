@@ -19,6 +19,8 @@ public class OrderEntity {
     private Long id;
 
     private Long userId;
+    private Long orderGroupId;
+    private java.time.LocalDateTime createdAt;
     private Long itemId;
     private Integer count;
     private Float price;
@@ -30,3 +32,5 @@ public class OrderEntity {
     @JsonBackReference
     private UserEntity userEntity;
 }
+
+

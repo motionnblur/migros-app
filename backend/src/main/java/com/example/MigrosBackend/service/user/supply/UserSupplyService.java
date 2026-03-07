@@ -6,6 +6,8 @@ import com.example.MigrosBackend.dto.admin.panel.ProductDto2;
 import com.example.MigrosBackend.dto.user.product.ProductDto;
 import com.example.MigrosBackend.dto.user.product.ProductPreviewDto;
 import com.example.MigrosBackend.dto.user.category.SubCategoryDto;
+import com.example.MigrosBackend.dto.user.order.UserOrderDetailDto;
+import com.example.MigrosBackend.dto.user.order.UserOrderGroupDto;
 import com.example.MigrosBackend.dto.user.product.UserCartItemDto;
 import com.example.MigrosBackend.entity.category.CategoryEntity;
 import com.example.MigrosBackend.entity.product.ProductDescriptionEntity;
@@ -317,4 +319,104 @@ public class UserSupplyService {
 
         return productDescriptionDto;
     }
+    public List<UserOrderDetailDto> getUserOrderDetails(String token) {
+        String userName = tokenService.extractUsername(token);
+        UserEntity user = userEntityRepository.findByUserMail(userName);
+
+        if (!tokenService.validateToken(token, user.getUserMail())) {
+            throw new InvalidTokenException();
+        }
+
+        List<OrderEntity> orders = user.getOrderEntities();
+        if (orders == null || orders.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        List<Long> productIds = orders.stream()
+                .map(OrderEntity::getItemId)
+                .distinct()
+                .toList();
+
+        Map<Long, ProductEntity> productMap = productEntityRepository.findAllById(productIds)
+                .stream()
+                .collect(Collectors.toMap(ProductEntity::getId, Function.identity()));
+
+        List<UserOrderDetailDto> result = new ArrayList<>();
+        for (OrderEntity order : orders) {
+            ProductEntity product = productMap.get(order.getItemId());
+
+            UserOrderDetailDto dto = new UserOrderDetailDto();
+            dto.setOrderId(order.getId());
+            dto.setProductId(order.getItemId());
+            dto.setProductName(product != null ? product.getProductName() : "");
+            dto.setCount(order.getCount());
+            dto.setPrice(order.getPrice());
+            dto.setTotalPrice(order.getTotalPrice());
+            dto.setStatus(order.getStatus());
+
+            result.add(dto);
+        }
+
+        return result;
+    }
+    public List<UserOrderGroupDto> getUserOrderGroups(String token) {
+        String userName = tokenService.extractUsername(token);
+        UserEntity user = userEntityRepository.findByUserMail(userName);
+
+        if (!tokenService.validateToken(token, user.getUserMail())) {
+            throw new InvalidTokenException();
+        }
+
+        List<OrderEntity> orders = user.getOrderEntities();
+        if (orders == null || orders.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        List<Long> productIds = orders.stream()
+                .map(OrderEntity::getItemId)
+                .distinct()
+                .toList();
+
+        Map<Long, ProductEntity> productMap = productEntityRepository.findAllById(productIds)
+                .stream()
+                .collect(Collectors.toMap(ProductEntity::getId, Function.identity()));
+
+        Map<Long, List<OrderEntity>> grouped = orders.stream()
+                .collect(Collectors.groupingBy(order -> order.getOrderGroupId() != null ? order.getOrderGroupId() : order.getId()));
+
+        List<UserOrderGroupDto> result = new ArrayList<>();
+        for (Map.Entry<Long, List<OrderEntity>> entry : grouped.entrySet()) {
+            UserOrderGroupDto groupDto = new UserOrderGroupDto();
+            groupDto.setOrderGroupId(entry.getKey());
+
+            List<UserOrderDetailDto> items = new ArrayList<>();
+            java.time.LocalDateTime createdAt = null;
+
+            for (OrderEntity order : entry.getValue()) {
+                ProductEntity product = productMap.get(order.getItemId());
+
+                UserOrderDetailDto dto = new UserOrderDetailDto();
+                dto.setOrderId(order.getId());
+                dto.setProductId(order.getItemId());
+                dto.setProductName(product != null ? product.getProductName() : "");
+                dto.setCount(order.getCount());
+                dto.setPrice(order.getPrice());
+                dto.setTotalPrice(order.getTotalPrice());
+                dto.setStatus(order.getStatus());
+
+                items.add(dto);
+
+                if (createdAt == null) {
+                    createdAt = order.getCreatedAt();
+                }
+            }
+
+            groupDto.setCreatedAt(createdAt);
+            groupDto.setItems(items);
+            result.add(groupDto);
+        }
+
+        return result;
+    }
 }
+

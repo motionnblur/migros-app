@@ -12,6 +12,8 @@ import { IUserCartItemDto } from '../../interfaces/IUserCartItemDto';
 import { IOrder } from '../../interfaces/IOrder';
 import { IUserProfileTable } from '../../interfaces/IUserProfileTable';
 import { IChatMessage } from '../../interfaces/IChatMessage';
+import { IUserOrderDetail } from '../../interfaces/IUserOrderDetail';
+import { IUserOrderGroup } from '../../interfaces/IUserOrderGroup';
 
 @Injectable({
   providedIn: 'root',
@@ -450,4 +452,25 @@ export class RestService {
       })
       .pipe(map((response) => response.status === 200));
   }
+  getUserOrders() {
+    const token: string = localStorage.getItem('token') as string;
+    return this.http
+      .get(`http://localhost:8080/user/supply/getUserOrders`, {
+        params: { token },
+        responseType: 'json',
+      })
+      .pipe(map((response) => response as IUserOrderDetail[]));
+  }
+  getUserOrderGroups() {
+    const token: string = localStorage.getItem('token') as string;
+    return this.http
+      .get(`http://localhost:8080/user/supply/getUserOrderGroups`, {
+        params: { token },
+        responseType: 'json',
+      })
+      .pipe(map((response) => response as IUserOrderGroup[]));
+  }
 }
+
+
+

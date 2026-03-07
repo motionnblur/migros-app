@@ -3,6 +3,8 @@ package com.example.MigrosBackend.controller.user.supply;
 import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionListDto;
 import com.example.MigrosBackend.dto.admin.panel.ProductDto2;
 import com.example.MigrosBackend.dto.user.category.SubCategoryDto;
+import com.example.MigrosBackend.dto.user.order.UserOrderDetailDto;
+import com.example.MigrosBackend.dto.user.order.UserOrderGroupDto;
 import com.example.MigrosBackend.dto.user.product.ProductPreviewDto;
 import com.example.MigrosBackend.dto.user.product.UserCartItemDto;
 import com.example.MigrosBackend.service.user.supply.UserSupplyService;
@@ -120,4 +122,13 @@ public class UserSupplyController {
     public ResponseEntity<String> getOrderStatusByOrderId(@RequestParam Long orderId, @RequestParam String token) {
         return ResponseEntity.ok(userSupplyService.getOrderStatusByOrderId(orderId, token));
     }
+    @GetMapping("getUserOrders")
+    public ResponseEntity<List<UserOrderDetailDto>> getUserOrders(@RequestParam String token) {
+        return ResponseEntity.ok(userSupplyService.getUserOrderDetails(token));
+    }
+    @GetMapping("getUserOrderGroups")
+    public ResponseEntity<List<UserOrderGroupDto>> getUserOrderGroups(@RequestParam String token) {
+        return ResponseEntity.ok(userSupplyService.getUserOrderGroups(token));
+    }
 }
+

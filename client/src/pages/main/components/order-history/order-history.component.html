@@ -1,0 +1,57 @@
+<div id="order-history-overlay" (click)="closeOrderHistoryComponent()"></div>
+
+<div id="order-history-container" class="card shadow-lg border-0">
+  <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
+    <h5 class="mb-0 fw-bold text-primary">Siparislerim</h5>
+    <button type="button" class="btn-close" (click)="closeOrderHistoryComponent()"></button>
+  </div>
+
+  <div class="card-body p-0 d-flex" style="min-height: 520px;">
+    <div class="order-history-list p-3 border-end">
+      <div *ngIf="isLoading" class="text-muted small">Yukleniyor...</div>
+      <div *ngIf="!isLoading && errorMessage" class="text-danger small">{{ errorMessage }}</div>
+      <div *ngIf="!isLoading && !errorMessage && orderGroups.length === 0" class="text-muted small">
+        Henuz siparisiniz yok.
+      </div>
+
+      <button
+        *ngFor="let group of orderGroups"
+        class="order-group-btn btn w-100 text-start mb-2"
+        [ngClass]="{ 'active': selectedGroup?.orderGroupId === group.orderGroupId }"
+        (click)="selectGroup(group)">
+        <div class="fw-bold">Siparis #{{ group.orderGroupId }}</div>
+        <div class="small text-muted">{{ getGroupSummary(group) }}</div>
+        <div class="small text-muted" *ngIf="group.createdAt">{{ group.createdAt | date:'short' }}</div>
+      </button>
+    </div>
+
+    <div class="order-history-detail p-4 flex-grow-1" *ngIf="selectedGroup; else emptyState">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="fw-bold mb-0">Siparis Detaylari #{{ selectedGroup.orderGroupId }}</h6>
+        <button class="btn btn-sm btn-outline-secondary" (click)="clearSelection()">Listeye Don</button>
+      </div>
+
+      <div class="order-item d-flex align-items-center gap-3 p-2 border rounded mb-2"
+           *ngFor="let item of selectedGroup.items">
+        <img
+          [src]="item.productImageUrl || 'assets/placeholder.png'"
+          class="rounded border"
+          width="60" height="60"
+          style="object-fit: contain; background: white;">
+        <div class="flex-grow-1">
+          <div class="fw-bold">{{ item.productName }}</div>
+          <div class="small text-muted">Adet: {{ item.count }} | Birim: {{ item.price }} ?</div>
+          <div class="small text-muted">Toplam: {{ item.totalPrice }} ?</div>
+          <div class="small">Durum: {{ item.status }}</div>
+        </div>
+        <div class="small text-muted">#{{ item.orderId }}</div>
+      </div>
+    </div>
+
+    <ng-template #emptyState>
+      <div class="order-history-detail p-4 flex-grow-1 text-muted">
+        Detaylari gormek icin bir siparis secin.
+      </div>
+    </ng-template>
+  </div>
+</div>

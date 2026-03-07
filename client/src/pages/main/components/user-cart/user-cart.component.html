@@ -71,13 +71,10 @@
       {{ items.length > 0 ? (isCartConfirmed ? 'Siparişi Tamamla' : 'Sepeti Onayla') : 'Sepet Boş' }}
     </button>
   </div>
+
   <app-payment
     *ngIf='isPaymentPhaseActive'
     (closePaymentComponentEvent)='closePaymentComponent()'
     (paymentSuccess)='handlePaymentSuccess()'
   />
 </div>
-
-
-
-
