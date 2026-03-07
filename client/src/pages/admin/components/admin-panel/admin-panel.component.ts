@@ -13,10 +13,11 @@ import { IChatMessage } from '../../../../interfaces/IChatMessage';
 import { SupportRealtimeService } from '../../../../services/support-realtime/support-realtime.service';
 import { ISupportRealtimeEvent } from '../../../../interfaces/support/ISupportRealtimeEvent';
 import { Subscription } from 'rxjs';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink, RouterLinkActive } from '@angular/router';
 
 @Component({
   selector: 'app-admin-panel',
+  standalone: true,
   imports: [
     ProductAdderComponent,
     ProductBodyComponent,
@@ -27,6 +28,7 @@ import { RouterLink } from '@angular/router';
     OrderPanelComponent,
     FormsModule,
     RouterLink,
+    RouterLinkActive,
   ],
   templateUrl: './admin-panel.component.html',
   styleUrl: './admin-panel.component.css',
@@ -39,6 +41,7 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
   hasProductEditOpened = false;
   hasOrdersOpened = false;
   hasSupportOpened = false;
+  currentSection: 'home' | 'products' | 'orders' | 'support' = 'home';
 
   supportUsers: string[] = [];
   bannedUsers: string[] = [];
@@ -50,6 +53,7 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
   supportError = '';
   private supportPollingIntervalId: ReturnType<typeof setInterval> | null = null;
   private supportRealtimeSub: Subscription | null = null;
+  private routeSub: Subscription | null = null;
 
   private productChangedCallback!: (data: any) => void;
   private editorOpenedCallback!: (id: number) => void;
@@ -57,7 +61,8 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
   constructor(
     private eventManager: EventService,
     private restService: RestService,
-    private supportRealtimeService: SupportRealtimeService
+    private supportRealtimeService: SupportRealtimeService,
+    private route: ActivatedRoute
   ) {
     this.productChangedCallback = (data: any) => {
       this.productChangedEventHandler(data);
@@ -89,6 +94,15 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
         }
       }
     );
+
+    this.routeSub = this.route.data.subscribe((data) => {
+      const section = (data['section'] ?? 'home') as
+        | 'home'
+        | 'products'
+        | 'orders'
+        | 'support';
+      this.setSection(section);
+    });
   }
 
   ngOnDestroy(): void {
@@ -96,6 +110,7 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     this.eventManager.off('editorOpened', this.editorOpenedCallback);
     this.stopSupportPolling();
     this.supportRealtimeSub?.unsubscribe();
+    this.routeSub?.unsubscribe();
   }
 
   productAddedEventHandler(event: boolean) {
@@ -140,30 +155,14 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     this.hasProductEditOpened = false;
   }
 
-  open_close_Products() {
-    this.hasProductsOpened = !this.hasProductsOpened;
-    if (this.hasProductsOpened) {
-      this.hasOrdersOpened = false;
-      this.hasSupportOpened = false;
-      this.stopSupportPolling();
-    }
-  }
+  private setSection(section: 'home' | 'products' | 'orders' | 'support') {
+    this.currentSection = section;
 
-  open_close_Orders() {
-    this.hasOrdersOpened = !this.hasOrdersOpened;
-    if (this.hasOrdersOpened) {
-      this.hasProductsOpened = false;
-      this.hasSupportOpened = false;
-      this.stopSupportPolling();
-    }
-  }
-
-  open_close_Support() {
-    this.hasSupportOpened = !this.hasSupportOpened;
+    this.hasProductsOpened = section === 'products';
+    this.hasOrdersOpened = section === 'orders';
+    this.hasSupportOpened = section === 'support';
 
     if (this.hasSupportOpened) {
-      this.hasProductsOpened = false;
-      this.hasOrdersOpened = false;
       this.loadSupportUsers();
       this.loadBannedUsers();
       this.startSupportPolling();

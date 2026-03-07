@@ -6,14 +6,14 @@
 
       <div *ngIf="isLoginPhaseActive && !isLoginCompleted" class="text-center">
         <div class="spinner-border text-primary" role="status">
-          <span class="visually-hidden">Yükleniyor...</span>
+          <span class="visually-hidden">Yukleniyor...</span>
         </div>
       </div>
     </div>
   </div>
 
   <div *ngIf="isLoginCompleted" class="w-100 h-100 flex-grow-1 animate-fade-in">
-    <app-admin-panel/>
+    <router-outlet></router-outlet>
   </div>
 
 </div>

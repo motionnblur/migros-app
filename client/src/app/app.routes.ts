@@ -9,6 +9,7 @@ import { UserProfileComponent } from '../pages/main/components/user-profile/user
 import { OrderTrackerComponent } from '../pages/main/components/order-tracker/order-tracker.component';
 import { OrderHistoryComponent } from '../pages/main/components/order-history/order-history.component';
 import { SupportChatComponent } from '../pages/main/components/support-chat/support-chat.component';
+import { AdminPanelComponent } from '../pages/admin/components/admin-panel/admin-panel.component';
 
 export const routes: Routes = [
   {
@@ -26,6 +27,15 @@ export const routes: Routes = [
       { path: 'support', outlet: 'modal', component: SupportChatComponent },
     ],
   },
-  { path: 'admin', component: AdminComponent },
+  {
+    path: 'admin',
+    component: AdminComponent,
+    children: [
+      { path: '', pathMatch: 'full', component: AdminPanelComponent, data: { section: 'home' } },
+      { path: 'products', component: AdminPanelComponent, data: { section: 'products' } },
+      { path: 'orders', component: AdminPanelComponent, data: { section: 'orders' } },
+      { path: 'support', component: AdminPanelComponent, data: { section: 'support' } },
+    ],
+  },
   { path: '**', redirectTo: '' },
 ];

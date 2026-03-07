@@ -7,21 +7,21 @@
     </a>
 
     <div class="ms-auto d-flex gap-2">
-      <button class="btn btn-sm px-3 rounded-pill transition-all"
-              [ngClass]="hasProductsOpened ? 'btn-orange' : 'btn-outline-light'"
-              (click)="open_close_Products()">
+      <a class="btn btn-sm px-3 rounded-pill transition-all"
+         routerLink="/admin/products"
+         [ngClass]="currentSection === 'products' ? 'btn-orange' : 'btn-outline-light'">
         <i class="bi bi-box-seam me-1"></i> Urunler
-      </button>
-      <button class="btn btn-sm px-3 rounded-pill transition-all"
-              [ngClass]="hasOrdersOpened ? 'btn-orange' : 'btn-outline-light'"
-              (click)="open_close_Orders()">
+      </a>
+      <a class="btn btn-sm px-3 rounded-pill transition-all"
+         routerLink="/admin/orders"
+         [ngClass]="currentSection === 'orders' ? 'btn-orange' : 'btn-outline-light'">
         <i class="bi bi-receipt me-1"></i> Siparisler
-      </button>
-      <button class="btn btn-sm px-3 rounded-pill transition-all"
-              [ngClass]="hasSupportOpened ? 'btn-orange' : 'btn-outline-light'"
-              (click)="open_close_Support()">
+      </a>
+      <a class="btn btn-sm px-3 rounded-pill transition-all"
+         routerLink="/admin/support"
+         [ngClass]="currentSection === 'support' ? 'btn-orange' : 'btn-outline-light'">
         <i class="bi bi-chat-dots me-1"></i> Canli Destek
-      </button>
+      </a>
     </div>
   </nav>
 
@@ -149,6 +149,3 @@
     </div>
   </div>
 </div>
-
-
-
