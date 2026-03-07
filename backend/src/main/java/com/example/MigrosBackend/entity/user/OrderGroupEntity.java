@@ -1,8 +1,13 @@
 package com.example.MigrosBackend.entity.user;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Data
@@ -10,28 +15,24 @@ import lombok.*;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-public class OrderEntity {
+public class OrderGroupEntity {
     @Id
-    @Column(name = "order_entity_id")
+    @Column(name = "order_group_entity_id")
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     private Long userId;
-    private Long itemId;
-    private Integer count;
-    private Float price;
-    private Float totalPrice;
+    private LocalDateTime createdAt;
     private String status;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_entity_id", referencedColumnName = "user_entity_id")
-    @JsonBackReference("user-orders")
+    @JsonBackReference("user-order-groups")
     private UserEntity userEntity;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "order_group_entity_id", referencedColumnName = "order_group_entity_id")
-    @JsonBackReference("group-orders")
-    private OrderGroupEntity orderGroup;
+    @OneToMany(mappedBy = "orderGroup", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference("group-orders")
+    private List<OrderEntity> orderItems = new ArrayList<>();
 }
 
 

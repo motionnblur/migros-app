@@ -3,17 +3,17 @@ package com.example.MigrosBackend.service.user.supply;
 import com.example.MigrosBackend.dto.admin.panel.DescriptionsDto;
 import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionListDto;
 import com.example.MigrosBackend.dto.admin.panel.ProductDto2;
-import com.example.MigrosBackend.dto.user.product.ProductDto;
-import com.example.MigrosBackend.dto.user.product.ProductPreviewDto;
 import com.example.MigrosBackend.dto.user.category.SubCategoryDto;
 import com.example.MigrosBackend.dto.user.order.UserOrderDetailDto;
 import com.example.MigrosBackend.dto.user.order.UserOrderGroupDto;
+import com.example.MigrosBackend.dto.user.product.ProductPreviewDto;
 import com.example.MigrosBackend.dto.user.product.UserCartItemDto;
 import com.example.MigrosBackend.entity.category.CategoryEntity;
 import com.example.MigrosBackend.entity.product.ProductDescriptionEntity;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.product.ProductImageEntity;
 import com.example.MigrosBackend.entity.user.OrderEntity;
+import com.example.MigrosBackend.entity.user.OrderGroupEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.exception.admin.ProductNotFoundException;
 import com.example.MigrosBackend.exception.admin.UserNotFoundException;
@@ -28,6 +28,7 @@ import com.example.MigrosBackend.repository.product.ProductDescriptionEntityRepo
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductImageEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderEntityRepository;
+import com.example.MigrosBackend.repository.user.OrderGroupEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,9 +37,6 @@ import org.springframework.core.io.UrlResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Paths;
@@ -57,6 +55,7 @@ public class UserSupplyService {
     private final UserEntityRepository userEntityRepository;
     private final TokenService tokenService;
     private final OrderEntityRepository orderEntityRepository;
+    private final OrderGroupEntityRepository orderGroupEntityRepository;
     private final ProductDescriptionEntityRepository productDescriptionEntityRepository;
 
     @Autowired
@@ -67,6 +66,7 @@ public class UserSupplyService {
             UserEntityRepository userEntityRepository,
             TokenService tokenService,
             OrderEntityRepository orderEntityRepository,
+            OrderGroupEntityRepository orderGroupEntityRepository,
             ProductDescriptionEntityRepository productDescriptionEntityRepository
     ) {
         this.categoryEntityRepository = categoryEntityRepository;
@@ -75,6 +75,7 @@ public class UserSupplyService {
         this.userEntityRepository = userEntityRepository;
         this.tokenService = tokenService;
         this.orderEntityRepository = orderEntityRepository;
+        this.orderGroupEntityRepository = orderGroupEntityRepository;
         this.productDescriptionEntityRepository = productDescriptionEntityRepository;
     }
 
@@ -99,7 +100,6 @@ public class UserSupplyService {
             } else {
                 itemDto.setProductPrice(itemEntity.getProductPrice());
             }
-
             return itemDto;
         }).collect(Collectors.toList());
     }
@@ -128,14 +128,13 @@ public class UserSupplyService {
     public int getProductCountsFromCategory(Long categoryId) {
         boolean b = categoryEntityRepository.existsById(categoryId);
         if (!b) throw new CategoryNotFoundException(categoryId.toString());
-
         return productEntityRepository.countByCategoryEntityId(categoryId);
     }
 
     public List<SubCategoryDto> getSubCategories(Long categoryId) {
         CategoryEntity categoryEntity = categoryEntityRepository.findById(categoryId).get();
 
-        List<SubCategoryDto> subCategoryDto = categoryEntity.getItemEntities().stream()
+        return categoryEntity.getItemEntities().stream()
                 .filter(itemEntity -> itemEntity.getSubcategoryName() != null && !itemEntity.getSubcategoryName().isEmpty())
                 .collect(Collectors.groupingBy(ProductEntity::getSubcategoryName, Collectors.counting()))
                 .entrySet().stream()
@@ -146,8 +145,6 @@ public class UserSupplyService {
                     dto.setProductCount(entry.getValue().intValue());
                     return dto;
                 }).collect(Collectors.toList());
-
-        return subCategoryDto;
     }
 
     public List<ProductPreviewDto> getProductsFromSubcategory(String subcategoryName, int page, int productRange) {
@@ -162,7 +159,6 @@ public class UserSupplyService {
             } else {
                 itemDto.setProductPrice(itemEntity.getProductPrice());
             }
-
             return itemDto;
         }).collect(Collectors.toList());
     }
@@ -177,7 +173,7 @@ public class UserSupplyService {
         UserEntity user = userEntityRepository.findByUserMail(userName);
 
         if (user.getProductsIdsInCart() == null) {
-            user.setProductsIdsInCart(new ArrayList<>()); // Initialize if null
+            user.setProductsIdsInCart(new ArrayList<>());
         }
         user.getProductsIdsInCart().add(productId);
         userEntityRepository.save(user);
@@ -191,20 +187,17 @@ public class UserSupplyService {
                 .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
 
         List<ProductEntity> productEntities = productEntityRepository.findAllById(productIdCounts.keySet());
-
         Map<Long, ProductEntity> productEntityMap = productEntities.stream()
                 .collect(Collectors.toMap(ProductEntity::getId, Function.identity()));
 
         return productIdCounts.entrySet().stream()
                 .map(entry -> {
                     ProductEntity productEntity = productEntityMap.get(entry.getKey());
-
                     UserCartItemDto dto = new UserCartItemDto();
                     dto.setProductId(productEntity.getId());
                     dto.setProductName(productEntity.getProductName());
                     dto.setProductPrice(productEntity.getProductPrice());
                     dto.setProductCount(entry.getValue().intValue());
-
                     return dto;
                 }).toList();
     }
@@ -221,7 +214,6 @@ public class UserSupplyService {
         productDto2.setProductDiscount(productEntity.getProductDiscount());
         productDto2.setProductDescription(productEntity.getProductDescription());
         productDto2.setProductCategoryId(Math.toIntExact(productEntity.getCategoryEntity().getId()));
-
         return productDto2;
     }
 
@@ -230,7 +222,7 @@ public class UserSupplyService {
         UserEntity user = userEntityRepository.findByUserMail(userName);
         if (tokenService.validateToken(token, user.getUserMail())) {
             if (user.getProductsIdsInCart() == null) {
-                user.setProductsIdsInCart(new ArrayList<>()); // Initialize if null
+                user.setProductsIdsInCart(new ArrayList<>());
             }
             user.getProductsIdsInCart().removeAll(Collections.singleton(productId));
             userEntityRepository.save(user);
@@ -250,7 +242,7 @@ public class UserSupplyService {
 
         if (tokenService.validateToken(token, user.getUserMail())) {
             if (user.getProductsIdsInCart() == null) {
-                user.setProductsIdsInCart(new ArrayList<>()); // Initialize if null
+                user.setProductsIdsInCart(new ArrayList<>());
             }
             user.getProductsIdsInCart().removeAll(Collections.singleton(productId));
             for (int i = 0; i < count; i++) {
@@ -266,37 +258,53 @@ public class UserSupplyService {
         String userName = tokenService.extractUsername(token);
         UserEntity user = userEntityRepository.findByUserMail(userName);
 
-        if (tokenService.validateToken(token, user.getUserMail())) {
-            List<OrderEntity> orders = user.getOrderEntities();
-            return orders.stream().map(OrderEntity::getId).toList();
-        } else {
+        if (!tokenService.validateToken(token, user.getUserMail())) {
             throw new InvalidTokenException();
         }
+
+        List<Long> ids = new ArrayList<>();
+        ids.addAll(orderGroupEntityRepository.findByUserId(user.getId()).stream().map(OrderGroupEntity::getId).toList());
+        ids.addAll(orderEntityRepository.findByUserIdAndOrderGroupIsNull(user.getId()).stream().map(OrderEntity::getId).toList());
+        return ids.stream().distinct().toList();
     }
 
     public String getOrderStatusByOrderId(Long orderId, String token) {
         String userName = tokenService.extractUsername(token);
         UserEntity user = userEntityRepository.findByUserMail(userName);
 
-        if (tokenService.validateToken(token, user.getUserMail())) {
-            OrderEntity order = orderEntityRepository.findById(orderId).orElseThrow(() -> new GeneralException("Order not found"));
-            return order.getStatus();
-        } else {
+        if (!tokenService.validateToken(token, user.getUserMail())) {
             throw new InvalidTokenException();
         }
+
+        OrderGroupEntity orderGroup = orderGroupEntityRepository.findByIdAndUserId(orderId, user.getId()).orElse(null);
+        if (orderGroup != null) {
+            return orderGroup.getStatus();
+        }
+
+        OrderEntity legacyOrder = orderEntityRepository.findByIdAndUserId(orderId, user.getId())
+                .orElseThrow(() -> new GeneralException("Order not found"));
+        return legacyOrder.getStatus();
     }
 
     public void cancelOrder(Long orderId, String token) {
         String userName = tokenService.extractUsername(token);
         UserEntity user = userEntityRepository.findByUserMail(userName);
 
-        if (tokenService.validateToken(token, user.getUserMail())) {
-            OrderEntity order = orderEntityRepository.findById(orderId)
-                    .orElseThrow(() -> new GeneralException("Order not found"));
-            orderEntityRepository.delete(order);
-        } else {
+        if (!tokenService.validateToken(token, user.getUserMail())) {
             throw new InvalidTokenException();
         }
+
+        OrderGroupEntity orderGroup = orderGroupEntityRepository.findByIdAndUserId(orderId, user.getId()).orElse(null);
+        if (orderGroup != null) {
+            orderGroup.getOrderItems().clear();
+            orderGroupEntityRepository.save(orderGroup);
+            orderGroupEntityRepository.delete(orderGroup);
+            return;
+        }
+
+        OrderEntity legacyOrder = orderEntityRepository.findByIdAndUserId(orderId, user.getId())
+                .orElseThrow(() -> new GeneralException("Order not found"));
+        orderEntityRepository.delete(legacyOrder);
     }
 
     public ProductDescriptionListDto getProductDescription(Long productId) {
@@ -313,12 +321,12 @@ public class UserSupplyService {
             dto.setDescriptionId(item.getId());
             dto.setDescriptionTabName(item.getDescriptionTabName());
             dto.setDescriptionTabContent(item.getDescriptionTabContent());
-
             productDescriptionDto.getDescriptionList().add(dto);
         }
 
         return productDescriptionDto;
     }
+
     public List<UserOrderDetailDto> getUserOrderDetails(String token) {
         String userName = tokenService.extractUsername(token);
         UserEntity user = userEntityRepository.findByUserMail(userName);
@@ -327,38 +335,54 @@ public class UserSupplyService {
             throw new InvalidTokenException();
         }
 
-        List<OrderEntity> orders = user.getOrderEntities();
-        if (orders == null || orders.isEmpty()) {
-            return new ArrayList<>();
+        List<UserOrderDetailDto> result = new ArrayList<>();
+
+        List<OrderGroupEntity> groups = orderGroupEntityRepository.findByUserId(user.getId());
+        List<OrderEntity> legacyOrders = orderEntityRepository.findByUserIdAndOrderGroupIsNull(user.getId());
+
+        List<Long> productIds = new ArrayList<>();
+        productIds.addAll(groups.stream().flatMap(g -> g.getOrderItems().stream()).map(OrderEntity::getItemId).toList());
+        productIds.addAll(legacyOrders.stream().map(OrderEntity::getItemId).toList());
+
+        if (productIds.isEmpty()) {
+            return result;
         }
 
-        List<Long> productIds = orders.stream()
-                .map(OrderEntity::getItemId)
-                .distinct()
-                .toList();
-
-        Map<Long, ProductEntity> productMap = productEntityRepository.findAllById(productIds)
+        Map<Long, ProductEntity> productMap = productEntityRepository.findAllById(productIds.stream().distinct().toList())
                 .stream()
                 .collect(Collectors.toMap(ProductEntity::getId, Function.identity()));
 
-        List<UserOrderDetailDto> result = new ArrayList<>();
-        for (OrderEntity order : orders) {
-            ProductEntity product = productMap.get(order.getItemId());
+        for (OrderGroupEntity group : groups) {
+            for (OrderEntity order : group.getOrderItems()) {
+                ProductEntity product = productMap.get(order.getItemId());
+                UserOrderDetailDto dto = new UserOrderDetailDto();
+                dto.setOrderId(order.getId());
+                dto.setProductId(order.getItemId());
+                dto.setProductName(product != null ? product.getProductName() : "");
+                dto.setCount(order.getCount());
+                dto.setPrice(order.getPrice());
+                dto.setTotalPrice(order.getTotalPrice());
+                dto.setStatus(group.getStatus());
+                result.add(dto);
+            }
+        }
 
+        for (OrderEntity legacy : legacyOrders) {
+            ProductEntity product = productMap.get(legacy.getItemId());
             UserOrderDetailDto dto = new UserOrderDetailDto();
-            dto.setOrderId(order.getId());
-            dto.setProductId(order.getItemId());
+            dto.setOrderId(legacy.getId());
+            dto.setProductId(legacy.getItemId());
             dto.setProductName(product != null ? product.getProductName() : "");
-            dto.setCount(order.getCount());
-            dto.setPrice(order.getPrice());
-            dto.setTotalPrice(order.getTotalPrice());
-            dto.setStatus(order.getStatus());
-
+            dto.setCount(legacy.getCount());
+            dto.setPrice(legacy.getPrice());
+            dto.setTotalPrice(legacy.getTotalPrice());
+            dto.setStatus(legacy.getStatus());
             result.add(dto);
         }
 
         return result;
     }
+
     public List<UserOrderGroupDto> getUserOrderGroups(String token) {
         String userName = tokenService.extractUsername(token);
         UserEntity user = userEntityRepository.findByUserMail(userName);
@@ -367,34 +391,31 @@ public class UserSupplyService {
             throw new InvalidTokenException();
         }
 
-        List<OrderEntity> orders = user.getOrderEntities();
-        if (orders == null || orders.isEmpty()) {
-            return new ArrayList<>();
+        List<UserOrderGroupDto> result = new ArrayList<>();
+
+        List<OrderGroupEntity> groups = orderGroupEntityRepository.findByUserId(user.getId());
+        List<OrderEntity> legacyOrders = orderEntityRepository.findByUserIdAndOrderGroupIsNull(user.getId());
+
+        List<Long> productIds = new ArrayList<>();
+        productIds.addAll(groups.stream().flatMap(g -> g.getOrderItems().stream()).map(OrderEntity::getItemId).toList());
+        productIds.addAll(legacyOrders.stream().map(OrderEntity::getItemId).toList());
+
+        if (productIds.isEmpty()) {
+            return result;
         }
 
-        List<Long> productIds = orders.stream()
-                .map(OrderEntity::getItemId)
-                .distinct()
-                .toList();
-
-        Map<Long, ProductEntity> productMap = productEntityRepository.findAllById(productIds)
+        Map<Long, ProductEntity> productMap = productEntityRepository.findAllById(productIds.stream().distinct().toList())
                 .stream()
                 .collect(Collectors.toMap(ProductEntity::getId, Function.identity()));
 
-        Map<Long, List<OrderEntity>> grouped = orders.stream()
-                .collect(Collectors.groupingBy(order -> order.getOrderGroupId() != null ? order.getOrderGroupId() : order.getId()));
-
-        List<UserOrderGroupDto> result = new ArrayList<>();
-        for (Map.Entry<Long, List<OrderEntity>> entry : grouped.entrySet()) {
+        for (OrderGroupEntity group : groups) {
             UserOrderGroupDto groupDto = new UserOrderGroupDto();
-            groupDto.setOrderGroupId(entry.getKey());
+            groupDto.setOrderGroupId(group.getId());
+            groupDto.setCreatedAt(group.getCreatedAt());
 
             List<UserOrderDetailDto> items = new ArrayList<>();
-            java.time.LocalDateTime createdAt = null;
-
-            for (OrderEntity order : entry.getValue()) {
+            for (OrderEntity order : group.getOrderItems()) {
                 ProductEntity product = productMap.get(order.getItemId());
-
                 UserOrderDetailDto dto = new UserOrderDetailDto();
                 dto.setOrderId(order.getId());
                 dto.setProductId(order.getItemId());
@@ -402,21 +423,33 @@ public class UserSupplyService {
                 dto.setCount(order.getCount());
                 dto.setPrice(order.getPrice());
                 dto.setTotalPrice(order.getTotalPrice());
-                dto.setStatus(order.getStatus());
-
+                dto.setStatus(group.getStatus());
                 items.add(dto);
-
-                if (createdAt == null) {
-                    createdAt = order.getCreatedAt();
-                }
             }
-
-            groupDto.setCreatedAt(createdAt);
             groupDto.setItems(items);
             result.add(groupDto);
         }
 
+        for (OrderEntity legacy : legacyOrders) {
+            ProductEntity product = productMap.get(legacy.getItemId());
+            UserOrderGroupDto groupDto = new UserOrderGroupDto();
+            groupDto.setOrderGroupId(legacy.getId());
+            groupDto.setCreatedAt(null);
+
+            UserOrderDetailDto dto = new UserOrderDetailDto();
+            dto.setOrderId(legacy.getId());
+            dto.setProductId(legacy.getItemId());
+            dto.setProductName(product != null ? product.getProductName() : "");
+            dto.setCount(legacy.getCount());
+            dto.setPrice(legacy.getPrice());
+            dto.setTotalPrice(legacy.getTotalPrice());
+            dto.setStatus(legacy.getStatus());
+            groupDto.setItems(List.of(dto));
+
+            result.add(groupDto);
+        }
+
+        result.sort((a, b) -> Long.compare(b.getOrderGroupId(), a.getOrderGroupId()));
         return result;
     }
 }
-

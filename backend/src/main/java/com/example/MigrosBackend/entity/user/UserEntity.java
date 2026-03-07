@@ -34,8 +34,12 @@ public class UserEntity {
 
     @OneToMany(cascade = CascadeType.ALL)
     @JoinColumn(name = "user_entity_id", referencedColumnName = "user_entity_id")
-    @JsonManagedReference
+    @JsonManagedReference("user-orders")
     private List<OrderEntity> orderEntities;
+
+    @OneToMany(mappedBy = "userEntity", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference("user-order-groups")
+    private List<OrderGroupEntity> orderGroupEntities;
 
     @Override
     public String toString() {
@@ -54,3 +58,5 @@ public class UserEntity {
                 '}';
     }
 }
+
+
