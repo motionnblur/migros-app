@@ -1,4 +1,4 @@
-import {Component, OnInit} from '@angular/core';
+import {Component, OnDestroy, OnInit} from '@angular/core';
 import {AdminLoginComponent} from './components/admin-login/admin-login.component';
 import {CommonModule} from '@angular/common';
 import {AdminService} from './services/admin.service';
@@ -12,9 +12,10 @@ import {AuthService} from '../../services/auth/auth.service';
   templateUrl: './admin.component.html',
   styleUrl: './admin.component.css',
 })
-export class AdminComponent implements OnInit {
+export class AdminComponent implements OnInit, OnDestroy {
   isLoginPhaseActive: boolean = false;
   isLoginCompleted: boolean = false;
+  private tokenExpiryIntervalId: ReturnType<typeof setInterval> | null = null;
 
   constructor(private adminService: AdminService, private authService: AuthService) {
   }
@@ -25,6 +26,8 @@ export class AdminComponent implements OnInit {
       this.isLoginCompleted = true;
       this.isLoginPhaseActive = false;
     }
+
+    this.startTokenExpiryPolling();
 
     // Subscribe to login phase (e.g., while checking credentials)
     this.adminService.getLoginPhaseStatus().subscribe((status) => {
@@ -40,8 +43,33 @@ export class AdminComponent implements OnInit {
     });
   }
 
+  ngOnDestroy(): void {
+    this.stopTokenExpiryPolling();
+  }
+
   setLoginPhase(): void {
     this.adminService.setLoginPhase(true);
   }
-}
 
+  private startTokenExpiryPolling() {
+    this.stopTokenExpiryPolling();
+    this.tokenExpiryIntervalId = setInterval(() => {
+      const token = this.authService.getAdminToken();
+      if (!token) {
+        return;
+      }
+      if (this.authService.isTokenExpired(token)) {
+        this.authService.logoutAdmin();
+        this.isLoginCompleted = false;
+        this.isLoginPhaseActive = false;
+      }
+    }, 15000);
+  }
+
+  private stopTokenExpiryPolling() {
+    if (this.tokenExpiryIntervalId) {
+      clearInterval(this.tokenExpiryIntervalId);
+      this.tokenExpiryIntervalId = null;
+    }
+  }
+}

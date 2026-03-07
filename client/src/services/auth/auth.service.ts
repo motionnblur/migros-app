@@ -37,6 +37,9 @@ export class AuthService {
   public logout() {
     localStorage.removeItem('token');
   }
+  public logoutAdmin() {
+    localStorage.removeItem('admin-token');
+  }
   decodeToken(token: string): any {
     try {
       const payload = token.split('.')[1];
@@ -53,4 +56,3 @@ export class AuthService {
     return expirationDate < new Date();
   }
 }
-
