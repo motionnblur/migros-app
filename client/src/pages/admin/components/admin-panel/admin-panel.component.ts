@@ -1,19 +1,19 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
-import { ProductAdderComponent } from '../product-adder/product-adder.component';
-import { CommonModule } from '@angular/common';
-import { ProductBodyComponent } from '../product-body/product-body.component';
-import { WallComponent } from '../wall/wall.component';
-import { ProductUpdaterComponent } from '../product-adder/product-updater.component';
-import { EventService } from '../../../../services/event/event.service';
-import { ProductEditComponent } from '../product-edit/product-edit.component';
-import { OrderPanelComponent } from '../order-panel/order-panel.component';
-import { RestService } from '../../../../services/rest/rest.service';
-import { FormsModule } from '@angular/forms';
-import { IChatMessage } from '../../../../interfaces/IChatMessage';
-import { SupportRealtimeService } from '../../../../services/support-realtime/support-realtime.service';
-import { ISupportRealtimeEvent } from '../../../../interfaces/support/ISupportRealtimeEvent';
-import { Subscription } from 'rxjs';
-import { ActivatedRoute, RouterLink, RouterLinkActive } from '@angular/router';
+import {Component, OnDestroy, OnInit} from '@angular/core';
+import {ProductAdderComponent} from '../product-adder/product-adder.component';
+import {CommonModule} from '@angular/common';
+import {ProductBodyComponent} from '../product-body/product-body.component';
+import {WallComponent} from '../wall/wall.component';
+import {ProductUpdaterComponent} from '../product-adder/product-updater.component';
+import {EventService} from '../../../../services/event/event.service';
+import {ProductEditComponent} from '../product-edit/product-edit.component';
+import {OrderPanelComponent} from '../order-panel/order-panel.component';
+import {RestService} from '../../../../services/rest/rest.service';
+import {FormsModule} from '@angular/forms';
+import {IChatMessage} from '../../../../interfaces/IChatMessage';
+import {SupportRealtimeService} from '../../../../services/support-realtime/support-realtime.service';
+import {ISupportRealtimeEvent} from '../../../../interfaces/support/ISupportRealtimeEvent';
+import {Subscription} from 'rxjs';
+import {ActivatedRoute, RouterLink} from '@angular/router';
 
 @Component({
   selector: 'app-admin-panel',
@@ -28,7 +28,6 @@ import { ActivatedRoute, RouterLink, RouterLinkActive } from '@angular/router';
     OrderPanelComponent,
     FormsModule,
     RouterLink,
-    RouterLinkActive,
   ],
   templateUrl: './admin-panel.component.html',
   styleUrl: './admin-panel.component.css',
