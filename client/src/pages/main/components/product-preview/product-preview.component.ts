@@ -2,6 +2,7 @@ import {Component, Input, OnInit} from '@angular/core';
 import {CommonModule} from '@angular/common'; // Important for [src] and [ngClass]
 import {RestService} from '../../../../services/rest/rest.service';
 import {EventService} from '../../../../services/event/event.service';
+import {AuthService} from '../../../../services/auth/auth.service';
 
 @Component({
   selector: 'app-product-preview',
@@ -19,7 +20,8 @@ export class ProductPreviewComponent implements OnInit {
 
   constructor(
     private restService: RestService,
-    private eventService: EventService
+    private eventService: EventService,
+    private authService: AuthService
   ) {
   }
 
@@ -39,6 +41,11 @@ export class ProductPreviewComponent implements OnInit {
   }
 
   public addProductToUserCart() {
+    if (!this.authService.isLoggedIn()) {
+      this.eventService.trigger('openLogin');
+      return;
+    }
+
     this.restService.addProductToUserCart(this.productId).subscribe({
       next: () => {
         // You could trigger a 'cartUpdated' event here if you have a cart badge in header
