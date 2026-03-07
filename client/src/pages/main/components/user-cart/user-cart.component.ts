@@ -154,4 +154,17 @@ export class UserCartComponent {
   public closePaymentComponent() {
     this.isPaymentPhaseActive = false;
   }
+
+  public handlePaymentSuccess() {
+    this.isPaymentPhaseActive = false;
+    this.isCartConfirmed = false;
+    this.items = [];
+    this.itemsToDelete = [];
+    this.itemCountMap.clear();
+    this.totalPrice = 0;
+    this.eventService.trigger('orderUpdated');
+    this.eventService.trigger('openOrderTracker');
+    this.closeCartComponent();
+  }
 }
+

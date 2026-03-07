@@ -81,6 +81,18 @@ export class MainComponent implements OnInit, OnDestroy {
       this.openLoginComponent();
     });
 
+    this.eventManager.on('orderUpdated', () => {
+      if (this.isUserSigned) {
+        this.loadOrderIds();
+      }
+    });
+
+    this.eventManager.on('openOrderTracker', () => {
+      if (this.isUserSigned) {
+        this.openOrderComponent();
+      }
+    });
+
     this.checkAuthStatus();
   }
 
@@ -328,3 +340,4 @@ export class MainComponent implements OnInit, OnDestroy {
     }
   }
 }
+

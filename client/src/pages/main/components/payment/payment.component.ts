@@ -15,6 +15,7 @@ export class PaymentComponent implements OnInit {
   errorMessage: string = ''; // To store and display errors
 
   @Output() closePaymentComponentEvent = new EventEmitter<void>();
+  @Output() paymentSuccess = new EventEmitter<void>();
 
   ngOnInit() {
     this.loadStripe();
@@ -67,6 +68,8 @@ export class PaymentComponent implements OnInit {
 
         if (data.success) {
           data.totalCartPrice = 0;
+          this.paymentSuccess.emit();
+          this.closePaymentComponentEvent.emit();
           alert('Payment Successful!');
         } else {
           alert('Payment Failed! Please try again.');
@@ -83,3 +86,4 @@ export class PaymentComponent implements OnInit {
     this.closePaymentComponentEvent.emit();
   }
 }
+
