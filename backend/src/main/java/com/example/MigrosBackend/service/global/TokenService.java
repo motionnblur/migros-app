@@ -8,15 +8,20 @@ import java.util.Date;
 
 @Service
 public class TokenService {
+    private static final long TOKEN_TTL_MILLIS = 1000L * 60 * 3;
     private String secretKey = "2D4A614E645267556B58703273357638792F423F4428472B4B6250655368566D";
 
     public String generateToken(String username) {
         return Jwts.builder()
                 .setSubject(username)
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60*3)) // 10 min
+                .setExpiration(new Date(System.currentTimeMillis() + TOKEN_TTL_MILLIS)) // 3 min
                 .signWith(SignatureAlgorithm.HS256, secretKey)
                 .compact();
+    }
+
+    public long getTokenTtlMillis() {
+        return TOKEN_TTL_MILLIS;
     }
 
     // Validate token

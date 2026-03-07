@@ -1,4 +1,4 @@
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { map } from 'rxjs';
 import { IProductUploader } from '../../interfaces/IProductUploader';
@@ -170,14 +170,11 @@ export class RestService {
     formData.append('userCountry', table.userCountry);
     formData.append('userPostalCode', table.userPostalCode);
 
-    const userToken = localStorage.getItem('token');
-
     return this.http
       .post(
         'http://localhost:8080/user/profile/uploadUserProfileTable',
         formData,
         {
-          params: { token: userToken! },
           responseType: 'text',
           observe: 'response',
         }
@@ -185,10 +182,8 @@ export class RestService {
       .pipe(map((response) => response.status === 200));
   }
   getUserProfileTableData() {
-    const userToken = localStorage.getItem('token');
     return this.http
       .get(`http://localhost:8080/user/profile/getUserProfileTable`, {
-        params: { token: userToken! },
         responseType: 'json',
       })
       .pipe(map((response) => response as IUserProfileTable));
@@ -267,33 +262,30 @@ export class RestService {
         responseType: 'text',
         observe: 'response',
       })
-      .pipe(map((response) => response.body));
+      .pipe(map((response) => response.status === 200));
   }
   addProductToUserCart(productId: number) {
-    const token: string = localStorage.getItem('token') as string;
     return this.http
       .get(`http://localhost:8080/user/supply/addProductToUserCart`, {
-        params: { productId, token },
+        params: { productId },
         responseType: 'text',
         observe: 'response',
       })
       .pipe(map((response) => response.body));
   }
   removeProductFromUserCart(productId: number) {
-    const token: string = localStorage.getItem('token') as string;
     return this.http
       .delete(`http://localhost:8080/user/supply/removeProductFromUserCart`, {
-        params: { productId, token },
+        params: { productId },
         responseType: 'text',
         observe: 'response',
       })
       .pipe(map((response) => response.body));
   }
   updateProductCountInUserCart(productId: number, count: number) {
-    const token: string = localStorage.getItem('token') as string;
     return this.http
       .get(`http://localhost:8080/user/supply/updateProductCountInUserCart`, {
-        params: { productId, count, token },
+        params: { productId, count },
         responseType: 'text',
         observe: 'response',
       })
@@ -316,51 +308,43 @@ export class RestService {
       .pipe(map((response) => response as IUserProfileTable));
   }
   getAllOrderIds() {
-    const token: string = localStorage.getItem('token') as string;
     return this.http
       .get(`http://localhost:8080/user/supply/getAllOrderIds`, {
-        params: { token },
         responseType: 'json',
       })
       .pipe(map((response) => response as number[]));
   }
   getOrderStatusByOrderId(orderId: number) {
-    const token: string = localStorage.getItem('token') as string;
     return this.http
       .get(`http://localhost:8080/user/supply/getOrderStatusByOrderId`, {
-        params: { orderId, token },
+        params: { orderId },
         responseType: 'text',
       })
       .pipe(map((response) => response as string));
   }
   calcelOrder(orderId: number) {
-    const token: string = localStorage.getItem('token') as string;
     return this.http
       .delete(`http://localhost:8080/user/supply/cancelOrder`, {
-        params: { orderId, token },
+        params: { orderId },
         responseType: 'text',
         observe: 'response',
       })
       .pipe(map((response) => response.status === 200));
   }
   getSupportMessages() {
-    const token: string = localStorage.getItem('token') as string;
     return this.http
       .get(`http://localhost:8080/user/support/messages`, {
-        params: { token },
         responseType: 'json',
       })
       .pipe(map((response) => response as IChatMessage[]));
   }
 
   sendSupportMessage(message: string) {
-    const token: string = localStorage.getItem('token') as string;
     return this.http
       .post(
         `http://localhost:8080/user/support/send`,
         { message },
         {
-          params: { token },
           responseType: 'text',
           observe: 'response',
         }
@@ -430,7 +414,7 @@ export class RestService {
       )
       .pipe(map((response) => response.status === 200));
   }
-    unbanSupportUserFromAdmin(userMail: string) {
+  unbanSupportUserFromAdmin(userMail: string) {
     return this.http
       .post(
         `http://localhost:8080/admin/panel/support/unban`,
@@ -454,19 +438,15 @@ export class RestService {
       .pipe(map((response) => response.status === 200));
   }
   getUserOrders() {
-    const token: string = localStorage.getItem('token') as string;
     return this.http
       .get(`http://localhost:8080/user/supply/getUserOrders`, {
-        params: { token },
         responseType: 'json',
       })
       .pipe(map((response) => response as IUserOrderDetail[]));
   }
   getUserOrderGroups() {
-    const token: string = localStorage.getItem('token') as string;
     return this.http
       .get(`http://localhost:8080/user/supply/getUserOrderGroups`, {
-        params: { token },
         responseType: 'json',
       })
       .pipe(map((response) => response as IUserOrderGroup[]));

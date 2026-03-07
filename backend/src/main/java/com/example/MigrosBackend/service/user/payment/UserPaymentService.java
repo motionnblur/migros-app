@@ -17,9 +17,8 @@ public class UserPaymentService {
         this.userOrderService = userOrderService;
     }
 
-    public Map<String, Object> processCharge(Map<String, Object> payload) {
+    public Map<String, Object> processCharge(Map<String, Object> payload, String userToken) {
         String token = (String) payload.get("token");
-        String userToken = (String) payload.get("userToken");
 
         float amount = userOrderService.getOrderPrice(userToken);
 

@@ -88,8 +88,7 @@ export class SignUserComponent {
         userPassword: this.userPassword,
       })
       .subscribe({
-        next: (response) => {
-          console.log('User signed up successfully:', response);
+        next: () => {
           alert(
             'Confirmation mail has been sent to your mailbox. Please click the link to activate your account in 5 minutes.'
           );
@@ -118,13 +117,17 @@ export class SignUserComponent {
         userPassword: this.userPassword,
       })
       .subscribe({
-        next: (response) => {
-          console.log('User logged in successfully');
-          this.authService.setToken(response!);
-          this.userLoginEvent.emit();
-          this.closeModal();
+        next: (success) => {
+          if (!success) {
+            return;
+          }
+
+          this.authService.refreshUserSession().subscribe(() => {
+            this.userLoginEvent.emit();
+            this.closeModal();
+          });
         },
-        error: (error) => {
+        error: () => {
           console.error('Error logging in user');
         },
       });

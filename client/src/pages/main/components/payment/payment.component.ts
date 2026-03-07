@@ -55,11 +55,11 @@ export class PaymentComponent implements OnInit {
       method: 'POST',
       body: JSON.stringify({
         token: token.id,
-        userToken: localStorage.getItem('token'),
       }),
       headers: {
         'Content-Type': 'application/json',
       },
+      credentials: 'include',
     })
       .then((response) => response.json())
       .then((data) => {
@@ -86,4 +86,3 @@ export class PaymentComponent implements OnInit {
     this.closePaymentComponentEvent.emit();
   }
 }
-

@@ -1,9 +1,9 @@
-import {Component} from '@angular/core';
-import {AdminService} from '../../services/admin.service';
-import {FormsModule} from '@angular/forms';
-import {CommonModule} from '@angular/common'; // Required for ngClass
-import {SignService} from '../../services/sign/sign.service';
-import {AuthService} from '../../../../services/auth/auth.service';
+import { Component } from '@angular/core';
+import { AdminService } from '../../services/admin.service';
+import { FormsModule } from '@angular/forms';
+import { CommonModule } from '@angular/common';
+import { SignService } from '../../services/sign/sign.service';
+import { AuthService } from '../../../../services/auth/auth.service';
 
 @Component({
   selector: 'app-admin-login',
@@ -21,8 +21,7 @@ export class AdminLoginComponent {
     private adminService: AdminService,
     private authService: AuthService,
     private signService: SignService
-  ) {
-  }
+  ) {}
 
   showPassword() {
     this.passwordVisible = !this.passwordVisible;
@@ -32,17 +31,20 @@ export class AdminLoginComponent {
     if (!username || !password) return;
 
     this.signService.adminLogin(username, password).subscribe({
-      next: (response) => {
-        if (response) {
-          this.authService.setAdminToken(response);
-          this.adminService.setLoginCompleted(true);
+      next: (success) => {
+        if (!success) {
+          return;
         }
+
+        this.authService.refreshAdminSession().subscribe((loggedIn) => {
+          if (loggedIn) {
+            this.adminService.setLoginCompleted(true);
+          }
+        });
       },
       error: (error) => {
         console.error('Login failed', error);
-        // Hint: You could add a 'showErrorMessage' variable here
-        // to show a Bootstrap Alert if the credentials are wrong
-      }
+      },
     });
   }
 }

@@ -36,31 +36,33 @@ export class SupportChatComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    if (!this.authService.isLoggedIn()) {
-      this.router.navigate(
-        [{ outlets: { modal: ['login'] } }],
-        { relativeTo: this.route.parent ?? this.route }
-      );
-      return;
-    }
-
-    this.updateCurrentUserMailFromToken();
-
-    this.supportRealtimeService.connect();
-    this.supportRealtimeSub = this.supportRealtimeService.events$.subscribe(
-      (event: ISupportRealtimeEvent) => {
-        if (!this.currentUserMail) {
-          return;
-        }
-
-        if (event.userMail === this.currentUserMail) {
-          this.loadSupportMessages();
-        }
+    this.authService.refreshUserSession().subscribe((isLoggedIn) => {
+      if (!isLoggedIn) {
+        this.router.navigate(
+          [{ outlets: { modal: ['login'] } }],
+          { relativeTo: this.route.parent ?? this.route }
+        );
+        return;
       }
-    );
 
-    this.loadSupportMessages();
-    this.startSupportMessagePolling();
+      this.currentUserMail = this.authService.getUserMail();
+
+      this.supportRealtimeService.connect();
+      this.supportRealtimeSub = this.supportRealtimeService.events$.subscribe(
+        (event: ISupportRealtimeEvent) => {
+          if (!this.currentUserMail) {
+            return;
+          }
+
+          if (event.userMail === this.currentUserMail) {
+            this.loadSupportMessages();
+          }
+        }
+      );
+
+      this.loadSupportMessages();
+      this.startSupportMessagePolling();
+    });
   }
 
   ngOnDestroy(): void {
@@ -95,17 +97,6 @@ export class SupportChatComponent implements OnInit, OnDestroy {
             : 'Mesaj gonderilemedi. Lutfen tekrar deneyin.';
       },
     });
-  }
-
-  private updateCurrentUserMailFromToken() {
-    const token = this.authService.getToken();
-    if (!token) {
-      this.currentUserMail = '';
-      return;
-    }
-
-    const decoded = this.authService.decodeToken(token);
-    this.currentUserMail = decoded?.sub ?? '';
   }
 
   private loadSupportMessages() {

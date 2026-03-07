@@ -1,6 +1,6 @@
 import { Component, HostListener, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute, NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { Subscription } from 'rxjs';
 
 import { AuthService } from '../../services/auth/auth.service';
@@ -18,7 +18,7 @@ export class MainComponent implements OnInit, OnDestroy {
 
   isMenuOpen = false;
 
-  private routeSub: Subscription | null = null;
+  private authStatusSub: Subscription | null = null;
 
   constructor(
     private authService: AuthService,
@@ -27,21 +27,21 @@ export class MainComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    this.checkAuthStatus();
-    this.routeSub = this.router.events.subscribe((event) => {
-      if (event instanceof NavigationEnd) {
-        this.checkAuthStatus();
-      }
+    this.authStatusSub = this.authService.userLoggedIn$.subscribe(() => {
+      this.checkAuthStatus();
     });
+
+    this.authService.refreshUserSession().subscribe();
   }
 
   ngOnDestroy(): void {
-    this.routeSub?.unsubscribe();
+    this.authStatusSub?.unsubscribe();
   }
 
   private checkAuthStatus() {
     if (this.authService.isLoggedIn()) {
-      this.loginText = 'Can';
+      const userMail = this.authService.getUserMail();
+      this.loginText = userMail || 'Can';
       this.isUserSigned = true;
     } else {
       this.isUserSigned = false;
@@ -70,7 +70,6 @@ export class MainComponent implements OnInit, OnDestroy {
   public logoutUser() {
     this.authService.logout();
     this.isMenuOpen = false;
-    this.checkAuthStatus();
     this.router.navigate([{ outlets: { modal: null } }], {
       relativeTo: this.route,
     });

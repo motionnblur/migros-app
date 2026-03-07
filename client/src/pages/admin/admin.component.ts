@@ -4,6 +4,7 @@ import { CommonModule } from '@angular/common';
 import { AdminService } from './services/admin.service';
 import { AuthService } from '../../services/auth/auth.service';
 import { RouterOutlet } from '@angular/router';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-admin',
@@ -15,18 +16,23 @@ import { RouterOutlet } from '@angular/router';
 export class AdminComponent implements OnInit, OnDestroy {
   isLoginPhaseActive: boolean = false;
   isLoginCompleted: boolean = false;
-  private tokenExpiryIntervalId: ReturnType<typeof setInterval> | null = null;
+  private sessionPollingIntervalId: ReturnType<typeof setInterval> | null = null;
+  private loginStatusSub: Subscription | null = null;
 
   constructor(private adminService: AdminService, private authService: AuthService) {}
 
   ngOnInit(): void {
-    const isAdminLoggedIn = this.authService.isAdminLoggedIn();
-    if (isAdminLoggedIn) {
-      this.isLoginCompleted = true;
-      this.isLoginPhaseActive = false;
-    }
+    this.loginStatusSub = this.authService.adminLoggedIn$.subscribe(
+      (isLoggedIn) => {
+        this.isLoginCompleted = isLoggedIn;
+        if (isLoggedIn) {
+          this.isLoginPhaseActive = false;
+        }
+      }
+    );
 
-    this.startTokenExpiryPolling();
+    this.authService.refreshAdminSession().subscribe();
+    this.startSessionPolling();
 
     this.adminService.getLoginPhaseStatus().subscribe((status) => {
       this.isLoginPhaseActive = status;
@@ -41,32 +47,25 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.stopTokenExpiryPolling();
+    this.stopSessionPolling();
+    this.loginStatusSub?.unsubscribe();
   }
 
   setLoginPhase(): void {
     this.adminService.setLoginPhase(true);
   }
 
-  private startTokenExpiryPolling() {
-    this.stopTokenExpiryPolling();
-    this.tokenExpiryIntervalId = setInterval(() => {
-      const token = this.authService.getAdminToken();
-      if (!token) {
-        return;
-      }
-      if (this.authService.isTokenExpired(token)) {
-        this.authService.logoutAdmin();
-        this.isLoginCompleted = false;
-        this.isLoginPhaseActive = false;
-      }
+  private startSessionPolling() {
+    this.stopSessionPolling();
+    this.sessionPollingIntervalId = setInterval(() => {
+      this.authService.refreshAdminSession().subscribe();
     }, 15000);
   }
 
-  private stopTokenExpiryPolling() {
-    if (this.tokenExpiryIntervalId) {
-      clearInterval(this.tokenExpiryIntervalId);
-      this.tokenExpiryIntervalId = null;
+  private stopSessionPolling() {
+    if (this.sessionPollingIntervalId) {
+      clearInterval(this.sessionPollingIntervalId);
+      this.sessionPollingIntervalId = null;
     }
   }
 }

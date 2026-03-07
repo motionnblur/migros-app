@@ -1,58 +1,103 @@
+import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
+import { BehaviorSubject, Observable, of } from 'rxjs';
+import { catchError, map, tap } from 'rxjs/operators';
+
+interface UserSessionResponse {
+  userMail: string;
+}
+
+interface AdminSessionResponse {
+  adminName: string;
+}
 
 @Injectable({
   providedIn: 'root',
 })
 export class AuthService {
-  constructor() {}
+  private userLoggedInSubject = new BehaviorSubject<boolean>(false);
+  private adminLoggedInSubject = new BehaviorSubject<boolean>(false);
+  private userMail = '';
+  private adminName = '';
 
-  public setToken(token: string) {
-    localStorage.setItem('token', token);
-  }
-  public getToken() {
-    return localStorage.getItem('token');
+  readonly userLoggedIn$ = this.userLoggedInSubject.asObservable();
+  readonly adminLoggedIn$ = this.adminLoggedInSubject.asObservable();
+
+  constructor(private http: HttpClient) {}
+
+  public refreshUserSession(): Observable<boolean> {
+    return this.http
+      .get<UserSessionResponse>('http://localhost:8080/user/session')
+      .pipe(
+        tap((session) => {
+          this.userMail = session?.userMail ?? '';
+          this.userLoggedInSubject.next(!!this.userMail);
+        }),
+        map((session) => !!session?.userMail),
+        catchError(() => {
+          this.userMail = '';
+          this.userLoggedInSubject.next(false);
+          return of(false);
+        })
+      );
   }
 
-  public setAdminToken(token: string) {
-    localStorage.setItem('admin-token', token);
-  }
-  public getAdminToken() {
-    return localStorage.getItem('admin-token');
+  public refreshAdminSession(): Observable<boolean> {
+    return this.http
+      .get<AdminSessionResponse>('http://localhost:8080/admin/session')
+      .pipe(
+        tap((session) => {
+          this.adminName = session?.adminName ?? '';
+          this.adminLoggedInSubject.next(!!this.adminName);
+        }),
+        map((session) => !!session?.adminName),
+        catchError(() => {
+          this.adminName = '';
+          this.adminLoggedInSubject.next(false);
+          return of(false);
+        })
+      );
   }
 
-  public isLoggedIn() {
-    const token = this.getToken();
-    if (!token) return false;
-    return !this.isTokenExpired(token);
+  public isLoggedIn(): boolean {
+    return this.userLoggedInSubject.value;
   }
-  public isAdminLoggedIn() {
-    const token = this.getAdminToken();
-    if (!token) return false;
-    return !this.isTokenExpired(token);
+
+  public isAdminLoggedIn(): boolean {
+    return this.adminLoggedInSubject.value;
   }
-  public isTokenExists() {
-    const token = this.getToken();
-    return token !== null;
+
+  public getUserMail(): string {
+    return this.userMail;
   }
-  public logout() {
-    localStorage.removeItem('token');
+
+  public getAdminName(): string {
+    return this.adminName;
   }
-  public logoutAdmin() {
-    localStorage.removeItem('admin-token');
+
+  public logout(): void {
+    this.http.post('http://localhost:8080/user/logout', {}).subscribe({
+      next: () => {
+        this.userMail = '';
+        this.userLoggedInSubject.next(false);
+      },
+      error: () => {
+        this.userMail = '';
+        this.userLoggedInSubject.next(false);
+      },
+    });
   }
-  decodeToken(token: string): any {
-    try {
-      const payload = token.split('.')[1];
-      return JSON.parse(atob(payload));
-    } catch (error) {
-      return null;
-    }
-  }
-  isTokenExpired(token: string): boolean {
-    const decodedToken = this.decodeToken(token);
-    if (!decodedToken?.exp) return false;
-    const expirationDate = new Date(0);
-    expirationDate.setUTCSeconds(decodedToken.exp);
-    return expirationDate < new Date();
+
+  public logoutAdmin(): void {
+    this.http.post('http://localhost:8080/admin/logout', {}).subscribe({
+      next: () => {
+        this.adminName = '';
+        this.adminLoggedInSubject.next(false);
+      },
+      error: () => {
+        this.adminName = '';
+        this.adminLoggedInSubject.next(false);
+      },
+    });
   }
 }
