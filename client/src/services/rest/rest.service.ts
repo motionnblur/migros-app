@@ -10,6 +10,7 @@ import { ISubCategory } from '../../interfaces/ISubCategory';
 import { ISignDto } from '../../interfaces/ISignDto';
 import { IUserCartItemDto } from '../../interfaces/IUserCartItemDto';
 import { IOrder } from '../../interfaces/IOrder';
+import { IOrderPage } from '../../interfaces/IOrderPage';
 import { IUserProfileTable } from '../../interfaces/IUserProfileTable';
 import { IChatMessage } from '../../interfaces/IChatMessage';
 import { IUserOrderDetail } from '../../interfaces/IUserOrderDetail';
@@ -304,7 +305,7 @@ export class RestService {
         params: { page, productRange },
         responseType: 'json',
       })
-      .pipe(map((response) => response as IOrder[]));
+      .pipe(map((response) => response as IOrderPage));
   }
   getUserProfileData(orderId: number) {
     return this.http
@@ -471,6 +472,3 @@ export class RestService {
       .pipe(map((response) => response as IUserOrderGroup[]));
   }
 }
-
-
-

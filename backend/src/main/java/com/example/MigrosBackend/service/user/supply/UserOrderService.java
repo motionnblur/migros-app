@@ -1,6 +1,7 @@
 package com.example.MigrosBackend.service.user.supply;
 
 import com.example.MigrosBackend.dto.order.OrderDto;
+import com.example.MigrosBackend.dto.order.OrderPageDto;
 import com.example.MigrosBackend.dto.user.UserProfileTableDto;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.user.OrderEntity;
@@ -122,7 +123,7 @@ public class UserOrderService {
         return 0;
     }
 
-    public List<OrderDto> getAllOrders(int page, int productRange) {
+    public OrderPageDto getAllOrders(int page, int productRange) {
         List<OrderDto> orderDtos = new ArrayList<>();
 
         List<OrderGroupEntity> groups = orderGroupEntityRepository.findAll();
@@ -154,12 +155,18 @@ public class UserOrderService {
         }
 
         orderDtos.sort((a, b) -> Long.compare(b.getOrderId(), a.getOrderId()));
+        int total = orderDtos.size();
         int fromIndex = Math.max(0, page * productRange);
-        if (fromIndex >= orderDtos.size()) {
-            return new ArrayList<>();
+        OrderPageDto pageDto = new OrderPageDto();
+        pageDto.setTotal(total);
+        if (fromIndex >= total) {
+            pageDto.setItems(new ArrayList<>());
+            return pageDto;
         }
-        int toIndex = Math.min(orderDtos.size(), fromIndex + productRange);
-        return new ArrayList<>(orderDtos.subList(fromIndex, toIndex));
+        int toIndex = Math.min(total, fromIndex + productRange);
+        List<OrderDto> pageItems = new ArrayList<>(orderDtos.subList(fromIndex, toIndex));
+        pageDto.setItems(pageItems);
+        return pageDto;
     }
 
     public UserProfileTableDto getUserProfileData(Long orderId) {
@@ -222,3 +229,7 @@ public class UserOrderService {
         orderEntityRepository.delete(legacyOrder);
     }
 }
+
+
+
+

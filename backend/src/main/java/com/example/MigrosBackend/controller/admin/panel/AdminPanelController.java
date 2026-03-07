@@ -1,7 +1,7 @@
 package com.example.MigrosBackend.controller.admin.panel;
 
 import com.example.MigrosBackend.dto.admin.panel.*;
-import com.example.MigrosBackend.dto.order.OrderDto;
+import com.example.MigrosBackend.dto.order.OrderPageDto;
 import com.example.MigrosBackend.dto.user.UserProfileTableDto;
 import com.example.MigrosBackend.service.admin.supply.AdminSupplyService;
 import com.example.MigrosBackend.service.user.supply.UserOrderService;
@@ -96,7 +96,7 @@ public class AdminPanelController {
     }
 
     @GetMapping("getAllOrders")
-    public ResponseEntity<List<OrderDto>> getOrder(@RequestParam int page, @RequestParam int productRange) {
+    public ResponseEntity<OrderPageDto> getOrder(@RequestParam int page, @RequestParam int productRange) {
         return ResponseEntity.ok(userOrderService.getAllOrders(page, productRange));
     }
 
@@ -117,3 +117,5 @@ public class AdminPanelController {
         return ResponseEntity.ok().build();
     }
 }
+
+

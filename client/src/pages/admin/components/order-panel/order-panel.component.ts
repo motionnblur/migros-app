@@ -1,7 +1,7 @@
 import {Component, OnInit} from '@angular/core';
-import {MatPaginatorModule} from '@angular/material/paginator';
+import {MatPaginatorModule, PageEvent} from '@angular/material/paginator';
 import {RestService} from '../../../../services/rest/rest.service';
-import {IOrder} from '../../../../interfaces/IOrder';
+import {IOrderPage} from '../../../../interfaces/IOrderPage';
 import {CommonModule} from '@angular/common';
 import {ActionPanelComponent} from '../action-panel/action-panel.component';
 
@@ -29,6 +29,10 @@ export class OrderPanelComponent implements OnInit {
   orderId: number = 0;
   deletingOrderId: number | null = null;
 
+  pageIndex = 0;
+  pageSize = 5;
+  totalOrders = 0;
+
   constructor(private restService: RestService) {
   }
 
@@ -36,14 +40,21 @@ export class OrderPanelComponent implements OnInit {
     this.loadOrders();
   }
 
-  loadOrders() {
-    this.restService.getAllOrders(0, 10).subscribe({
-      next: (data: IOrder[]) => {
-        this.tableData = data;
-        this.dataSource = data;
+  loadOrders(pageIndex: number = this.pageIndex, pageSize: number = this.pageSize) {
+    this.restService.getAllOrders(pageIndex, pageSize).subscribe({
+      next: (page: IOrderPage) => {
+        this.tableData = page.items;
+        this.dataSource = page.items;
+        this.totalOrders = page.total;
       },
       error: (err) => console.error('Siparisler yuklenemedi', err)
     });
+  }
+
+  onPageChange(event: PageEvent) {
+    this.pageIndex = event.pageIndex;
+    this.pageSize = event.pageSize;
+    this.loadOrders(this.pageIndex, this.pageSize);
   }
 
   public openActionPanel(orderId: number) {
@@ -67,6 +78,7 @@ export class OrderPanelComponent implements OnInit {
         if (success) {
           this.dataSource = this.dataSource.filter((item) => item.orderId !== orderId);
           this.tableData = this.tableData.filter((item) => item.orderId !== orderId);
+          this.totalOrders = Math.max(0, this.totalOrders - 1);
         }
         this.deletingOrderId = null;
       },

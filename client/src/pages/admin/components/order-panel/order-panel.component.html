@@ -3,7 +3,7 @@
     <h5 class="mb-0 fw-bold text-dark">
       <i class="bi bi-receipt me-2 text-primary"></i>Siparis Yonetimi
     </h5>
-    <span class="badge bg-light text-dark border px-3">Toplam: {{ tableData.length }} Siparis</span>
+    <span class="badge bg-light text-dark border px-3">Toplam: {{ totalOrders }} Siparis</span>
   </div>
 
   <div class="card-body p-0" style="min-height: 400px;">
@@ -57,9 +57,11 @@
   <div class="card-footer bg-white border-top py-2">
     <div class="d-flex justify-content-end align-items-center">
       <mat-paginator
-        [length]="tableData.length"
-        [pageSize]="5"
+        [length]="totalOrders"
+        [pageSize]="pageSize"
+        [pageIndex]="pageIndex"
         [pageSizeOptions]="[5, 10, 15]"
+        (page)="onPageChange($event)"
         class="bg-transparent border-0"
       >
       </mat-paginator>
@@ -73,3 +75,4 @@
     (closeActionPanelEvent)="closeActionPanel()"
   />
 </div>
+
