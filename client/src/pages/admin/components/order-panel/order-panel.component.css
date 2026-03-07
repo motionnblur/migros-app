@@ -15,6 +15,28 @@
   transform: scale(1.1);
 }
 
+.btn-delete {
+  width: 32px;
+  height: 32px;
+  background-color: #ffebee;
+  color: #c62828;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.btn-delete:hover {
+  background-color: #ffcdd2;
+  transform: scale(1.1);
+}
+
+.btn-delete:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .table-hover tbody tr:hover {
   background-color: #f8f9fa;
 }

@@ -27,11 +27,19 @@
             </span>
           </td>
           <td class="text-end pe-4">
-            <button class="btn btn-sm btn-action rounded-circle shadow-sm"
-                    (click)="openActionPanel(element.orderId)"
-                    title="Islemleri Goruntule">
-              <i class="bi bi-three-dots-vertical"></i>
-            </button>
+            <div class="d-inline-flex gap-2">
+              <button class="btn btn-sm btn-action rounded-circle shadow-sm"
+                      (click)="openActionPanel(element.orderId)"
+                      title="Islemleri Goruntule">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <button class="btn btn-sm btn-delete rounded-circle shadow-sm"
+                      [disabled]="deletingOrderId === element.orderId"
+                      (click)="deleteOrder(element.orderId)"
+                      title="Siparisi Sil">
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
           </td>
         </tr>
 

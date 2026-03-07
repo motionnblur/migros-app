@@ -27,6 +27,7 @@ export class OrderPanelComponent implements OnInit {
   dataSource: ITable[] = [];
   isActionPanelOpen: boolean = false;
   orderId: number = 0;
+  deletingOrderId: number | null = null;
 
   constructor(private restService: RestService) {
   }
@@ -41,7 +42,7 @@ export class OrderPanelComponent implements OnInit {
         this.tableData = data;
         this.dataSource = data;
       },
-      error: (err) => console.error('Siparişler yüklenemedi', err)
+      error: (err) => console.error('Siparisler yuklenemedi', err)
     });
   }
 
@@ -54,12 +55,34 @@ export class OrderPanelComponent implements OnInit {
     this.isActionPanelOpen = false;
   }
 
+  public deleteOrder(orderId: number) {
+    const approved = confirm(`Siparis silinsin mi? (#${orderId})`);
+    if (!approved) {
+      return;
+    }
+
+    this.deletingOrderId = orderId;
+    this.restService.deleteOrder(orderId).subscribe({
+      next: (success) => {
+        if (success) {
+          this.dataSource = this.dataSource.filter((item) => item.orderId !== orderId);
+          this.tableData = this.tableData.filter((item) => item.orderId !== orderId);
+        }
+        this.deletingOrderId = null;
+      },
+      error: (err) => {
+        console.error('Siparis silinemedi', err);
+        this.deletingOrderId = null;
+      }
+    });
+  }
+
   /**
    * Returns Bootstrap badge classes based on order status
    */
   getStatusClass(status: string): string {
     const s = status.toLowerCase();
-    if (s.includes('hazır') || s.includes('tamam')) return 'bg-success text-white';
+    if (s.includes('hazir') || s.includes('tamam')) return 'bg-success text-white';
     if (s.includes('yolda') || s.includes('bekliyor')) return 'bg-warning text-dark';
     if (s.includes('iptal')) return 'bg-danger text-white';
     return 'bg-secondary text-white';

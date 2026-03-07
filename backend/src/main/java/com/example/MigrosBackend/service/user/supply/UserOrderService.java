@@ -11,11 +11,9 @@ import com.example.MigrosBackend.repository.product.ProductEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
-import org.apache.catalina.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -136,5 +134,12 @@ public class UserOrderService {
 
         orderEntity.setStatus(status);
         orderEntityRepository.save(orderEntity);
+    }
+
+    public void deleteOrder(Long orderId) {
+        OrderEntity orderEntity = orderEntityRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException(orderId.toString()));
+
+        orderEntityRepository.delete(orderEntity);
     }
 }

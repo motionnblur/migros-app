@@ -427,7 +427,7 @@ export class RestService {
       )
       .pipe(map((response) => response.status === 200));
   }
-  unbanSupportUserFromAdmin(userMail: string) {
+    unbanSupportUserFromAdmin(userMail: string) {
     return this.http
       .post(
         `http://localhost:8080/admin/panel/support/unban`,
@@ -440,12 +440,14 @@ export class RestService {
       )
       .pipe(map((response) => response.status === 200));
   }
+
+  deleteOrder(orderId: number) {
+    return this.http
+      .delete('http://localhost:8080/admin/panel/deleteOrder', {
+        params: { orderId },
+        responseType: 'text',
+        observe: 'response',
+      })
+      .pipe(map((response) => response.status === 200));
+  }
 }
-
-
-
-
-
-
-
-

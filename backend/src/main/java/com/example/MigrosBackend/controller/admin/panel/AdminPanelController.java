@@ -3,11 +3,9 @@ package com.example.MigrosBackend.controller.admin.panel;
 import com.example.MigrosBackend.dto.admin.panel.*;
 import com.example.MigrosBackend.dto.order.OrderDto;
 import com.example.MigrosBackend.dto.user.UserProfileTableDto;
-import com.example.MigrosBackend.entity.user.OrderEntity;
 import com.example.MigrosBackend.service.admin.supply.AdminSupplyService;
 import com.example.MigrosBackend.service.user.supply.UserOrderService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -110,6 +108,12 @@ public class AdminPanelController {
     @GetMapping("updateOrderStatus")
     public ResponseEntity<Void> updateOrderStatus(@RequestParam Long orderId, @RequestParam String status) {
         userOrderService.updateOrderStatus(orderId, status);
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("deleteOrder")
+    public ResponseEntity<Void> deleteOrder(@RequestParam Long orderId) {
+        userOrderService.deleteOrder(orderId);
         return ResponseEntity.ok().build();
     }
 }
