@@ -9,11 +9,12 @@ import { RestService } from '../../../../services/rest/rest.service';
 import { IUserCartItemDto } from '../../../../interfaces/IUserCartItemDto';
 import { CommonModule } from '@angular/common';
 import { PaymentComponent } from '../payment/payment.component';
-import { EventService } from '../../../../services/event/event.service';
 import { data } from '../../../../memory/global-data';
+import { ActivatedRoute, Router } from '@angular/router';
 
 @Component({
   selector: 'app-user-cart',
+  standalone: true,
   imports: [CommonModule, PaymentComponent],
   templateUrl: './user-cart.component.html',
   styleUrl: './user-cart.component.css',
@@ -31,7 +32,8 @@ export class UserCartComponent {
 
   constructor(
     private restService: RestService,
-    private eventService: EventService
+    private router: Router,
+    private route: ActivatedRoute
   ) {
     restService.getAllProductsFromUserCart().subscribe({
       next: (data: IUserCartItemDto[]) => {
@@ -93,6 +95,9 @@ export class UserCartComponent {
     }
   }
   public closeCartComponent() {
+    this.router.navigate([{ outlets: { modal: null } }], {
+      relativeTo: this.route.parent ?? this.route,
+    });
     this.closeComponentEvent.emit();
   }
   public removeProductFromUserCart(productId: number) {
@@ -161,8 +166,8 @@ export class UserCartComponent {
     this.itemsToDelete = [];
     this.itemCountMap.clear();
     this.totalPrice = 0;
-    this.eventService.trigger('orderUpdated');
-    this.eventService.trigger('openOrderTracker');
-    this.closeCartComponent();
+    this.router.navigate([{ outlets: { modal: ['order-tracker'] } }], {
+      relativeTo: this.route.parent ?? this.route,
+    });
   }
 }

@@ -4,7 +4,7 @@
     <div class="container py-3">
       <div class="d-flex flex-column flex-md-row align-items-center justify-content-between gap-3">
 
-        <a class="logo-link" href="#" (click)="setItemPageOpened(false); $event.preventDefault()">
+        <a class="logo-link" [routerLink]="['/']">
           <img src="migros_header.png" height="40" alt="Logo" class="d-block">
         </a>
 
@@ -78,8 +78,7 @@
 
   <main class="flex-grow-1">
     <div class="container py-4">
-      <app-discover *ngIf="!hasItemPageOpened()"/>
-      <app-product-page *ngIf="hasItemPageOpened()"/>
+      <router-outlet></router-outlet>
     </div>
   </main>
 
@@ -95,59 +94,9 @@
     </div>
   </footer>
 
-  <button class="live-support-btn" type="button" (click)="toggleSupportChat()">
+  <button class="live-support-btn" type="button" (click)="openSupportChat()">
     <i class="bi bi-chat fs-2"></i>
   </button>
 
-  <div class="live-support-chat" *ngIf="isSupportChatOpen">
-    <div class="chat-header">
-      <strong>Canli Destek</strong>
-      <button type="button" class="btn btn-sm btn-light" (click)="toggleSupportChat()">Kapat</button>
-    </div>
-
-    <div class="chat-body">
-      <div class="chat-info" *ngIf="isSupportLoading">Yukleniyor...</div>
-      <div class="chat-info text-danger" *ngIf="supportErrorMessage">{{ supportErrorMessage }}</div>
-
-      <div class="chat-message" *ngFor="let message of supportMessages" [ngClass]="{ 'management': message.sender === 'MANAGEMENT' }">
-        <div class="chat-message-meta">{{ message.sender === 'MANAGEMENT' ? 'Yonetim' : 'Siz' }}</div>
-        <div class="chat-message-content">{{ message.message }}</div>
-      </div>
-    </div>
-
-    <div class="chat-footer">
-      <input
-        type="text"
-        [(ngModel)]="supportMessageInput"
-        class="form-control form-control-sm"
-        placeholder="Mesajinizi yazin..."
-        (keydown.enter)="sendSupportMessage()"
-      />
-      <button type="button" class="btn btn-sm btn-warning" [disabled]="isSupportSending" (click)="sendSupportMessage()">
-        Gonder
-      </button>
-    </div>
-  </div>
-
-  <app-sign-user *ngIf="isLoginButtonClicked && !isUserSigned"
-                 (closeComponentEvent)="closeLoginComponent()"
-                 (userLoginEvent)="loginUser()"/>
-
-  <app-user-cart *ngIf="isCartComponentOpened"
-                 (closeComponentEvent)="closeCartComponent()"/>
-
-  <app-user-profile *ngIf="isProfileButtonClicked"
-                    (closeComponentEvent)="closeProfileComponent()"/>
-
-  <app-order-tracker *ngIf="isOrderButtonClicked"
-                     [orderIds]="orderIds"
-                     (closeOrderTrackerComponentEvent)="closeOrderTrackerComponent()"/>
-
-  <app-order-history *ngIf='isOrderHistoryOpened'
-                     (closeOrderHistoryComponentEvent)='closeOrderHistoryComponent()'/>
+  <router-outlet name="modal"></router-outlet>
 </div>
-
-
-
-
-

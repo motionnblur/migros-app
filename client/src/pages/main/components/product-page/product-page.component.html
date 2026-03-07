@@ -6,7 +6,7 @@
         <div class="card-body p-0">
           <div class="p-3 border-bottom bg-white">
             <h6 class="fw-bold mb-1">{{ categoryName }}</h6>
-            <span class="badge bg-primary-soft text-primary">{{ totalProductCount }} Ürün</span>
+            <span class="badge bg-primary-soft text-primary">{{ totalProductCount }} Urun</span>
           </div>
           <div class="p-2">
             <div class="list-group list-group-flush">
@@ -23,7 +23,7 @@
     </div>
 
     <div class="col-12 col-lg-8 col-xl-9 col-xxl-10">
-      <div #product_page_ref class="product-content-area">
+      <div class="product-content-area">
 
         <div *ngIf="hasProductPreviewOpened"
              class="row g-3 row-cols-2 row-cols-md-3 row-cols-lg-4 row-cols-xl-5 row-cols-xxl-6 animate-fade-in">
@@ -32,6 +32,7 @@
               [productId]="item.productId"
               [productName]="item.productName"
               [productPrice]="item.productPrice"
+              [categoryId]="currentCategoryId"
             />
           </div>
         </div>

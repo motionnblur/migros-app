@@ -2,7 +2,7 @@ import { Component, EventEmitter, Output, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RestService } from '../../../../services/rest/rest.service';
 import { IUserOrderGroup } from '../../../../interfaces/IUserOrderGroup';
-import { IUserOrderDetail } from '../../../../interfaces/IUserOrderDetail';
+import { ActivatedRoute, Router } from '@angular/router';
 
 @Component({
   selector: 'app-order-history',
@@ -19,7 +19,11 @@ export class OrderHistoryComponent {
   isLoading = false;
   errorMessage = '';
 
-  constructor(private restService: RestService) {
+  constructor(
+    private restService: RestService,
+    private router: Router,
+    private route: ActivatedRoute
+  ) {
     this.loadOrderGroups();
   }
 
@@ -65,6 +69,9 @@ export class OrderHistoryComponent {
   }
 
   public closeOrderHistoryComponent() {
+    this.router.navigate([{ outlets: { modal: null } }], {
+      relativeTo: this.route.parent ?? this.route,
+    });
     this.closeOrderHistoryComponentEvent.emit();
   }
 

@@ -1,7 +1,8 @@
-import {Component, EventEmitter, Input, Output, HostListener} from '@angular/core';
-import {CommonModule} from '@angular/common';
-import {ScrollingModule} from '@angular/cdk/scrolling';
-import {RestService} from '../../../../services/rest/rest.service';
+import { Component, EventEmitter, Input, Output, HostListener } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { ScrollingModule } from '@angular/cdk/scrolling';
+import { RestService } from '../../../../services/rest/rest.service';
+import { ActivatedRoute, Router } from '@angular/router';
 
 @Component({
   selector: 'app-order-tracker',
@@ -18,13 +19,16 @@ export class OrderTrackerComponent {
   public currentSelectedOrderId: number = 0;
   public currentStatus: string = 'Ordered';
 
-  // Status order for calculation
   private statusSteps = ['Ordered', 'Shipped', 'Out for delivery', 'Delivered'];
 
-  constructor(private restService: RestService) {
+  constructor(
+    private restService: RestService,
+    private router: Router,
+    private route: ActivatedRoute
+  ) {
     this.restService.getAllOrderIds().subscribe({
-      next: (data) => this.orderIds = data,
-      error: (err) => console.error(err)
+      next: (data) => (this.orderIds = data),
+      error: (err) => console.error(err),
     });
   }
 
@@ -48,7 +52,7 @@ export class OrderTrackerComponent {
         this.currentStatus = status;
         this.currentSelectedOrderId = orderId;
         this.showOrderTrackerComponent = true;
-      }
+      },
     });
   }
 
@@ -57,6 +61,9 @@ export class OrderTrackerComponent {
   }
 
   public closeOrderTrackerComponent() {
+    this.router.navigate([{ outlets: { modal: null } }], {
+      relativeTo: this.route.parent ?? this.route,
+    });
     this.closeOrderTrackerComponentEvent.emit();
   }
 
@@ -65,10 +72,10 @@ export class OrderTrackerComponent {
     this.restService.calcelOrder(this.currentSelectedOrderId).subscribe({
       next: (success) => {
         if (success) {
-          alert('Sipariş iptal edildi.');
+          alert('Siparis iptal edildi.');
           this.closeOrderTrackerComponent();
         }
-      }
+      },
     });
   }
 }

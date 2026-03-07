@@ -11,6 +11,7 @@ import { EventService } from '../../../../services/event/event.service';
 
 @Component({
   selector: 'app-product-page-switcher',
+  standalone: true,
   imports: [],
   templateUrl: './product-page-switcher.component.html',
   styleUrl: './product-page-switcher.component.css',

@@ -1,0 +1,29 @@
+<div class="live-support-chat">
+  <div class="chat-header">
+    <strong>Canli Destek</strong>
+    <button type="button" class="btn btn-sm btn-light" (click)="closeSupportChat()">Kapat</button>
+  </div>
+
+  <div class="chat-body">
+    <div class="chat-info" *ngIf="isSupportLoading">Yukleniyor...</div>
+    <div class="chat-info text-danger" *ngIf="supportErrorMessage">{{ supportErrorMessage }}</div>
+
+    <div class="chat-message" *ngFor="let message of supportMessages" [ngClass]="{ 'management': message.sender === 'MANAGEMENT' }">
+      <div class="chat-message-meta">{{ message.sender === 'MANAGEMENT' ? 'Yonetim' : 'Siz' }}</div>
+      <div class="chat-message-content">{{ message.message }}</div>
+    </div>
+  </div>
+
+  <div class="chat-footer">
+    <input
+      type="text"
+      [(ngModel)]="supportMessageInput"
+      class="form-control form-control-sm"
+      placeholder="Mesajinizi yazin..."
+      (keydown.enter)="sendSupportMessage()"
+    />
+    <button type="button" class="btn btn-sm btn-warning" [disabled]="isSupportSending" (click)="sendSupportMessage()">
+      Gonder
+    </button>
+  </div>
+</div>

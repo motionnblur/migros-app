@@ -8,9 +8,11 @@ import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { AuthService } from '../../../../services/auth/auth.service';
+import { ActivatedRoute, Router } from '@angular/router';
 
 @Component({
   selector: 'app-sign-user',
+  standalone: true,
   imports: [
     MatFormFieldModule,
     MatInputModule,
@@ -32,11 +34,14 @@ export class SignUserComponent {
 
   constructor(
     private restService: RestService,
-    private authService: AuthService
+    private authService: AuthService,
+    private router: Router,
+    private route: ActivatedRoute
   ) {}
 
   @Output() closeComponentEvent = new EventEmitter<void>();
   @Output() userLoginEvent = new EventEmitter<void>();
+
   public openSign() {
     this.isSignPhaseActive = false;
     this.clearFields();
@@ -52,8 +57,15 @@ export class SignUserComponent {
   }
   public closeComponent(event: any) {
     if (event.target.id === 'login-component') {
-      this.closeComponentEvent.emit();
+      this.closeModal();
     }
+  }
+
+  private closeModal() {
+    this.router.navigate([{ outlets: { modal: null } }], {
+      relativeTo: this.route.parent ?? this.route,
+    });
+    this.closeComponentEvent.emit();
   }
 
   public signUser() {
@@ -109,9 +121,8 @@ export class SignUserComponent {
         next: (response) => {
           console.log('User logged in successfully');
           this.authService.setToken(response!);
-          //console.log(response);
           this.userLoginEvent.emit();
-          this.closeComponentEvent.emit();
+          this.closeModal();
         },
         error: (error) => {
           console.error('Error logging in user');

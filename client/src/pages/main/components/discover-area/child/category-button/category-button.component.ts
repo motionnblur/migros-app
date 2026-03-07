@@ -1,8 +1,9 @@
 import { Component, Input } from '@angular/core';
-import { EventService } from '../../../../../../services/event/event.service';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-category-button',
+  standalone: true,
   imports: [],
   templateUrl: './category-button.component.html',
   styleUrl: './category-button.component.css',
@@ -12,9 +13,9 @@ export class CategoryButtonComponent {
   @Input() name: string = 'Name';
   @Input() categoryId!: number;
 
-  constructor(private eventManager: EventService) {}
+  constructor(private router: Router) {}
 
   openItemPage() {
-    this.eventManager.trigger('openItemPage', this.categoryId);
+    this.router.navigate(['/category', this.categoryId]);
   }
 }

@@ -1,13 +1,14 @@
-import {Component, EventEmitter, HostListener, Output} from '@angular/core';
-import {FormsModule} from '@angular/forms'; // Only need FormsModule and CommonModule
-import {CommonModule} from '@angular/common';
-import {RestService} from '../../../../services/rest/rest.service';
-import {IUserProfileTable} from '../../../../interfaces/IUserProfileTable';
+import { Component, EventEmitter, HostListener, Output } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { CommonModule } from '@angular/common';
+import { RestService } from '../../../../services/rest/rest.service';
+import { IUserProfileTable } from '../../../../interfaces/IUserProfileTable';
+import { ActivatedRoute, Router } from '@angular/router';
 
 @Component({
   selector: 'app-user-profile',
-  standalone: true, // Assuming you are using standalone components
-  imports: [FormsModule, CommonModule], // Removed Mat-related imports
+  standalone: true,
+  imports: [FormsModule, CommonModule],
   templateUrl: './user-profile.component.html',
   styleUrl: './user-profile.component.css',
 })
@@ -28,7 +29,11 @@ export class UserProfileComponent {
   public userPostalCode = '';
   private baseTableData: IUserProfileTable | null = null;
 
-  constructor(private restService: RestService) {
+  constructor(
+    private restService: RestService,
+    private router: Router,
+    private route: ActivatedRoute
+  ) {
     this.restService.getUserProfileTableData().subscribe({
       next: (data: IUserProfileTable) => {
         if (data) {
@@ -39,13 +44,16 @@ export class UserProfileComponent {
           this.userTown = data.userTown || '';
           this.userCountry = data.userCountry || '';
           this.userPostalCode = data.userPostalCode || '';
-          this.baseTableData = {...data};
+          this.baseTableData = { ...data };
         }
       },
     });
   }
 
   public closeProfileComponent() {
+    this.router.navigate([{ outlets: { modal: null } }], {
+      relativeTo: this.route.parent ?? this.route,
+    });
     this.closeComponentEvent.emit();
   }
 
@@ -60,7 +68,6 @@ export class UserProfileComponent {
       userPostalCode: this.userPostalCode,
     };
 
-    // Prevent redundant API calls
     if (this.baseTableData && JSON.stringify(this.baseTableData) === JSON.stringify(table)) {
       this.closeProfileComponent();
       return;
@@ -68,11 +75,11 @@ export class UserProfileComponent {
 
     this.restService.uploadUserProfileTableData(table).subscribe({
       next: () => {
-        this.baseTableData = {...table};
-        alert('Profil başarıyla güncellendi.');
+        this.baseTableData = { ...table };
+        alert('Profil basariyla guncellendi.');
         this.closeProfileComponent();
       },
-      error: (err) => console.error('Error:', err)
+      error: (err) => console.error('Error:', err),
     });
   }
 }
