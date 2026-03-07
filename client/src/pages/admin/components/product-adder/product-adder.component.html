@@ -1,7 +1,7 @@
 <div class="product-adder-container h-100 d-flex flex-column">
   <div class="px-4 py-3 border-bottom bg-white rounded-top">
     <h5 class="mb-0 fw-bold text-dark">
-      <i class="bi bi-plus-circle-fill me-2 text-orange"></i> {{ isUpdateMode ? 'Ürün Güncelle' : 'Yeni Ürün Ekle' }}
+      <i class="bi bi-plus-circle-fill me-2 text-orange"></i> {{ isUpdateMode ? 'ÃœrÃ¼n GÃ¼ncelle' : 'Yeni Ã¼rÃ¼n Ekle' }}
     </h5>
   </div>
 
@@ -23,8 +23,8 @@
 
     <div class="row g-3">
       <div class="col-12">
-        <label class="form-label small fw-bold text-muted text-uppercase">Ürün Adi</label>
-        <input type="text" class="form-control" placeholder="Örn: Süt 1L" [(ngModel)]="productName"/>
+        <label class="form-label small fw-bold text-muted text-uppercase">ÃœrÃ¼n Adi</label>
+        <input type="text" class="form-control" placeholder="Ã–rn: SÃ¼t 1L" [(ngModel)]="productName"/>
       </div>
 
       <div class="col-md-6">
@@ -37,7 +37,7 @@
       </div>
       <div class="col-md-6">
         <label class="form-label small fw-bold text-muted text-uppercase">Alt Kategori</label>
-        <input type="text" class="form-control" placeholder="Örn: Günlük Süt" [(ngModel)]="subCategoryName"/>
+        <input type="text" class="form-control" placeholder="Ã–rn: GÃ¼nlÃ¼k SÃ¼t" [(ngModel)]="subCategoryName"/>
       </div>
 
       <div class="col-md-4">
@@ -52,7 +52,7 @@
         <input type="number" class="form-control" [(ngModel)]="count" min="0"/>
       </div>
       <div class="col-md-4">
-        <label class="form-label small fw-bold text-muted text-uppercase">Indirim</label>
+        <label class="form-label small fw-bold text-muted text-uppercase">Ä°ndirim</label>
         <div class="input-group">
           <input type="number" class="form-control" [(ngModel)]="discount" min="0" max="100"/>
           <span class="input-group-text text-muted">%</span>
@@ -60,8 +60,8 @@
       </div>
 
       <div class="col-12">
-        <label class="form-label small fw-bold text-muted text-uppercase">Açiklama</label>
-        <textarea class="form-control" rows="3" placeholder="Ürün detaylarini girin..."
+        <label class="form-label small fw-bold text-muted text-uppercase">AÃ§Ä±klama</label>
+        <textarea class="form-control" rows="3" placeholder="ÃœrÃ¼n detaylarini girin..."
                   [(ngModel)]="description"></textarea>
       </div>
     </div>
@@ -73,7 +73,7 @@
         <i class="bi bi-cloud-arrow-up-fill me-2"></i>{{ buttonString }}
       </button>
       <button class="btn btn-outline-secondary py-2 px-4 fw-bold" *ngIf="isUpdateMode" (click)="openEditor!()">
-        Düzenle
+        DÃ¼zenle
       </button>
     </div>
   </div>
