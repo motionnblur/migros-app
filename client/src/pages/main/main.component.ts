@@ -77,6 +77,10 @@ export class MainComponent implements OnInit, OnDestroy {
       this.setItemPageOpened(true);
     });
 
+    this.eventManager.on('openLogin', () => {
+      this.openLoginComponent();
+    });
+
     this.checkAuthStatus();
   }
 

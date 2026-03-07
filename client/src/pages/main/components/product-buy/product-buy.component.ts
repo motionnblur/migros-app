@@ -6,6 +6,7 @@ import {ProductBuyBase} from '../../../../base-components/product-buy.base';
 import {RestService} from '../../../../services/rest/rest.service';
 import {CommonModule} from '@angular/common';
 import {Component} from '@angular/core';
+import {AuthService} from '../../../../services/auth/auth.service';
 
 @Component({
   selector: 'app-product-buy',
@@ -33,7 +34,8 @@ export class ProductBuyComponent extends ProductBuyBase {
   constructor(
     protected override restService: RestService,
     protected sanitizer: DomSanitizer,
-    protected override eventManager: EventService
+    protected override eventManager: EventService,
+    private authService: AuthService
   ) {
     super(restService, eventManager);
   }
@@ -50,6 +52,11 @@ export class ProductBuyComponent extends ProductBuyBase {
   }
 
   public addProductToUserCart() {
+    if (!this.authService.isLoggedIn()) {
+      this.eventManager.trigger('openLogin');
+      return;
+    }
+
     this.restService.addProductToUserCart(this.productId).subscribe({
       next: () => {
         // You could emit a global event here to refresh the cart count in the header
