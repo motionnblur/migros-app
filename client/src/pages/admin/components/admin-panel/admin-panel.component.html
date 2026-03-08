@@ -22,6 +22,13 @@
          [ngClass]="currentSection === 'support' ? 'btn-orange' : 'btn-outline-light'">
         <i class="bi bi-chat-dots me-1"></i> Canli Destek
       </a>
+      <button class="btn btn-sm px-3 rounded-pill btn-outline-danger"
+              type="button"
+              [disabled]="isLoggingOut"
+              (click)="logoutAdmin()">
+        <i class="bi bi-box-arrow-right me-1"></i>
+        {{ isLoggingOut ? 'Cikis Yapiliyor...' : 'Cikis Yap' }}
+      </button>
     </div>
   </nav>
 
@@ -149,3 +156,4 @@
     </div>
   </div>
 </div>
+

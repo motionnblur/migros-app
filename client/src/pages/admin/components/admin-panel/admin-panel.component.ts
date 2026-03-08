@@ -1,19 +1,20 @@
-import {Component, OnDestroy, OnInit} from '@angular/core';
-import {ProductAdderComponent} from '../product-adder/product-adder.component';
-import {CommonModule} from '@angular/common';
-import {ProductBodyComponent} from '../product-body/product-body.component';
-import {WallComponent} from '../wall/wall.component';
-import {ProductUpdaterComponent} from '../product-adder/product-updater.component';
-import {EventService} from '../../../../services/event/event.service';
-import {ProductEditComponent} from '../product-edit/product-edit.component';
-import {OrderPanelComponent} from '../order-panel/order-panel.component';
-import {RestService} from '../../../../services/rest/rest.service';
-import {FormsModule} from '@angular/forms';
-import {IChatMessage} from '../../../../interfaces/IChatMessage';
-import {SupportRealtimeService} from '../../../../services/support-realtime/support-realtime.service';
-import {ISupportRealtimeEvent} from '../../../../interfaces/support/ISupportRealtimeEvent';
-import {Subscription} from 'rxjs';
-import {ActivatedRoute, RouterLink} from '@angular/router';
+import { Component, OnDestroy, OnInit } from '@angular/core';
+import { ProductAdderComponent } from '../product-adder/product-adder.component';
+import { CommonModule } from '@angular/common';
+import { ProductBodyComponent } from '../product-body/product-body.component';
+import { WallComponent } from '../wall/wall.component';
+import { ProductUpdaterComponent } from '../product-adder/product-updater.component';
+import { EventService } from '../../../../services/event/event.service';
+import { ProductEditComponent } from '../product-edit/product-edit.component';
+import { OrderPanelComponent } from '../order-panel/order-panel.component';
+import { RestService } from '../../../../services/rest/rest.service';
+import { FormsModule } from '@angular/forms';
+import { IChatMessage } from '../../../../interfaces/IChatMessage';
+import { SupportRealtimeService } from '../../../../services/support-realtime/support-realtime.service';
+import { ISupportRealtimeEvent } from '../../../../interfaces/support/ISupportRealtimeEvent';
+import { Subscription } from 'rxjs';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { AuthService } from '../../../../services/auth/auth.service';
 
 @Component({
   selector: 'app-admin-panel',
@@ -40,6 +41,7 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
   hasProductEditOpened = false;
   hasOrdersOpened = false;
   hasSupportOpened = false;
+  isLoggingOut = false;
   currentSection: 'home' | 'products' | 'orders' | 'support' = 'home';
 
   supportUsers: string[] = [];
@@ -61,7 +63,9 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     private eventManager: EventService,
     private restService: RestService,
     private supportRealtimeService: SupportRealtimeService,
-    private route: ActivatedRoute
+    private authService: AuthService,
+    private route: ActivatedRoute,
+    private router: Router
   ) {
     this.productChangedCallback = (data: any) => {
       this.productChangedEventHandler(data);
@@ -110,6 +114,21 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     this.stopSupportPolling();
     this.supportRealtimeSub?.unsubscribe();
     this.routeSub?.unsubscribe();
+  }
+
+  logoutAdmin() {
+    if (this.isLoggingOut) {
+      return;
+    }
+
+    this.isLoggingOut = true;
+    this.stopSupportPolling();
+    this.supportRealtimeService.disconnect();
+
+    this.authService.logoutAdmin(() => {
+      this.isLoggingOut = false;
+      this.router.navigate(['/admin']);
+    });
   }
 
   productAddedEventHandler(event: boolean) {

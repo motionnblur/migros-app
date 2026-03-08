@@ -75,28 +75,32 @@ export class AuthService {
     return this.adminName;
   }
 
-  public logout(): void {
+  public logout(onComplete?: () => void): void {
     this.http.post('http://localhost:8080/user/logout', {}).subscribe({
       next: () => {
         this.userMail = '';
         this.userLoggedInSubject.next(false);
+        onComplete?.();
       },
       error: () => {
         this.userMail = '';
         this.userLoggedInSubject.next(false);
+        onComplete?.();
       },
     });
   }
 
-  public logoutAdmin(): void {
+  public logoutAdmin(onComplete?: () => void): void {
     this.http.post('http://localhost:8080/admin/logout', {}).subscribe({
       next: () => {
         this.adminName = '';
         this.adminLoggedInSubject.next(false);
+        onComplete?.();
       },
       error: () => {
         this.adminName = '';
         this.adminLoggedInSubject.next(false);
+        onComplete?.();
       },
     });
   }
