@@ -427,6 +427,79 @@ class UserSupplyServiceTest {
         assertEquals("Bread", grouped.getItems().get(0).getProductName());
         assertEquals("Shipped", grouped.getItems().get(0).getStatus());
     }
-}
+    @Test
+    void getAllOrderIds_ShouldMergeAndDeduplicateGroupAndLegacyIds() {
+        stubAuthenticatedUser();
 
+        OrderGroupEntity groupA = new OrderGroupEntity();
+        groupA.setId(11L);
+        OrderGroupEntity groupB = new OrderGroupEntity();
+        groupB.setId(12L);
+
+        OrderEntity legacyA = new OrderEntity();
+        legacyA.setId(12L);
+        OrderEntity legacyB = new OrderEntity();
+        legacyB.setId(13L);
+
+        when(orderGroupEntityRepository.findByUserId(user.getId())).thenReturn(List.of(groupA, groupB));
+        when(orderEntityRepository.findByUserIdAndOrderGroupIsNull(user.getId())).thenReturn(List.of(legacyA, legacyB));
+
+        List<Long> result = userSupplyService.getAllOrderIds(TOKEN);
+
+        assertEquals(List.of(11L, 12L, 13L), result);
+    }
+
+    @Test
+    void getAllOrderIds_ShouldReturnEmpty_WhenUserHasNoOrderGroupsAndNoLegacyOrders() {
+        stubAuthenticatedUser();
+        when(orderGroupEntityRepository.findByUserId(user.getId())).thenReturn(List.of());
+        when(orderEntityRepository.findByUserIdAndOrderGroupIsNull(user.getId())).thenReturn(List.of());
+
+        List<Long> result = userSupplyService.getAllOrderIds(TOKEN);
+
+        assertEquals(0, result.size());
+    }
+
+    @Test
+    void getOrderStatusByOrderId_ShouldPreferGroupStatus_WhenGroupExists() {
+        stubAuthenticatedUser();
+
+        OrderGroupEntity group = new OrderGroupEntity();
+        group.setId(500L);
+        group.setStatus("Pending");
+
+        when(orderGroupEntityRepository.findByIdAndUserId(500L, user.getId())).thenReturn(Optional.of(group));
+
+        String result = userSupplyService.getOrderStatusByOrderId(500L, TOKEN);
+
+        assertEquals("Pending", result);
+        verify(orderEntityRepository, never()).findByIdAndUserId(any(), any());
+    }
+
+    @Test
+    void getOrderStatusByOrderId_ShouldReturnLegacyStatus_WhenGroupMissing() {
+        stubAuthenticatedUser();
+
+        OrderEntity legacyOrder = new OrderEntity();
+        legacyOrder.setId(501L);
+        legacyOrder.setStatus("Delivered");
+
+        when(orderGroupEntityRepository.findByIdAndUserId(501L, user.getId())).thenReturn(Optional.empty());
+        when(orderEntityRepository.findByIdAndUserId(501L, user.getId())).thenReturn(Optional.of(legacyOrder));
+
+        String result = userSupplyService.getOrderStatusByOrderId(501L, TOKEN);
+
+        assertEquals("Delivered", result);
+    }
+
+    @Test
+    void getOrderStatusByOrderId_ShouldThrow_WhenOrderNotFoundInBothSources() {
+        stubAuthenticatedUser();
+
+        when(orderGroupEntityRepository.findByIdAndUserId(999L, user.getId())).thenReturn(Optional.empty());
+        when(orderEntityRepository.findByIdAndUserId(999L, user.getId())).thenReturn(Optional.empty());
+
+        assertThrows(GeneralException.class, () -> userSupplyService.getOrderStatusByOrderId(999L, TOKEN));
+    }
+}
 
