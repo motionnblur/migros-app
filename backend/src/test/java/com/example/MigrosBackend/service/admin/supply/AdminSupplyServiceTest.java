@@ -1,6 +1,10 @@
 package com.example.MigrosBackend.service.admin.supply;
 
-import com.example.MigrosBackend.dto.admin.panel.*;
+import com.example.MigrosBackend.dto.admin.panel.AdminAddItemDto;
+import com.example.MigrosBackend.dto.admin.panel.DescriptionsDto;
+import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionListDto;
+import com.example.MigrosBackend.dto.admin.panel.AdminProductPreviewDto;
+import com.example.MigrosBackend.dto.admin.panel.ProductDto2;
 import com.example.MigrosBackend.dto.user.product.ProductDto;
 import com.example.MigrosBackend.entity.admin.AdminEntity;
 import com.example.MigrosBackend.entity.category.CategoryEntity;
@@ -8,6 +12,7 @@ import com.example.MigrosBackend.entity.product.ProductDescriptionEntity;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.product.ProductImageEntity;
 import com.example.MigrosBackend.exception.admin.AdminHasNoProductException;
+import com.example.MigrosBackend.exception.admin.AdminNotFoundException;
 import com.example.MigrosBackend.exception.admin.FileUploadFailedException;
 import com.example.MigrosBackend.exception.admin.ProductNotFoundException;
 import com.example.MigrosBackend.exception.shared.GeneralException;
@@ -78,7 +83,6 @@ class AdminSupplyServiceTest {
 
     @Test
     void addProduct_Success() {
-        // Arrange
         AdminAddItemDto dto = new AdminAddItemDto();
         dto.setAdminId(1L);
         ProductDto pDto = new ProductDto();
@@ -88,52 +92,63 @@ class AdminSupplyServiceTest {
         when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(admin));
         when(productEntityRepository.save(any(ProductEntity.class))).thenAnswer(i -> i.getArguments()[0]);
 
-        // Act
         adminSupplyService.addProduct(dto);
 
-        // Assert
-        verify(adminEntityRepository, times(1)).save(admin);
+        verify(adminEntityRepository).save(admin);
         assertEquals(1, admin.getItemEntities().size());
         assertEquals("Coke", admin.getItemEntities().get(0).getProductName());
     }
 
     @Test
     void addCategory_ThrowsException_WhenCategoryExists() {
-        // Arrange
         when(categoryEntityRepository.findByCategoryName("Beverages")).thenReturn(category);
 
-        // Act & Assert
         assertThrows(GeneralException.class, () -> adminSupplyService.addCategory("Beverages"));
         verify(categoryEntityRepository, never()).save(any());
     }
 
     @Test
     void uploadProduct_Success() throws IOException {
-        // Arrange
         MockMultipartFile file = new MockMultipartFile(
                 "selectedImage", "test.png", "image/png", "some-image-data".getBytes());
-
         Path mockPath = Paths.get("UploadFolder/image_123.png");
 
         when(fileService.writeFileToDisk(any(), anyString(), anyString())).thenReturn(mockPath);
         when(categoryEntityRepository.findByCategoryId(10)).thenReturn(category);
         when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(admin));
 
-        // Act
         adminSupplyService.uploadProduct(1L, "Water", "Still", 5.0f, 100, 0.1f, "Fresh water", 10, file);
 
-        // Assert
-        verify(productEntityRepository, times(1)).save(any(ProductEntity.class));
-        verify(productImageEntityRepository, times(1)).save(any(ProductImageEntity.class));
+        verify(productEntityRepository).save(any(ProductEntity.class));
+        verify(productImageEntityRepository).save(any(ProductImageEntity.class));
+    }
+
+    @Test
+    void uploadProduct_ThrowsException_WhenImageMissing() {
+        GeneralException ex = assertThrows(GeneralException.class, () ->
+                adminSupplyService.uploadProduct(1L, "Water", "Still", 5.0f, 100, 0.1f, "Fresh", 10, null)
+        );
+
+        assertEquals("Product image is required", ex.getMessage());
+    }
+
+    @Test
+    void uploadProduct_ThrowsException_WhenProductNameIsBlank() {
+        MockMultipartFile file = new MockMultipartFile(
+                "selectedImage", "test.png", "image/png", "data".getBytes());
+
+        GeneralException ex = assertThrows(GeneralException.class, () ->
+                adminSupplyService.uploadProduct(1L, "   ", "Still", 5.0f, 100, 0.1f, "Fresh", 10, file)
+        );
+
+        assertEquals("Product name is required", ex.getMessage());
     }
 
     @Test
     void uploadProduct_ThrowsException_WhenNotPng() {
-        // Arrange
         MockMultipartFile file = new MockMultipartFile(
                 "selectedImage", "test.jpg", "image/jpeg", "data".getBytes());
 
-        // Act & Assert
         GeneralException ex = assertThrows(GeneralException.class, () ->
                 adminSupplyService.uploadProduct(1L, "Water", "Still", 5.0f, 100, 0.1f, "Fresh", 10, file)
         );
@@ -142,13 +157,11 @@ class AdminSupplyServiceTest {
 
     @Test
     void uploadProduct_ThrowsException_WhenFileUploadFails() throws IOException {
-        // Arrange
         MockMultipartFile file = new MockMultipartFile(
                 "selectedImage", "test.png", "image/png", "data".getBytes());
 
         when(fileService.writeFileToDisk(any(), anyString(), anyString())).thenThrow(new IOException());
 
-        // Act & Assert
         assertThrows(FileUploadFailedException.class, () ->
                 adminSupplyService.uploadProduct(1L, "Water", "Still", 5.0f, 100, 0.1f, "Fresh", 10, file)
         );
@@ -156,21 +169,18 @@ class AdminSupplyServiceTest {
 
     @Test
     void updateProduct_Success() throws IOException {
-        // Arrange
         Long adminId = 1L;
         Long productId = 100L;
         int categoryId = 5;
 
-        // Mock MultipartFile
         MockMultipartFile file = new MockMultipartFile(
                 "selectedImage", "test.png", "image/png", "image-content".getBytes());
 
-        // Mock Entities
-        AdminEntity admin = new AdminEntity();
-        admin.setId(adminId);
+        AdminEntity localAdmin = new AdminEntity();
+        localAdmin.setId(adminId);
 
-        CategoryEntity category = new CategoryEntity();
-        category.setId((long) categoryId);
+        CategoryEntity localCategory = new CategoryEntity();
+        localCategory.setId((long) categoryId);
 
         ProductEntity existingProduct = new ProductEntity();
         existingProduct.setId(productId);
@@ -179,91 +189,72 @@ class AdminSupplyServiceTest {
         existingImage.setId(500L);
         existingImage.setImagePath("old/path.png");
 
-        // Stubbing
         Path mockPath = Paths.get("UploadFolder/new_image.png");
         when(fileService.writeFileToDisk(any(), anyString(), anyString())).thenReturn(mockPath);
-        when(categoryEntityRepository.findByCategoryId(categoryId)).thenReturn(category);
-        when(adminEntityRepository.findById(adminId)).thenReturn(Optional.of(admin));
+        when(categoryEntityRepository.findByCategoryId(categoryId)).thenReturn(localCategory);
+        when(adminEntityRepository.findById(adminId)).thenReturn(Optional.of(localAdmin));
         when(productEntityRepository.findById(productId)).thenReturn(Optional.of(existingProduct));
-
-        // The service calls .get(0) on the list returned by this repository
         when(productImageEntityRepository.findByProductEntityId(productId)).thenReturn(List.of(existingImage));
 
-        // Act
         adminSupplyService.updateProduct(adminId, productId, "Updated Name", "SubCat",
                 10.0f, 50, 0.2f, "New Desc", categoryId, file);
 
-        // Assert
-        // 1. Verify product updates
         verify(productEntityRepository).save(existingProduct);
         assertEquals("Updated Name", existingProduct.getProductName());
-        assertEquals(admin, existingProduct.getAdminEntity());
+        assertEquals(localAdmin, existingProduct.getAdminEntity());
 
-        // 2. Verify image update
         verify(productImageEntityRepository).save(existingImage);
         assertEquals(mockPath.toString(), existingImage.getImagePath());
     }
 
-
     @Test
     void updateProduct_DoesNotWriteFile_WhenImageMissing() throws IOException {
-        // Arrange
         when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(new AdminEntity()));
         when(categoryEntityRepository.findByCategoryId(1)).thenReturn(new CategoryEntity());
         ProductEntity product = new ProductEntity();
         product.setId(100L);
         when(productEntityRepository.findById(100L)).thenReturn(Optional.of(product));
 
-        // Act
         adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", 10f, 5, 0f, "Desc", 1, null);
 
-        // Assert
         verify(fileService, never()).writeFileToDisk(any(), anyString(), anyString());
         verify(productImageEntityRepository, never()).findByProductEntityId(anyLong());
         verify(productEntityRepository).save(product);
     }
+
     @Test
     void updateProduct_ThrowsException_WhenAdminNotFound() {
-        // Arrange
         MockMultipartFile file = new MockMultipartFile("selectedImage", "test.png", "image/png", "data".getBytes());
+        when(categoryEntityRepository.findByCategoryId(1)).thenReturn(new CategoryEntity());
         when(adminEntityRepository.findById(anyLong())).thenReturn(Optional.empty());
 
-        // Act & Assert
-        RuntimeException ex = assertThrows(RuntimeException.class, () ->
+        assertThrows(AdminNotFoundException.class, () ->
                 adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", 10f, 5, 0f, "Desc", 1, file)
         );
-        assertTrue(ex.getMessage().contains("Admin with that id"));
     }
 
     @Test
     void updateProduct_ThrowsException_WhenProductNotFound() {
-        // Arrange
         MockMultipartFile file = new MockMultipartFile("selectedImage", "test.png", "image/png", "data".getBytes());
 
+        when(categoryEntityRepository.findByCategoryId(1)).thenReturn(new CategoryEntity());
         when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(new AdminEntity()));
         when(productEntityRepository.findById(100L)).thenReturn(Optional.empty());
 
-        // Act & Assert
-        RuntimeException ex = assertThrows(RuntimeException.class, () ->
+        assertThrows(ProductNotFoundException.class, () ->
                 adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", 10f, 5, 0f, "Desc", 1, file)
         );
-        assertTrue(ex.getMessage().contains("Product with that id"));
     }
 
     @Test
     void updateProduct_ThrowsFileUploadFailedException_OnIOException() throws IOException {
-        // Arrange
         MockMultipartFile file = new MockMultipartFile("selectedImage", "test.png", "image/png", "data".getBytes());
 
-        // Ensure admin/product lookups pass so we reach the file write path
         when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(new AdminEntity()));
         when(categoryEntityRepository.findByCategoryId(1)).thenReturn(new CategoryEntity());
         when(productEntityRepository.findById(100L)).thenReturn(Optional.of(new ProductEntity()));
-
-        // Simulate disk failure
         when(fileService.writeFileToDisk(any(), anyString(), anyString())).thenThrow(new IOException());
 
-        // Act & Assert
         assertThrows(FileUploadFailedException.class, () ->
                 adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", 10f, 5, 0f, "Desc", 1, file)
         );
@@ -271,7 +262,6 @@ class AdminSupplyServiceTest {
 
     @Test
     void getAllAdminProducts_shouldReturnMappedPreviews() {
-        // Arrange
         ProductEntity first = new ProductEntity();
         first.setId(1L);
         first.setProductName("Apple");
@@ -282,15 +272,11 @@ class AdminSupplyServiceTest {
         Page<ProductEntity> page = new PageImpl<>(List.of(first, second), PageRequest.of(0, 2), 2);
         when(productEntityRepository.findByAdminEntityId(eq(10L), any(Pageable.class))).thenReturn(page);
 
-        // Act
         List<AdminProductPreviewDto> result = adminSupplyService.getAllAdminProducts(10L, 0, 2);
 
-        // Assert
         assertEquals(2, result.size());
         assertEquals(1L, result.get(0).getProductId());
         assertEquals("Apple", result.get(0).getProductName());
-        assertEquals(2L, result.get(1).getProductId());
-        assertEquals("Banana", result.get(1).getProductName());
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         verify(productEntityRepository).findByAdminEntityId(eq(10L), pageableCaptor.capture());

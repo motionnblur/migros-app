@@ -7,6 +7,7 @@ import com.example.MigrosBackend.dto.admin.panel.ProductDto2;
 import com.example.MigrosBackend.dto.order.OrderDto;
 import com.example.MigrosBackend.dto.order.OrderPageDto;
 import com.example.MigrosBackend.dto.user.UserProfileTableDto;
+import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.service.admin.supply.AdminSupplyService;
 import com.example.MigrosBackend.service.global.TokenService;
 import com.example.MigrosBackend.service.user.supply.UserOrderService;
@@ -23,8 +24,11 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyFloat;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -54,13 +58,12 @@ class AdminPanelControllerTest {
     @BeforeEach
     void setup() {
         descriptionListDto = new ProductDescriptionListDto();
-
         addItemDto = new AdminAddItemDto();
 
         mockFile = new MockMultipartFile(
                 "selectedImage",
-                "image.jpg",
-                "image/jpeg",
+                "image.png",
+                "image/png",
                 "dummy content".getBytes()
         );
     }
@@ -138,6 +141,26 @@ class AdminPanelControllerTest {
                         .param("categoryValue", "1"))
                 .andExpect(status().isOk())
                 .andExpect(content().string("File uploaded successfully"));
+    }
+
+    @Test
+    void uploadProduct_shouldReturnBadRequest_whenValidationFails() throws Exception {
+        doThrow(new GeneralException("Product name is required"))
+                .when(adminSupplyService)
+                .uploadProduct(anyLong(), any(), any(), anyFloat(), anyInt(), anyFloat(), any(), anyInt(), any());
+
+        mockMvc.perform(multipart("/admin/panel/uploadProduct")
+                        .file(mockFile)
+                        .param("adminId", "1")
+                        .param("productName", "undefined")
+                        .param("subCategoryName", "SubCat")
+                        .param("productPrice", "10.0")
+                        .param("productCount", "5")
+                        .param("productDiscount", "2.0")
+                        .param("productDescription", "Desc")
+                        .param("categoryValue", "1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Product name is required"));
     }
 
     @Test
