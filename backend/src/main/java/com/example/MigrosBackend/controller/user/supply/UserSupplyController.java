@@ -84,7 +84,7 @@ public class UserSupplyController {
 
     @GetMapping("addProductToUserCart")
     public ResponseEntity<Void> addProductToUserCart(@RequestParam Long productId,
-                                                     @CookieValue(name = AuthCookies.SESSION_COOKIE_NAME, required = false) String token) {
+                                                     @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
         userSupplyService.addProductToInventory(productId, authTokenResolver.requireToken(token));
         return ResponseEntity.ok().build();
     }
@@ -106,7 +106,7 @@ public class UserSupplyController {
 
     @DeleteMapping("removeProductFromUserCart")
     public ResponseEntity<Void> removeProductFromUserCart(@RequestParam Long productId,
-                                                          @CookieValue(name = AuthCookies.SESSION_COOKIE_NAME, required = false) String token) {
+                                                          @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
         userSupplyService.removeProductFromInventory(productId, authTokenResolver.requireToken(token));
         return ResponseEntity.ok().build();
     }
@@ -114,39 +114,39 @@ public class UserSupplyController {
     @GetMapping("updateProductCountInUserCart")
     public ResponseEntity<Void> updateProductCountInUserCart(@RequestParam Long productId,
                                                              @RequestParam int count,
-                                                             @CookieValue(name = AuthCookies.SESSION_COOKIE_NAME, required = false) String token) {
+                                                             @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
         userSupplyService.updateProductCountInInventory(productId, count, authTokenResolver.requireToken(token));
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("getAllOrderIds")
     public ResponseEntity<List<Long>> getAllOrderIds(
-            @CookieValue(name = AuthCookies.SESSION_COOKIE_NAME, required = false) String token) {
+            @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
         return ResponseEntity.ok(userSupplyService.getAllOrderIds(authTokenResolver.requireToken(token)));
     }
 
     @DeleteMapping("cancelOrder")
     public ResponseEntity<Void> cancelOrder(@RequestParam Long orderId,
-                                            @CookieValue(name = AuthCookies.SESSION_COOKIE_NAME, required = false) String token) {
+                                            @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
         userSupplyService.cancelOrder(orderId, authTokenResolver.requireToken(token));
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("getOrderStatusByOrderId")
     public ResponseEntity<String> getOrderStatusByOrderId(@RequestParam Long orderId,
-                                                          @CookieValue(name = AuthCookies.SESSION_COOKIE_NAME, required = false) String token) {
+                                                          @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
         return ResponseEntity.ok(userSupplyService.getOrderStatusByOrderId(orderId, authTokenResolver.requireToken(token)));
     }
 
     @GetMapping("getUserOrders")
     public ResponseEntity<List<UserOrderDetailDto>> getUserOrders(
-            @CookieValue(name = AuthCookies.SESSION_COOKIE_NAME, required = false) String token) {
+            @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
         return ResponseEntity.ok(userSupplyService.getUserOrderDetails(authTokenResolver.requireToken(token)));
     }
 
     @GetMapping("getUserOrderGroups")
     public ResponseEntity<List<UserOrderGroupDto>> getUserOrderGroups(
-            @CookieValue(name = AuthCookies.SESSION_COOKIE_NAME, required = false) String token) {
+            @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
         return ResponseEntity.ok(userSupplyService.getUserOrderGroups(authTokenResolver.requireToken(token)));
     }
 }

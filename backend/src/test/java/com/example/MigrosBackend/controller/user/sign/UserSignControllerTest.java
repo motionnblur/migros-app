@@ -84,14 +84,14 @@ class UserSignControllerTest {
 
     @Test
     void login_shouldSetSessionCookie() throws Exception {
-        ResponseCookie cookie = ResponseCookie.from(AuthCookies.SESSION_COOKIE_NAME, "mock-jwt-token")
+        ResponseCookie cookie = ResponseCookie.from(AuthCookies.USER_SESSION_COOKIE_NAME, "mock-jwt-token")
                 .httpOnly(true)
                 .path("/")
                 .maxAge(Duration.ofMinutes(3))
                 .build();
 
         when(userSignupService.login(any(UserSignDto.class))).thenReturn("mock-jwt-token");
-        when(authCookieService.createSessionCookie("mock-jwt-token")).thenReturn(cookie);
+        when(authCookieService.createUserSessionCookie("mock-jwt-token")).thenReturn(cookie);
 
         mockMvc.perform(post("/user/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -99,25 +99,25 @@ class UserSignControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.SET_COOKIE,
                         Matchers.allOf(
-                                Matchers.containsString("migros_session="),
+                                Matchers.containsString("migros_user_session="),
                                 Matchers.containsString("Max-Age=180"))));
     }
 
     @Test
-    void logout_shouldClearSessionCookie() throws Exception {
-        ResponseCookie cookie = ResponseCookie.from(AuthCookies.SESSION_COOKIE_NAME, "")
+    void logout_shouldClearUserSessionCookie() throws Exception {
+        ResponseCookie cookie = ResponseCookie.from(AuthCookies.USER_SESSION_COOKIE_NAME, "")
                 .httpOnly(true)
                 .path("/")
                 .maxAge(Duration.ZERO)
                 .build();
 
-        when(authCookieService.clearSessionCookie()).thenReturn(cookie);
+        when(authCookieService.clearUserSessionCookie()).thenReturn(cookie);
 
         mockMvc.perform(post("/user/logout"))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.SET_COOKIE,
                         Matchers.allOf(
-                                Matchers.containsString("migros_session="),
+                                Matchers.containsString("migros_user_session="),
                                 Matchers.containsString("Max-Age=0"))));
     }
 
@@ -127,7 +127,7 @@ class UserSignControllerTest {
         when(tokenService.extractUsername("session-token")).thenReturn("test@example.com");
 
         mockMvc.perform(get("/user/session")
-                        .cookie(new Cookie(AuthCookies.SESSION_COOKIE_NAME, "session-token")))
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "session-token")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.userMail").value("test@example.com"));
     }
@@ -140,3 +140,5 @@ class UserSignControllerTest {
                 .andExpect(status().isNotFound());
     }
 }
+
+

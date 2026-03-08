@@ -54,20 +54,20 @@ public class UserSignController {
     private ResponseEntity<Void> login(@RequestBody UserSignDto userSignDto) {
         String token = userSignupService.login(userSignDto);
         return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, authCookieService.createSessionCookie(token).toString())
+                .header(HttpHeaders.SET_COOKIE, authCookieService.createUserSessionCookie(token).toString())
                 .build();
     }
 
     @PostMapping("logout")
     private ResponseEntity<Void> logout() {
         return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, authCookieService.clearSessionCookie().toString())
+                .header(HttpHeaders.SET_COOKIE, authCookieService.clearUserSessionCookie().toString())
                 .build();
     }
 
     @GetMapping("session")
     private ResponseEntity<Map<String, String>> session(
-            @CookieValue(name = AuthCookies.SESSION_COOKIE_NAME, required = false) String token) {
+            @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
         String userToken = authTokenResolver.requireToken(token);
         String userMail = tokenService.extractUsername(userToken);
         return ResponseEntity.ok(Map.of("userMail", userMail));

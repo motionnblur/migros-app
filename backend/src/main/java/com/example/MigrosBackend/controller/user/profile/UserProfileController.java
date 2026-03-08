@@ -31,7 +31,7 @@ public class UserProfileController {
                                                        @RequestParam("userTown") String userTown,
                                                        @RequestParam("userCountry") String userCountry,
                                                        @RequestParam("userPostalCode") String userPostalCode,
-                                                       @CookieValue(name = AuthCookies.SESSION_COOKIE_NAME, required = false) String token) {
+                                                       @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
         userProfileService.uploadUserProfileTable(
                 userFirstName, userLastName,
                 userAddress, userAddress2,
@@ -43,7 +43,7 @@ public class UserProfileController {
 
     @GetMapping("getUserProfileTable")
     public ResponseEntity<UserProfileTableDto> getUserProfileTable(
-            @CookieValue(name = AuthCookies.SESSION_COOKIE_NAME, required = false) String token) {
+            @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
         return ResponseEntity.ok(userProfileService.getUserProfileTable(authTokenResolver.requireToken(token)));
     }
 }

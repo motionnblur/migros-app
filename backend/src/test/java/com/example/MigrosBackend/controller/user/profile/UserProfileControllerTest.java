@@ -69,7 +69,7 @@ class UserProfileControllerTest {
                         .param("userTown", "Townsville")
                         .param("userCountry", "Countryland")
                         .param("userPostalCode", "12345")
-                        .cookie(new Cookie(AuthCookies.SESSION_COOKIE_NAME, "sample-token"))
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "sample-token"))
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED))
                 .andExpect(status().isOk());
     }
@@ -80,7 +80,7 @@ class UserProfileControllerTest {
         when(userProfileService.getUserProfileTable(anyString())).thenReturn(userProfileTableDto);
 
         mockMvc.perform(get("/user/profile/getUserProfileTable")
-                        .cookie(new Cookie(AuthCookies.SESSION_COOKIE_NAME, "sample-token"))
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "sample-token"))
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(content().json("""

@@ -94,7 +94,7 @@ class JwtRequestFilterTest {
         MockHttpServletRequest request = new MockHttpServletRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
         String token = "cookie.jwt.token";
-        request.setCookies(new Cookie(AuthCookies.SESSION_COOKIE_NAME, token));
+        request.setCookies(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, token));
 
         when(tokenService.extractUsername(token)).thenReturn("user@example.com");
         when(tokenService.validateToken(token, "user@example.com")).thenReturn(true);
@@ -132,4 +132,38 @@ class JwtRequestFilterTest {
         assertNull(SecurityContextHolder.getContext().getAuthentication());
         verify(filterChain).doFilter(request, response);
     }
+
+    @Test
+    void doFilterInternal_UsesAdminCookie_ForAdminPath() throws ServletException, IOException {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        String token = "admin.cookie.token";
+        request.setServletPath("/admin/panel");
+        request.setCookies(new Cookie(AuthCookies.ADMIN_SESSION_COOKIE_NAME, token));
+
+        when(tokenService.extractUsername(token)).thenReturn("admin");
+        when(tokenService.validateToken(token, "admin")).thenReturn(true);
+
+        jwtRequestFilter.doFilterInternal(request, response, filterChain);
+
+        assertNotNull(SecurityContextHolder.getContext().getAuthentication());
+        assertTrue(SecurityContextHolder.getContext().getAuthentication().getAuthorities()
+                .contains(new SimpleGrantedAuthority("ROLE_ADMIN")));
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    void doFilterInternal_DoesNotUseUserCookie_OnAdminPath() throws ServletException, IOException {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        request.setServletPath("/admin/panel");
+        request.setCookies(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "user.token"));
+
+        jwtRequestFilter.doFilterInternal(request, response, filterChain);
+
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+        verifyNoInteractions(tokenService);
+        verify(filterChain).doFilter(request, response);
+    }
 }
+

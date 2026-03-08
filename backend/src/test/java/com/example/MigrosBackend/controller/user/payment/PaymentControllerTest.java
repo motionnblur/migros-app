@@ -62,7 +62,7 @@ class PaymentControllerTest {
         when(userPaymentService.processCharge(eq(payload), eq("sample-token"))).thenReturn(response);
 
         mockMvc.perform(post("/payment/create-charge")
-                        .cookie(new Cookie(AuthCookies.SESSION_COOKIE_NAME, "sample-token"))
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "sample-token"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(payload)))
                 .andExpect(status().isOk())
@@ -85,7 +85,7 @@ class PaymentControllerTest {
         when(userPaymentService.processCharge(eq(payload), eq("sample-token"))).thenReturn(null);
 
         mockMvc.perform(post("/payment/create-charge")
-                        .cookie(new Cookie(AuthCookies.SESSION_COOKIE_NAME, "sample-token"))
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "sample-token"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(payload)))
                 .andExpect(status().isOk())

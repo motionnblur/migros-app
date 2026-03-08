@@ -64,20 +64,20 @@ class AdminSignControllerTest {
 
     @Test
     void login_shouldSetSessionCookie_whenCredentialsValid() throws Exception {
-        ResponseCookie cookie = ResponseCookie.from(AuthCookies.SESSION_COOKIE_NAME, "mocked-token")
+        ResponseCookie cookie = ResponseCookie.from(AuthCookies.ADMIN_SESSION_COOKIE_NAME, "mocked-token")
                 .httpOnly(true)
-                .path("/")
+                .path("/admin")
                 .maxAge(Duration.ofMinutes(3))
                 .build();
 
         when(adminSignupService.login(any(), any())).thenReturn("mocked-token");
-        when(authCookieService.createSessionCookie("mocked-token")).thenReturn(cookie);
+        when(authCookieService.createAdminSessionCookie("mocked-token")).thenReturn(cookie);
 
         mockMvc.perform(post("/admin/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(dto)))
                 .andExpect(status().isOk())
-                 .andExpect(header().string(HttpHeaders.SET_COOKIE, Matchers.allOf(Matchers.containsString("migros_session="), Matchers.containsString("Max-Age=180"))));
+                 .andExpect(header().string(HttpHeaders.SET_COOKIE, Matchers.allOf(Matchers.containsString("migros_admin_session="), Matchers.containsString("Max-Age=180"))));
     }
 
     @Test
@@ -103,20 +103,20 @@ class AdminSignControllerTest {
     }
 
     @Test
-    void logout_shouldClearSessionCookie() throws Exception {
-        ResponseCookie cookie = ResponseCookie.from(AuthCookies.SESSION_COOKIE_NAME, "")
+    void logout_shouldClearAdminSessionCookie() throws Exception {
+        ResponseCookie cookie = ResponseCookie.from(AuthCookies.ADMIN_SESSION_COOKIE_NAME, "")
                 .httpOnly(true)
-                .path("/")
+                .path("/admin")
                 .maxAge(Duration.ZERO)
                 .build();
 
-        when(authCookieService.clearSessionCookie()).thenReturn(cookie);
+        when(authCookieService.clearAdminSessionCookie()).thenReturn(cookie);
 
         mockMvc.perform(post("/admin/logout"))
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.SET_COOKIE,
                         Matchers.allOf(
-                                Matchers.containsString("migros_session="),
+                                Matchers.containsString("migros_admin_session="),
                                 Matchers.containsString("Max-Age=0"))));
     }
 
@@ -126,7 +126,7 @@ class AdminSignControllerTest {
         when(tokenService.extractUsername("session-token")).thenReturn("admin");
 
         mockMvc.perform(get("/admin/session")
-                        .cookie(new Cookie(AuthCookies.SESSION_COOKIE_NAME, "session-token")))
+                        .cookie(new Cookie(AuthCookies.ADMIN_SESSION_COOKIE_NAME, "session-token")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.adminName").value("admin"));
     }
@@ -146,6 +146,8 @@ class AdminSignControllerTest {
                 .andExpect(status().isBadRequest());
     }
 }
+
+
 
 
 

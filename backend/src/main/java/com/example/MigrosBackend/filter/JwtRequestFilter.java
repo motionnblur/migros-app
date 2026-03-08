@@ -34,7 +34,8 @@ public class JwtRequestFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        String jwt = resolveToken(request);
+        boolean isAdminPath = request.getServletPath().startsWith("/admin");
+        String jwt = resolveToken(request, isAdminPath);
         String username = null;
 
         if (jwt != null) {
@@ -65,7 +66,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private String resolveToken(HttpServletRequest request) {
+    private String resolveToken(HttpServletRequest request, boolean isAdminPath) {
         final String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             return authHeader.substring(7);
@@ -76,8 +77,12 @@ public class JwtRequestFilter extends OncePerRequestFilter {
             return null;
         }
 
+        String cookieName = isAdminPath
+                ? AuthCookies.ADMIN_SESSION_COOKIE_NAME
+                : AuthCookies.USER_SESSION_COOKIE_NAME;
+
         for (Cookie cookie : cookies) {
-            if (AuthCookies.SESSION_COOKIE_NAME.equals(cookie.getName())) {
+            if (cookieName.equals(cookie.getName())) {
                 return cookie.getValue();
             }
         }

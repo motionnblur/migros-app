@@ -42,20 +42,20 @@ public class AdminSignController {
     private ResponseEntity<Void> login(@RequestBody AdminSignDto adminSignDto, HttpServletRequest request) {
         String token = adminSupplyService.login(adminSignDto, request);
         return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, authCookieService.createSessionCookie(token).toString())
+                .header(HttpHeaders.SET_COOKIE, authCookieService.createAdminSessionCookie(token).toString())
                 .build();
     }
 
     @PostMapping("logout")
     private ResponseEntity<Void> logout() {
         return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, authCookieService.clearSessionCookie().toString())
+                .header(HttpHeaders.SET_COOKIE, authCookieService.clearAdminSessionCookie().toString())
                 .build();
     }
 
     @GetMapping("session")
     private ResponseEntity<Map<String, String>> session(
-            @CookieValue(name = AuthCookies.SESSION_COOKIE_NAME, required = false) String token) {
+            @CookieValue(name = AuthCookies.ADMIN_SESSION_COOKIE_NAME, required = false) String token) {
         String adminToken = authTokenResolver.requireToken(token);
         String adminName = tokenService.extractUsername(adminToken);
         return ResponseEntity.ok(Map.of("adminName", adminName));

@@ -53,7 +53,7 @@ class UserSupportControllerTest {
         when(supportChatService.getMessagesForUser("token")).thenReturn(List.of(dto));
 
         mockMvc.perform(get("/user/support/messages")
-                        .cookie(new Cookie(AuthCookies.SESSION_COOKIE_NAME, "token")))
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "token")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].message").value("Hello"));
     }
@@ -67,7 +67,7 @@ class UserSupportControllerTest {
         doNothing().when(supportChatService).addUserMessage("token", "Need help");
 
         mockMvc.perform(post("/user/support/send")
-                        .cookie(new Cookie(AuthCookies.SESSION_COOKIE_NAME, "token"))
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "token"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(dto)))
                 .andExpect(status().isOk());

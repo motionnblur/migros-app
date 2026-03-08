@@ -30,13 +30,13 @@ public class UserSupportController {
 
     @GetMapping("messages")
     public ResponseEntity<List<SupportMessageDto>> getSupportMessages(
-            @CookieValue(name = AuthCookies.SESSION_COOKIE_NAME, required = false) String token) {
+            @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
         return ResponseEntity.ok(supportChatService.getMessagesForUser(authTokenResolver.requireToken(token)));
     }
 
     @PostMapping("send")
     public ResponseEntity<Void> sendSupportMessage(
-            @CookieValue(name = AuthCookies.SESSION_COOKIE_NAME, required = false) String token,
+            @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token,
             @RequestBody SupportSendMessageDto dto) {
         supportChatService.addUserMessage(authTokenResolver.requireToken(token), dto.getMessage());
         return ResponseEntity.ok().build();

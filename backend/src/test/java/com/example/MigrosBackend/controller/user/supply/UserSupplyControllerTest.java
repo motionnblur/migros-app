@@ -103,7 +103,7 @@ class UserSupplyControllerTest {
 
         mockMvc.perform(get("/user/supply/addProductToUserCart")
                         .param("productId", "1")
-                        .cookie(new Cookie(AuthCookies.SESSION_COOKIE_NAME, SESSION_TOKEN)))
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, SESSION_TOKEN)))
                 .andExpect(status().isOk());
 
         verify(userSupplyService).addProductToInventory(1L, SESSION_TOKEN);
@@ -125,7 +125,7 @@ class UserSupplyControllerTest {
 
         mockMvc.perform(delete("/user/supply/removeProductFromUserCart")
                         .param("productId", "1")
-                        .cookie(new Cookie(AuthCookies.SESSION_COOKIE_NAME, SESSION_TOKEN)))
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, SESSION_TOKEN)))
                 .andExpect(status().isOk());
 
         verify(userSupplyService).removeProductFromInventory(1L, SESSION_TOKEN);
@@ -138,7 +138,7 @@ class UserSupplyControllerTest {
         when(userSupplyService.getAllOrderIds(SESSION_TOKEN)).thenReturn(orderIds);
 
         mockMvc.perform(get("/user/supply/getAllOrderIds")
-                        .cookie(new Cookie(AuthCookies.SESSION_COOKIE_NAME, SESSION_TOKEN)))
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, SESSION_TOKEN)))
                 .andExpect(status().isOk())
                 .andExpect(content().json(objectMapper.writeValueAsString(orderIds)));
     }
@@ -150,7 +150,7 @@ class UserSupplyControllerTest {
 
         mockMvc.perform(get("/user/supply/getOrderStatusByOrderId")
                         .param("orderId", "100")
-                        .cookie(new Cookie(AuthCookies.SESSION_COOKIE_NAME, SESSION_TOKEN)))
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, SESSION_TOKEN)))
                 .andExpect(status().isOk())
                 .andExpect(content().string("DELIVERED"));
     }
@@ -355,7 +355,7 @@ class UserSupplyControllerTest {
         mockMvc.perform(get("/user/supply/updateProductCountInUserCart")
                         .param("productId", productId.toString())
                         .param("count", String.valueOf(count))
-                        .cookie(new Cookie(AuthCookies.SESSION_COOKIE_NAME, SESSION_TOKEN))
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, SESSION_TOKEN))
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
 
@@ -371,7 +371,7 @@ class UserSupplyControllerTest {
 
         mockMvc.perform(delete("/user/supply/cancelOrder")
                         .param("orderId", orderId.toString())
-                        .cookie(new Cookie(AuthCookies.SESSION_COOKIE_NAME, SESSION_TOKEN))
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, SESSION_TOKEN))
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
 
@@ -390,7 +390,7 @@ class UserSupplyControllerTest {
         when(userSupplyService.getUserOrderDetails(SESSION_TOKEN)).thenReturn(details);
 
         mockMvc.perform(get("/user/supply/getUserOrders")
-                        .cookie(new Cookie(AuthCookies.SESSION_COOKIE_NAME, SESSION_TOKEN)))
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, SESSION_TOKEN)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].orderId").value(1));
     }
@@ -414,7 +414,7 @@ class UserSupplyControllerTest {
         when(userSupplyService.getUserOrderGroups(SESSION_TOKEN)).thenReturn(groups);
 
         mockMvc.perform(get("/user/supply/getUserOrderGroups")
-                        .cookie(new Cookie(AuthCookies.SESSION_COOKIE_NAME, SESSION_TOKEN)))
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, SESSION_TOKEN)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].orderGroupId").value(10));
     }

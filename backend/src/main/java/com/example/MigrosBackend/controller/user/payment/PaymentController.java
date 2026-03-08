@@ -25,7 +25,7 @@ public class PaymentController {
 
     @PostMapping("/create-charge")
     public ResponseEntity<Map<String, Object>> createCharge(@RequestBody Map<String, Object> payload,
-                                                            @CookieValue(name = AuthCookies.SESSION_COOKIE_NAME, required = false) String token) {
+                                                            @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
         String userToken = authTokenResolver.requireToken(token);
         return ResponseEntity.ok(userPaymentService.processCharge(payload, userToken));
     }
