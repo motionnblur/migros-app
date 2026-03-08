@@ -242,11 +242,12 @@ public class AdminSupplyService {
         productDescriptionDto.setDescriptionList(new ArrayList<>());
 
         for (ProductDescriptionEntity item : productDescriptionEntities) {
-            DescriptionsDto dto = new DescriptionsDto();
-            dto.setDescriptionId(item.getId());
-            dto.setDescriptionTabName(item.getDescriptionTabName());
-            dto.setDescriptionTabContent(item.getDescriptionTabContent());
-
+            DescriptionsDto dto = new DescriptionsDto(
+                    item.getId(),
+                    item.getDescriptionTabName(),
+                    item.getDescriptionTabContent()
+            );
+            
             productDescriptionDto.getDescriptionList().add(dto);
         }
 

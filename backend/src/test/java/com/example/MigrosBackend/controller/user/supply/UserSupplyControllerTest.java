@@ -324,10 +324,7 @@ class UserSupplyControllerTest {
     void getProductDescription_ShouldReturnNestedDescriptions() throws Exception {
         Long productId = 50L;
 
-        DescriptionsDto desc1 = new DescriptionsDto();
-        desc1.setDescriptionId(101L);
-        desc1.setDescriptionTabName("Ingredients");
-        desc1.setDescriptionTabContent("Sugar, Spice, Everything Nice");
+        DescriptionsDto desc1 = new DescriptionsDto(101L, "Ingredients", "Sugar, Spice, Everything Nice");
 
         ProductDescriptionListDto resultDto = new ProductDescriptionListDto();
         resultDto.setProductId(productId);
