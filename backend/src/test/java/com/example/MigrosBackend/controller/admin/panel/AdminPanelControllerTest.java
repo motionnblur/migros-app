@@ -5,6 +5,7 @@ import com.example.MigrosBackend.dto.admin.panel.AdminProductPreviewDto;
 import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionListDto;
 import com.example.MigrosBackend.dto.admin.panel.ProductDto2;
 import com.example.MigrosBackend.dto.order.OrderDto;
+import com.example.MigrosBackend.dto.order.OrderPageDto;
 import com.example.MigrosBackend.dto.user.UserProfileTableDto;
 import com.example.MigrosBackend.service.admin.supply.AdminSupplyService;
 import com.example.MigrosBackend.service.global.TokenService;
@@ -23,13 +24,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(AdminPanelController.class)
 @AutoConfigureMockMvc(addFilters = false)
@@ -41,10 +39,10 @@ class AdminPanelControllerTest {
     private AdminSupplyService adminSupplyService;
 
     @MockBean
-    private TokenService tokenService;
+    private UserOrderService userOrderService;
 
     @MockBean
-    private UserOrderService userOrderService;
+    private TokenService tokenService;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -56,10 +54,8 @@ class AdminPanelControllerTest {
     @BeforeEach
     void setup() {
         descriptionListDto = new ProductDescriptionListDto();
-        // populate descriptionListDto as needed
 
         addItemDto = new AdminAddItemDto();
-        // populate addItemDto as needed
 
         mockFile = new MockMultipartFile(
                 "selectedImage",
@@ -170,14 +166,23 @@ class AdminPanelControllerTest {
 
     @Test
     void getAllOrders_shouldReturnOk() throws Exception {
-        List<OrderDto> orders = List.of(new OrderDto());
-        when(userOrderService.getAllOrders(anyInt(), anyInt())).thenReturn(orders);
+        OrderDto order = new OrderDto();
+        order.setOrderId(1L);
+        order.setOrderGroupId(1L);
+        order.setTotalPrice(25.0f);
+        order.setStatus("PENDING");
+
+        OrderPageDto pageDto = new OrderPageDto();
+        pageDto.setItems(List.of(order));
+        pageDto.setTotal(1);
+
+        when(userOrderService.getAllOrders(anyInt(), anyInt())).thenReturn(pageDto);
 
         mockMvc.perform(get("/admin/panel/getAllOrders")
                         .param("page", "0")
                         .param("productRange", "10"))
                 .andExpect(status().isOk())
-                .andExpect(content().json(objectMapper.writeValueAsString(orders)));
+                .andExpect(content().json(objectMapper.writeValueAsString(pageDto)));
     }
 
     @Test
@@ -197,5 +202,18 @@ class AdminPanelControllerTest {
                         .param("orderId", "1")
                         .param("status", "SHIPPED"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void deleteOrder_shouldReturnOk() throws Exception {
+        mockMvc.perform(delete("/admin/panel/deleteOrder")
+                        .param("orderId", "1"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void deleteOrder_shouldReturnBadRequest_whenMissingParam() throws Exception {
+        mockMvc.perform(delete("/admin/panel/deleteOrder"))
+                .andExpect(status().isBadRequest());
     }
 }

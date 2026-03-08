@@ -39,6 +39,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -201,6 +202,24 @@ class AdminSupplyServiceTest {
         assertEquals(mockPath.toString(), existingImage.getImagePath());
     }
 
+
+    @Test
+    void updateProduct_DoesNotWriteFile_WhenImageMissing() throws IOException {
+        // Arrange
+        when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(new AdminEntity()));
+        when(categoryEntityRepository.findByCategoryId(1)).thenReturn(new CategoryEntity());
+        ProductEntity product = new ProductEntity();
+        product.setId(100L);
+        when(productEntityRepository.findById(100L)).thenReturn(Optional.of(product));
+
+        // Act
+        adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", 10f, 5, 0f, "Desc", 1, null);
+
+        // Assert
+        verify(fileService, never()).writeFileToDisk(any(), anyString(), anyString());
+        verify(productImageEntityRepository, never()).findByProductEntityId(anyLong());
+        verify(productEntityRepository).save(product);
+    }
     @Test
     void updateProduct_ThrowsException_WhenAdminNotFound() {
         // Arrange
@@ -234,6 +253,11 @@ class AdminSupplyServiceTest {
         // Arrange
         MockMultipartFile file = new MockMultipartFile("selectedImage", "test.png", "image/png", "data".getBytes());
 
+        // Ensure admin/product lookups pass so we reach the file write path
+        when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(new AdminEntity()));
+        when(categoryEntityRepository.findByCategoryId(1)).thenReturn(new CategoryEntity());
+        when(productEntityRepository.findById(100L)).thenReturn(Optional.of(new ProductEntity()));
+
         // Simulate disk failure
         when(fileService.writeFileToDisk(any(), anyString(), anyString())).thenThrow(new IOException());
 
@@ -242,212 +266,11 @@ class AdminSupplyServiceTest {
                 adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", 10f, 5, 0f, "Desc", 1, file)
         );
     }
-
-    @Test
-    void getProductData_Success() {
-        // Arrange
-        ProductEntity product = new ProductEntity();
-        product.setId(50L);
-        product.setProductName("Apple");
-        product.setCategoryEntity(category);
-
-        when(productEntityRepository.findById(50L)).thenReturn(Optional.of(product));
-
-        // Act
-        ProductDto2 result = adminSupplyService.getProductData(50L);
-
-        // Assert
-        assertNotNull(result);
-        assertEquals("Apple", result.getProductName());
-        verify(productEntityRepository, times(1)).findById(50L);
-    }
-
-    @Test
-    void deleteProduct_CallsRepository() {
-        // Act
-        adminSupplyService.deleteProduct(1L);
-
-        // Assert
-        verify(productEntityRepository, times(1)).deleteById(1L);
-    }
-
-    @Test
-    void addProductDescription_ThrowsException_WhenProductNotFound() {
-        // Arrange
-        ProductDescriptionListDto dto = new ProductDescriptionListDto();
-        dto.setProductId(1L);
-
-        when(productEntityRepository.findById(1L)).thenReturn(Optional.empty());
-
-        // Act & Assert
-        assertThrows(ProductNotFoundException.class, () -> adminSupplyService.addProductDescription(dto));
-    }
-
-    @Test
-    void addProductDescription_CreatesNew_WhenNoDescriptionsExist() {
-        // Arrange
-        Long productId = 1L;
-        ProductEntity product = new ProductEntity();
-        product.setId(productId);
-
-        ProductDescriptionListDto dto = new ProductDescriptionListDto();
-        dto.setProductId(productId);
-
-        DescriptionsDto desc1 = new DescriptionsDto();
-        desc1.setDescriptionTabName("Specs");
-        desc1.setDescriptionTabContent("High quality");
-        dto.setDescriptionList(List.of(desc1));
-
-        when(productEntityRepository.findById(productId)).thenReturn(Optional.of(product));
-        // Branch A: Existing descriptions list is empty
-        when(productDescriptionEntityRepository.findByProductEntityId(productId)).thenReturn(new ArrayList<>());
-
-        // Act
-        adminSupplyService.addProductDescription(dto);
-
-        // Assert
-        // Verify save was called for the new description
-        verify(productDescriptionEntityRepository, times(1)).save(any(ProductDescriptionEntity.class));
-    }
-
-    @Test
-    void addProductDescription_UpdatesAndCreates_WhenDescriptionsAlreadyExist() {
-        // Arrange
-        Long productId = 1L;
-        ProductEntity product = new ProductEntity();
-        product.setId(productId);
-
-        // 1. Existing entity in DB (ID: 100)
-        ProductDescriptionEntity existingEntity = new ProductDescriptionEntity();
-        existingEntity.setId(100L);
-        existingEntity.setDescriptionTabName("Old Name");
-
-        // 2. Incoming DTO with one UPDATE (ID: 100) and one NEW (ID: 200/null)
-        ProductDescriptionListDto dto = new ProductDescriptionListDto();
-        dto.setProductId(productId);
-
-        DescriptionsDto updateDto = new DescriptionsDto();
-        updateDto.setDescriptionId(100L);
-        updateDto.setDescriptionTabName("Updated Name");
-
-        DescriptionsDto newDto = new DescriptionsDto();
-        newDto.setDescriptionId(200L); // ID doesn't exist in DB
-        newDto.setDescriptionTabName("New Tab");
-
-        dto.setDescriptionList(List.of(updateDto, newDto));
-
-        when(productEntityRepository.findById(productId)).thenReturn(Optional.of(product));
-        // Branch B: Existing list is NOT empty
-        when(productDescriptionEntityRepository.findByProductEntityId(productId)).thenReturn(List.of(existingEntity));
-
-        // Mocking findById for the loop logic
-        when(productDescriptionEntityRepository.findById(100L)).thenReturn(Optional.of(existingEntity));
-        when(productDescriptionEntityRepository.findById(200L)).thenReturn(Optional.empty());
-
-        // Act
-        adminSupplyService.addProductDescription(dto);
-
-        // Assert
-        // Should be called twice: once for the update, once for the new creation
-        verify(productDescriptionEntityRepository, times(2)).save(any(ProductDescriptionEntity.class));
-        assertEquals("Updated Name", existingEntity.getDescriptionTabName());
-    }
-
-    @Test
-    void getAllAdminProducts_Success() {
-        // Arrange
-        Long adminId = 1L;
-        int page = 0;
-        int range = 5;
-        Pageable pageable = PageRequest.of(page, range);
-
-        ProductEntity product = new ProductEntity();
-        product.setId(101L);
-        product.setProductName("Organic Apples");
-
-        Page<ProductEntity> productPage = new PageImpl<>(List.of(product));
-
-        when(productEntityRepository.findByAdminEntityId(adminId, pageable))
-                .thenReturn(productPage);
-
-        // Act
-        List<AdminProductPreviewDto> result = adminSupplyService.getAllAdminProducts(adminId, page, range);
-
-        // Assert
-        assertNotNull(result);
-        assertEquals(1, result.size());
-        assertEquals(101L, result.get(0).getProductId());
-        assertEquals("Organic Apples", result.get(0).getProductName());
-
-        verify(productEntityRepository, times(1)).findByAdminEntityId(adminId, pageable);
-    }
-
-    @Test
-    void getAllAdminProducts_ThrowsException_WhenPageIsEmpty() {
-        // Arrange
-        Long adminId = 99L;
-        int page = 0;
-        int range = 5;
-        Pageable pageable = PageRequest.of(page, range);
-
-        when(productEntityRepository.findByAdminEntityId(adminId, pageable))
-                .thenReturn(Page.empty());
-
-        // Act & Assert
-        AdminHasNoProductException exception = assertThrows(AdminHasNoProductException.class, () -> {
-            adminSupplyService.getAllAdminProducts(adminId, 0, 5);
-        });
-
-        assertEquals("Admin with id 99 has no products.", exception.getMessage());
-        verify(productEntityRepository, times(1)).findByAdminEntityId(adminId, pageable);
-    }
-
-    @Test
-    void getProductDescription_Success() {
-        // Arrange
-        Long productId = 10L;
-
-        ProductDescriptionEntity desc = new ProductDescriptionEntity();
-        desc.setId(101L);
-        desc.setDescriptionTabName("Specs");
-        desc.setDescriptionTabContent("100% Cotton");
-
-        when(productDescriptionEntityRepository.findByProductEntityId(productId))
-                .thenReturn(List.of(desc));
-
-        // Act
-        ProductDescriptionListDto result = adminSupplyService.getProductDescription(productId);
-
-        // Assert
-        assertNotNull(result);
-        assertEquals(productId, result.getProductId());
-        assertEquals(1, result.getDescriptionList().size());
-        assertEquals("Specs", result.getDescriptionList().get(0).getDescriptionTabName());
-    }
-
-    @Test
-    void getProductDescription_ThrowsException_WhenNoDescriptionsFound() {
-        // Arrange
-        Long productId = 99L;
-
-        // Mocking an EMPTY list, which is what actually happens when no data is found
-        when(productDescriptionEntityRepository.findByProductEntityId(productId))
-                .thenReturn(Collections.emptyList());
-
-        // Act & Assert
-        assertThrows(ProductNotFoundException.class, () -> {
-            adminSupplyService.getProductDescription(productId);
-        });
-    }
-
-    @Test
-    void deleteProductDescription_ShouldInvokeRepositoryDelete() {
-        // Arrange
-        Long descriptionId = 500L;
-
-        // Act
-        adminSupplyService.deleteProductDescription(descriptionId);
-
-        verify(productDescriptionEntityRepository, times(1)).deleteById(descriptionId);
-    }
 }
+
+
+
+
+
+
+

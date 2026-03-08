@@ -27,28 +27,23 @@ class UserPaymentServiceTest {
 
     @Test
     void processCharge_Success() throws StripeException {
-        // Arrange
         String userToken = "user-123";
         String stripeToken = "tok_visa";
         Map<String, Object> payload = new HashMap<>();
         payload.put("token", stripeToken);
-        payload.put("userToken", userToken);
 
         when(userOrderService.getOrderPrice(userToken)).thenReturn(50.0f);
 
-        // Mocking the static Stripe Charge.create method
         try (MockedStatic<Charge> mockedCharge = mockStatic(Charge.class)) {
             Charge mockCharge = mock(Charge.class);
             when(mockCharge.getId()).thenReturn("ch_123");
-            when(mockCharge.getAmount()).thenReturn(5000L); // Stripe uses cents usually, but following your cast
+            when(mockCharge.getAmount()).thenReturn(5000L);
             when(mockCharge.getStatus()).thenReturn("succeeded");
 
             mockedCharge.when(() -> Charge.create(any(ChargeCreateParams.class))).thenReturn(mockCharge);
 
-            // Act
-            Map<String, Object> response = userPaymentService.processCharge(payload);
+            Map<String, Object> response = userPaymentService.processCharge(payload, userToken);
 
-            // Assert
             assertNotNull(response);
             assertTrue((Boolean) response.get("success"));
             verify(userOrderService, times(1)).createOrder(userToken);
@@ -57,37 +52,52 @@ class UserPaymentServiceTest {
 
     @Test
     void processCharge_ReturnsNull_WhenAmountIsZeroOrLess() {
-        // Arrange
+        String userToken = "user-123";
         Map<String, Object> payload = new HashMap<>();
-        payload.put("userToken", "user-123");
-        when(userOrderService.getOrderPrice("user-123")).thenReturn(0.0f);
+        payload.put("token", "tok_visa");
+        when(userOrderService.getOrderPrice(userToken)).thenReturn(0.0f);
 
-        // Act
-        Map<String, Object> response = userPaymentService.processCharge(payload);
+        Map<String, Object> response = userPaymentService.processCharge(payload, userToken);
 
-        // Assert
         assertNull(response);
-        verify(userOrderService, never()).createOrder(anyString());
+        verify(userOrderService, never()).createOrder(any());
     }
 
     @Test
     void processCharge_ReturnsError_WhenStripeFails() throws StripeException {
-        // Arrange
+        String userToken = "user-123";
         Map<String, Object> payload = new HashMap<>();
-        payload.put("userToken", "user-123");
-        when(userOrderService.getOrderPrice("user-123")).thenReturn(10.0f);
+        payload.put("token", "tok_visa");
+        when(userOrderService.getOrderPrice(userToken)).thenReturn(10.0f);
 
         try (MockedStatic<Charge> mockedCharge = mockStatic(Charge.class)) {
             mockedCharge.when(() -> Charge.create(any(ChargeCreateParams.class)))
                     .thenThrow(mock(StripeException.class));
 
-            // Act
-            Map<String, Object> response = userPaymentService.processCharge(payload);
+            Map<String, Object> response = userPaymentService.processCharge(payload, userToken);
 
-            // Assert
             assertFalse((Boolean) response.get("success"));
             assertTrue(response.get("error").toString().contains("Stripe error"));
-            verify(userOrderService, never()).createOrder(anyString());
+            verify(userOrderService, never()).createOrder(any());
+        }
+    }
+
+    @Test
+    void processCharge_ReturnsError_WhenUnexpectedExceptionOccurs() {
+        String userToken = "user-123";
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("token", "tok_visa");
+        when(userOrderService.getOrderPrice(userToken)).thenReturn(10.0f);
+
+        try (MockedStatic<Charge> mockedCharge = mockStatic(Charge.class)) {
+            mockedCharge.when(() -> Charge.create(any(ChargeCreateParams.class)))
+                    .thenThrow(new RuntimeException("boom"));
+
+            Map<String, Object> response = userPaymentService.processCharge(payload, userToken);
+
+            assertFalse((Boolean) response.get("success"));
+            assertTrue(response.get("error").toString().contains("Unexpected error"));
+            verify(userOrderService, never()).createOrder(any());
         }
     }
 }

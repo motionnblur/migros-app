@@ -1,8 +1,12 @@
 package com.example.MigrosBackend.controller.user.payment;
 
+import com.example.MigrosBackend.config.security.AuthCookies;
+import com.example.MigrosBackend.exception.shared.TokenNotFoundException;
+import com.example.MigrosBackend.helper.AuthTokenResolver;
 import com.example.MigrosBackend.service.global.TokenService;
 import com.example.MigrosBackend.service.user.payment.UserPaymentService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,8 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -35,6 +38,9 @@ class PaymentControllerTest {
     private UserPaymentService userPaymentService;
 
     @MockBean
+    private AuthTokenResolver authTokenResolver;
+
+    @MockBean
     private TokenService tokenService;
 
     private Map<String, Object> payload;
@@ -43,9 +49,7 @@ class PaymentControllerTest {
     @BeforeEach
     void setup() {
         payload = new HashMap<>();
-        payload.put("amount", 1000);
-        payload.put("currency", "USD");
-        payload.put("source", "tok_visa");
+        payload.put("token", "tok_visa");
 
         response = new HashMap<>();
         response.put("status", "success");
@@ -54,13 +58,37 @@ class PaymentControllerTest {
 
     @Test
     void createCharge_shouldReturnOkWithResponse() throws Exception {
-        // Mock the service
-        when(userPaymentService.processCharge(any(Map.class))).thenReturn(response);
+        when(authTokenResolver.requireToken("sample-token")).thenReturn("sample-token");
+        when(userPaymentService.processCharge(eq(payload), eq("sample-token"))).thenReturn(response);
 
         mockMvc.perform(post("/payment/create-charge")
+                        .cookie(new Cookie(AuthCookies.SESSION_COOKIE_NAME, "sample-token"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(payload)))
                 .andExpect(status().isOk())
                 .andExpect(content().json(objectMapper.writeValueAsString(response)));
+    }
+
+    @Test
+    void createCharge_shouldReturnNotFound_whenCookieMissing() throws Exception {
+        when(authTokenResolver.requireToken(null)).thenThrow(new TokenNotFoundException());
+
+        mockMvc.perform(post("/payment/create-charge")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(payload)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void createCharge_shouldReturnEmptyBody_whenServiceReturnsNull() throws Exception {
+        when(authTokenResolver.requireToken("sample-token")).thenReturn("sample-token");
+        when(userPaymentService.processCharge(eq(payload), eq("sample-token"))).thenReturn(null);
+
+        mockMvc.perform(post("/payment/create-charge")
+                        .cookie(new Cookie(AuthCookies.SESSION_COOKIE_NAME, "sample-token"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(payload)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(""));
     }
 }

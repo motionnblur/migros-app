@@ -21,7 +21,6 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-
 @WebMvcTest(AdminSupplyController.class)
 @AutoConfigureMockMvc(addFilters = false)
 class AdminSupplyControllerTest {
@@ -32,17 +31,16 @@ class AdminSupplyControllerTest {
     private AdminSupplyService adminSupplyService;
 
     @MockBean
-    private TokenService tokenService;
+    private UserSupplyService userSupplyService;
 
     @MockBean
-    private UserSupplyService userSupplyService;
+    private TokenService tokenService;
 
     @Autowired
     private ObjectMapper objectMapper;
 
     @Test
     void addCategory_shouldReturnOk_whenCategoryAdded() throws Exception {
-
         mockMvc.perform(get("/admin/supply/addCategory")
                         .param("categoryName", "Electronics"))
                 .andExpect(status().isOk());
@@ -53,7 +51,6 @@ class AdminSupplyControllerTest {
 
     @Test
     void getProductCountsFromCategory_shouldReturnCount() throws Exception {
-
         when(userSupplyService.getProductCountsFromCategory(anyLong()))
                 .thenReturn(15);
 
@@ -68,7 +65,6 @@ class AdminSupplyControllerTest {
 
     @Test
     void getProductsFromCategory_shouldReturnProductList() throws Exception {
-
         ProductPreviewDto product = new ProductPreviewDto();
         product.setProductName("Laptop");
 
@@ -90,7 +86,6 @@ class AdminSupplyControllerTest {
 
     @Test
     void addCategory_shouldReturnBadRequest_whenParamMissing() throws Exception {
-
         mockMvc.perform(get("/admin/supply/addCategory"))
                 .andExpect(status().isBadRequest());
     }

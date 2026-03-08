@@ -1,15 +1,20 @@
 package com.example.MigrosBackend.controller.user.supply;
 
+import com.example.MigrosBackend.config.security.AuthCookies;
 import com.example.MigrosBackend.dto.admin.panel.DescriptionsDto;
 import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionListDto;
 import com.example.MigrosBackend.dto.admin.panel.ProductDto2;
 import com.example.MigrosBackend.dto.user.category.SubCategoryDto;
+import com.example.MigrosBackend.dto.user.order.UserOrderDetailDto;
+import com.example.MigrosBackend.dto.user.order.UserOrderGroupDto;
 import com.example.MigrosBackend.dto.user.product.ProductPreviewDto;
 import com.example.MigrosBackend.dto.user.product.UserCartItemDto;
+import com.example.MigrosBackend.exception.shared.TokenNotFoundException;
+import com.example.MigrosBackend.helper.AuthTokenResolver;
 import com.example.MigrosBackend.service.global.TokenService;
 import com.example.MigrosBackend.service.user.supply.UserSupplyService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.BeforeEach;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -30,6 +35,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(UserSupplyController.class)
 @AutoConfigureMockMvc(addFilters = false)
 class UserSupplyControllerTest {
+    private static final String SESSION_TOKEN = "session-token";
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -40,12 +47,10 @@ class UserSupplyControllerTest {
     private UserSupplyService userSupplyService;
 
     @MockBean
-    private TokenService tokenService;
+    private AuthTokenResolver authTokenResolver;
 
-    @BeforeEach
-    void setup() {
-        // Any setup if needed
-    }
+    @MockBean
+    private TokenService tokenService;
 
     @Test
     void getAllCategoryNames_shouldReturnList() throws Exception {
@@ -93,49 +98,65 @@ class UserSupplyControllerTest {
 
     @Test
     void addProductToUserCart_shouldReturnOk() throws Exception {
-        doNothing().when(userSupplyService).addProductToInventory(1L, "token");
+        when(authTokenResolver.requireToken(SESSION_TOKEN)).thenReturn(SESSION_TOKEN);
+        doNothing().when(userSupplyService).addProductToInventory(1L, SESSION_TOKEN);
 
         mockMvc.perform(get("/user/supply/addProductToUserCart")
                         .param("productId", "1")
-                        .param("token", "token"))
+                        .cookie(new Cookie(AuthCookies.SESSION_COOKIE_NAME, SESSION_TOKEN)))
                 .andExpect(status().isOk());
+
+        verify(userSupplyService).addProductToInventory(1L, SESSION_TOKEN);
+    }
+
+    @Test
+    void addProductToUserCart_shouldReturnNotFound_whenCookieMissing() throws Exception {
+        when(authTokenResolver.requireToken(null)).thenThrow(new TokenNotFoundException());
+
+        mockMvc.perform(get("/user/supply/addProductToUserCart")
+                        .param("productId", "1"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
     void removeProductFromUserCart_shouldReturnOk() throws Exception {
-        doNothing().when(userSupplyService).removeProductFromInventory(1L, "token");
+        when(authTokenResolver.requireToken(SESSION_TOKEN)).thenReturn(SESSION_TOKEN);
+        doNothing().when(userSupplyService).removeProductFromInventory(1L, SESSION_TOKEN);
 
         mockMvc.perform(delete("/user/supply/removeProductFromUserCart")
                         .param("productId", "1")
-                        .param("token", "token"))
+                        .cookie(new Cookie(AuthCookies.SESSION_COOKIE_NAME, SESSION_TOKEN)))
                 .andExpect(status().isOk());
+
+        verify(userSupplyService).removeProductFromInventory(1L, SESSION_TOKEN);
     }
 
     @Test
     void getAllOrderIds_shouldReturnList() throws Exception {
+        when(authTokenResolver.requireToken(SESSION_TOKEN)).thenReturn(SESSION_TOKEN);
         List<Long> orderIds = List.of(100L, 101L);
-        when(userSupplyService.getAllOrderIds("token")).thenReturn(orderIds);
+        when(userSupplyService.getAllOrderIds(SESSION_TOKEN)).thenReturn(orderIds);
 
         mockMvc.perform(get("/user/supply/getAllOrderIds")
-                        .param("token", "token"))
+                        .cookie(new Cookie(AuthCookies.SESSION_COOKIE_NAME, SESSION_TOKEN)))
                 .andExpect(status().isOk())
                 .andExpect(content().json(objectMapper.writeValueAsString(orderIds)));
     }
 
     @Test
     void getOrderStatusByOrderId_shouldReturnStatus() throws Exception {
-        when(userSupplyService.getOrderStatusByOrderId(100L, "token")).thenReturn("DELIVERED");
+        when(authTokenResolver.requireToken(SESSION_TOKEN)).thenReturn(SESSION_TOKEN);
+        when(userSupplyService.getOrderStatusByOrderId(100L, SESSION_TOKEN)).thenReturn("DELIVERED");
 
         mockMvc.perform(get("/user/supply/getOrderStatusByOrderId")
                         .param("orderId", "100")
-                        .param("token", "token"))
+                        .cookie(new Cookie(AuthCookies.SESSION_COOKIE_NAME, SESSION_TOKEN)))
                 .andExpect(status().isOk())
                 .andExpect(content().string("DELIVERED"));
     }
 
     @Test
     void getSubProductsFromCategory_ShouldReturnProductList() throws Exception {
-        // Arrange
         String subName = "Fruits";
         int page = 0;
         int range = 10;
@@ -148,8 +169,7 @@ class UserSupplyControllerTest {
         when(userSupplyService.getProductsFromSubcategory(subName, page, range))
                 .thenReturn(List.of(dto));
 
-        // Act & Assert
-        mockMvc.perform(get("/user/supply/getProductsFromSubcategory") // Full path updated!
+        mockMvc.perform(get("/user/supply/getProductsFromSubcategory")
                         .param("subcategoryName", subName)
                         .param("page", String.valueOf(page))
                         .param("productRange", String.valueOf(range)))
@@ -159,65 +179,51 @@ class UserSupplyControllerTest {
 
     @Test
     void getProductCountsFromSubcategory_ShouldReturnCount() throws Exception {
-        // Arrange
         String subName = "Beverages";
         int expectedCount = 42;
 
-        // Mock the service to return our specific integer
         when(userSupplyService.getProductCountsFromSubcategory(subName))
                 .thenReturn(expectedCount);
 
-        // Act & Assert
-        mockMvc.perform(get("/user/supply/getProductCountsFromSubcategory") // Full path!
+        mockMvc.perform(get("/user/supply/getProductCountsFromSubcategory")
                         .param("subcategoryName", subName)
                         .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk()) // 200 OK
-                // Since the response is just a raw integer, the root "$" is the value itself
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$").value(expectedCount));
 
-        // Verify service interaction
         verify(userSupplyService, times(1)).getProductCountsFromSubcategory(subName);
     }
 
     @Test
     void getProductCountsFromCategory_ShouldReturnTotalCount() throws Exception {
-        // Arrange
         Long categoryId = 5L;
         int expectedCount = 120;
 
-        // Mock the service layer
         when(userSupplyService.getProductCountsFromCategory(categoryId))
                 .thenReturn(expectedCount);
 
-        // Act & Assert
         mockMvc.perform(get("/user/supply/getProductCountsFromCategory")
-                        .param("categoryId", categoryId.toString()) // Parameters are sent as Strings in HTTP
+                        .param("categoryId", categoryId.toString())
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                // For a single primitive/wrapper return, "$" is the root value
                 .andExpect(jsonPath("$").value(expectedCount));
 
-        // Verify service interaction
         verify(userSupplyService).getProductCountsFromCategory(categoryId);
     }
 
     @Test
     void getProductImageNames_ShouldReturnListOfStrings() throws Exception {
-        // Arrange
         Long productId = 101L;
         List<String> imageNames = List.of("image1.jpg", "image2.png", "thumbnail.webp");
 
         when(userSupplyService.getProductImageNames(productId))
                 .thenReturn(imageNames);
 
-        // Act & Assert
         mockMvc.perform(get("/user/supply/getProductImageNames")
                         .param("productId", productId.toString())
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                // Check that the response is an array of size 3
                 .andExpect(jsonPath("$.size()").value(3))
-                // Verify specific values in the list
                 .andExpect(jsonPath("$[0]").value("image1.jpg"))
                 .andExpect(jsonPath("$[1]").value("image2.png"))
                 .andExpect(jsonPath("$[2]").value("thumbnail.webp"));
@@ -227,12 +233,11 @@ class UserSupplyControllerTest {
 
     @Test
     void getSubCategories_ShouldReturnDtoList() throws Exception {
-        // Arrange
         Long categoryId = 1L;
 
         SubCategoryDto dto1 = new SubCategoryDto();
-        dto1.setSubCategoryId(10L); // Changed from .setId
-        dto1.setSubCategoryName("Dairy"); // Changed from .setSubcategoryName
+        dto1.setSubCategoryId(10L);
+        dto1.setSubCategoryName("Dairy");
 
         SubCategoryDto dto2 = new SubCategoryDto();
         dto2.setSubCategoryId(11L);
@@ -242,13 +247,11 @@ class UserSupplyControllerTest {
 
         when(userSupplyService.getSubCategories(categoryId)).thenReturn(mockList);
 
-        // Act & Assert
         mockMvc.perform(get("/user/supply/getSubCategories")
                         .param("categoryId", categoryId.toString())
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.size()").value(2))
-                // Updated paths to match your actual DTO fields
                 .andExpect(jsonPath("$[0].subCategoryId").value(10))
                 .andExpect(jsonPath("$[0].subCategoryName").value("Dairy"))
                 .andExpect(jsonPath("$[1].subCategoryId").value(11))
@@ -259,12 +262,11 @@ class UserSupplyControllerTest {
 
     @Test
     void getProductData_ShouldReturnCartItems() throws Exception {
-        // Arrange
         UserCartItemDto item1 = new UserCartItemDto();
         item1.setProductId(101L);
         item1.setProductName("Milk");
-        item1.setProductPrice(1.5f); // Match the body field name
-        item1.setProductCount(2);   // Match the body field name
+        item1.setProductPrice(1.5f);
+        item1.setProductCount(2);
 
         UserCartItemDto item2 = new UserCartItemDto();
         item2.setProductId(102L);
@@ -276,12 +278,10 @@ class UserSupplyControllerTest {
 
         when(userSupplyService.getProductData()).thenReturn(cartItems);
 
-        // Act & Assert
         mockMvc.perform(get("/user/supply/getProductData")
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.size()").value(2))
-                // Content validation with correct keys
                 .andExpect(jsonPath("$[0].productId").value(101))
                 .andExpect(jsonPath("$[0].productName").value("Milk"))
                 .andExpect(jsonPath("$[0].productPrice").value(1.5))
@@ -294,7 +294,6 @@ class UserSupplyControllerTest {
 
     @Test
     void getProductDataWithProductId_ShouldReturnProduct() throws Exception {
-        // Arrange
         Long productId = 50L;
 
         ProductDto2 mockProduct = new ProductDto2();
@@ -308,12 +307,10 @@ class UserSupplyControllerTest {
 
         when(userSupplyService.getProductData(productId)).thenReturn(mockProduct);
 
-        // Act & Assert
         mockMvc.perform(get("/user/supply/getProductDataWithProductId")
                         .param("productId", productId.toString())
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                // Matching your DTO fields exactly
                 .andExpect(jsonPath("$.productName").value("Organic Honey"))
                 .andExpect(jsonPath("$.subCategoryName").value("Sweeteners"))
                 .andExpect(jsonPath("$.productPrice").value(15.50))
@@ -325,10 +322,8 @@ class UserSupplyControllerTest {
 
     @Test
     void getProductDescription_ShouldReturnNestedDescriptions() throws Exception {
-        // Arrange
         Long productId = 50L;
 
-        // 1. Setup the Nested DTOs
         DescriptionsDto desc1 = new DescriptionsDto();
         desc1.setDescriptionId(101L);
         desc1.setDescriptionTabName("Ingredients");
@@ -338,17 +333,13 @@ class UserSupplyControllerTest {
         resultDto.setProductId(productId);
         resultDto.setDescriptionList(List.of(desc1));
 
-        // 2. Mock Service
         when(userSupplyService.getProductDescription(productId)).thenReturn(resultDto);
 
-        // Act & Assert
         mockMvc.perform(get("/user/supply/getProductDescription")
                         .param("productId", productId.toString())
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                // Verify top-level field
                 .andExpect(jsonPath("$.productId").value(50))
-                // Verify nested list fields
                 .andExpect(jsonPath("$.descriptionList[0].descriptionId").value(101))
                 .andExpect(jsonPath("$.descriptionList[0].descriptionTabName").value("Ingredients"))
                 .andExpect(jsonPath("$.descriptionList[0].descriptionTabContent").value("Sugar, Spice, Everything Nice"));
@@ -358,45 +349,76 @@ class UserSupplyControllerTest {
 
     @Test
     void updateProductCountInUserCart_ShouldReturnOk() throws Exception {
-        // Arrange
         Long productId = 101L;
         int count = 5;
-        String token = "mock-jwt-token";
 
-        // Since the service method returns void, we use doNothing() (or just skip when() as it's the default)
-        doNothing().when(userSupplyService).updateProductCountInInventory(productId, count, token);
+        when(authTokenResolver.requireToken(SESSION_TOKEN)).thenReturn(SESSION_TOKEN);
+        doNothing().when(userSupplyService).updateProductCountInInventory(productId, count, SESSION_TOKEN);
 
-        // Act & Assert
         mockMvc.perform(get("/user/supply/updateProductCountInUserCart")
                         .param("productId", productId.toString())
                         .param("count", String.valueOf(count))
-                        .param("token", token)
+                        .cookie(new Cookie(AuthCookies.SESSION_COOKIE_NAME, SESSION_TOKEN))
                         .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").doesNotExist()); // Verify the body is empty
+                .andExpect(status().isOk());
 
-        // Verify the service was actually triggered with these values
-        verify(userSupplyService, times(1)).updateProductCountInInventory(productId, count, token);
+        verify(userSupplyService, times(1)).updateProductCountInInventory(productId, count, SESSION_TOKEN);
     }
 
     @Test
     void cancelOrder_ShouldReturnOk() throws Exception {
-        // Arrange
         Long orderId = 99L;
-        String token = "user-auth-token";
 
-        // Standard for void methods: we tell Mockito to do nothing
-        doNothing().when(userSupplyService).cancelOrder(orderId, token);
+        when(authTokenResolver.requireToken(SESSION_TOKEN)).thenReturn(SESSION_TOKEN);
+        doNothing().when(userSupplyService).cancelOrder(orderId, SESSION_TOKEN);
 
-        // Act & Assert
-        mockMvc.perform(delete("/user/supply/cancelOrder") // Using delete() instead of get()
+        mockMvc.perform(delete("/user/supply/cancelOrder")
                         .param("orderId", orderId.toString())
-                        .param("token", token)
+                        .cookie(new Cookie(AuthCookies.SESSION_COOKIE_NAME, SESSION_TOKEN))
                         .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").doesNotExist());
+                .andExpect(status().isOk());
 
-        // Crucial: verify the service was called with the specific ID and token
-        verify(userSupplyService, times(1)).cancelOrder(orderId, token);
+        verify(userSupplyService, times(1)).cancelOrder(orderId, SESSION_TOKEN);
+    }
+
+    @Test
+    void getUserOrders_shouldReturnList() throws Exception {
+        when(authTokenResolver.requireToken(SESSION_TOKEN)).thenReturn(SESSION_TOKEN);
+
+        UserOrderDetailDto detail = new UserOrderDetailDto();
+        detail.setOrderId(1L);
+        detail.setProductName("Milk");
+        List<UserOrderDetailDto> details = List.of(detail);
+
+        when(userSupplyService.getUserOrderDetails(SESSION_TOKEN)).thenReturn(details);
+
+        mockMvc.perform(get("/user/supply/getUserOrders")
+                        .cookie(new Cookie(AuthCookies.SESSION_COOKIE_NAME, SESSION_TOKEN)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].orderId").value(1));
+    }
+
+    @Test
+    void getUserOrders_shouldReturnNotFound_whenCookieMissing() throws Exception {
+        when(authTokenResolver.requireToken(null)).thenThrow(new TokenNotFoundException());
+
+        mockMvc.perform(get("/user/supply/getUserOrders"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getUserOrderGroups_shouldReturnList() throws Exception {
+        when(authTokenResolver.requireToken(SESSION_TOKEN)).thenReturn(SESSION_TOKEN);
+
+        UserOrderGroupDto group = new UserOrderGroupDto();
+        group.setOrderGroupId(10L);
+        List<UserOrderGroupDto> groups = List.of(group);
+
+        when(userSupplyService.getUserOrderGroups(SESSION_TOKEN)).thenReturn(groups);
+
+        mockMvc.perform(get("/user/supply/getUserOrderGroups")
+                        .cookie(new Cookie(AuthCookies.SESSION_COOKIE_NAME, SESSION_TOKEN)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].orderGroupId").value(10));
     }
 }

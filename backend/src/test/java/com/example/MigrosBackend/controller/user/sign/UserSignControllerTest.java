@@ -1,27 +1,37 @@
 package com.example.MigrosBackend.controller.user.sign;
 
+import com.example.MigrosBackend.config.security.AuthCookieService;
+import com.example.MigrosBackend.config.security.AuthCookies;
 import com.example.MigrosBackend.dto.user.sign.UserSignDto;
+import com.example.MigrosBackend.exception.shared.TokenNotFoundException;
+import com.example.MigrosBackend.helper.AuthTokenResolver;
 import com.example.MigrosBackend.service.global.TokenService;
 import com.example.MigrosBackend.service.user.sign.UserSignupService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.Cookie;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseCookie;
 import org.springframework.test.web.servlet.MockMvc;
+
+import java.time.Duration;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(UserSignController.class)
 @AutoConfigureMockMvc(addFilters = false)
@@ -34,6 +44,12 @@ class UserSignControllerTest {
 
     @MockBean
     private UserSignupService userSignupService;
+
+    @MockBean
+    private AuthCookieService authCookieService;
+
+    @MockBean
+    private AuthTokenResolver authTokenResolver;
 
     @MockBean
     private TokenService tokenService;
@@ -63,18 +79,64 @@ class UserSignControllerTest {
 
         mockMvc.perform(get("/user/signup/confirm")
                         .param("token", "sample-token"))
-                .andExpect(status().isOk())
-                .andExpect(content().string("Your account has been created successfully, you can close this page now."));
+                .andExpect(status().isOk());
     }
 
     @Test
-    void login_shouldReturnToken() throws Exception {
+    void login_shouldSetSessionCookie() throws Exception {
+        ResponseCookie cookie = ResponseCookie.from(AuthCookies.SESSION_COOKIE_NAME, "mock-jwt-token")
+                .httpOnly(true)
+                .path("/")
+                .maxAge(Duration.ofMinutes(3))
+                .build();
+
         when(userSignupService.login(any(UserSignDto.class))).thenReturn("mock-jwt-token");
+        when(authCookieService.createSessionCookie("mock-jwt-token")).thenReturn(cookie);
 
         mockMvc.perform(post("/user/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(userSignDto)))
                 .andExpect(status().isOk())
-                .andExpect(content().string("mock-jwt-token"));
+                .andExpect(header().string(HttpHeaders.SET_COOKIE,
+                        Matchers.allOf(
+                                Matchers.containsString("migros_session="),
+                                Matchers.containsString("Max-Age=180"))));
+    }
+
+    @Test
+    void logout_shouldClearSessionCookie() throws Exception {
+        ResponseCookie cookie = ResponseCookie.from(AuthCookies.SESSION_COOKIE_NAME, "")
+                .httpOnly(true)
+                .path("/")
+                .maxAge(Duration.ZERO)
+                .build();
+
+        when(authCookieService.clearSessionCookie()).thenReturn(cookie);
+
+        mockMvc.perform(post("/user/logout"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.SET_COOKIE,
+                        Matchers.allOf(
+                                Matchers.containsString("migros_session="),
+                                Matchers.containsString("Max-Age=0"))));
+    }
+
+    @Test
+    void session_shouldReturnUserMail() throws Exception {
+        when(authTokenResolver.requireToken("session-token")).thenReturn("session-token");
+        when(tokenService.extractUsername("session-token")).thenReturn("test@example.com");
+
+        mockMvc.perform(get("/user/session")
+                        .cookie(new Cookie(AuthCookies.SESSION_COOKIE_NAME, "session-token")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userMail").value("test@example.com"));
+    }
+
+    @Test
+    void session_shouldReturnNotFound_whenCookieMissing() throws Exception {
+        when(authTokenResolver.requireToken(null)).thenThrow(new TokenNotFoundException());
+
+        mockMvc.perform(get("/user/session"))
+                .andExpect(status().isNotFound());
     }
 }

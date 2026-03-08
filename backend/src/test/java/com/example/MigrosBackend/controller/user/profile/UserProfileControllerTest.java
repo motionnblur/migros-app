@@ -1,9 +1,12 @@
 package com.example.MigrosBackend.controller.user.profile;
 
+import com.example.MigrosBackend.config.security.AuthCookies;
 import com.example.MigrosBackend.dto.user.UserProfileTableDto;
+import com.example.MigrosBackend.exception.shared.TokenNotFoundException;
+import com.example.MigrosBackend.helper.AuthTokenResolver;
 import com.example.MigrosBackend.service.global.TokenService;
 import com.example.MigrosBackend.service.user.profile.UserProfileService;
-import com.stripe.model.Token;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,10 +16,10 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -29,6 +32,9 @@ class UserProfileControllerTest {
 
     @MockBean
     private UserProfileService userProfileService;
+
+    @MockBean
+    private AuthTokenResolver authTokenResolver;
 
     @MockBean
     private TokenService tokenService;
@@ -49,6 +55,7 @@ class UserProfileControllerTest {
 
     @Test
     void uploadUserProfileTable_shouldReturnOk() throws Exception {
+        when(authTokenResolver.requireToken("sample-token")).thenReturn("sample-token");
         doNothing().when(userProfileService).uploadUserProfileTable(
                 anyString(), anyString(), anyString(), anyString(),
                 anyString(), anyString(), anyString(), anyString()
@@ -62,17 +69,18 @@ class UserProfileControllerTest {
                         .param("userTown", "Townsville")
                         .param("userCountry", "Countryland")
                         .param("userPostalCode", "12345")
-                        .param("token", "sample-token")
+                        .cookie(new Cookie(AuthCookies.SESSION_COOKIE_NAME, "sample-token"))
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED))
                 .andExpect(status().isOk());
     }
 
     @Test
     void getUserProfileTable_shouldReturnProfileDto() throws Exception {
+        when(authTokenResolver.requireToken("sample-token")).thenReturn("sample-token");
         when(userProfileService.getUserProfileTable(anyString())).thenReturn(userProfileTableDto);
 
         mockMvc.perform(get("/user/profile/getUserProfileTable")
-                        .param("token", "sample-token")
+                        .cookie(new Cookie(AuthCookies.SESSION_COOKIE_NAME, "sample-token"))
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(content().json("""
@@ -86,5 +94,13 @@ class UserProfileControllerTest {
                             "userPostalCode":"12345"
                         }
                         """));
+    }
+
+    @Test
+    void getUserProfileTable_shouldReturnNotFound_whenCookieMissing() throws Exception {
+        when(authTokenResolver.requireToken(null)).thenThrow(new TokenNotFoundException());
+
+        mockMvc.perform(get("/user/profile/getUserProfileTable"))
+                .andExpect(status().isNotFound());
     }
 }

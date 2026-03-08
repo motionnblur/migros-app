@@ -1,14 +1,17 @@
 package com.example.MigrosBackend.service.user.supply;
 
 import com.example.MigrosBackend.dto.order.OrderDto;
+import com.example.MigrosBackend.dto.order.OrderPageDto;
 import com.example.MigrosBackend.dto.user.UserProfileTableDto;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.user.OrderEntity;
+import com.example.MigrosBackend.entity.user.OrderGroupEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.exception.admin.OrderNotFoundException;
 import com.example.MigrosBackend.exception.admin.UserNotFoundException;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderEntityRepository;
+import com.example.MigrosBackend.repository.user.OrderGroupEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,16 +20,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
@@ -38,6 +38,8 @@ class UserOrderServiceTest {
     private UserEntityRepository userEntityRepository;
     @Mock
     private OrderEntityRepository orderEntityRepository;
+    @Mock
+    private OrderGroupEntityRepository orderGroupEntityRepository;
     @Mock
     private ProductEntityRepository productEntityRepository;
 
@@ -53,12 +55,11 @@ class UserOrderServiceTest {
         user = new UserEntity();
         user.setId(1L);
         user.setUserMail(email);
-        user.setProductsIdsInCart(new ArrayList<>(List.of(101L, 101L, 102L))); // 2x item 101, 1x item 102
+        user.setProductsIdsInCart(new ArrayList<>(List.of(101L, 101L, 102L)));
     }
 
     @Test
     void getOrderPrice_ShouldCalculateCorrectTotal() {
-        // Arrange
         when(tokenService.extractUsername(token)).thenReturn(email);
         when(userEntityRepository.findByUserMail(email)).thenReturn(user);
         when(tokenService.validateToken(token, email)).thenReturn(true);
@@ -71,194 +72,232 @@ class UserOrderServiceTest {
         when(productEntityRepository.findById(101L)).thenReturn(Optional.of(p1));
         when(productEntityRepository.findById(102L)).thenReturn(Optional.of(p2));
 
-        // Act
         float total = userOrderService.getOrderPrice(token);
 
-        // Assert
-        // (2 * 10.0) + (1 * 5.0) = 25.0
         assertEquals(25.0f, total);
     }
 
     @Test
-    void createOrder_ShouldSaveOrdersAndClearCart() {
-        // Arrange
+    void getOrderPrice_ShouldReturnZero_WhenTokenInvalid() {
+        when(tokenService.extractUsername(token)).thenReturn(email);
+        when(userEntityRepository.findByUserMail(email)).thenReturn(user);
+        when(tokenService.validateToken(token, email)).thenReturn(false);
+
+        float total = userOrderService.getOrderPrice(token);
+
+        assertEquals(0.0f, total);
+        verify(productEntityRepository, never()).findById(anyLong());
+    }
+
+    @Test
+    void createOrder_ShouldSaveOrderGroupAndItems_AndClearCart() {
         when(tokenService.extractUsername(token)).thenReturn(email);
         when(userEntityRepository.findByUserMail(email)).thenReturn(user);
         when(tokenService.validateToken(token, email)).thenReturn(true);
+
+        when(orderGroupEntityRepository.save(any(OrderGroupEntity.class)))
+                .thenAnswer(invocation -> {
+                    OrderGroupEntity group = invocation.getArgument(0);
+                    group.setId(10L);
+                    return group;
+                });
 
         ProductEntity p1 = new ProductEntity();
         p1.setProductPrice(10.0f);
         when(productEntityRepository.findById(anyLong())).thenReturn(Optional.of(p1));
 
-        // Act
         userOrderService.createOrder(token);
 
-        // Assert
-        // Verify orders saved (one for each unique product ID: 101 and 102)
+        verify(orderGroupEntityRepository, times(1)).save(any(OrderGroupEntity.class));
         verify(orderEntityRepository, times(2)).save(any(OrderEntity.class));
-        // Verify cart is cleared (empty list)
         assertTrue(user.getProductsIdsInCart().isEmpty());
         verify(userEntityRepository, atLeastOnce()).save(user);
     }
 
     @Test
-    void clearUserCart_ShouldEmptyList_WhenTokenValid() {
-        // Arrange
+    void createOrder_ShouldNotSave_WhenTokenInvalid() {
+        when(tokenService.extractUsername(token)).thenReturn(email);
+        when(userEntityRepository.findByUserMail(email)).thenReturn(user);
+        when(tokenService.validateToken(token, email)).thenReturn(false);
+
+        userOrderService.createOrder(token);
+
+        verify(orderGroupEntityRepository, never()).save(any());
+        verify(orderEntityRepository, never()).save(any());
+    }
+
+    @Test
+    void createOrder_ShouldNotSave_WhenCartEmpty() {
+        user.setProductsIdsInCart(new ArrayList<>());
         when(tokenService.extractUsername(token)).thenReturn(email);
         when(userEntityRepository.findByUserMail(email)).thenReturn(user);
         when(tokenService.validateToken(token, email)).thenReturn(true);
 
-        // Act
+        userOrderService.createOrder(token);
+
+        verify(orderGroupEntityRepository, never()).save(any());
+        verify(orderEntityRepository, never()).save(any());
+    }
+
+    @Test
+    void clearUserCart_ShouldEmptyList_WhenTokenValid() {
+        when(tokenService.extractUsername(token)).thenReturn(email);
+        when(userEntityRepository.findByUserMail(email)).thenReturn(user);
+        when(tokenService.validateToken(token, email)).thenReturn(true);
+
         userOrderService.clearUserCart(token);
 
-        // Assert
         assertEquals(0, user.getProductsIdsInCart().size());
         verify(userEntityRepository).save(user);
     }
 
     @Test
-    void updateOrderStatus_ShouldUpdateAndSave() {
-        // Arrange
-        OrderEntity order = new OrderEntity();
-        order.setId(1L);
-        order.setStatus("Pending");
-        when(orderEntityRepository.findById(1L)).thenReturn(Optional.of(order));
+    void updateOrderStatus_ShouldUpdateGroupAndItems() {
+        OrderGroupEntity group = new OrderGroupEntity();
+        group.setId(1L);
+        group.setStatus("Pending");
 
-        // Act
+        OrderEntity item1 = new OrderEntity();
+        item1.setStatus("Pending");
+        OrderEntity item2 = new OrderEntity();
+        item2.setStatus("Pending");
+
+        when(orderGroupEntityRepository.findById(1L)).thenReturn(Optional.of(group));
+        when(orderEntityRepository.findByOrderGroup_Id(1L)).thenReturn(List.of(item1, item2));
+
         userOrderService.updateOrderStatus(1L, "Shipped");
 
-        // Assert
-        assertEquals("Shipped", order.getStatus());
-        verify(orderEntityRepository).save(order);
+        assertEquals("Shipped", group.getStatus());
+        assertEquals("Shipped", item1.getStatus());
+        assertEquals("Shipped", item2.getStatus());
+        verify(orderGroupEntityRepository).save(group);
+        verify(orderEntityRepository).saveAll(List.of(item1, item2));
     }
 
     @Test
-    void getAllOrders_ShouldReturnMappedDtoList() {
-        // Arrange
-        int page = 0;
-        int size = 5;
-        Pageable pageable = PageRequest.of(page, size);
+    void updateOrderStatus_ShouldUpdateLegacyOrder_WhenGroupMissing() {
+        OrderEntity legacy = new OrderEntity();
+        legacy.setId(5L);
+        legacy.setStatus("Pending");
 
-        OrderEntity order1 = new OrderEntity();
-        order1.setId(10L);
-        order1.setTotalPrice(150.50f);
-        order1.setStatus("PENDING");
+        when(orderGroupEntityRepository.findById(5L)).thenReturn(Optional.empty());
+        when(orderEntityRepository.findById(5L)).thenReturn(Optional.of(legacy));
 
-        OrderEntity order2 = new OrderEntity();
-        order2.setId(11L);
-        order2.setTotalPrice(200.00f);
-        order2.setStatus("COMPLETED");
+        userOrderService.updateOrderStatus(5L, "Delivered");
 
-        // Create a Page object containing our mock entities
-        Page<OrderEntity> orderPage = new PageImpl<>(List.of(order1, order2));
-
-        when(orderEntityRepository.findAll(pageable)).thenReturn(orderPage);
-
-        // Act
-        List<OrderDto> result = userOrderService.getAllOrders(page, size);
-
-        // Assert
-        assertNotNull(result);
-        assertEquals(2, result.size());
-
-        // Verify mapping for the first item
-        OrderDto dto1 = result.get(0);
-        assertEquals(10L, dto1.getOrderId());
-        assertEquals(150.50f, dto1.getTotalPrice());
-        assertEquals("PENDING", dto1.getStatus());
-
-        // Verify mapping for the second item
-        OrderDto dto2 = result.get(1);
-        assertEquals(11L, dto2.getOrderId());
-        assertEquals("COMPLETED", dto2.getStatus());
-
-        verify(orderEntityRepository, times(1)).findAll(pageable);
+        assertEquals("Delivered", legacy.getStatus());
+        verify(orderEntityRepository).save(legacy);
     }
 
     @Test
-    void getAllOrders_ShouldReturnEmptyList_WhenNoOrdersExist() {
-        // Arrange
-        Pageable pageable = PageRequest.of(0, 5);
-        when(orderEntityRepository.findAll(pageable)).thenReturn(Page.empty());
+    void getAllOrders_ShouldReturnPagedDto() {
+        OrderGroupEntity group1 = new OrderGroupEntity();
+        group1.setId(2L);
+        group1.setStatus("Pending");
 
-        // Act
-        List<OrderDto> result = userOrderService.getAllOrders(0, 5);
+        OrderGroupEntity group2 = new OrderGroupEntity();
+        group2.setId(5L);
+        group2.setStatus("Shipped");
 
-        // Assert
-        assertNotNull(result);
-        assertTrue(result.isEmpty());
+        OrderEntity g1Item1 = new OrderEntity();
+        g1Item1.setTotalPrice(10.0f);
+        OrderEntity g1Item2 = new OrderEntity();
+        g1Item2.setTotalPrice(5.0f);
+
+        OrderEntity g2Item1 = new OrderEntity();
+        g2Item1.setTotalPrice(20.0f);
+
+        OrderEntity legacy = new OrderEntity();
+        legacy.setId(3L);
+        legacy.setTotalPrice(7.0f);
+        legacy.setStatus("Legacy");
+
+        when(orderGroupEntityRepository.findAll()).thenReturn(List.of(group1, group2));
+        when(orderEntityRepository.findByOrderGroup_Id(2L)).thenReturn(List.of(g1Item1, g1Item2));
+        when(orderEntityRepository.findByOrderGroup_Id(5L)).thenReturn(List.of(g2Item1));
+        when(orderEntityRepository.findByOrderGroupIsNull()).thenReturn(List.of(legacy));
+
+        OrderPageDto page = userOrderService.getAllOrders(0, 2);
+
+        assertNotNull(page);
+        assertEquals(3, page.getTotal());
+        assertEquals(2, page.getItems().size());
+        assertEquals(5L, page.getItems().get(0).getOrderId());
+        assertEquals(3L, page.getItems().get(1).getOrderId());
     }
 
     @Test
-    void getUserProfileData_Success() {
-        // Arrange
+    void getUserProfileData_ShouldUseGroup_WhenExists() {
         Long orderId = 100L;
         Long userId = 1L;
 
-        // 1. Mock the Order
-        OrderEntity order = new OrderEntity();
-        order.setId(orderId);
-        order.setUserId(userId); // The link to the user
+        OrderGroupEntity group = new OrderGroupEntity();
+        group.setId(orderId);
+        group.setUserId(userId);
 
-        // 2. Mock the User
-        UserEntity user = new UserEntity();
-        user.setUserName("John");
-        user.setUserLastName("Doe");
-        user.setUserAddress("123 Java St");
-        user.setUserAddress2("Apt 4B");
-        user.setUserTown("Springfield");
-        user.setUserCountry("USA");
-        user.setUserPostalCode("12345");
+        UserEntity profileUser = new UserEntity();
+        profileUser.setUserName("John");
+        profileUser.setUserLastName("Doe");
+        profileUser.setUserAddress("123 Java St");
+        profileUser.setUserAddress2("Apt 4B");
+        profileUser.setUserTown("Springfield");
+        profileUser.setUserCountry("USA");
+        profileUser.setUserPostalCode("12345");
 
-        when(orderEntityRepository.findById(orderId)).thenReturn(Optional.of(order));
-        when(userEntityRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(orderGroupEntityRepository.findById(orderId)).thenReturn(Optional.of(group));
+        when(userEntityRepository.findById(userId)).thenReturn(Optional.of(profileUser));
 
-        // Act
         UserProfileTableDto result = userOrderService.getUserProfileData(orderId);
 
-        // Assert
         assertNotNull(result);
         assertEquals("John", result.getUserFirstName());
-        assertEquals("Doe", result.getUserLastName());
-        assertEquals("123 Java St", result.getUserAddress());
-        assertEquals("Springfield", result.getUserTown());
-        assertEquals("12345", result.getUserPostalCode());
+        verify(orderEntityRepository, never()).findById(anyLong());
+    }
 
-        // Verify both repositories were called
-        verify(orderEntityRepository).findById(orderId);
-        verify(userEntityRepository).findById(userId);
+    @Test
+    void getUserProfileData_ShouldUseLegacy_WhenGroupMissing() {
+        Long orderId = 200L;
+        Long userId = 2L;
+
+        OrderEntity legacyOrder = new OrderEntity();
+        legacyOrder.setId(orderId);
+        legacyOrder.setUserId(userId);
+
+        UserEntity profileUser = new UserEntity();
+        profileUser.setUserName("Jane");
+        profileUser.setUserLastName("Smith");
+
+        when(orderGroupEntityRepository.findById(orderId)).thenReturn(Optional.empty());
+        when(orderEntityRepository.findById(orderId)).thenReturn(Optional.of(legacyOrder));
+        when(userEntityRepository.findById(userId)).thenReturn(Optional.of(profileUser));
+
+        UserProfileTableDto result = userOrderService.getUserProfileData(orderId);
+
+        assertNotNull(result);
+        assertEquals("Jane", result.getUserFirstName());
     }
 
     @Test
     void getUserProfileData_ThrowsOrderNotFound() {
-        // Arrange
         Long orderId = 999L;
+        when(orderGroupEntityRepository.findById(orderId)).thenReturn(Optional.empty());
         when(orderEntityRepository.findById(orderId)).thenReturn(Optional.empty());
 
-        // Act & Assert
-        assertThrows(OrderNotFoundException.class, () -> {
-            userOrderService.getUserProfileData(orderId);
-        });
-
-        // Verify the second repo was NEVER called
+        assertThrows(OrderNotFoundException.class, () -> userOrderService.getUserProfileData(orderId));
         verify(userEntityRepository, never()).findById(anyLong());
     }
 
     @Test
     void getUserProfileData_ThrowsUserNotFound() {
-        // Arrange
         Long orderId = 100L;
         Long userId = 1L;
-        OrderEntity order = new OrderEntity();
-        order.setUserId(userId);
 
-        when(orderEntityRepository.findById(orderId)).thenReturn(Optional.of(order));
-        // Mocking the scenario where order exists but user doesn't
+        OrderGroupEntity group = new OrderGroupEntity();
+        group.setUserId(userId);
+
+        when(orderGroupEntityRepository.findById(orderId)).thenReturn(Optional.of(group));
         when(userEntityRepository.findById(userId)).thenReturn(Optional.empty());
 
-        // Act & Assert
-        assertThrows(UserNotFoundException.class, () -> {
-            userOrderService.getUserProfileData(orderId);
-        });
+        assertThrows(UserNotFoundException.class, () -> userOrderService.getUserProfileData(orderId));
     }
 }
