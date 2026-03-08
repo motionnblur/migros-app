@@ -6,6 +6,8 @@ import com.example.MigrosBackend.dto.admin.panel.ProductDto2;
 import com.example.MigrosBackend.dto.user.category.SubCategoryDto;
 import com.example.MigrosBackend.dto.user.product.ProductPreviewDto;
 import com.example.MigrosBackend.dto.user.product.UserCartItemDto;
+import com.example.MigrosBackend.dto.user.order.UserOrderDetailDto;
+import com.example.MigrosBackend.dto.user.order.UserOrderGroupDto;
 import com.example.MigrosBackend.entity.category.CategoryEntity;
 import com.example.MigrosBackend.entity.product.ProductDescriptionEntity;
 import com.example.MigrosBackend.entity.product.ProductEntity;
@@ -42,6 +44,7 @@ import org.springframework.data.domain.Pageable;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -760,6 +763,200 @@ class UserSupplyServiceTest {
             userSupplyService.getProductDescription(productId);
         });
     }
+
+    @Test
+    void getUserOrderDetails_returnsEmpty_whenNoOrders() {
+        String token = "token";
+        String email = "user@example.com";
+        UserEntity user = new UserEntity();
+        user.setId(1L);
+        user.setUserMail(email);
+
+        when(tokenService.extractUsername(token)).thenReturn(email);
+        when(userEntityRepository.findByUserMail(email)).thenReturn(user);
+        when(tokenService.validateToken(token, email)).thenReturn(true);
+        when(orderGroupEntityRepository.findByUserId(1L)).thenReturn(Collections.emptyList());
+        when(orderEntityRepository.findByUserIdAndOrderGroupIsNull(1L)).thenReturn(Collections.emptyList());
+
+        List<UserOrderDetailDto> result = userSupplyService.getUserOrderDetails(token);
+
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+        verify(productEntityRepository, never()).findAllById(any());
+    }
+
+    @Test
+    void getUserOrderDetails_mapsGroupAndLegacy_andHandlesMissingProduct() {
+        String token = "token";
+        String email = "user@example.com";
+        UserEntity user = new UserEntity();
+        user.setId(1L);
+        user.setUserMail(email);
+
+        OrderEntity groupOrder = new OrderEntity();
+        groupOrder.setId(10L);
+        groupOrder.setItemId(100L);
+        groupOrder.setCount(2);
+        groupOrder.setPrice(5f);
+        groupOrder.setTotalPrice(10f);
+
+        OrderGroupEntity group = new OrderGroupEntity();
+        group.setId(5L);
+        group.setStatus("SHIPPED");
+        group.setOrderItems(List.of(groupOrder));
+
+        OrderEntity legacyOrder = new OrderEntity();
+        legacyOrder.setId(11L);
+        legacyOrder.setItemId(200L);
+        legacyOrder.setCount(1);
+        legacyOrder.setPrice(3f);
+        legacyOrder.setTotalPrice(3f);
+        legacyOrder.setStatus("PENDING");
+
+        ProductEntity product = new ProductEntity();
+        product.setId(100L);
+        product.setProductName("Apple");
+
+        when(tokenService.extractUsername(token)).thenReturn(email);
+        when(userEntityRepository.findByUserMail(email)).thenReturn(user);
+        when(tokenService.validateToken(token, email)).thenReturn(true);
+        when(orderGroupEntityRepository.findByUserId(1L)).thenReturn(List.of(group));
+        when(orderEntityRepository.findByUserIdAndOrderGroupIsNull(1L)).thenReturn(List.of(legacyOrder));
+        when(productEntityRepository.findAllById(any())).thenReturn(List.of(product));
+
+        List<UserOrderDetailDto> result = userSupplyService.getUserOrderDetails(token);
+
+        assertEquals(2, result.size());
+        UserOrderDetailDto groupDto = result.get(0);
+        assertEquals(10L, groupDto.getOrderId());
+        assertEquals(100L, groupDto.getProductId());
+        assertEquals("Apple", groupDto.getProductName());
+        assertEquals(2, groupDto.getCount());
+        assertEquals(5f, groupDto.getPrice());
+        assertEquals(10f, groupDto.getTotalPrice());
+        assertEquals("SHIPPED", groupDto.getStatus());
+
+        UserOrderDetailDto legacyDto = result.get(1);
+        assertEquals(11L, legacyDto.getOrderId());
+        assertEquals(200L, legacyDto.getProductId());
+        assertEquals("", legacyDto.getProductName());
+        assertEquals(1, legacyDto.getCount());
+        assertEquals(3f, legacyDto.getPrice());
+        assertEquals(3f, legacyDto.getTotalPrice());
+        assertEquals("PENDING", legacyDto.getStatus());
+    }
+
+    @Test
+    void getUserOrderDetails_throwsInvalidToken_whenInvalid() {
+        String token = "bad-token";
+        String email = "user@example.com";
+        UserEntity user = new UserEntity();
+        user.setUserMail(email);
+
+        when(tokenService.extractUsername(token)).thenReturn(email);
+        when(userEntityRepository.findByUserMail(email)).thenReturn(user);
+        when(tokenService.validateToken(token, email)).thenReturn(false);
+
+        assertThrows(InvalidTokenException.class, () -> userSupplyService.getUserOrderDetails(token));
+        verify(orderGroupEntityRepository, never()).findByUserId(anyLong());
+        verify(orderEntityRepository, never()).findByUserIdAndOrderGroupIsNull(anyLong());
+    }
+
+    @Test
+    void getUserOrderGroups_returnsEmpty_whenNoOrders() {
+        String token = "token";
+        String email = "user@example.com";
+        UserEntity user = new UserEntity();
+        user.setId(1L);
+        user.setUserMail(email);
+
+        when(tokenService.extractUsername(token)).thenReturn(email);
+        when(userEntityRepository.findByUserMail(email)).thenReturn(user);
+        when(tokenService.validateToken(token, email)).thenReturn(true);
+        when(orderGroupEntityRepository.findByUserId(1L)).thenReturn(Collections.emptyList());
+        when(orderEntityRepository.findByUserIdAndOrderGroupIsNull(1L)).thenReturn(Collections.emptyList());
+
+        List<UserOrderGroupDto> result = userSupplyService.getUserOrderGroups(token);
+
+        assertNotNull(result);
+        assertTrue(result.isEmpty());
+        verify(productEntityRepository, never()).findAllById(any());
+    }
+
+    @Test
+    void getUserOrderGroups_mapsGroupsAndLegacy_andSortsDesc() {
+        String token = "token";
+        String email = "user@example.com";
+        UserEntity user = new UserEntity();
+        user.setId(1L);
+        user.setUserMail(email);
+
+        OrderEntity groupOrder = new OrderEntity();
+        groupOrder.setId(10L);
+        groupOrder.setItemId(100L);
+        groupOrder.setCount(2);
+        groupOrder.setPrice(5f);
+        groupOrder.setTotalPrice(10f);
+
+        OrderGroupEntity group = new OrderGroupEntity();
+        group.setId(5L);
+        group.setStatus("DELIVERED");
+        group.setCreatedAt(LocalDateTime.now().minusDays(1));
+        group.setOrderItems(List.of(groupOrder));
+
+        OrderEntity legacyOrder = new OrderEntity();
+        legacyOrder.setId(7L);
+        legacyOrder.setItemId(200L);
+        legacyOrder.setCount(1);
+        legacyOrder.setPrice(3f);
+        legacyOrder.setTotalPrice(3f);
+        legacyOrder.setStatus("PENDING");
+
+        ProductEntity product1 = new ProductEntity();
+        product1.setId(100L);
+        product1.setProductName("Apple");
+        ProductEntity product2 = new ProductEntity();
+        product2.setId(200L);
+        product2.setProductName("Bread");
+
+        when(tokenService.extractUsername(token)).thenReturn(email);
+        when(userEntityRepository.findByUserMail(email)).thenReturn(user);
+        when(tokenService.validateToken(token, email)).thenReturn(true);
+        when(orderGroupEntityRepository.findByUserId(1L)).thenReturn(List.of(group));
+        when(orderEntityRepository.findByUserIdAndOrderGroupIsNull(1L)).thenReturn(List.of(legacyOrder));
+        when(productEntityRepository.findAllById(any())).thenReturn(List.of(product1, product2));
+
+        List<UserOrderGroupDto> result = userSupplyService.getUserOrderGroups(token);
+
+        assertEquals(2, result.size());
+        assertEquals(7L, result.get(0).getOrderGroupId());
+        assertNull(result.get(0).getCreatedAt());
+        assertEquals(1, result.get(0).getItems().size());
+        assertEquals("Bread", result.get(0).getItems().get(0).getProductName());
+
+        assertEquals(5L, result.get(1).getOrderGroupId());
+        assertNotNull(result.get(1).getCreatedAt());
+        assertEquals(1, result.get(1).getItems().size());
+        assertEquals("Apple", result.get(1).getItems().get(0).getProductName());
+        assertEquals("DELIVERED", result.get(1).getItems().get(0).getStatus());
+    }
+
+    @Test
+    void getUserOrderGroups_throwsInvalidToken_whenInvalid() {
+        String token = "bad-token";
+        String email = "user@example.com";
+        UserEntity user = new UserEntity();
+        user.setUserMail(email);
+
+        when(tokenService.extractUsername(token)).thenReturn(email);
+        when(userEntityRepository.findByUserMail(email)).thenReturn(user);
+        when(tokenService.validateToken(token, email)).thenReturn(false);
+
+        assertThrows(InvalidTokenException.class, () -> userSupplyService.getUserOrderGroups(token));
+        verify(orderGroupEntityRepository, never()).findByUserId(anyLong());
+        verify(orderEntityRepository, never()).findByUserIdAndOrderGroupIsNull(anyLong());
+    }
+
 }
 
 

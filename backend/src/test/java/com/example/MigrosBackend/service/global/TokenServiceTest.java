@@ -73,4 +73,11 @@ class TokenServiceTest {
         // Assert
         assertFalse(isExpired);
     }
+
+    @Test
+    void getTokenTtlMillis_ShouldReturnThreeMinutes() {
+        long ttl = tokenService.getTokenTtlMillis();
+
+        assertEquals(1000L * 60 * 3, ttl);
+    }
 }

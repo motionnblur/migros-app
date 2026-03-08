@@ -300,4 +300,56 @@ class UserOrderServiceTest {
 
         assertThrows(UserNotFoundException.class, () -> userOrderService.getUserProfileData(orderId));
     }
+
+    @Test
+    void deleteOrder_shouldDeleteGroupAndItems_whenGroupExists() {
+        Long orderId = 10L;
+        OrderGroupEntity group = new OrderGroupEntity();
+        group.setId(orderId);
+
+        OrderEntity item1 = new OrderEntity();
+        item1.setId(1L);
+        OrderEntity item2 = new OrderEntity();
+        item2.setId(2L);
+
+        when(orderGroupEntityRepository.findById(orderId)).thenReturn(Optional.of(group));
+        when(orderEntityRepository.findByOrderGroup_Id(orderId)).thenReturn(List.of(item1, item2));
+
+        userOrderService.deleteOrder(orderId);
+
+        verify(orderEntityRepository).deleteAll(List.of(item1, item2));
+        verify(orderGroupEntityRepository).delete(group);
+        verify(orderEntityRepository, never()).delete(any());
+    }
+
+    @Test
+    void deleteOrder_shouldDeleteLegacyOrder_whenGroupMissing() {
+        Long orderId = 20L;
+        OrderEntity legacy = new OrderEntity();
+        legacy.setId(orderId);
+
+        when(orderGroupEntityRepository.findById(orderId)).thenReturn(Optional.empty());
+        when(orderEntityRepository.findById(orderId)).thenReturn(Optional.of(legacy));
+
+        userOrderService.deleteOrder(orderId);
+
+        verify(orderEntityRepository).delete(legacy);
+        verify(orderGroupEntityRepository, never()).delete(any());
+        verify(orderEntityRepository, never()).deleteAll(any());
+    }
+
+    @Test
+    void deleteOrder_shouldThrowOrderNotFound_whenMissing() {
+        Long orderId = 30L;
+
+        when(orderGroupEntityRepository.findById(orderId)).thenReturn(Optional.empty());
+        when(orderEntityRepository.findById(orderId)).thenReturn(Optional.empty());
+
+        assertThrows(OrderNotFoundException.class, () -> userOrderService.deleteOrder(orderId));
+        verify(orderEntityRepository, never()).delete(any());
+        verify(orderEntityRepository, never()).deleteAll(any());
+        verify(orderGroupEntityRepository, never()).delete(any());
+    }
+
 }
+
