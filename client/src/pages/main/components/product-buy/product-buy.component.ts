@@ -1,5 +1,3 @@
-// ... imports stay the same
-
 import { EventService } from '../../../../services/event/event.service';
 import { DomSanitizer } from '@angular/platform-browser';
 import { ProductBuyBase } from '../../../../base-components/product-buy.base';
@@ -32,6 +30,10 @@ export class ProductBuyComponent extends ProductBuyBase {
     return +(price - (price * discount) / 100).toFixed(2);
   }
 
+  public get isOutOfStock(): boolean {
+    return (this.productData?.productCount ?? 0) <= 0;
+  }
+
   constructor(
     protected override restService: RestService,
     protected sanitizer: DomSanitizer,
@@ -45,15 +47,22 @@ export class ProductBuyComponent extends ProductBuyBase {
 
   public onTabClick(index: number) {
     this.selectedTabIndex = index;
-    const content = this.productDescriptions.descriptionList[index].descriptionTabContent;
+    const content =
+      this.productDescriptions.descriptionList[index].descriptionTabContent;
     this.updateProductDescriptionBody(content);
   }
 
   private updateProductDescriptionBody(description: string) {
-    this.currentProductDescriptionBody = this.sanitizer.bypassSecurityTrustHtml(description);
+    this.currentProductDescriptionBody =
+      this.sanitizer.bypassSecurityTrustHtml(description);
   }
 
   public addProductToUserCart() {
+    if (this.isOutOfStock) {
+      alert('Bu urun stokta kalmadi.');
+      return;
+    }
+
     if (!this.authService.isLoggedIn()) {
       this.router.navigate([{ outlets: { modal: ['login'] } }], {
         relativeTo: this.route,
@@ -63,7 +72,10 @@ export class ProductBuyComponent extends ProductBuyBase {
 
     this.restService.addProductToUserCart(this.productId).subscribe({
       next: () => {},
-      error: (error) => console.error('Error adding product', error),
+      error: (error: any) => {
+        const message = error?.error || 'Urun sepete eklenemedi.';
+        alert(message);
+      },
       complete: () => alert('Urun sepete eklendi!'),
     });
   }

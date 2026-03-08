@@ -15,6 +15,7 @@ export class ProductPreviewComponent implements OnInit {
   @Input() productId!: number;
   @Input() productName!: string;
   @Input() productPrice!: number;
+  @Input() productCount!: number;
   @Input() categoryId!: number;
 
   imageUrl: string | null = null;
@@ -42,6 +43,11 @@ export class ProductPreviewComponent implements OnInit {
   }
 
   public addProductToUserCart() {
+    if (this.productCount <= 0) {
+      alert('Bu urun stokta kalmadi.');
+      return;
+    }
+
     if (!this.authService.isLoggedIn()) {
       this.router.navigate([{ outlets: { modal: ['login'] } }], {
         relativeTo: this.route,
@@ -51,7 +57,10 @@ export class ProductPreviewComponent implements OnInit {
 
     this.restService.addProductToUserCart(this.productId).subscribe({
       next: () => {},
-      error: (error) => console.error('Error adding to cart', error),
+      error: (error: any) => {
+        const message = error?.error || 'Urun sepete eklenemedi.';
+        alert(message);
+      },
       complete: () => {
         alert(`${this.productName} sepete eklendi.`);
       },

@@ -12,6 +12,10 @@
       {{ productName }}
     </h6>
 
+    <div class="small mb-2" [ngClass]="productCount > 0 ? 'text-success' : 'text-danger'">
+      {{ productCount > 0 ? ('Stok: ' + productCount) : 'Tukendi' }}
+    </div>
+
     <div class="mt-auto d-flex justify-content-between align-items-center">
       <div class="product-price">
         <span class="fs-5 fw-bold text-orange">{{ productPrice }}</span>
@@ -21,6 +25,7 @@
       <button
         type="button"
         class="btn btn-orange-action rounded-circle d-flex align-items-center justify-content-center shadow-sm"
+        [disabled]="productCount <= 0"
         (click)="addProductToUserCart()"
         title="Sepete Ekle">
         <i class="bi bi-plus-lg text-white"></i>

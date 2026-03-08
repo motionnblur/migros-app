@@ -10,4 +10,5 @@ public class UserCartItemDto {
     private String productName;
     private float productPrice;
     private int productCount;
+    private int availableStock;
 }

@@ -9,13 +9,14 @@ import com.example.MigrosBackend.entity.user.OrderGroupEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.exception.admin.OrderNotFoundException;
 import com.example.MigrosBackend.exception.admin.UserNotFoundException;
+import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderGroupEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -44,24 +45,15 @@ public class UserOrderService {
         this.productEntityRepository = productEntityRepository;
     }
 
-    @Async
     public void clearUserCart(String userToken) {
-        String userName = tokenService.extractUsername(userToken);
-        UserEntity user = userEntityRepository.findByUserMail(userName);
-        if (tokenService.validateToken(userToken, user.getUserMail())) {
-            user.setProductsIdsInCart(new ArrayList<>());
-            userEntityRepository.save(user);
-        }
+        UserEntity user = getValidatedUser(userToken);
+        user.setProductsIdsInCart(new ArrayList<>());
+        userEntityRepository.save(user);
     }
 
-    @Async
+    @Transactional
     public void createOrder(String userToken) {
-        String userName = tokenService.extractUsername(userToken);
-        UserEntity user = userEntityRepository.findByUserMail(userName);
-
-        if (!tokenService.validateToken(userToken, user.getUserMail())) {
-            return;
-        }
+        UserEntity user = getValidatedUser(userToken);
 
         List<Long> productsInCart = user.getProductsIdsInCart();
         if (productsInCart == null || productsInCart.isEmpty()) {
@@ -70,6 +62,20 @@ public class UserOrderService {
 
         Map<Long, Integer> productCounts = productsInCart.stream()
                 .collect(Collectors.groupingBy(Function.identity(), Collectors.summingInt(e -> 1)));
+
+        Map<Long, ProductEntity> productMap = productEntityRepository.findAllById(productCounts.keySet())
+                .stream()
+                .collect(Collectors.toMap(ProductEntity::getId, Function.identity()));
+
+        for (Map.Entry<Long, Integer> entry : productCounts.entrySet()) {
+            ProductEntity product = productMap.get(entry.getKey());
+            if (product == null) {
+                throw new GeneralException("One or more products are no longer available.");
+            }
+            if (product.getProductCount() < entry.getValue()) {
+                throw new GeneralException("Insufficient stock for product: " + product.getProductName());
+            }
+        }
 
         OrderGroupEntity orderGroup = new OrderGroupEntity();
         orderGroup.setUserEntity(user);
@@ -82,45 +88,57 @@ public class UserOrderService {
             Long productId = entry.getKey();
             Integer count = entry.getValue();
 
-            ProductEntity product = productEntityRepository.findById(productId)
-                    .orElseThrow(() -> new OrderNotFoundException(productId.toString()));
+            ProductEntity product = productMap.get(productId);
 
             OrderEntity order = new OrderEntity();
             order.setUserEntity(user);
             order.setOrderGroup(orderGroup);
             order.setUserId(user.getId());
             order.setItemId(productId);
-            order.setPrice(product.getProductPrice());
+            float effectivePrice = getEffectivePrice(product);
+            order.setPrice(effectivePrice);
             order.setCount(count);
-            order.setTotalPrice(product.getProductPrice() * count);
+            order.setTotalPrice(effectivePrice * count);
             order.setStatus(orderGroup.getStatus());
             orderEntityRepository.save(order);
+
+            int remainingStock = product.getProductCount() - count;
+            product.setProductCount(remainingStock);
         }
 
-        clearUserCart(userToken);
+        productEntityRepository.saveAll(productMap.values());
+
+        user.setProductsIdsInCart(new ArrayList<>());
+        userEntityRepository.save(user);
     }
 
     public float getOrderPrice(String userToken) {
-        String userName = tokenService.extractUsername(userToken);
-        UserEntity user = userEntityRepository.findByUserMail(userName);
-        if (tokenService.validateToken(userToken, user.getUserMail())) {
-            List<Long> productsInCart = user.getProductsIdsInCart();
-            if (productsInCart == null || productsInCart.isEmpty()) {
-                return 0;
-            }
+        UserEntity user = getValidatedUser(userToken);
 
-            Map<Long, Integer> productCounts = productsInCart.stream()
-                    .collect(Collectors.groupingBy(Function.identity(), Collectors.summingInt(e -> 1)));
-
-            float total = 0;
-            for (Map.Entry<Long, Integer> entry : productCounts.entrySet()) {
-                ProductEntity product = productEntityRepository.findById(entry.getKey())
-                        .orElseThrow(() -> new OrderNotFoundException(entry.getKey().toString()));
-                total += product.getProductPrice() * entry.getValue();
-            }
-            return total;
+        List<Long> productsInCart = user.getProductsIdsInCart();
+        if (productsInCart == null || productsInCart.isEmpty()) {
+            return 0;
         }
-        return 0;
+
+        Map<Long, Integer> productCounts = productsInCart.stream()
+                .collect(Collectors.groupingBy(Function.identity(), Collectors.summingInt(e -> 1)));
+
+        Map<Long, ProductEntity> productMap = productEntityRepository.findAllById(productCounts.keySet())
+                .stream()
+                .collect(Collectors.toMap(ProductEntity::getId, Function.identity()));
+
+        float total = 0;
+        for (Map.Entry<Long, Integer> entry : productCounts.entrySet()) {
+            ProductEntity product = productMap.get(entry.getKey());
+            if (product == null) {
+                throw new GeneralException("One or more products are no longer available.");
+            }
+            if (product.getProductCount() < entry.getValue()) {
+                throw new GeneralException("Insufficient stock for product: " + product.getProductName());
+            }
+            total += getEffectivePrice(product) * entry.getValue();
+        }
+        return total;
     }
 
     public OrderPageDto getAllOrders(int page, int productRange) {
@@ -215,10 +233,14 @@ public class UserOrderService {
         orderEntityRepository.save(legacyOrder);
     }
 
+    @Transactional
     public void deleteOrder(Long orderId) {
         OrderGroupEntity orderGroup = orderGroupEntityRepository.findById(orderId).orElse(null);
         if (orderGroup != null) {
             List<OrderEntity> items = orderEntityRepository.findByOrderGroup_Id(orderGroup.getId());
+            if ("Pending".equalsIgnoreCase(orderGroup.getStatus())) {
+                restockOrderItems(items);
+            }
             orderEntityRepository.deleteAll(items);
             orderGroupEntityRepository.delete(orderGroup);
             return;
@@ -226,10 +248,43 @@ public class UserOrderService {
 
         OrderEntity legacyOrder = orderEntityRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId.toString()));
+        if ("Pending".equalsIgnoreCase(legacyOrder.getStatus())) {
+            ProductEntity product = productEntityRepository.findById(legacyOrder.getItemId()).orElse(null);
+            if (product != null) {
+                product.setProductCount(product.getProductCount() + legacyOrder.getCount());
+                productEntityRepository.save(product);
+            }
+        }
         orderEntityRepository.delete(legacyOrder);
     }
+
+
+    private float getEffectivePrice(ProductEntity product) {
+        float discount = product.getProductDiscount();
+        float price = product.getProductPrice();
+        if (discount <= 0) {
+            return price;
+        }
+        return price - (price * discount / 100);
+    }
+
+    private void restockOrderItems(List<OrderEntity> orderItems) {
+        for (OrderEntity orderItem : orderItems) {
+            ProductEntity product = productEntityRepository.findById(orderItem.getItemId()).orElse(null);
+            if (product == null) {
+                continue;
+            }
+            product.setProductCount(product.getProductCount() + orderItem.getCount());
+            productEntityRepository.save(product);
+        }
+    }
+    private UserEntity getValidatedUser(String userToken) {
+        String userName = tokenService.extractUsername(userToken);
+        UserEntity user = userEntityRepository.findByUserMail(userName);
+        if (user == null || !tokenService.validateToken(userToken, user.getUserMail())) {
+            throw new UserNotFoundException("User not found for active session");
+        }
+        return user;
+    }
 }
-
-
-
 

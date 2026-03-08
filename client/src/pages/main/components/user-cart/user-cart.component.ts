@@ -30,120 +30,133 @@ export class UserCartComponent {
   isPaymentPhaseActive: boolean = false;
   isCartConfirmed: boolean = false;
 
+  private readonly escHandler = (event: KeyboardEvent) => {
+    if (event.key === 'Escape') {
+      this.closeCartComponent();
+    }
+  };
+
   constructor(
     private restService: RestService,
     private router: Router,
     private route: ActivatedRoute
   ) {
-    restService.getAllProductsFromUserCart().subscribe({
+    this.loadCart();
+  }
+
+  ngAfterViewInit() {
+    document.addEventListener('keydown', this.escHandler);
+  }
+
+  ngOnDestroy() {
+    document.removeEventListener('keydown', this.escHandler);
+    this.saveCartItems();
+  }
+
+  private loadCart() {
+    this.restService.getAllProductsFromUserCart().subscribe({
       next: (data: IUserCartItemDto[]) => {
         this.items = data;
-        console.log(data);
+        this.totalPrice = this.calculateTotal(data);
+
+        this.items.forEach((item) => {
+          this.restService.getProductImage(item.productId).subscribe((blob: Blob) => {
+            const url: string = window.URL.createObjectURL(blob);
+            item.productImageUrl = url;
+          });
+        });
       },
       error: (error: any) => {
         console.error(error);
       },
-      complete: () => {
-        this.items.forEach((item) => {
-          this.totalPrice += item.productPrice * item.productCount;
-          this.restService
-            .getProductImage(item.productId)
-            .subscribe((blob: Blob) => {
-              const url: string = window.URL.createObjectURL(blob);
-              item.productImageUrl = url;
-            });
-        });
-      },
     });
   }
-  ngAfterViewInit() {
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') {
-        this.closeCartComponent();
-      }
-    });
+
+  private calculateTotal(items: IUserCartItemDto[]): number {
+    return items.reduce(
+      (total, item) => total + item.productPrice * item.productCount,
+      0
+    );
   }
-  ngOnDestroy() {
-    document.removeEventListener('keydown', (event) => {
-      if (event.key === 'Escape') {
-        if (this.itemsToDelete.length > 0) {
-          this.itemsToDelete.forEach((productId) => {
-            this.restService.removeProductFromUserCart(productId).subscribe();
-          });
-        }
-        this.closeCartComponent();
-      }
-    });
-    if (this.itemsToDelete.length > 0) {
-      this.itemsToDelete.forEach((productId) => {
-        this.restService.removeProductFromUserCart(productId).subscribe();
-      });
-    }
-  }
+
   private saveCartItems() {
-    if (this.itemsToDelete.length > 0) {
-      this.itemsToDelete.forEach((productId) => {
-        this.restService.removeProductFromUserCart(productId).subscribe();
-      });
-    }
-    if (this.itemCountMap.size > 0) {
-      this.itemCountMap.forEach((count, productId) => {
-        this.restService
-          .updateProductCountInUserCart(productId, count)
-          .subscribe();
-      });
-    }
+    this.itemsToDelete.forEach((productId) => {
+      this.restService.removeProductFromUserCart(productId).subscribe();
+    });
+
+    this.itemCountMap.forEach((count, productId) => {
+      if (count > 0) {
+        this.restService.updateProductCountInUserCart(productId, count).subscribe();
+      }
+    });
+
+    this.itemsToDelete = [];
+    this.itemCountMap.clear();
   }
+
   public closeCartComponent() {
     this.router.navigate([{ outlets: { modal: null } }], {
       relativeTo: this.route.parent ?? this.route,
     });
     this.closeComponentEvent.emit();
   }
+
   public removeProductFromUserCart(productId: number) {
-    const itemToRemove = this.items.find(
-      (item) => item.productId === productId
-    );
+    const itemToRemove = this.items.find((item) => item.productId === productId);
     if (itemToRemove) {
       this.totalPrice -= itemToRemove.productPrice * itemToRemove.productCount;
     }
-    this.itemsToDelete.push(productId);
+
+    if (!this.itemsToDelete.includes(productId)) {
+      this.itemsToDelete.push(productId);
+    }
+
+    this.itemCountMap.delete(productId);
     this.items = this.items.filter((item) => item.productId !== productId);
   }
+
   public increaseProductCount(productId: number) {
-    const item = this.items.find((item) => item.productId === productId);
-    if (item) {
-      if (item.deleteState) {
-        item.deleteState = false;
-      }
-
-      item.productCount++;
-      this.totalPrice += item.productPrice;
-
-      this.itemCountMap.set(item.productId, item.productCount);
+    const item = this.items.find((entry) => entry.productId === productId);
+    if (!item) {
+      return;
     }
+
+    if (item.productCount >= item.availableStock) {
+      alert(`Bu urunden en fazla ${item.availableStock} adet alabilirsiniz.`);
+      return;
+    }
+
+    item.productCount++;
+    item.deleteState = false;
+    this.totalPrice += item.productPrice;
+    this.itemCountMap.set(item.productId, item.productCount);
   }
+
   public decreaseProductCount(productId: number) {
-    const item = this.items.find((item) => item.productId === productId);
-
-    if (item) {
-      if (item.deleteState) {
-        this.removeProductFromUserCart(item.productId);
-        return;
-      }
-
-      item.productCount--;
-      if (item.productCount <= 0) {
-        item.deleteState = true;
-      }
-
-      this.totalPrice -= item.productPrice;
-
-      this.itemCountMap.set(item.productId, item.productCount);
+    const item = this.items.find((entry) => entry.productId === productId);
+    if (!item) {
+      return;
     }
+
+    if (item.productCount <= 1) {
+      this.removeProductFromUserCart(item.productId);
+      return;
+    }
+
+    item.productCount--;
+    this.totalPrice -= item.productPrice;
+    this.itemCountMap.set(item.productId, item.productCount);
   }
+
   public openPaymentComponent() {
-    if (this.items.length == 0) return;
+    if (this.items.length === 0) {
+      return;
+    }
+
+    if (this.items.some((item) => item.productCount > item.availableStock)) {
+      alert('Sepetteki bir veya daha fazla urunun stogu yetersiz. Lutfen sepeti guncelleyin.');
+      return;
+    }
 
     if (this.isCartConfirmed) {
       data.totalCartPrice = this.totalPrice;
@@ -151,10 +164,10 @@ export class UserCartComponent {
     } else {
       this.buyButtonRef.nativeElement.style.backgroundColor = 'green';
       this.isCartConfirmed = true;
-
       this.saveCartItems();
     }
   }
+
   public closePaymentComponent() {
     this.isPaymentPhaseActive = false;
   }

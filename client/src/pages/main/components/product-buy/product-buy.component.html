@@ -38,14 +38,15 @@
             <div class="col-auto">
               <span class="fw-bold text-muted text-uppercase small d-block mb-1">Miktar</span>
               <div class="d-flex align-items-center bg-light rounded px-2" style="height: 50px; width: 120px;">
-                <span class="mx-auto fw-bold">1 Adet</span>
+                <span class="mx-auto fw-bold">Stok: {{ productData.productCount }}</span>
               </div>
             </div>
             <div class="col">
               <button class="btn btn-orange w-100 fw-bold shadow-sm mt-4"
                       style="height: 55px; font-size: 1.1rem;"
-                      (click)="addProductToUserCart()">
-                <i class="bi bi-cart-plus me-2"></i>Sepete Ekle
+                      (click)="addProductToUserCart()"
+                      [disabled]="isOutOfStock">
+                <i class="bi bi-cart-plus me-2"></i>{{ isOutOfStock ? 'Tukendi' : 'Sepete Ekle' }}
               </button>
             </div>
           </div>
@@ -82,4 +83,5 @@
 
   </div>
 </div>
+
 

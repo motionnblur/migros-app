@@ -3,6 +3,7 @@ export interface IUserCartItemDto {
   productName: string;
   productPrice: number;
   productCount: number;
+  availableStock: number;
   productImageUrl?: string;
   deleteState?: boolean;
 }

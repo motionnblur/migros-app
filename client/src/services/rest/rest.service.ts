@@ -15,6 +15,7 @@ import { IUserProfileTable } from '../../interfaces/IUserProfileTable';
 import { IChatMessage } from '../../interfaces/IChatMessage';
 import { IUserOrderDetail } from '../../interfaces/IUserOrderDetail';
 import { IUserOrderGroup } from '../../interfaces/IUserOrderGroup';
+import { IProductPreview } from '../../interfaces/IProductPreview';
 
 @Injectable({
   providedIn: 'root',
@@ -246,7 +247,7 @@ export class RestService {
         params: { subcategoryName, page, productRange },
         responseType: 'json',
       })
-      .pipe(map((response) => response as IAdminProductPreview[]));
+      .pipe(map((response) => response as IProductPreview[]));
   }
   signUser(userSignDto: ISignDto) {
     return this.http
@@ -452,3 +453,6 @@ export class RestService {
       .pipe(map((response) => response as IUserOrderGroup[]));
   }
 }
+
+
+

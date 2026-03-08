@@ -9,4 +9,5 @@ public class ProductPreviewDto {
     private Long productId;
     private String productName;
     private float productPrice;
+    private int productCount;
 }

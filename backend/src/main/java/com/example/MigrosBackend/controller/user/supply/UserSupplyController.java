@@ -90,8 +90,9 @@ public class UserSupplyController {
     }
 
     @GetMapping("getProductData")
-    public ResponseEntity<List<UserCartItemDto>> getProductData() {
-        return ResponseEntity.ok(userSupplyService.getProductData());
+    public ResponseEntity<List<UserCartItemDto>> getProductData(
+            @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
+        return ResponseEntity.ok(userSupplyService.getProductData(authTokenResolver.requireToken(token)));
     }
 
     @GetMapping("getProductDataWithProductId")
@@ -150,3 +151,4 @@ public class UserSupplyController {
         return ResponseEntity.ok(userSupplyService.getUserOrderGroups(authTokenResolver.requireToken(token)));
     }
 }
+

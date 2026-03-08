@@ -38,6 +38,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -84,12 +85,16 @@ public class UserSupplyService {
     }
 
     public List<ProductPreviewDto> getProductsFromCategory(Long categoryId, int page, int itemRange) {
-        boolean b = categoryEntityRepository.existsById(categoryId);
-        if (!b) throw new CategoryNotFoundException(categoryId.toString());
+        boolean exists = categoryEntityRepository.existsById(categoryId);
+        if (!exists) {
+            throw new CategoryNotFoundException(categoryId.toString());
+        }
 
         Pageable pageable = PageRequest.of(page, itemRange);
-        Page<ProductEntity> entities = productEntityRepository.findByCategoryEntityId(categoryId, pageable);
-        if (entities.isEmpty()) throw new CategoryHasNoProductException(categoryId.toString());
+        Page<ProductEntity> entities = productEntityRepository.findByCategoryEntityIdAndProductCountGreaterThan(categoryId, 0, pageable);
+        if (entities.isEmpty()) {
+            throw new CategoryHasNoProductException(categoryId.toString());
+        }
 
         return entities.stream().map(itemEntity -> {
             ProductPreviewDto itemDto = new ProductPreviewDto();
@@ -100,6 +105,7 @@ public class UserSupplyService {
             } else {
                 itemDto.setProductPrice(itemEntity.getProductPrice());
             }
+            itemDto.setProductCount(itemEntity.getProductCount());
             return itemDto;
         }).collect(Collectors.toList());
     }
@@ -117,24 +123,27 @@ public class UserSupplyService {
             Resource resource = new UrlResource(Paths.get(filename).toUri());
             if (resource.exists() && resource.isReadable()) {
                 return resource;
-            } else {
-                throw new FileNotFoundException();
             }
+            throw new FileNotFoundException();
         } catch (Exception e) {
             throw new GeneralException("Error while loading image");
         }
     }
 
     public int getProductCountsFromCategory(Long categoryId) {
-        boolean b = categoryEntityRepository.existsById(categoryId);
-        if (!b) throw new CategoryNotFoundException(categoryId.toString());
-        return productEntityRepository.countByCategoryEntityId(categoryId);
+        boolean exists = categoryEntityRepository.existsById(categoryId);
+        if (!exists) {
+            throw new CategoryNotFoundException(categoryId.toString());
+        }
+        return productEntityRepository.countByCategoryEntityIdAndProductCountGreaterThan(categoryId, 0);
     }
 
     public List<SubCategoryDto> getSubCategories(Long categoryId) {
-        CategoryEntity categoryEntity = categoryEntityRepository.findById(categoryId).get();
+        CategoryEntity categoryEntity = categoryEntityRepository.findById(categoryId)
+                .orElseThrow(() -> new CategoryNotFoundException(categoryId.toString()));
 
         return categoryEntity.getItemEntities().stream()
+                .filter(itemEntity -> itemEntity.getProductCount() > 0)
                 .filter(itemEntity -> itemEntity.getSubcategoryName() != null && !itemEntity.getSubcategoryName().isEmpty())
                 .collect(Collectors.groupingBy(ProductEntity::getSubcategoryName, Collectors.counting()))
                 .entrySet().stream()
@@ -149,7 +158,7 @@ public class UserSupplyService {
 
     public List<ProductPreviewDto> getProductsFromSubcategory(String subcategoryName, int page, int productRange) {
         Pageable pageable = PageRequest.of(page, productRange);
-        Page<ProductEntity> entities = productEntityRepository.findBySubcategoryName(subcategoryName, pageable);
+        Page<ProductEntity> entities = productEntityRepository.findBySubcategoryNameAndProductCountGreaterThan(subcategoryName, 0, pageable);
         return entities.stream().map(itemEntity -> {
             ProductPreviewDto itemDto = new ProductPreviewDto();
             itemDto.setProductId(itemEntity.getId());
@@ -159,47 +168,89 @@ public class UserSupplyService {
             } else {
                 itemDto.setProductPrice(itemEntity.getProductPrice());
             }
+            itemDto.setProductCount(itemEntity.getProductCount());
             return itemDto;
         }).collect(Collectors.toList());
     }
 
     public int getProductCountsFromSubcategory(String subcategoryName) {
-        return productEntityRepository.countBySubcategoryName(subcategoryName);
+        return productEntityRepository.countBySubcategoryNameAndProductCountGreaterThan(subcategoryName, 0);
     }
 
     public void addProductToInventory(Long productId, String token) {
-        String userName = tokenService.extractUsername(token);
-        if (userName == null) throw new TokenNotFoundException();
-        UserEntity user = userEntityRepository.findByUserMail(userName);
+        UserEntity user = getValidatedUserFromToken(token);
+        ProductEntity product = productEntityRepository.findById(productId)
+                .orElseThrow(() -> new ProductNotFoundException(productId.toString()));
+
+        if (product.getProductCount() <= 0) {
+            throw new GeneralException("Product is out of stock.");
+        }
 
         if (user.getProductsIdsInCart() == null) {
             user.setProductsIdsInCart(new ArrayList<>());
         }
+
+        long currentCountInCart = user.getProductsIdsInCart().stream()
+                .filter(id -> id.equals(productId))
+                .count();
+
+        if (currentCountInCart >= product.getProductCount()) {
+            throw new GeneralException("You cannot add more than available stock.");
+        }
+
         user.getProductsIdsInCart().add(productId);
         userEntityRepository.save(user);
     }
 
-    public List<UserCartItemDto> getProductData() {
-        UserEntity user = userEntityRepository.findById(1L).orElseThrow(() -> new UserNotFoundException("User not found"));
-        List<Long> productIds = user.getProductsIdsInCart();
+    public List<UserCartItemDto> getProductData(String token) {
+        UserEntity user = getValidatedUserFromToken(token);
 
-        Map<Long, Long> productIdCounts = productIds.stream()
+        if (user.getProductsIdsInCart() == null || user.getProductsIdsInCart().isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        List<Long> originalProductIds = new ArrayList<>(user.getProductsIdsInCart());
+        Map<Long, Long> productIdCounts = originalProductIds.stream()
                 .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
 
         List<ProductEntity> productEntities = productEntityRepository.findAllById(productIdCounts.keySet());
         Map<Long, ProductEntity> productEntityMap = productEntities.stream()
                 .collect(Collectors.toMap(ProductEntity::getId, Function.identity()));
 
-        return productIdCounts.entrySet().stream()
-                .map(entry -> {
-                    ProductEntity productEntity = productEntityMap.get(entry.getKey());
-                    UserCartItemDto dto = new UserCartItemDto();
-                    dto.setProductId(productEntity.getId());
-                    dto.setProductName(productEntity.getProductName());
-                    dto.setProductPrice(productEntity.getProductPrice());
-                    dto.setProductCount(entry.getValue().intValue());
-                    return dto;
-                }).toList();
+        List<Long> normalizedCart = new ArrayList<>();
+        List<UserCartItemDto> cartItems = new ArrayList<>();
+
+        for (Map.Entry<Long, Long> entry : productIdCounts.entrySet()) {
+            ProductEntity productEntity = productEntityMap.get(entry.getKey());
+            if (productEntity == null || productEntity.getProductCount() <= 0) {
+                continue;
+            }
+
+            int requestedCount = entry.getValue().intValue();
+            int allowedCount = Math.min(requestedCount, productEntity.getProductCount());
+            if (allowedCount <= 0) {
+                continue;
+            }
+
+            for (int i = 0; i < allowedCount; i++) {
+                normalizedCart.add(productEntity.getId());
+            }
+
+            UserCartItemDto dto = new UserCartItemDto();
+            dto.setProductId(productEntity.getId());
+            dto.setProductName(productEntity.getProductName());
+            dto.setProductPrice(getEffectivePrice(productEntity));
+            dto.setProductCount(allowedCount);
+            dto.setAvailableStock(productEntity.getProductCount());
+            cartItems.add(dto);
+        }
+
+        if (!normalizedCart.equals(originalProductIds)) {
+            user.setProductsIdsInCart(normalizedCart);
+            userEntityRepository.save(user);
+        }
+
+        return cartItems;
     }
 
     public ProductDto2 getProductData(Long productId) {
@@ -218,49 +269,46 @@ public class UserSupplyService {
     }
 
     public void removeProductFromInventory(Long productId, String token) {
-        String userName = tokenService.extractUsername(token);
-        UserEntity user = userEntityRepository.findByUserMail(userName);
-        if (tokenService.validateToken(token, user.getUserMail())) {
-            if (user.getProductsIdsInCart() == null) {
-                user.setProductsIdsInCart(new ArrayList<>());
-            }
-            user.getProductsIdsInCart().removeAll(Collections.singleton(productId));
-            userEntityRepository.save(user);
-        } else {
-            throw new RuntimeException("Token not valid");
+        UserEntity user = getValidatedUserFromToken(token);
+
+        if (user.getProductsIdsInCart() == null) {
+            user.setProductsIdsInCart(new ArrayList<>());
         }
+
+        user.getProductsIdsInCart().removeAll(Collections.singleton(productId));
+        userEntityRepository.save(user);
     }
 
     public void updateProductCountInInventory(Long productId, int count, String token) {
-        if (count <= 0) throw new GeneralException("Count can not be negative or zero");
-
-        String userName = tokenService.extractUsername(token);
-        if (userName == null) throw new InvalidTokenException();
-
-        UserEntity user = userEntityRepository.findByUserMail(userName);
-        if (user == null) throw new UserNotFoundException(userName);
-
-        if (tokenService.validateToken(token, user.getUserMail())) {
-            if (user.getProductsIdsInCart() == null) {
-                user.setProductsIdsInCart(new ArrayList<>());
-            }
-            user.getProductsIdsInCart().removeAll(Collections.singleton(productId));
-            for (int i = 0; i < count; i++) {
-                user.getProductsIdsInCart().add(productId);
-            }
-            userEntityRepository.save(user);
-        } else {
-            throw new InvalidTokenException();
+        if (count <= 0) {
+            throw new GeneralException("Count can not be negative or zero");
         }
+
+        UserEntity user = getValidatedUserFromToken(token);
+        ProductEntity product = productEntityRepository.findById(productId)
+                .orElseThrow(() -> new ProductNotFoundException(productId.toString()));
+
+        if (product.getProductCount() <= 0) {
+            throw new GeneralException("Product is out of stock.");
+        }
+
+        if (count > product.getProductCount()) {
+            throw new GeneralException("You cannot add more than available stock.");
+        }
+
+        if (user.getProductsIdsInCart() == null) {
+            user.setProductsIdsInCart(new ArrayList<>());
+        }
+
+        user.getProductsIdsInCart().removeAll(Collections.singleton(productId));
+        for (int i = 0; i < count; i++) {
+            user.getProductsIdsInCart().add(productId);
+        }
+        userEntityRepository.save(user);
     }
 
     public List<Long> getAllOrderIds(String token) {
-        String userName = tokenService.extractUsername(token);
-        UserEntity user = userEntityRepository.findByUserMail(userName);
-
-        if (!tokenService.validateToken(token, user.getUserMail())) {
-            throw new InvalidTokenException();
-        }
+        UserEntity user = getValidatedUserFromToken(token);
 
         List<Long> ids = new ArrayList<>();
         ids.addAll(orderGroupEntityRepository.findByUserId(user.getId()).stream().map(OrderGroupEntity::getId).toList());
@@ -269,12 +317,7 @@ public class UserSupplyService {
     }
 
     public String getOrderStatusByOrderId(Long orderId, String token) {
-        String userName = tokenService.extractUsername(token);
-        UserEntity user = userEntityRepository.findByUserMail(userName);
-
-        if (!tokenService.validateToken(token, user.getUserMail())) {
-            throw new InvalidTokenException();
-        }
+        UserEntity user = getValidatedUserFromToken(token);
 
         OrderGroupEntity orderGroup = orderGroupEntityRepository.findByIdAndUserId(orderId, user.getId()).orElse(null);
         if (orderGroup != null) {
@@ -286,31 +329,42 @@ public class UserSupplyService {
         return legacyOrder.getStatus();
     }
 
+    @Transactional
     public void cancelOrder(Long orderId, String token) {
-        String userName = tokenService.extractUsername(token);
-        UserEntity user = userEntityRepository.findByUserMail(userName);
-
-        if (!tokenService.validateToken(token, user.getUserMail())) {
-            throw new InvalidTokenException();
-        }
+        UserEntity user = getValidatedUserFromToken(token);
 
         OrderGroupEntity orderGroup = orderGroupEntityRepository.findByIdAndUserId(orderId, user.getId()).orElse(null);
         if (orderGroup != null) {
-            orderGroup.getOrderItems().clear();
-            orderGroupEntityRepository.save(orderGroup);
+            if (!"Pending".equalsIgnoreCase(orderGroup.getStatus())) {
+                throw new GeneralException("Only pending orders can be canceled.");
+            }
+
+            List<OrderEntity> orderItems = new ArrayList<>(orderGroup.getOrderItems());
+            for (OrderEntity orderItem : orderItems) {
+                restockProduct(orderItem.getItemId(), orderItem.getCount());
+            }
+
+            orderEntityRepository.deleteAll(orderItems);
             orderGroupEntityRepository.delete(orderGroup);
             return;
         }
 
         OrderEntity legacyOrder = orderEntityRepository.findByIdAndUserId(orderId, user.getId())
                 .orElseThrow(() -> new GeneralException("Order not found"));
+
+        if (!"Pending".equalsIgnoreCase(legacyOrder.getStatus())) {
+            throw new GeneralException("Only pending orders can be canceled.");
+        }
+
+        restockProduct(legacyOrder.getItemId(), legacyOrder.getCount());
         orderEntityRepository.delete(legacyOrder);
     }
 
     public ProductDescriptionListDto getProductDescription(Long productId) {
         List<ProductDescriptionEntity> productDescriptionEntities = productDescriptionEntityRepository.findByProductEntityId(productId);
-        if (productDescriptionEntities == null)
+        if (productDescriptionEntities == null) {
             throw new ProductNotFoundException(productId.toString());
+        }
 
         ProductDescriptionListDto productDescriptionDto = new ProductDescriptionListDto();
         productDescriptionDto.setProductId(productId);
@@ -325,12 +379,7 @@ public class UserSupplyService {
     }
 
     public List<UserOrderDetailDto> getUserOrderDetails(String token) {
-        String userName = tokenService.extractUsername(token);
-        UserEntity user = userEntityRepository.findByUserMail(userName);
-
-        if (!tokenService.validateToken(token, user.getUserMail())) {
-            throw new InvalidTokenException();
-        }
+        UserEntity user = getValidatedUserFromToken(token);
 
         List<UserOrderDetailDto> result = new ArrayList<>();
 
@@ -381,12 +430,7 @@ public class UserSupplyService {
     }
 
     public List<UserOrderGroupDto> getUserOrderGroups(String token) {
-        String userName = tokenService.extractUsername(token);
-        UserEntity user = userEntityRepository.findByUserMail(userName);
-
-        if (!tokenService.validateToken(token, user.getUserMail())) {
-            throw new InvalidTokenException();
-        }
+        UserEntity user = getValidatedUserFromToken(token);
 
         List<UserOrderGroupDto> result = new ArrayList<>();
 
@@ -449,4 +493,44 @@ public class UserSupplyService {
         result.sort((a, b) -> Long.compare(b.getOrderGroupId(), a.getOrderGroupId()));
         return result;
     }
+
+
+
+    private float getEffectivePrice(ProductEntity product) {
+        float discount = product.getProductDiscount();
+        float price = product.getProductPrice();
+        if (discount <= 0) {
+            return price;
+        }
+        return price - (price * discount / 100);
+    }
+    private void restockProduct(Long productId, int amount) {
+        if (amount <= 0) {
+            return;
+        }
+
+        productEntityRepository.findById(productId).ifPresent(product -> {
+            product.setProductCount(product.getProductCount() + amount);
+            productEntityRepository.save(product);
+        });
+    }
+    private UserEntity getValidatedUserFromToken(String token) {
+        String userName = tokenService.extractUsername(token);
+        if (userName == null || userName.isBlank()) {
+            throw new TokenNotFoundException();
+        }
+
+        UserEntity user = userEntityRepository.findByUserMail(userName);
+        if (user == null) {
+            throw new UserNotFoundException(userName);
+        }
+
+        if (!tokenService.validateToken(token, user.getUserMail())) {
+            throw new InvalidTokenException();
+        }
+
+        return user;
+    }
 }
+
+

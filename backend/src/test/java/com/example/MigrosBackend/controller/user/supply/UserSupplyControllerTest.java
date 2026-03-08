@@ -276,9 +276,11 @@ class UserSupplyControllerTest {
 
         List<UserCartItemDto> cartItems = List.of(item1, item2);
 
-        when(userSupplyService.getProductData()).thenReturn(cartItems);
+        when(authTokenResolver.requireToken(SESSION_TOKEN)).thenReturn(SESSION_TOKEN);
+        when(userSupplyService.getProductData(SESSION_TOKEN)).thenReturn(cartItems);
 
         mockMvc.perform(get("/user/supply/getProductData")
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, SESSION_TOKEN))
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.size()").value(2))
@@ -289,7 +291,7 @@ class UserSupplyControllerTest {
                 .andExpect(jsonPath("$[1].productId").value(102))
                 .andExpect(jsonPath("$[1].productName").value("Bread"));
 
-        verify(userSupplyService, times(1)).getProductData();
+        verify(userSupplyService, times(1)).getProductData(SESSION_TOKEN);
     }
 
     @Test
@@ -419,3 +421,5 @@ class UserSupplyControllerTest {
                 .andExpect(jsonPath("$[0].orderGroupId").value(10));
     }
 }
+
+

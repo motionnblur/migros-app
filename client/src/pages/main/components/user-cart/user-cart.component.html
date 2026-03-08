@@ -13,7 +13,7 @@
   <div class="card-body p-0">
     <div *ngIf="items.length === 0" class="text-center py-5 text-muted">
       <i class="bi bi-cart-x fs-1 d-block mb-2"></i>
-      Sepetiniz henüz boş.
+      Sepetiniz henuz bos.
     </div>
 
     <div *ngFor="let item of items; let i = index" class="cart-item p-3 border-bottom">
@@ -30,6 +30,9 @@
             {{ item.productName }}
           </div>
           <div class="text-orange fw-bold fs-5">{{ item.productPrice }} TL</div>
+          <div class="small" [ngClass]="item.availableStock > 0 ? 'text-success' : 'text-danger'">
+            Stok: {{ item.availableStock }}
+          </div>
         </div>
 
         <div class="col-auto">
@@ -43,12 +46,12 @@
         <div class="col d-flex justify-content-end">
           <div class="input-group input-group-sm" style="width: 140px;">
             <button class="btn btn-orange" (click)="decreaseProductCount(item.productId)">
-              <i class="bi" [ngClass]="item.deleteState ? 'bi-trash' : 'bi-dash-lg'"></i>
+              <i class="bi bi-dash-lg"></i>
             </button>
             <span class="input-group-text bg-white border-top border-bottom flex-grow-1 justify-content-center fw-bold">
               {{ item.productCount }}
             </span>
-            <button class="btn btn-orange" (click)="increaseProductCount(item.productId)">
+            <button class="btn btn-orange" [disabled]="item.productCount >= item.availableStock" (click)="increaseProductCount(item.productId)">
               <i class="bi bi-plus-lg"></i>
             </button>
           </div>
@@ -68,7 +71,7 @@
       class="btn btn-orange w-100 py-3 fw-bold shadow-sm"
       [disabled]="items.length === 0"
       (click)="openPaymentComponent()">
-      {{ items.length > 0 ? (isCartConfirmed ? 'Siparişi Tamamla' : 'Sepeti Onayla') : 'Sepet Boş' }}
+      {{ items.length > 0 ? (isCartConfirmed ? 'Siparisi Tamamla' : 'Sepeti Onayla') : 'Sepet Bos' }}
     </button>
   </div>
 

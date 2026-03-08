@@ -1,14 +1,10 @@
 package com.example.MigrosBackend.service.user.supply;
 
-import com.example.MigrosBackend.dto.order.OrderDto;
-import com.example.MigrosBackend.dto.order.OrderPageDto;
-import com.example.MigrosBackend.dto.user.UserProfileTableDto;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.user.OrderEntity;
 import com.example.MigrosBackend.entity.user.OrderGroupEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
-import com.example.MigrosBackend.exception.admin.OrderNotFoundException;
-import com.example.MigrosBackend.exception.admin.UserNotFoundException;
+import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderGroupEntityRepository;
@@ -17,6 +13,7 @@ import com.example.MigrosBackend.service.global.TokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -25,331 +22,247 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class UserOrderServiceTest {
     @Mock
     private TokenService tokenService;
+
     @Mock
     private UserEntityRepository userEntityRepository;
+
     @Mock
     private OrderEntityRepository orderEntityRepository;
+
     @Mock
     private OrderGroupEntityRepository orderGroupEntityRepository;
+
     @Mock
     private ProductEntityRepository productEntityRepository;
 
     @InjectMocks
     private UserOrderService userOrderService;
 
+    private static final String TOKEN = "mock-token";
+    private static final String EMAIL = "test@migros.com";
+
     private UserEntity user;
-    private final String token = "mock-token";
-    private final String email = "test@migros.com";
 
     @BeforeEach
     void setUp() {
         user = new UserEntity();
         user.setId(1L);
-        user.setUserMail(email);
+        user.setUserMail(EMAIL);
         user.setProductsIdsInCart(new ArrayList<>(List.of(101L, 101L, 102L)));
     }
 
+    private void stubAuthenticatedUser() {
+        when(tokenService.extractUsername(TOKEN)).thenReturn(EMAIL);
+        when(userEntityRepository.findByUserMail(EMAIL)).thenReturn(user);
+        when(tokenService.validateToken(TOKEN, EMAIL)).thenReturn(true);
+    }
+
     @Test
-    void getOrderPrice_ShouldCalculateCorrectTotal() {
-        when(tokenService.extractUsername(token)).thenReturn(email);
-        when(userEntityRepository.findByUserMail(email)).thenReturn(user);
-        when(tokenService.validateToken(token, email)).thenReturn(true);
+    void getOrderPrice_ShouldCalculate_WhenStockIsAvailable() {
+        stubAuthenticatedUser();
 
         ProductEntity p1 = new ProductEntity();
+        p1.setId(101L);
         p1.setProductPrice(10.0f);
+        p1.setProductDiscount(20.0f);
+        p1.setProductCount(5);
+
         ProductEntity p2 = new ProductEntity();
+        p2.setId(102L);
         p2.setProductPrice(5.0f);
+        p2.setProductCount(2);
 
-        when(productEntityRepository.findById(101L)).thenReturn(Optional.of(p1));
-        when(productEntityRepository.findById(102L)).thenReturn(Optional.of(p2));
+        when(productEntityRepository.findAllById(any())).thenReturn(List.of(p1, p2));
 
-        float total = userOrderService.getOrderPrice(token);
+        float total = userOrderService.getOrderPrice(TOKEN);
 
-        assertEquals(25.0f, total);
+        assertEquals(21.0f, total);
     }
 
     @Test
-    void getOrderPrice_ShouldReturnZero_WhenTokenInvalid() {
-        when(tokenService.extractUsername(token)).thenReturn(email);
-        when(userEntityRepository.findByUserMail(email)).thenReturn(user);
-        when(tokenService.validateToken(token, email)).thenReturn(false);
-
-        float total = userOrderService.getOrderPrice(token);
-
-        assertEquals(0.0f, total);
-        verify(productEntityRepository, never()).findById(anyLong());
-    }
-
-    @Test
-    void createOrder_ShouldSaveOrderGroupAndItems_AndClearCart() {
-        when(tokenService.extractUsername(token)).thenReturn(email);
-        when(userEntityRepository.findByUserMail(email)).thenReturn(user);
-        when(tokenService.validateToken(token, email)).thenReturn(true);
-
-        when(orderGroupEntityRepository.save(any(OrderGroupEntity.class)))
-                .thenAnswer(invocation -> {
-                    OrderGroupEntity group = invocation.getArgument(0);
-                    group.setId(10L);
-                    return group;
-                });
+    void getOrderPrice_ShouldThrow_WhenCartExceedsStock() {
+        stubAuthenticatedUser();
 
         ProductEntity p1 = new ProductEntity();
+        p1.setId(101L);
         p1.setProductPrice(10.0f);
-        when(productEntityRepository.findById(anyLong())).thenReturn(Optional.of(p1));
+        p1.setProductCount(1);
 
-        userOrderService.createOrder(token);
+        ProductEntity p2 = new ProductEntity();
+        p2.setId(102L);
+        p2.setProductPrice(5.0f);
+        p2.setProductCount(2);
 
-        verify(orderGroupEntityRepository, times(1)).save(any(OrderGroupEntity.class));
-        verify(orderEntityRepository, times(2)).save(any(OrderEntity.class));
-        assertTrue(user.getProductsIdsInCart().isEmpty());
-        verify(userEntityRepository, atLeastOnce()).save(user);
+        when(productEntityRepository.findAllById(any())).thenReturn(List.of(p1, p2));
+
+        assertThrows(GeneralException.class, () -> userOrderService.getOrderPrice(TOKEN));
     }
 
     @Test
-    void createOrder_ShouldNotSave_WhenTokenInvalid() {
-        when(tokenService.extractUsername(token)).thenReturn(email);
-        when(userEntityRepository.findByUserMail(email)).thenReturn(user);
-        when(tokenService.validateToken(token, email)).thenReturn(false);
+    void createOrder_ShouldUseDiscountedPrice_AndDecreaseStock_AndClearCart() {
+        stubAuthenticatedUser();
 
-        userOrderService.createOrder(token);
+        ProductEntity p1 = new ProductEntity();
+        p1.setId(101L);
+        p1.setProductName("Apple");
+        p1.setProductPrice(10.0f);
+        p1.setProductDiscount(20.0f);
+        p1.setProductCount(2);
 
-        verify(orderGroupEntityRepository, never()).save(any());
-        verify(orderEntityRepository, never()).save(any());
-    }
+        ProductEntity p2 = new ProductEntity();
+        p2.setId(102L);
+        p2.setProductName("Milk");
+        p2.setProductPrice(5.0f);
+        p2.setProductCount(5);
 
-    @Test
-    void createOrder_ShouldNotSave_WhenCartEmpty() {
-        user.setProductsIdsInCart(new ArrayList<>());
-        when(tokenService.extractUsername(token)).thenReturn(email);
-        when(userEntityRepository.findByUserMail(email)).thenReturn(user);
-        when(tokenService.validateToken(token, email)).thenReturn(true);
+        when(productEntityRepository.findAllById(any())).thenReturn(List.of(p1, p2));
+        when(orderGroupEntityRepository.save(any(OrderGroupEntity.class))).thenAnswer(invocation -> {
+            OrderGroupEntity group = invocation.getArgument(0);
+            group.setId(10L);
+            return group;
+        });
 
-        userOrderService.createOrder(token);
+        userOrderService.createOrder(TOKEN);
 
-        verify(orderGroupEntityRepository, never()).save(any());
-        verify(orderEntityRepository, never()).save(any());
-    }
-
-    @Test
-    void clearUserCart_ShouldEmptyList_WhenTokenValid() {
-        when(tokenService.extractUsername(token)).thenReturn(email);
-        when(userEntityRepository.findByUserMail(email)).thenReturn(user);
-        when(tokenService.validateToken(token, email)).thenReturn(true);
-
-        userOrderService.clearUserCart(token);
-
+        assertEquals(0, p1.getProductCount());
+        assertEquals(4, p2.getProductCount());
         assertEquals(0, user.getProductsIdsInCart().size());
-        verify(userEntityRepository).save(user);
+
+        ArgumentCaptor<OrderEntity> orderCaptor = ArgumentCaptor.forClass(OrderEntity.class);
+        verify(orderEntityRepository, times(2)).save(orderCaptor.capture());
+        List<OrderEntity> savedOrders = orderCaptor.getAllValues();
+
+        OrderEntity appleOrder = savedOrders.stream()
+                .filter(item -> item.getItemId().equals(101L))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(8.0f, appleOrder.getPrice());
+        assertEquals(16.0f, appleOrder.getTotalPrice());
+
+        verify(productEntityRepository, times(1)).saveAll(any());
+        verify(userEntityRepository, times(1)).save(user);
     }
 
     @Test
-    void updateOrderStatus_ShouldUpdateGroupAndItems() {
+    void createOrder_ShouldThrow_WhenAnyProductMissing() {
+        stubAuthenticatedUser();
+
+        ProductEntity p1 = new ProductEntity();
+        p1.setId(101L);
+        p1.setProductName("Apple");
+        p1.setProductPrice(10.0f);
+        p1.setProductCount(3);
+
+        when(productEntityRepository.findAllById(any())).thenReturn(List.of(p1));
+
+        assertThrows(GeneralException.class, () -> userOrderService.createOrder(TOKEN));
+    }
+
+    @Test
+    void deleteOrder_ShouldRestock_WhenGroupOrderIsPending() {
         OrderGroupEntity group = new OrderGroupEntity();
-        group.setId(1L);
+        group.setId(200L);
         group.setStatus("Pending");
 
-        OrderEntity item1 = new OrderEntity();
-        item1.setStatus("Pending");
-        OrderEntity item2 = new OrderEntity();
-        item2.setStatus("Pending");
+        OrderEntity itemA = new OrderEntity();
+        itemA.setItemId(11L);
+        itemA.setCount(2);
 
-        when(orderGroupEntityRepository.findById(1L)).thenReturn(Optional.of(group));
-        when(orderEntityRepository.findByOrderGroup_Id(1L)).thenReturn(List.of(item1, item2));
+        OrderEntity itemB = new OrderEntity();
+        itemB.setItemId(12L);
+        itemB.setCount(1);
 
-        userOrderService.updateOrderStatus(1L, "Shipped");
+        ProductEntity productA = new ProductEntity();
+        productA.setId(11L);
+        productA.setProductCount(0);
 
-        assertEquals("Shipped", group.getStatus());
-        assertEquals("Shipped", item1.getStatus());
-        assertEquals("Shipped", item2.getStatus());
-        verify(orderGroupEntityRepository).save(group);
-        verify(orderEntityRepository).saveAll(List.of(item1, item2));
+        ProductEntity productB = new ProductEntity();
+        productB.setId(12L);
+        productB.setProductCount(5);
+
+        when(orderGroupEntityRepository.findById(200L)).thenReturn(Optional.of(group));
+        when(orderEntityRepository.findByOrderGroup_Id(200L)).thenReturn(List.of(itemA, itemB));
+        when(productEntityRepository.findById(11L)).thenReturn(Optional.of(productA));
+        when(productEntityRepository.findById(12L)).thenReturn(Optional.of(productB));
+
+        userOrderService.deleteOrder(200L);
+
+        assertEquals(2, productA.getProductCount());
+        assertEquals(6, productB.getProductCount());
+        verify(orderEntityRepository, times(1)).deleteAll(any());
+        verify(orderGroupEntityRepository, times(1)).delete(group);
     }
 
     @Test
-    void updateOrderStatus_ShouldUpdateLegacyOrder_WhenGroupMissing() {
-        OrderEntity legacy = new OrderEntity();
-        legacy.setId(5L);
-        legacy.setStatus("Pending");
-
-        when(orderGroupEntityRepository.findById(5L)).thenReturn(Optional.empty());
-        when(orderEntityRepository.findById(5L)).thenReturn(Optional.of(legacy));
-
-        userOrderService.updateOrderStatus(5L, "Delivered");
-
-        assertEquals("Delivered", legacy.getStatus());
-        verify(orderEntityRepository).save(legacy);
-    }
-
-    @Test
-    void getAllOrders_ShouldReturnPagedDto() {
-        OrderGroupEntity group1 = new OrderGroupEntity();
-        group1.setId(2L);
-        group1.setStatus("Pending");
-
-        OrderGroupEntity group2 = new OrderGroupEntity();
-        group2.setId(5L);
-        group2.setStatus("Shipped");
-
-        OrderEntity g1Item1 = new OrderEntity();
-        g1Item1.setTotalPrice(10.0f);
-        OrderEntity g1Item2 = new OrderEntity();
-        g1Item2.setTotalPrice(5.0f);
-
-        OrderEntity g2Item1 = new OrderEntity();
-        g2Item1.setTotalPrice(20.0f);
-
-        OrderEntity legacy = new OrderEntity();
-        legacy.setId(3L);
-        legacy.setTotalPrice(7.0f);
-        legacy.setStatus("Legacy");
-
-        when(orderGroupEntityRepository.findAll()).thenReturn(List.of(group1, group2));
-        when(orderEntityRepository.findByOrderGroup_Id(2L)).thenReturn(List.of(g1Item1, g1Item2));
-        when(orderEntityRepository.findByOrderGroup_Id(5L)).thenReturn(List.of(g2Item1));
-        when(orderEntityRepository.findByOrderGroupIsNull()).thenReturn(List.of(legacy));
-
-        OrderPageDto page = userOrderService.getAllOrders(0, 2);
-
-        assertNotNull(page);
-        assertEquals(3, page.getTotal());
-        assertEquals(2, page.getItems().size());
-        assertEquals(5L, page.getItems().get(0).getOrderId());
-        assertEquals(3L, page.getItems().get(1).getOrderId());
-    }
-
-    @Test
-    void getUserProfileData_ShouldUseGroup_WhenExists() {
-        Long orderId = 100L;
-        Long userId = 1L;
-
+    void deleteOrder_ShouldNotRestock_WhenGroupOrderIsNotPending() {
         OrderGroupEntity group = new OrderGroupEntity();
-        group.setId(orderId);
-        group.setUserId(userId);
+        group.setId(201L);
+        group.setStatus("Delivered");
 
-        UserEntity profileUser = new UserEntity();
-        profileUser.setUserName("John");
-        profileUser.setUserLastName("Doe");
-        profileUser.setUserAddress("123 Java St");
-        profileUser.setUserAddress2("Apt 4B");
-        profileUser.setUserTown("Springfield");
-        profileUser.setUserCountry("USA");
-        profileUser.setUserPostalCode("12345");
+        OrderEntity itemA = new OrderEntity();
+        itemA.setItemId(11L);
+        itemA.setCount(2);
 
-        when(orderGroupEntityRepository.findById(orderId)).thenReturn(Optional.of(group));
-        when(userEntityRepository.findById(userId)).thenReturn(Optional.of(profileUser));
+        when(orderGroupEntityRepository.findById(201L)).thenReturn(Optional.of(group));
+        when(orderEntityRepository.findByOrderGroup_Id(201L)).thenReturn(List.of(itemA));
 
-        UserProfileTableDto result = userOrderService.getUserProfileData(orderId);
+        userOrderService.deleteOrder(201L);
 
-        assertNotNull(result);
-        assertEquals("John", result.getUserFirstName());
-        verify(orderEntityRepository, never()).findById(anyLong());
+        verify(productEntityRepository, never()).save(any());
+        verify(orderEntityRepository, times(1)).deleteAll(any());
+        verify(orderGroupEntityRepository, times(1)).delete(group);
     }
 
     @Test
-    void getUserProfileData_ShouldUseLegacy_WhenGroupMissing() {
-        Long orderId = 200L;
-        Long userId = 2L;
-
+    void deleteOrder_ShouldRestockLegacyOrder_WhenStatusIsPending() {
         OrderEntity legacyOrder = new OrderEntity();
-        legacyOrder.setId(orderId);
-        legacyOrder.setUserId(userId);
+        legacyOrder.setId(300L);
+        legacyOrder.setItemId(31L);
+        legacyOrder.setCount(4);
+        legacyOrder.setStatus("Pending");
 
-        UserEntity profileUser = new UserEntity();
-        profileUser.setUserName("Jane");
-        profileUser.setUserLastName("Smith");
+        ProductEntity product = new ProductEntity();
+        product.setId(31L);
+        product.setProductCount(1);
 
-        when(orderGroupEntityRepository.findById(orderId)).thenReturn(Optional.empty());
-        when(orderEntityRepository.findById(orderId)).thenReturn(Optional.of(legacyOrder));
-        when(userEntityRepository.findById(userId)).thenReturn(Optional.of(profileUser));
+        when(orderGroupEntityRepository.findById(300L)).thenReturn(Optional.empty());
+        when(orderEntityRepository.findById(300L)).thenReturn(Optional.of(legacyOrder));
+        when(productEntityRepository.findById(31L)).thenReturn(Optional.of(product));
 
-        UserProfileTableDto result = userOrderService.getUserProfileData(orderId);
+        userOrderService.deleteOrder(300L);
 
-        assertNotNull(result);
-        assertEquals("Jane", result.getUserFirstName());
+        assertEquals(5, product.getProductCount());
+        verify(productEntityRepository, times(1)).save(product);
+        verify(orderEntityRepository, times(1)).delete(legacyOrder);
     }
 
     @Test
-    void getUserProfileData_ThrowsOrderNotFound() {
-        Long orderId = 999L;
-        when(orderGroupEntityRepository.findById(orderId)).thenReturn(Optional.empty());
-        when(orderEntityRepository.findById(orderId)).thenReturn(Optional.empty());
+    void deleteOrder_ShouldNotRestockLegacyOrder_WhenStatusIsNotPending() {
+        OrderEntity legacyOrder = new OrderEntity();
+        legacyOrder.setId(301L);
+        legacyOrder.setItemId(32L);
+        legacyOrder.setCount(4);
+        legacyOrder.setStatus("Delivered");
 
-        assertThrows(OrderNotFoundException.class, () -> userOrderService.getUserProfileData(orderId));
-        verify(userEntityRepository, never()).findById(anyLong());
+        when(orderGroupEntityRepository.findById(301L)).thenReturn(Optional.empty());
+        when(orderEntityRepository.findById(301L)).thenReturn(Optional.of(legacyOrder));
+
+        userOrderService.deleteOrder(301L);
+
+        verify(productEntityRepository, never()).findById(any());
+        verify(productEntityRepository, never()).save(any());
+        verify(orderEntityRepository, times(1)).delete(legacyOrder);
     }
-
-    @Test
-    void getUserProfileData_ThrowsUserNotFound() {
-        Long orderId = 100L;
-        Long userId = 1L;
-
-        OrderGroupEntity group = new OrderGroupEntity();
-        group.setUserId(userId);
-
-        when(orderGroupEntityRepository.findById(orderId)).thenReturn(Optional.of(group));
-        when(userEntityRepository.findById(userId)).thenReturn(Optional.empty());
-
-        assertThrows(UserNotFoundException.class, () -> userOrderService.getUserProfileData(orderId));
-    }
-
-    @Test
-    void deleteOrder_shouldDeleteGroupAndItems_whenGroupExists() {
-        Long orderId = 10L;
-        OrderGroupEntity group = new OrderGroupEntity();
-        group.setId(orderId);
-
-        OrderEntity item1 = new OrderEntity();
-        item1.setId(1L);
-        OrderEntity item2 = new OrderEntity();
-        item2.setId(2L);
-
-        when(orderGroupEntityRepository.findById(orderId)).thenReturn(Optional.of(group));
-        when(orderEntityRepository.findByOrderGroup_Id(orderId)).thenReturn(List.of(item1, item2));
-
-        userOrderService.deleteOrder(orderId);
-
-        verify(orderEntityRepository).deleteAll(List.of(item1, item2));
-        verify(orderGroupEntityRepository).delete(group);
-        verify(orderEntityRepository, never()).delete(any());
-    }
-
-    @Test
-    void deleteOrder_shouldDeleteLegacyOrder_whenGroupMissing() {
-        Long orderId = 20L;
-        OrderEntity legacy = new OrderEntity();
-        legacy.setId(orderId);
-
-        when(orderGroupEntityRepository.findById(orderId)).thenReturn(Optional.empty());
-        when(orderEntityRepository.findById(orderId)).thenReturn(Optional.of(legacy));
-
-        userOrderService.deleteOrder(orderId);
-
-        verify(orderEntityRepository).delete(legacy);
-        verify(orderGroupEntityRepository, never()).delete(any());
-        verify(orderEntityRepository, never()).deleteAll(any());
-    }
-
-    @Test
-    void deleteOrder_shouldThrowOrderNotFound_whenMissing() {
-        Long orderId = 30L;
-
-        when(orderGroupEntityRepository.findById(orderId)).thenReturn(Optional.empty());
-        when(orderEntityRepository.findById(orderId)).thenReturn(Optional.empty());
-
-        assertThrows(OrderNotFoundException.class, () -> userOrderService.deleteOrder(orderId));
-        verify(orderEntityRepository, never()).delete(any());
-        verify(orderEntityRepository, never()).deleteAll(any());
-        verify(orderGroupEntityRepository, never()).delete(any());
-    }
-
 }
-

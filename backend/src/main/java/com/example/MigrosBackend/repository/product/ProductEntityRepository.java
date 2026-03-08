@@ -9,9 +9,14 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface ProductEntityRepository extends JpaRepository<ProductEntity, Long> {
     ProductEntity findByProductName(String productName);
-    Page<ProductEntity> findByCategoryEntityId(Long categoryId, Pageable pageable);
+
+    Page<ProductEntity> findByCategoryEntityIdAndProductCountGreaterThan(Long categoryId, int productCount, Pageable pageable);
+
     Page<ProductEntity> findByAdminEntityId(Long adminId, Pageable pageable);
-    Page<ProductEntity> findBySubcategoryName(String subcategoryName, Pageable pageable);
-    int countByCategoryEntityId(Long categoryId);
-    int countBySubcategoryName(String subcategoryName);
+
+    Page<ProductEntity> findBySubcategoryNameAndProductCountGreaterThan(String subcategoryName, int productCount, Pageable pageable);
+
+    int countByCategoryEntityIdAndProductCountGreaterThan(Long categoryId, int productCount);
+
+    int countBySubcategoryNameAndProductCountGreaterThan(String subcategoryName, int productCount);
 }
