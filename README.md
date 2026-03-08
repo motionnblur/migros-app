@@ -101,6 +101,12 @@ To start the development server, just type the command below in your favorite te
 docker compose --env-file configs/postgres.env --env-file configs/spring.env up
 ```
 
+After startup:
+* Client UI: http://localhost:5000
+* API entrypoint (Nginx reverse proxy + rate limiting): http://localhost:8080
+
+Nginx now applies per-IP throttling before requests reach Spring Boot (including stricter limits for login, payment, and support send endpoints) and returns HTTP 429 when limits are exceeded.
+
 ## :camera: Screenshots
 
 * Current code coverage

@@ -13,8 +13,9 @@ services:
     build: backend/
     depends_on:
       - postgres
+    expose:
+      - "8080"
     ports:
-      - "8080:8080"
       - "5005:5005"
     environment:
       - SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL}
@@ -22,6 +23,15 @@ services:
       - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
     volumes:
       - ./backend:/App
+  nginx:
+    image: nginx:1.27-alpine
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+    volumes:
+      - ./configs/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./configs/nginx/proxy-common.inc:/etc/nginx/conf.d/proxy-common.inc:ro
   postgres:
     image: postgres:18.3-alpine3.22
     restart: always
