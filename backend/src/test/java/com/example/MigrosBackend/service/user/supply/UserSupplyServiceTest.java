@@ -1,13 +1,18 @@
 package com.example.MigrosBackend.service.user.supply;
 
+import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionListDto;
+import com.example.MigrosBackend.dto.user.order.UserOrderDetailDto;
+import com.example.MigrosBackend.dto.user.order.UserOrderGroupDto;
 import com.example.MigrosBackend.dto.user.category.SubCategoryDto;
 import com.example.MigrosBackend.dto.user.product.ProductPreviewDto;
 import com.example.MigrosBackend.dto.user.product.UserCartItemDto;
 import com.example.MigrosBackend.entity.category.CategoryEntity;
+import com.example.MigrosBackend.entity.product.ProductDescriptionEntity;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.user.OrderEntity;
 import com.example.MigrosBackend.entity.user.OrderGroupEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
+import com.example.MigrosBackend.exception.admin.ProductNotFoundException;
 import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.repository.category.CategoryEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductDescriptionEntityRepository;
@@ -26,6 +31,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -255,4 +261,172 @@ class UserSupplyServiceTest {
         verify(orderEntityRepository, never()).deleteAll(any());
         verify(orderGroupEntityRepository, never()).delete(any());
     }
+    @Test
+    void getProductDescription_ShouldMapAllDescriptions() {
+        ProductDescriptionEntity first = new ProductDescriptionEntity();
+        first.setId(100L);
+        first.setDescriptionTabName("Ingredients");
+        first.setDescriptionTabContent("Milk, sugar");
+
+        ProductDescriptionEntity second = new ProductDescriptionEntity();
+        second.setId(101L);
+        second.setDescriptionTabName("Storage");
+        second.setDescriptionTabContent("Keep refrigerated");
+
+        when(productDescriptionEntityRepository.findByProductEntityId(55L)).thenReturn(List.of(first, second));
+
+        ProductDescriptionListDto result = userSupplyService.getProductDescription(55L);
+
+        assertEquals(55L, result.getProductId());
+        assertEquals(2, result.getDescriptionList().size());
+        assertEquals(100L, result.getDescriptionList().get(0).getDescriptionId());
+        assertEquals("Ingredients", result.getDescriptionList().get(0).getDescriptionTabName());
+        assertEquals("Milk, sugar", result.getDescriptionList().get(0).getDescriptionTabContent());
+        assertEquals(101L, result.getDescriptionList().get(1).getDescriptionId());
+        assertEquals("Storage", result.getDescriptionList().get(1).getDescriptionTabName());
+    }
+
+    @Test
+    void getProductDescription_ShouldReturnEmptyList_WhenNoDescriptionsExist() {
+        when(productDescriptionEntityRepository.findByProductEntityId(56L)).thenReturn(List.of());
+
+        ProductDescriptionListDto result = userSupplyService.getProductDescription(56L);
+
+        assertEquals(56L, result.getProductId());
+        assertEquals(0, result.getDescriptionList().size());
+    }
+
+    @Test
+    void getProductDescription_ShouldThrow_WhenRepositoryReturnsNull() {
+        when(productDescriptionEntityRepository.findByProductEntityId(57L)).thenReturn(null);
+
+        assertThrows(ProductNotFoundException.class, () -> userSupplyService.getProductDescription(57L));
+    }
+
+    @Test
+    void getUserOrderDetails_ShouldReturnEmpty_WhenUserHasNoOrders() {
+        stubAuthenticatedUser();
+        when(orderGroupEntityRepository.findByUserId(user.getId())).thenReturn(List.of());
+        when(orderEntityRepository.findByUserIdAndOrderGroupIsNull(user.getId())).thenReturn(List.of());
+
+        List<UserOrderDetailDto> result = userSupplyService.getUserOrderDetails(TOKEN);
+
+        assertEquals(0, result.size());
+        verify(productEntityRepository, never()).findAllById(any());
+    }
+
+    @Test
+    void getUserOrderDetails_ShouldIncludeGroupedAndLegacyOrders_AndFallbackMissingProductName() {
+        stubAuthenticatedUser();
+
+        OrderEntity groupedOrder = new OrderEntity();
+        groupedOrder.setId(201L);
+        groupedOrder.setItemId(5001L);
+        groupedOrder.setCount(2);
+        groupedOrder.setPrice(12.5f);
+        groupedOrder.setTotalPrice(25f);
+
+        OrderGroupEntity group = new OrderGroupEntity();
+        group.setId(900L);
+        group.setStatus("Delivered");
+        group.setOrderItems(List.of(groupedOrder));
+
+        OrderEntity legacyOrder = new OrderEntity();
+        legacyOrder.setId(202L);
+        legacyOrder.setItemId(5002L);
+        legacyOrder.setCount(1);
+        legacyOrder.setPrice(5f);
+        legacyOrder.setTotalPrice(5f);
+        legacyOrder.setStatus("Pending");
+
+        ProductEntity existingProduct = new ProductEntity();
+        existingProduct.setId(5001L);
+        existingProduct.setProductName("Yogurt");
+
+        when(orderGroupEntityRepository.findByUserId(user.getId())).thenReturn(List.of(group));
+        when(orderEntityRepository.findByUserIdAndOrderGroupIsNull(user.getId())).thenReturn(List.of(legacyOrder));
+        when(productEntityRepository.findAllById(any())).thenReturn(List.of(existingProduct));
+
+        List<UserOrderDetailDto> result = userSupplyService.getUserOrderDetails(TOKEN);
+
+        assertEquals(2, result.size());
+
+        UserOrderDetailDto first = result.get(0);
+        assertEquals(201L, first.getOrderId());
+        assertEquals(5001L, first.getProductId());
+        assertEquals("Yogurt", first.getProductName());
+        assertEquals("Delivered", first.getStatus());
+
+        UserOrderDetailDto second = result.get(1);
+        assertEquals(202L, second.getOrderId());
+        assertEquals(5002L, second.getProductId());
+        assertEquals("", second.getProductName());
+        assertEquals("Pending", second.getStatus());
+    }
+
+    @Test
+    void getUserOrderGroups_ShouldReturnEmpty_WhenUserHasNoOrders() {
+        stubAuthenticatedUser();
+        when(orderGroupEntityRepository.findByUserId(user.getId())).thenReturn(List.of());
+        when(orderEntityRepository.findByUserIdAndOrderGroupIsNull(user.getId())).thenReturn(List.of());
+
+        List<UserOrderGroupDto> result = userSupplyService.getUserOrderGroups(TOKEN);
+
+        assertEquals(0, result.size());
+        verify(productEntityRepository, never()).findAllById(any());
+    }
+
+    @Test
+    void getUserOrderGroups_ShouldSortDesc_AndMapGroupAndLegacyItems() {
+        stubAuthenticatedUser();
+
+        OrderEntity groupOrder = new OrderEntity();
+        groupOrder.setId(3001L);
+        groupOrder.setItemId(7001L);
+        groupOrder.setCount(1);
+        groupOrder.setPrice(8f);
+        groupOrder.setTotalPrice(8f);
+
+        OrderGroupEntity orderGroup = new OrderGroupEntity();
+        orderGroup.setId(10L);
+        orderGroup.setStatus("Shipped");
+        orderGroup.setCreatedAt(LocalDateTime.of(2026, 1, 1, 12, 0));
+        orderGroup.setOrderItems(List.of(groupOrder));
+
+        OrderEntity legacyOrder = new OrderEntity();
+        legacyOrder.setId(20L);
+        legacyOrder.setItemId(7002L);
+        legacyOrder.setCount(3);
+        legacyOrder.setPrice(2f);
+        legacyOrder.setTotalPrice(6f);
+        legacyOrder.setStatus("Pending");
+
+        ProductEntity product = new ProductEntity();
+        product.setId(7001L);
+        product.setProductName("Bread");
+
+        when(orderGroupEntityRepository.findByUserId(user.getId())).thenReturn(List.of(orderGroup));
+        when(orderEntityRepository.findByUserIdAndOrderGroupIsNull(user.getId())).thenReturn(List.of(legacyOrder));
+        when(productEntityRepository.findAllById(any())).thenReturn(List.of(product));
+
+        List<UserOrderGroupDto> result = userSupplyService.getUserOrderGroups(TOKEN);
+
+        assertEquals(2, result.size());
+        assertEquals(20L, result.get(0).getOrderGroupId());
+        assertEquals(10L, result.get(1).getOrderGroupId());
+
+        UserOrderGroupDto legacyGroup = result.get(0);
+        assertEquals(null, legacyGroup.getCreatedAt());
+        assertEquals(1, legacyGroup.getItems().size());
+        assertEquals("", legacyGroup.getItems().get(0).getProductName());
+        assertEquals("Pending", legacyGroup.getItems().get(0).getStatus());
+
+        UserOrderGroupDto grouped = result.get(1);
+        assertEquals(LocalDateTime.of(2026, 1, 1, 12, 0), grouped.getCreatedAt());
+        assertEquals(1, grouped.getItems().size());
+        assertEquals("Bread", grouped.getItems().get(0).getProductName());
+        assertEquals("Shipped", grouped.getItems().get(0).getStatus());
+    }
 }
+
+
