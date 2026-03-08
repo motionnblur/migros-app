@@ -1,7 +1,6 @@
 package com.example.MigrosBackend.service.admin.supply;
 
 import com.example.MigrosBackend.dto.admin.panel.*;
-import com.example.MigrosBackend.dto.user.product.ProductDto;
 import com.example.MigrosBackend.entity.admin.AdminEntity;
 import com.example.MigrosBackend.entity.category.CategoryEntity;
 import com.example.MigrosBackend.entity.product.ProductDescriptionEntity;
@@ -87,9 +86,15 @@ public class AdminSupplyService {
                               int productCount, float productDiscount,
                               String productDescription, int categoryValue,
                               MultipartFile selectedImage) {
-        if (!Objects.equals(selectedImage.getContentType(), "image/png")) {
-            throw new GeneralException("Only PNG files are allowed");
+        String normalizedProductName = normalizeRequiredText("Product name", productName);
+        String normalizedSubCategoryName = normalizeRequiredText("Subcategory name", subCategoryName);
+        String normalizedDescription = normalizeOptionalText(productDescription);
+        validateProductNumbers(productPrice, productCount, productDiscount);
+
+        if (selectedImage == null || selectedImage.isEmpty()) {
+            throw new GeneralException("Product image is required");
         }
+        validatePngImage(selectedImage);
 
         String fileNameToSave = "image_" + System.currentTimeMillis() + ".png";
         Path savedFilePath;
@@ -99,20 +104,21 @@ public class AdminSupplyService {
             throw new FileUploadFailedException("Failed to read file bytes");
         }
 
-        System.out.println("Product data: " + productName + ", " + productPrice + ", " + productCount + ", " + productDiscount + ", " + productDescription + "," + categoryValue);
-
         CategoryEntity categoryEntity = categoryEntityRepository.findByCategoryId(categoryValue);
-        AdminEntity adminEntity = adminEntityRepository.findById(adminId).orElseThrow(() -> new RuntimeException("Admin with that id: " + adminId + " could not be found."));
+        if (categoryEntity == null) {
+            throw new GeneralException("Invalid category value: " + categoryValue);
+        }
+        AdminEntity adminEntity = adminEntityRepository.findById(adminId).orElseThrow(() -> new AdminNotFoundException(adminId.toString()));
 
         ProductEntity productEntity = new ProductEntity();
         productEntity.setAdminEntity(adminEntity);
-        productEntity.setProductName(productName);
-        productEntity.setSubcategoryName(subCategoryName);
+        productEntity.setProductName(normalizedProductName);
+        productEntity.setSubcategoryName(normalizedSubCategoryName);
         productEntity.setProductCount(productCount);
         productEntity.setProductPrice(productPrice);
         productEntity.setProductDiscount(productDiscount);
         productEntity.setCategoryEntity(categoryEntity);
-        productEntity.setProductDescription(productDescription);
+        productEntity.setProductDescription(normalizedDescription);
         productEntityRepository.save(productEntity);
 
         ProductImageEntity productImageEntity = new ProductImageEntity();
@@ -126,24 +132,30 @@ public class AdminSupplyService {
                               int productCount, float productDiscount,
                               String productDescription, int categoryValue,
                               MultipartFile selectedImage) {
-        CategoryEntity categoryEntity = categoryEntityRepository.findByCategoryId(categoryValue);
-        AdminEntity adminEntity = adminEntityRepository.findById(adminId).orElseThrow(() -> new RuntimeException("Admin with that id: " + adminId + " could not be found."));
+        String normalizedProductName = normalizeRequiredText("Product name", productName);
+        String normalizedSubCategoryName = normalizeRequiredText("Subcategory name", subCategoryName);
+        String normalizedDescription = normalizeOptionalText(productDescription);
+        validateProductNumbers(productPrice, productCount, productDiscount);
 
-        ProductEntity productEntity = productEntityRepository.findById(productId).orElseThrow(() -> new RuntimeException("Product with that id: " + productId + " could not be found."));
+        CategoryEntity categoryEntity = categoryEntityRepository.findByCategoryId(categoryValue);
+        if (categoryEntity == null) {
+            throw new GeneralException("Invalid category value: " + categoryValue);
+        }
+        AdminEntity adminEntity = adminEntityRepository.findById(adminId).orElseThrow(() -> new AdminNotFoundException(adminId.toString()));
+
+        ProductEntity productEntity = productEntityRepository.findById(productId).orElseThrow(() -> new ProductNotFoundException(productId.toString()));
         productEntity.setAdminEntity(adminEntity);
-        productEntity.setProductName(productName);
-        productEntity.setSubcategoryName(subCategoryName);
+        productEntity.setProductName(normalizedProductName);
+        productEntity.setSubcategoryName(normalizedSubCategoryName);
         productEntity.setProductCount(productCount);
         productEntity.setProductPrice(productPrice);
         productEntity.setProductDiscount(productDiscount);
         productEntity.setCategoryEntity(categoryEntity);
-        productEntity.setProductDescription(productDescription);
+        productEntity.setProductDescription(normalizedDescription);
         productEntityRepository.save(productEntity);
 
         if (selectedImage != null && !selectedImage.isEmpty()) {
-            if (!Objects.equals(selectedImage.getContentType(), "image/png")) {
-                throw new GeneralException("Only PNG files are allowed");
-            }
+            validatePngImage(selectedImage);
 
             String fileNameToSave = "image_" + System.currentTimeMillis() + ".png";
             Path savedFilePath;
@@ -247,7 +259,7 @@ public class AdminSupplyService {
                     item.getDescriptionTabName(),
                     item.getDescriptionTabContent()
             );
-            
+
             productDescriptionDto.getDescriptionList().add(dto);
         }
 
@@ -256,5 +268,51 @@ public class AdminSupplyService {
 
     public void deleteProductDescription(Long descriptionId) {
         productDescriptionEntityRepository.deleteById(descriptionId);
+    }
+
+    private void validatePngImage(MultipartFile selectedImage) {
+        if (!Objects.equals(selectedImage.getContentType(), "image/png")) {
+            throw new GeneralException("Only PNG files are allowed");
+        }
+    }
+
+    private void validateProductNumbers(float productPrice, int productCount, float productDiscount) {
+        if (productPrice < 0) {
+            throw new GeneralException("Product price cannot be negative");
+        }
+
+        if (productCount < 0) {
+            throw new GeneralException("Product count cannot be negative");
+        }
+
+        if (productDiscount < 0 || productDiscount > 100) {
+            throw new GeneralException("Product discount must be between 0 and 100");
+        }
+    }
+
+    private String normalizeRequiredText(String fieldName, String value) {
+        if (value == null) {
+            throw new GeneralException(fieldName + " is required");
+        }
+
+        String normalized = value.trim();
+        if (normalized.isEmpty() || "undefined".equalsIgnoreCase(normalized) || "null".equalsIgnoreCase(normalized)) {
+            throw new GeneralException(fieldName + " is required");
+        }
+
+        return normalized;
+    }
+
+    private String normalizeOptionalText(String value) {
+        if (value == null) {
+            return "";
+        }
+
+        String normalized = value.trim();
+        if ("undefined".equalsIgnoreCase(normalized) || "null".equalsIgnoreCase(normalized)) {
+            return "";
+        }
+
+        return normalized;
     }
 }

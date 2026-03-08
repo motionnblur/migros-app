@@ -20,11 +20,23 @@ public class ProductEntity {
     @Column(name = "product_entity_id")
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(nullable = false)
     private String productName;
+
+    @Column(nullable = false)
     private String subcategoryName;
+
+    @Column(nullable = false)
     private int productCount;
+
+    @Column(nullable = false)
     private float productPrice;
+
+    @Column(nullable = false)
     private float productDiscount;
+
+    @Column(nullable = false)
     private String productDescription;
 
     @ManyToOne(fetch = FetchType.LAZY)

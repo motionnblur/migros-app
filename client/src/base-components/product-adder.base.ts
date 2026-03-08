@@ -14,12 +14,12 @@ import { categories } from '../memory/global-data';
 
 @Directive()
 export abstract class ProductAdderBase {
-  @Input() productName!: string;
-  @Input() subCategoryName!: string;
-  @Input() price!: number;
-  @Input() count!: number;
-  @Input() discount!: number;
-  @Input() description!: string;
+  @Input() productName: string = '';
+  @Input() subCategoryName: string = '';
+  @Input() price: number = 0;
+  @Input() count: number = 0;
+  @Input() discount: number = 0;
+  @Input() description: string = '';
   @Input() selectedImage: File | null = null;
 
   @Output() hasEscapePressed = new EventEmitter<boolean>();
@@ -31,13 +31,14 @@ export abstract class ProductAdderBase {
 
   @Output() hasProductAdded = new EventEmitter<boolean>();
 
-  selectedFormValue: any = null;
+  selectedFormValue: number | null = null;
   protected imageUrl: string | null = null;
   protected categoryControl = new FormControl('');
 
   protected boundKeyDownEvent!: (event: KeyboardEvent) => void;
 
   public isUpdateMode: boolean = false;
+  public validationError: string = '';
 
   public categories = categories;
 
@@ -53,12 +54,13 @@ export abstract class ProductAdderBase {
       this.updateView(changes['selectedImage'].currentValue);
     }
   }
+
   ngOnInit() {
     document.addEventListener('keydown', this.boundKeyDownEvent);
     this.categoryControl.valueChanges.subscribe((value) => {
-      //console.log('Selected value:', value);
-      if (value !== null && value !== undefined) {
-        this.selectedFormValue = value;
+      if (value !== null && value !== undefined && value !== '') {
+        const parsedValue = Number(value);
+        this.selectedFormValue = Number.isNaN(parsedValue) ? null : parsedValue;
       }
     });
   }
@@ -76,12 +78,52 @@ export abstract class ProductAdderBase {
       this.imageUploaderRef.nativeElement.click();
     }
   }
-  public onImageSelected(event: any) {
-    if (event.target.files && event.target.files.length > 0) {
-      this.selectedImage = event.target.files[0];
+
+  public onImageSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      this.selectedImage = input.files[0];
       this.updateView(this.selectedImage);
+      this.validationError = '';
     }
   }
+
+  protected validateBeforeSubmit(requireImage: boolean): boolean {
+    const normalizedProductName = this.productName.trim();
+    const normalizedSubCategoryName = this.subCategoryName.trim();
+
+    if (!normalizedProductName) {
+      this.validationError = 'Product name is required.';
+      return false;
+    }
+
+    if (!normalizedSubCategoryName) {
+      this.validationError = 'Subcategory name is required.';
+      return false;
+    }
+
+    if (this.selectedFormValue === null) {
+      this.validationError = 'Category selection is required.';
+      return false;
+    }
+
+    if (this.price < 0 || this.count < 0 || this.discount < 0 || this.discount > 100) {
+      this.validationError = 'Price/count/discount values are invalid.';
+      return false;
+    }
+
+    if (requireImage && !this.selectedImage) {
+      this.validationError = 'Product image is required.';
+      return false;
+    }
+
+    this.productName = normalizedProductName;
+    this.subCategoryName = normalizedSubCategoryName;
+    this.description = this.description.trim();
+    this.validationError = '';
+    return true;
+  }
+
   private updateView(image: File | null) {
     if (image) {
       this.imageUrl = URL.createObjectURL(image);
@@ -98,3 +140,4 @@ export abstract class ProductAdderBase {
 
   openEditor?(): void {}
 }
+

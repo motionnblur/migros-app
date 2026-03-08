@@ -27,6 +27,10 @@ export class ProductAdderComponent extends ProductAdderBase {
   }
 
   uploadProductData() {
+    if (!this.validateBeforeSubmit(true)) {
+      return;
+    }
+
     const productData: IProductUploader = {
       adminId: 1,
       productName: this.productName,
@@ -36,15 +40,20 @@ export class ProductAdderComponent extends ProductAdderBase {
       productDiscount: this.discount,
       productDescription: this.description,
       selectedImage: this.selectedImage,
-      categoryValue: this.selectedFormValue,
+      categoryValue: this.selectedFormValue!,
     };
-    this.restService
-      .uploadProductData(productData)
-      .subscribe((status: boolean) => {
+
+    this.restService.uploadProductData(productData).subscribe({
+      next: (status: boolean) => {
         if (status) {
           this.outProductAdded();
           this.eventManager.trigger('productAdded');
         }
-      });
+      },
+      error: (error) => {
+        this.validationError =
+          error?.error ?? 'Product could not be uploaded. Please check fields.';
+      },
+    });
   }
 }

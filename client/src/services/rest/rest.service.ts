@@ -116,13 +116,15 @@ export class RestService {
   uploadProductData(productData: IProductUploader) {
     const formData = new FormData();
     formData.append('adminId', productData.adminId.toString());
-    formData.append('productName', productData.productName);
-    formData.append('subCategoryName', productData.subCategoryName);
+    formData.append('productName', this.normalizeStringField(productData.productName));
+    formData.append('subCategoryName', this.normalizeStringField(productData.subCategoryName));
     formData.append('productPrice', productData.productPrice.toString());
     formData.append('productCount', productData.productCount.toString());
     formData.append('productDiscount', productData.productDiscount.toString());
-    formData.append('productDescription', productData.productDescription);
-    formData.append('selectedImage', productData.selectedImage!);
+    formData.append('productDescription', this.normalizeOptionalStringField(productData.productDescription));
+    if (productData.selectedImage) {
+      formData.append('selectedImage', productData.selectedImage);
+    }
     formData.append('categoryValue', productData.categoryValue.toString());
 
     return this.http
@@ -136,13 +138,15 @@ export class RestService {
     const formData = new FormData();
     formData.append('adminId', productData.adminId.toString());
     formData.append('productId', productData.productId.toString());
-    formData.append('productName', productData.productName);
-    formData.append('subCategoryName', productData.subCategoryName);
+    formData.append('productName', this.normalizeStringField(productData.productName));
+    formData.append('subCategoryName', this.normalizeStringField(productData.subCategoryName));
     formData.append('productPrice', productData.productPrice.toString());
     formData.append('productCount', productData.productCount.toString());
     formData.append('productDiscount', productData.productDiscount.toString());
-    formData.append('productDescription', productData.productDescription);
-    formData.append('selectedImage', productData.selectedImage!);
+    formData.append('productDescription', this.normalizeOptionalStringField(productData.productDescription));
+    if (productData.selectedImage) {
+      formData.append('selectedImage', productData.selectedImage);
+    }
     formData.append('categoryValue', productData.categoryValue.toString());
 
     return this.http
@@ -452,7 +456,20 @@ export class RestService {
       })
       .pipe(map((response) => response as IUserOrderGroup[]));
   }
+
+  private normalizeStringField(value: string): string {
+    return (value ?? '').trim();
+  }
+
+  private normalizeOptionalStringField(value: string): string {
+    const normalized = (value ?? '').trim();
+    if (normalized.toLowerCase() === 'undefined' || normalized.toLowerCase() === 'null') {
+      return '';
+    }
+    return normalized;
+  }
 }
+
 
 
 
