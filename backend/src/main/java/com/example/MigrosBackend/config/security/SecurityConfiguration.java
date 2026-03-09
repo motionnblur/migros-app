@@ -32,8 +32,10 @@ public class SecurityConfiguration {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/admin/panel/**").authenticated()
-                        .requestMatchers("/admin/supply/**").authenticated()
+                        .requestMatchers("/admin/login", "/admin/logout").permitAll()
+                        .requestMatchers("/user/login", "/user/logout").permitAll()
+                        .requestMatchers("/admin/panel/**").hasRole("ADMIN")
+                        .requestMatchers("/admin/supply/**").hasRole("ADMIN")
                         .requestMatchers("/payment/**").authenticated()
                         .requestMatchers("/user/supply/addProductToUserCart").authenticated()
                         .requestMatchers("/user/supply/removeProductFromUserCart").authenticated()

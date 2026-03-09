@@ -51,7 +51,9 @@ public class JwtRequestFilter extends OncePerRequestFilter {
             if (tokenService.validateToken(jwt, username)) {
                 List<SimpleGrantedAuthority> authorities;
 
-                if ("admin".equalsIgnoreCase(username)) {
+                if (isAdminPath) {
+                    authorities = List.of(new SimpleGrantedAuthority("ROLE_ADMIN"));
+                } else if ("admin".equalsIgnoreCase(username)) {
                     authorities = List.of(new SimpleGrantedAuthority("ROLE_ADMIN"));
                 } else {
                     authorities = List.of(new SimpleGrantedAuthority("ROLE_USER"));
@@ -67,19 +69,23 @@ public class JwtRequestFilter extends OncePerRequestFilter {
     }
 
     private String resolveToken(HttpServletRequest request, boolean isAdminPath) {
+        if (isAdminPath) {
+            return getCookieToken(request, AuthCookies.ADMIN_SESSION_COOKIE_NAME);
+        }
+
         final String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             return authHeader.substring(7);
         }
 
+        return getCookieToken(request, AuthCookies.USER_SESSION_COOKIE_NAME);
+    }
+
+    private String getCookieToken(HttpServletRequest request, String cookieName) {
         Cookie[] cookies = request.getCookies();
         if (cookies == null) {
             return null;
         }
-
-        String cookieName = isAdminPath
-                ? AuthCookies.ADMIN_SESSION_COOKIE_NAME
-                : AuthCookies.USER_SESSION_COOKIE_NAME;
 
         for (Cookie cookie : cookies) {
             if (cookieName.equals(cookie.getName())) {

@@ -102,6 +102,8 @@ class JwtRequestFilterTest {
         jwtRequestFilter.doFilterInternal(request, response, filterChain);
 
         assertNotNull(SecurityContextHolder.getContext().getAuthentication());
+        assertTrue(SecurityContextHolder.getContext().getAuthentication().getAuthorities()
+                .contains(new SimpleGrantedAuthority("ROLE_USER")));
         verify(filterChain).doFilter(request, response);
     }
 
@@ -134,21 +136,35 @@ class JwtRequestFilterTest {
     }
 
     @Test
-    void doFilterInternal_UsesAdminCookie_ForAdminPath() throws ServletException, IOException {
+    void doFilterInternal_UsesAdminCookie_ForAdminPath_AndAssignsAdminRole() throws ServletException, IOException {
         MockHttpServletRequest request = new MockHttpServletRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
         String token = "admin.cookie.token";
         request.setServletPath("/admin/panel");
         request.setCookies(new Cookie(AuthCookies.ADMIN_SESSION_COOKIE_NAME, token));
 
-        when(tokenService.extractUsername(token)).thenReturn("admin");
-        when(tokenService.validateToken(token, "admin")).thenReturn(true);
+        when(tokenService.extractUsername(token)).thenReturn("manager@example.com");
+        when(tokenService.validateToken(token, "manager@example.com")).thenReturn(true);
 
         jwtRequestFilter.doFilterInternal(request, response, filterChain);
 
         assertNotNull(SecurityContextHolder.getContext().getAuthentication());
         assertTrue(SecurityContextHolder.getContext().getAuthentication().getAuthorities()
                 .contains(new SimpleGrantedAuthority("ROLE_ADMIN")));
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    void doFilterInternal_DoesNotUseAuthorizationHeader_OnAdminPath() throws ServletException, IOException {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        request.setServletPath("/admin/panel");
+        request.addHeader("Authorization", "Bearer user.token");
+
+        jwtRequestFilter.doFilterInternal(request, response, filterChain);
+
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+        verifyNoInteractions(tokenService);
         verify(filterChain).doFilter(request, response);
     }
 
@@ -166,4 +182,3 @@ class JwtRequestFilterTest {
         verify(filterChain).doFilter(request, response);
     }
 }
-
