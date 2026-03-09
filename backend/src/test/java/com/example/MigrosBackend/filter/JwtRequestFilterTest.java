@@ -53,6 +53,13 @@ class JwtRequestFilterTest {
     }
 
     @Test
+    void shouldNotFilter_UsesRequestUri_WhenServletPathIsBlank() throws ServletException {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/admin/login");
+
+        assertTrue(jwtRequestFilter.shouldNotFilter(request));
+    }
+
+    @Test
     void doFilterInternal_SetsAdminAuthentication_WhenUsernameIsAdmin() throws ServletException, IOException {
         MockHttpServletRequest request = new MockHttpServletRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();

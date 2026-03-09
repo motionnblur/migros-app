@@ -26,15 +26,16 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
-        String servletPath = request.getServletPath();
-        return servletPath.equals("/admin/login") || servletPath.equals("/user/login");
+        String requestPath = resolveRequestPath(request);
+        return requestPath.equals("/admin/login") || requestPath.equals("/user/login");
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        boolean isAdminPath = request.getServletPath().startsWith("/admin");
+        String requestPath = resolveRequestPath(request);
+        boolean isAdminPath = requestPath.startsWith("/admin");
         String jwt = resolveToken(request, isAdminPath);
         String username = null;
 
@@ -94,5 +95,15 @@ public class JwtRequestFilter extends OncePerRequestFilter {
         }
 
         return null;
+    }
+
+    private String resolveRequestPath(HttpServletRequest request) {
+        String servletPath = request.getServletPath();
+        if (servletPath != null && !servletPath.isBlank()) {
+            return servletPath;
+        }
+
+        String requestUri = request.getRequestURI();
+        return requestUri != null ? requestUri : "";
     }
 }
