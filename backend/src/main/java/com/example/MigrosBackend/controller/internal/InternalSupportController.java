@@ -1,6 +1,7 @@
 package com.example.MigrosBackend.controller.internal;
 
 import com.example.MigrosBackend.dto.support.InternalSupportAgentMessageDto;
+import com.example.MigrosBackend.dto.support.InternalSupportUserActionDto;
 import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.service.support.SupportChatService;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,12 +31,12 @@ public class InternalSupportController {
             @RequestHeader(name = "x-internal-key", required = false) String internalKey,
             @RequestBody InternalSupportAgentMessageDto dto
     ) {
-        if (supportInternalKey != null && !supportInternalKey.isBlank() && !supportInternalKey.equals(internalKey)) {
+        if (!isAuthorized(internalKey)) {
             return ResponseEntity.status(401).build();
         }
 
-        String userMail = dto.getUserMail() == null ? "" : dto.getUserMail().trim();
-        String message = dto.getMessage() == null ? "" : dto.getMessage().trim();
+        String userMail = safeTrim(dto.getUserMail());
+        String message = safeTrim(dto.getMessage());
 
         if (userMail.isEmpty() || message.isEmpty()) {
             throw new GeneralException("userMail and message are required");
@@ -43,5 +44,51 @@ public class InternalSupportController {
 
         supportChatService.addManagementMessage(userMail, message);
         return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("ban-user")
+    public ResponseEntity<Void> banUser(
+            @RequestHeader(name = "x-internal-key", required = false) String internalKey,
+            @RequestBody InternalSupportUserActionDto dto
+    ) {
+        if (!isAuthorized(internalKey)) {
+            return ResponseEntity.status(401).build();
+        }
+
+        String userMail = safeTrim(dto.getUserMail());
+        if (userMail.isEmpty()) {
+            throw new GeneralException("userMail is required");
+        }
+
+        supportChatService.banUser(userMail);
+        return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("clear-chat")
+    public ResponseEntity<Void> clearChat(
+            @RequestHeader(name = "x-internal-key", required = false) String internalKey,
+            @RequestBody InternalSupportUserActionDto dto
+    ) {
+        if (!isAuthorized(internalKey)) {
+            return ResponseEntity.status(401).build();
+        }
+
+        String userMail = safeTrim(dto.getUserMail());
+        if (userMail.isEmpty()) {
+            throw new GeneralException("userMail is required");
+        }
+
+        supportChatService.closeChat(userMail);
+        return ResponseEntity.accepted().build();
+    }
+
+    private boolean isAuthorized(String internalKey) {
+        return supportInternalKey == null
+                || supportInternalKey.isBlank()
+                || supportInternalKey.equals(internalKey);
+    }
+
+    private String safeTrim(String value) {
+        return value == null ? "" : value.trim();
     }
 }
