@@ -22,16 +22,19 @@ public class SupportChatService {
     private final UserEntityRepository userEntityRepository;
     private final TokenService tokenService;
     private final SupportChatWebSocketHandler supportChatWebSocketHandler;
+    private final SupportInternalEventService supportInternalEventService;
 
     @Autowired
     public SupportChatService(SupportMessageEntityRepository supportMessageEntityRepository,
                               UserEntityRepository userEntityRepository,
                               TokenService tokenService,
-                              SupportChatWebSocketHandler supportChatWebSocketHandler) {
+                              SupportChatWebSocketHandler supportChatWebSocketHandler,
+                              SupportInternalEventService supportInternalEventService) {
         this.supportMessageEntityRepository = supportMessageEntityRepository;
         this.userEntityRepository = userEntityRepository;
         this.tokenService = tokenService;
         this.supportChatWebSocketHandler = supportChatWebSocketHandler;
+        this.supportInternalEventService = supportInternalEventService;
     }
 
     public List<SupportMessageDto> getMessagesForUser(String token) {
@@ -59,7 +62,9 @@ public class SupportChatService {
         entity.setUserMail(userMail);
         entity.setSender("USER");
         entity.setMessage(trimmedMessage);
-        supportMessageEntityRepository.save(entity);
+        entity = supportMessageEntityRepository.save(entity);
+
+        supportInternalEventService.publishCustomerMessageCreated(entity);
         supportChatWebSocketHandler.broadcastSupportUpdate(userMail);
     }
 
