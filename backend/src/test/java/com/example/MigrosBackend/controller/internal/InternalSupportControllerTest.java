@@ -1,6 +1,7 @@
 package com.example.MigrosBackend.controller.internal;
 
 import com.example.MigrosBackend.dto.support.InternalSupportAgentMessageDto;
+import com.example.MigrosBackend.dto.support.InternalSupportDeleteAgentMessageDto;
 import com.example.MigrosBackend.dto.support.InternalSupportEditAgentMessageDto;
 import com.example.MigrosBackend.service.global.TokenService;
 import com.example.MigrosBackend.service.support.SupportChatService;
@@ -84,5 +85,36 @@ class InternalSupportControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(dto)))
                 .andExpect(status().isAccepted());
+    }
+
+    @Test
+    void deleteAgentMessage_shouldReturnAccepted_whenPayloadValid() throws Exception {
+        InternalSupportDeleteAgentMessageDto dto = new InternalSupportDeleteAgentMessageDto(
+                "user@test.com",
+                "agent-123"
+        );
+
+        doNothing().when(supportChatService)
+                .deleteManagementMessage("user@test.com", "agent-123");
+
+        mockMvc.perform(post("/internal/support/delete-agent-message")
+                        .header("x-internal-key", "test-internal-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isAccepted());
+    }
+
+    @Test
+    void deleteAgentMessage_shouldReturnUnauthorized_whenKeyInvalid() throws Exception {
+        InternalSupportDeleteAgentMessageDto dto = new InternalSupportDeleteAgentMessageDto(
+                "user@test.com",
+                "agent-123"
+        );
+
+        mockMvc.perform(post("/internal/support/delete-agent-message")
+                        .header("x-internal-key", "wrong-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isUnauthorized());
     }
 }

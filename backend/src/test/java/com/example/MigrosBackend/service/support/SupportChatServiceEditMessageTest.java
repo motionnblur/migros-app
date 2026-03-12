@@ -3,6 +3,7 @@ package com.example.MigrosBackend.service.support;
 import com.example.MigrosBackend.entity.user.SupportMessageEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.exception.shared.GeneralException;
+import com.example.MigrosBackend.exception.shared.SupportSyncConflictException;
 import com.example.MigrosBackend.repository.user.SupportMessageEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
@@ -127,5 +128,160 @@ class SupportChatServiceEditMessageTest {
         );
 
         assertEquals("Editable support message not found", error.getMessage());
+    }
+
+    @Test
+    void deleteManagementMessage_shouldDeleteAndBroadcast_whenValid() {
+        SupportMessageEntity entity = new SupportMessageEntity();
+        entity.setId(10L);
+        entity.setUserMail("user@mail.com");
+        entity.setSender("MANAGEMENT");
+        entity.setExternalMessageId("agent-10");
+
+        when(userEntityRepository.findByUserMail("user@mail.com")).thenReturn(user);
+        when(supportMessageEntityRepository.findByUserMailAndExternalMessageId("user@mail.com", "agent-10"))
+                .thenReturn(Optional.of(entity));
+
+        supportChatService.deleteManagementMessage("user@mail.com", "agent-10");
+
+        verify(supportMessageEntityRepository).delete(entity);
+        verify(supportChatWebSocketHandler).broadcastSupportUpdate("user@mail.com");
+    }
+
+    @Test
+    void deleteManagementMessage_shouldRejectMissingExternalMessageId() {
+        when(userEntityRepository.findByUserMail("user@mail.com")).thenReturn(user);
+
+        GeneralException error = assertThrows(
+                GeneralException.class,
+                () -> supportChatService.deleteManagementMessage("user@mail.com", "   ")
+        );
+
+        assertEquals("externalMessageId is required", error.getMessage());
+    }
+
+    @Test
+    void deleteManagementMessage_shouldRejectNonManagementMessages() {
+        SupportMessageEntity entity = new SupportMessageEntity();
+        entity.setUserMail("user@mail.com");
+        entity.setSender("USER");
+        entity.setExternalMessageId("agent-10");
+
+        when(userEntityRepository.findByUserMail("user@mail.com")).thenReturn(user);
+        when(supportMessageEntityRepository.findByUserMailAndExternalMessageId("user@mail.com", "agent-10"))
+                .thenReturn(Optional.of(entity));
+
+        GeneralException error = assertThrows(
+                GeneralException.class,
+                () -> supportChatService.deleteManagementMessage("user@mail.com", "agent-10")
+        );
+
+        assertEquals("Only management messages can be deleted", error.getMessage());
+    }
+
+    @Test
+    void deleteManagementMessage_shouldThrowWhenMessageNotFound() {
+        when(userEntityRepository.findByUserMail("user@mail.com")).thenReturn(user);
+        when(supportMessageEntityRepository.findByUserMailAndExternalMessageId("user@mail.com", "missing-id"))
+                .thenReturn(Optional.empty());
+
+        GeneralException error = assertThrows(
+                GeneralException.class,
+                () -> supportChatService.deleteManagementMessage("user@mail.com", "missing-id")
+        );
+
+        assertEquals("Deletable support message not found", error.getMessage());
+    }
+
+    @Test
+    void editMessageForAdmin_shouldEditUserMessageAndPublishSync() {
+        SupportMessageEntity entity = new SupportMessageEntity();
+        entity.setId(22L);
+        entity.setUserMail("user@mail.com");
+        entity.setSender("USER");
+        entity.setMessage("old");
+
+        when(userEntityRepository.findByUserMail("user@mail.com")).thenReturn(user);
+        when(supportMessageEntityRepository.findByIdAndUserMail(22L, "user@mail.com"))
+                .thenReturn(Optional.of(entity));
+
+        supportChatService.editMessageForAdmin("user@mail.com", 22L, "  updated user text ");
+
+        assertEquals("updated user text", entity.getMessage());
+        assertNotNull(entity.getEditedAt());
+        verify(supportMessageEntityRepository).save(entity);
+        verify(supportInternalEventService).publishSupportMessageEdited("user@mail.com", "22", "updated user text");
+        verify(supportChatWebSocketHandler).broadcastSupportUpdate("user@mail.com");
+    }
+
+    @Test
+    void editMessageForAdmin_shouldEditManagementMessageWithExternalIdAndPublishSync() {
+        SupportMessageEntity entity = new SupportMessageEntity();
+        entity.setId(33L);
+        entity.setUserMail("user@mail.com");
+        entity.setSender("MANAGEMENT");
+        entity.setMessage("old");
+        entity.setExternalMessageId("agent-33");
+
+        when(userEntityRepository.findByUserMail("user@mail.com")).thenReturn(user);
+        when(supportMessageEntityRepository.findByIdAndUserMail(33L, "user@mail.com"))
+                .thenReturn(Optional.of(entity));
+
+        supportChatService.editMessageForAdmin("user@mail.com", 33L, "new text");
+
+        verify(supportInternalEventService).publishSupportMessageEdited("user@mail.com", "agent-33", "new text");
+    }
+
+    @Test
+    void editMessageForAdmin_shouldRejectLegacyManagementWithoutExternalId() {
+        SupportMessageEntity entity = new SupportMessageEntity();
+        entity.setId(34L);
+        entity.setUserMail("user@mail.com");
+        entity.setSender("MANAGEMENT");
+        entity.setExternalMessageId(null);
+
+        when(userEntityRepository.findByUserMail("user@mail.com")).thenReturn(user);
+        when(supportMessageEntityRepository.findByIdAndUserMail(34L, "user@mail.com"))
+                .thenReturn(Optional.of(entity));
+
+        assertThrows(
+                SupportSyncConflictException.class,
+                () -> supportChatService.editMessageForAdmin("user@mail.com", 34L, "updated")
+        );
+    }
+
+    @Test
+    void deleteMessageForAdmin_shouldDeleteUserMessageAndPublishSync() {
+        SupportMessageEntity entity = new SupportMessageEntity();
+        entity.setId(41L);
+        entity.setUserMail("user@mail.com");
+        entity.setSender("USER");
+
+        when(userEntityRepository.findByUserMail("user@mail.com")).thenReturn(user);
+        when(supportMessageEntityRepository.findByIdAndUserMail(41L, "user@mail.com"))
+                .thenReturn(Optional.of(entity));
+
+        supportChatService.deleteMessageForAdmin("user@mail.com", 41L);
+
+        verify(supportMessageEntityRepository).delete(entity);
+        verify(supportInternalEventService).publishSupportMessageDeleted("user@mail.com", "41");
+        verify(supportChatWebSocketHandler).broadcastSupportUpdate("user@mail.com");
+    }
+
+    @Test
+    void deleteMessageForAdmin_shouldRejectLegacyManagementWithoutExternalId() {
+        SupportMessageEntity entity = new SupportMessageEntity();
+        entity.setId(42L);
+        entity.setUserMail("user@mail.com");
+        entity.setSender("MANAGEMENT");
+
+        when(userEntityRepository.findByUserMail("user@mail.com")).thenReturn(user);
+        when(supportMessageEntityRepository.findByIdAndUserMail(42L, "user@mail.com"))
+                .thenReturn(Optional.of(entity));
+
+        assertThrows(
+                SupportSyncConflictException.class,
+                () -> supportChatService.deleteMessageForAdmin("user@mail.com", 42L)
+        );
     }
 }

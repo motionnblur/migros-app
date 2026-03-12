@@ -71,6 +71,44 @@
 
       <div *ngIf="hasSupportOpened" class="support-chat-layout">
         <aside class="support-user-list">
+          <div class="support-list-title">Musteri Secimi</div>
+
+          <div class="support-customer-search">
+            <input
+              type="text"
+              class="form-control form-control-sm"
+              [(ngModel)]="supportCustomerQuery"
+              (input)="onSupportCustomerSearchChange()"
+              placeholder="Email veya ad ile ara"
+            />
+
+            <div class="support-search-results" *ngIf="supportCustomerQuery.trim()">
+              <div class="support-empty" *ngIf="isSupportCustomerSearchLoading">
+                Araniyor...
+              </div>
+
+              <button
+                type="button"
+                class="support-user-item support-search-item"
+                *ngFor="let customer of supportCustomerResults"
+                [ngClass]="{ 'active': customer.userMail === selectedSupportUserMail }"
+                (click)="selectSupportCustomerFromSearch(customer)">
+                <div class="support-search-main">{{ customer.userName || customer.userMail }} {{ customer.userLastName || '' }}</div>
+                <div class="support-search-sub">{{ customer.userMail }}</div>
+                <div class="support-search-tags">
+                  <span class="tag tag-convo" *ngIf="customer.hasConversation">Sohbet Var</span>
+                  <span class="tag tag-banned" *ngIf="customer.isBanned">Banli</span>
+                </div>
+              </button>
+
+              <div class="support-empty" *ngIf="!isSupportCustomerSearchLoading && supportCustomerResults.length === 0">
+                Sonuc bulunamadi.
+              </div>
+            </div>
+          </div>
+
+          <hr class="my-2" />
+
           <div class="support-list-title">Bekleyen Sohbetler</div>
 
           <div class="support-empty" *ngIf="!supportUsers.length">
@@ -122,8 +160,56 @@
             <div class="support-message"
                  *ngFor="let message of supportMessages"
                  [ngClass]="{ 'admin': message.sender === 'MANAGEMENT' }">
-              <div class="support-message-meta">{{ message.sender === 'MANAGEMENT' ? 'Yonetim' : 'Kullanici' }}</div>
-              <div class="support-message-content">{{ message.message }}</div>
+              <div class="support-message-meta-row">
+                <div class="support-message-meta">
+                  {{ message.sender === 'MANAGEMENT' ? 'Yonetim' : 'Kullanici' }}
+                  <span class="support-message-edited" *ngIf="message.editedAt">duzenlendi</span>
+                </div>
+                <div class="support-message-actions" *ngIf="editingSupportMessageId !== message.id">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-primary"
+                    [disabled]="supportMessageActionInProgressId !== null"
+                    (click)="startEditSupportMessage(message)">
+                    Duzenle
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-danger"
+                    [disabled]="supportMessageActionInProgressId !== null"
+                    (click)="deleteSupportMessage(message)">
+                    {{ isSupportMessageActionBusy(message) ? 'Siliniyor...' : 'Sil' }}
+                  </button>
+                </div>
+              </div>
+
+              <div *ngIf="editingSupportMessageId === message.id; else supportMessageReadOnly">
+                <textarea
+                  class="form-control form-control-sm support-message-editor"
+                  rows="3"
+                  [(ngModel)]="supportEditInput"
+                  [disabled]="supportMessageActionInProgressId !== null"></textarea>
+                <div class="support-editor-actions">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-secondary"
+                    [disabled]="supportMessageActionInProgressId !== null"
+                    (click)="cancelEditSupportMessage()">
+                    Iptal
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-warning"
+                    [disabled]="supportMessageActionInProgressId !== null || !supportEditInput.trim()"
+                    (click)="saveEditedSupportMessage(message)">
+                    {{ isSupportMessageActionBusy(message) ? 'Kaydediliyor...' : 'Kaydet' }}
+                  </button>
+                </div>
+              </div>
+
+              <ng-template #supportMessageReadOnly>
+                <div class="support-message-content">{{ message.message }}</div>
+              </ng-template>
             </div>
           </div>
 
@@ -132,10 +218,15 @@
               type="text"
               class="form-control form-control-sm"
               [(ngModel)]="supportReplyInput"
+              [disabled]="isSelectedUserBanned()"
               placeholder="Yanitinizi yazin..."
               (keydown.enter)="sendSupportReply()"
             />
-            <button type="button" class="btn btn-warning btn-sm" [disabled]="isSupportSending" (click)="sendSupportReply()">
+            <button
+              type="button"
+              class="btn btn-warning btn-sm"
+              [disabled]="isSupportSending || isSelectedUserBanned()"
+              (click)="sendSupportReply()">
               <i class="bi bi-send h6"></i>
             </button>
           </div>
@@ -156,4 +247,3 @@
     </div>
   </div>
 </div>
-

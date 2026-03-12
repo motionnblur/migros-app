@@ -1,5 +1,6 @@
 package com.example.MigrosBackend.controller.admin.panel;
 
+import com.example.MigrosBackend.dto.admin.panel.SupportAdminEditMessageDto;
 import com.example.MigrosBackend.dto.admin.panel.SupportReplyDto;
 import com.example.MigrosBackend.dto.user.support.SupportMessageDto;
 import com.example.MigrosBackend.service.global.TokenService;
@@ -19,6 +20,7 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -82,6 +84,27 @@ class AdminSupportControllerTest {
         mockMvc.perform(post("/admin/panel/support/reply")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(reply)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void editSupportMessage_shouldReturnOk() throws Exception {
+        SupportAdminEditMessageDto dto = new SupportAdminEditMessageDto("user@test.com", "updated");
+
+        doNothing().when(supportChatService).editMessageForAdmin("user@test.com", 10L, "updated");
+
+        mockMvc.perform(patch("/admin/panel/support/messages/10")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void deleteSupportMessage_shouldReturnOk() throws Exception {
+        doNothing().when(supportChatService).deleteMessageForAdmin("user@test.com", 10L);
+
+        mockMvc.perform(delete("/admin/panel/support/messages/10")
+                        .param("userMail", "user@test.com"))
                 .andExpect(status().isOk());
     }
 

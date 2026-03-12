@@ -1,12 +1,16 @@
 package com.example.MigrosBackend.controller.admin.panel;
 
+import com.example.MigrosBackend.dto.admin.panel.SupportAdminEditMessageDto;
 import com.example.MigrosBackend.dto.admin.panel.SupportReplyDto;
+import com.example.MigrosBackend.dto.support.SupportCustomerSummaryDto;
 import com.example.MigrosBackend.dto.user.support.SupportMessageDto;
 import com.example.MigrosBackend.service.support.SupportChatService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -30,6 +34,14 @@ public class AdminSupportController {
         return ResponseEntity.ok(supportChatService.getSupportUserMails());
     }
 
+    @GetMapping("support/customers")
+    public ResponseEntity<List<SupportCustomerSummaryDto>> getSupportCustomers(
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) Integer limit
+    ) {
+        return ResponseEntity.ok(supportChatService.searchSupportCustomers(query, limit));
+    }
+
     @GetMapping("support/banned-users")
     public ResponseEntity<List<String>> getBannedSupportUsers() {
         return ResponseEntity.ok(supportChatService.getBannedUserMails());
@@ -43,6 +55,24 @@ public class AdminSupportController {
     @PostMapping("support/reply")
     public ResponseEntity<Void> sendSupportReply(@RequestBody SupportReplyDto dto) {
         supportChatService.addManagementMessage(dto.getUserMail(), dto.getMessage());
+        return ResponseEntity.ok().build();
+    }
+
+    @PatchMapping("support/messages/{messageId}")
+    public ResponseEntity<Void> editSupportMessage(
+            @PathVariable Long messageId,
+            @RequestBody SupportAdminEditMessageDto dto
+    ) {
+        supportChatService.editMessageForAdmin(dto.getUserMail(), messageId, dto.getMessage());
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("support/messages/{messageId}")
+    public ResponseEntity<Void> deleteSupportMessage(
+            @PathVariable Long messageId,
+            @RequestParam String userMail
+    ) {
+        supportChatService.deleteMessageForAdmin(userMail, messageId);
         return ResponseEntity.ok().build();
     }
 

@@ -16,6 +16,7 @@ import { IChatMessage } from '../../interfaces/IChatMessage';
 import { IUserOrderDetail } from '../../interfaces/IUserOrderDetail';
 import { IUserOrderGroup } from '../../interfaces/IUserOrderGroup';
 import { IProductPreview } from '../../interfaces/IProductPreview';
+import { ISupportCustomerSummary } from '../../interfaces/support/ISupportCustomerSummary';
 
 @Injectable({
   providedIn: 'root',
@@ -365,6 +366,16 @@ export class RestService {
       .pipe(map((response) => response as string[]));
   }
 
+
+  searchSupportCustomersForAdmin(query: string, limit: number = 20) {
+    return this.http
+      .get(`http://localhost:8080/admin/panel/support/customers`, {
+        params: { query, limit },
+        responseType: 'json',
+      })
+      .pipe(map((response) => response as ISupportCustomerSummary[]));
+  }
+
   getBannedSupportUsersForAdmin() {
     return this.http
       .get(`http://localhost:8080/admin/panel/support/banned-users`, {
@@ -391,6 +402,28 @@ export class RestService {
           observe: 'response',
         }
       )
+      .pipe(map((response) => response.status === 200));
+  }
+  editSupportMessageForAdmin(userMail: string, messageId: number, message: string) {
+    return this.http
+      .patch(
+        `http://localhost:8080/admin/panel/support/messages/${messageId}`,
+        { userMail, message },
+        {
+          responseType: 'text',
+          observe: 'response',
+        }
+      )
+      .pipe(map((response) => response.status === 200));
+  }
+
+  deleteSupportMessageForAdmin(userMail: string, messageId: number) {
+    return this.http
+      .delete(`http://localhost:8080/admin/panel/support/messages/${messageId}`, {
+        params: { userMail },
+        responseType: 'text',
+        observe: 'response',
+      })
       .pipe(map((response) => response.status === 200));
   }
   closeSupportChatForAdmin(userMail: string) {
@@ -469,7 +502,5 @@ export class RestService {
     return normalized;
   }
 }
-
-
 
 

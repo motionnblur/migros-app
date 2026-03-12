@@ -32,6 +32,8 @@ describe('AdminPanelComponent', () => {
       'getBannedSupportUsersForAdmin',
       'getSupportMessagesForAdmin',
       'sendSupportReplyFromAdmin',
+      'editSupportMessageForAdmin',
+      'deleteSupportMessageForAdmin',
       'closeSupportChatForAdmin',
       'banSupportUserFromAdmin',
       'unbanSupportUserFromAdmin',
@@ -40,6 +42,8 @@ describe('AdminPanelComponent', () => {
     restServiceSpy.getSupportUsersForAdmin.and.returnValue(of([]));
     restServiceSpy.getBannedSupportUsersForAdmin.and.returnValue(of([]));
     restServiceSpy.getSupportMessagesForAdmin.and.returnValue(of([]));
+    restServiceSpy.editSupportMessageForAdmin.and.returnValue(of(true));
+    restServiceSpy.deleteSupportMessageForAdmin.and.returnValue(of(true));
 
     const supportSpyBase = jasmine.createSpyObj<SupportRealtimeService>(
       'SupportRealtimeService',

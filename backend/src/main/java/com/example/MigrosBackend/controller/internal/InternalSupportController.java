@@ -1,17 +1,24 @@
 package com.example.MigrosBackend.controller.internal;
 
 import com.example.MigrosBackend.dto.support.InternalSupportAgentMessageDto;
+import com.example.MigrosBackend.dto.support.InternalSupportDeleteAgentMessageDto;
 import com.example.MigrosBackend.dto.support.InternalSupportEditAgentMessageDto;
 import com.example.MigrosBackend.dto.support.InternalSupportUserActionDto;
+import com.example.MigrosBackend.dto.support.SupportCustomerStatusDto;
+import com.example.MigrosBackend.dto.support.SupportCustomerSummaryDto;
 import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.service.support.SupportChatService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("internal/support")
@@ -25,6 +32,31 @@ public class InternalSupportController {
     ) {
         this.supportChatService = supportChatService;
         this.supportInternalKey = supportInternalKey;
+    }
+
+    @GetMapping("customers")
+    public ResponseEntity<List<SupportCustomerSummaryDto>> getCustomers(
+            @RequestHeader(name = "x-internal-key", required = false) String internalKey,
+            @RequestParam(name = "query", required = false) String query,
+            @RequestParam(name = "limit", required = false) Integer limit
+    ) {
+        if (!isAuthorized(internalKey)) {
+            return ResponseEntity.status(401).build();
+        }
+
+        return ResponseEntity.ok(supportChatService.searchSupportCustomers(query, limit));
+    }
+
+    @GetMapping("customer-status")
+    public ResponseEntity<SupportCustomerStatusDto> getCustomerStatus(
+            @RequestHeader(name = "x-internal-key", required = false) String internalKey,
+            @RequestParam(name = "userMail") String userMail
+    ) {
+        if (!isAuthorized(internalKey)) {
+            return ResponseEntity.status(401).build();
+        }
+
+        return ResponseEntity.ok(supportChatService.getCustomerStatus(userMail));
     }
 
     @PostMapping("agent-message")
@@ -65,6 +97,26 @@ public class InternalSupportController {
         }
 
         supportChatService.editManagementMessage(userMail, externalMessageId, message);
+        return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("delete-agent-message")
+    public ResponseEntity<Void> deleteAgentMessage(
+            @RequestHeader(name = "x-internal-key", required = false) String internalKey,
+            @RequestBody InternalSupportDeleteAgentMessageDto dto
+    ) {
+        if (!isAuthorized(internalKey)) {
+            return ResponseEntity.status(401).build();
+        }
+
+        String userMail = safeTrim(dto.getUserMail());
+        String externalMessageId = safeTrim(dto.getExternalMessageId());
+
+        if (userMail.isEmpty() || externalMessageId.isEmpty()) {
+            throw new GeneralException("userMail and externalMessageId are required");
+        }
+
+        supportChatService.deleteManagementMessage(userMail, externalMessageId);
         return ResponseEntity.accepted().build();
     }
 

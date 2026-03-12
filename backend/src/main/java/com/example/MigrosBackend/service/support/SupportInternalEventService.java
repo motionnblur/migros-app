@@ -1,6 +1,8 @@
 package com.example.MigrosBackend.service.support;
 
 import com.example.MigrosBackend.dto.support.SupportCustomerMessageCreatedEventDto;
+import com.example.MigrosBackend.dto.support.SupportMessageDeletedEventDto;
+import com.example.MigrosBackend.dto.support.SupportMessageEditedEventDto;
 import com.example.MigrosBackend.entity.user.SupportMessageEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,6 +21,8 @@ import java.util.UUID;
 public class SupportInternalEventService {
     private static final Logger LOGGER = LoggerFactory.getLogger(SupportInternalEventService.class);
     private static final String CUSTOMER_MESSAGE_CREATED_PATH = "/internal/events/customer-message-created";
+    private static final String SUPPORT_MESSAGE_EDITED_PATH = "/internal/events/support-message-edited";
+    private static final String SUPPORT_MESSAGE_DELETED_PATH = "/internal/events/support-message-deleted";
 
     private final RestTemplate restTemplate;
     private final String internalKey;
@@ -42,17 +46,49 @@ public class SupportInternalEventService {
                 entity.getCreatedAt().atZone(ZoneId.systemDefault()).toInstant().toString()
         );
 
+        try {
+            postEvent(CUSTOMER_MESSAGE_CREATED_PATH, payload);
+        } catch (Exception ex) {
+            // Non-blocking for user chat; in production, add retry/outbox.
+            LOGGER.warn("Failed to publish customer support message event to support-service: {}", ex.getMessage());
+        }
+    }
+
+    public void publishSupportMessageEdited(String userMail, String messageId, String text) {
+        SupportMessageEditedEventDto payload = new SupportMessageEditedEventDto(
+                UUID.randomUUID().toString(),
+                userMail,
+                messageId,
+                text
+        );
+
+        postEvent(SUPPORT_MESSAGE_EDITED_PATH, payload);
+    }
+
+    public void publishSupportMessageDeleted(String userMail, String messageId) {
+        SupportMessageDeletedEventDto payload = new SupportMessageDeletedEventDto(
+                UUID.randomUUID().toString(),
+                userMail,
+                messageId
+        );
+
+        postEvent(SUPPORT_MESSAGE_DELETED_PATH, payload);
+    }
+
+    private void postEvent(String path, Object payload) {
+        try {
+            restTemplate.postForEntity(path, new HttpEntity<>(payload, buildHeaders()), Void.class);
+        } catch (Exception ex) {
+            throw new RuntimeException("Failed to publish support internal event: " + ex.getMessage(), ex);
+        }
+    }
+
+    private HttpHeaders buildHeaders() {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         if (internalKey != null && !internalKey.isBlank()) {
             headers.set("x-internal-key", internalKey);
         }
-
-        try {
-            restTemplate.postForEntity(CUSTOMER_MESSAGE_CREATED_PATH, new HttpEntity<>(payload, headers), Void.class);
-        } catch (Exception ex) {
-            // Non-blocking for user chat; in production, add retry/outbox.
-            LOGGER.warn("Failed to publish customer support message event to support-service: {}", ex.getMessage());
-        }
+        return headers;
     }
 }

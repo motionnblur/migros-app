@@ -12,6 +12,7 @@ import { FormsModule } from '@angular/forms';
 import { IChatMessage } from '../../../../interfaces/IChatMessage';
 import { SupportRealtimeService } from '../../../../services/support-realtime/support-realtime.service';
 import { ISupportRealtimeEvent } from '../../../../interfaces/support/ISupportRealtimeEvent';
+import { ISupportCustomerSummary } from '../../../../interfaces/support/ISupportCustomerSummary';
 import { Subscription } from 'rxjs';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../../../services/auth/auth.service';
@@ -49,12 +50,20 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
   selectedSupportUserMail = '';
   supportMessages: IChatMessage[] = [];
   supportReplyInput = '';
+  editingSupportMessageId: number | null = null;
+  supportEditInput = '';
+  supportMessageActionInProgressId: number | null = null;
   isSupportLoading = false;
   isSupportSending = false;
   supportError = '';
+  supportCustomerQuery = '';
+  supportCustomerResults: ISupportCustomerSummary[] = [];
+  isSupportCustomerSearchLoading = false;
+
   private supportPollingIntervalId: ReturnType<typeof setInterval> | null = null;
   private supportRealtimeSub: Subscription | null = null;
   private routeSub: Subscription | null = null;
+  private supportCustomerSearchTimer: ReturnType<typeof setTimeout> | null = null;
 
   private productChangedCallback!: (data: any) => void;
   private editorOpenedCallback!: (id: number) => void;
@@ -114,6 +123,11 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     this.stopSupportPolling();
     this.supportRealtimeSub?.unsubscribe();
     this.routeSub?.unsubscribe();
+
+    if (this.supportCustomerSearchTimer) {
+      clearTimeout(this.supportCustomerSearchTimer);
+      this.supportCustomerSearchTimer = null;
+    }
   }
 
   logoutAdmin() {
@@ -196,19 +210,19 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
         this.supportUsers = users;
 
         if (!users.length) {
-          this.selectedSupportUserMail = '';
-          this.supportMessages = [];
+          if (!this.selectedSupportUserMail) {
+            this.supportMessages = [];
+          }
           return;
         }
 
-        if (
-          !this.selectedSupportUserMail ||
-          !users.includes(this.selectedSupportUserMail)
-        ) {
+        if (!this.selectedSupportUserMail) {
           this.selectedSupportUserMail = users[0];
         }
 
-        this.loadSupportMessages();
+        if (this.selectedSupportUserMail) {
+          this.loadSupportMessages();
+        }
       },
       error: () => {
         this.supportError = 'Kullanici sohbetleri yuklenemedi.';
@@ -225,6 +239,50 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
         this.supportError = 'Banli kullanicilar yuklenemedi.';
       },
     });
+  }
+
+  onSupportCustomerSearchChange() {
+    const query = this.supportCustomerQuery.trim();
+
+    if (this.supportCustomerSearchTimer) {
+      clearTimeout(this.supportCustomerSearchTimer);
+      this.supportCustomerSearchTimer = null;
+    }
+
+    if (!query) {
+      this.supportCustomerResults = [];
+      this.isSupportCustomerSearchLoading = false;
+      return;
+    }
+
+    this.supportCustomerSearchTimer = setTimeout(() => {
+      this.searchSupportCustomers(query);
+    }, 300);
+  }
+
+  private searchSupportCustomers(query: string) {
+    this.isSupportCustomerSearchLoading = true;
+
+    this.restService.searchSupportCustomersForAdmin(query, 20).subscribe({
+      next: (customers: ISupportCustomerSummary[]) => {
+        this.isSupportCustomerSearchLoading = false;
+        this.supportCustomerResults = customers || [];
+      },
+      error: () => {
+        this.isSupportCustomerSearchLoading = false;
+        this.supportError = 'Kullanici aramasi yapilamadi.';
+      },
+    });
+  }
+
+  selectSupportCustomerFromSearch(customer: ISupportCustomerSummary) {
+    if (!customer?.userMail) {
+      return;
+    }
+
+    this.selectedSupportUserMail = customer.userMail;
+    this.supportError = '';
+    this.loadSupportMessages();
   }
 
   selectSupportUser(userMail: string) {
@@ -247,6 +305,9 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
         next: (messages: IChatMessage[]) => {
           this.supportMessages = messages;
           this.isSupportLoading = false;
+          this.editingSupportMessageId = null;
+          this.supportEditInput = '';
+          this.supportMessageActionInProgressId = null;
         },
         error: () => {
           this.isSupportLoading = false;
@@ -255,9 +316,102 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
       });
   }
 
+  startEditSupportMessage(message: IChatMessage) {
+    if (this.supportMessageActionInProgressId !== null) {
+      return;
+    }
+
+    this.editingSupportMessageId = message.id;
+    this.supportEditInput = message.message || '';
+    this.supportError = '';
+  }
+
+  cancelEditSupportMessage() {
+    if (this.supportMessageActionInProgressId !== null) {
+      return;
+    }
+
+    this.editingSupportMessageId = null;
+    this.supportEditInput = '';
+  }
+
+  saveEditedSupportMessage(message: IChatMessage) {
+    if (!this.selectedSupportUserMail || this.supportMessageActionInProgressId !== null) {
+      return;
+    }
+
+    const nextMessage = this.supportEditInput.trim();
+    if (!nextMessage) {
+      this.supportError = 'Mesaj bos olamaz.';
+      return;
+    }
+
+    this.supportMessageActionInProgressId = message.id;
+    this.restService
+      .editSupportMessageForAdmin(this.selectedSupportUserMail, message.id, nextMessage)
+      .subscribe({
+        next: () => {
+          this.supportMessageActionInProgressId = null;
+          this.editingSupportMessageId = null;
+          this.supportEditInput = '';
+          this.loadSupportMessages();
+          this.loadSupportUsers();
+        },
+        error: (err) => {
+          this.supportMessageActionInProgressId = null;
+          this.supportError =
+            typeof err?.error === 'string' && err.error
+              ? err.error
+              : 'Mesaj duzenlenemedi.';
+        },
+      });
+  }
+
+  deleteSupportMessage(message: IChatMessage) {
+    if (!this.selectedSupportUserMail || this.supportMessageActionInProgressId !== null) {
+      return;
+    }
+
+    const approved = confirm('Mesaj kalici olarak silinecek. Devam edilsin mi?');
+    if (!approved) {
+      return;
+    }
+
+    this.supportMessageActionInProgressId = message.id;
+    this.restService
+      .deleteSupportMessageForAdmin(this.selectedSupportUserMail, message.id)
+      .subscribe({
+        next: () => {
+          this.supportMessageActionInProgressId = null;
+          if (this.editingSupportMessageId === message.id) {
+            this.editingSupportMessageId = null;
+            this.supportEditInput = '';
+          }
+          this.loadSupportMessages();
+          this.loadSupportUsers();
+        },
+        error: (err) => {
+          this.supportMessageActionInProgressId = null;
+          this.supportError =
+            typeof err?.error === 'string' && err.error
+              ? err.error
+              : 'Mesaj silinemedi.';
+        },
+      });
+  }
+
+  isSupportMessageActionBusy(message: IChatMessage): boolean {
+    return this.supportMessageActionInProgressId === message.id;
+  }
+
   sendSupportReply() {
     const message = this.supportReplyInput.trim();
     if (!this.selectedSupportUserMail || !message || this.isSupportSending) {
+      return;
+    }
+
+    if (this.isSelectedUserBanned()) {
+      this.supportError = 'Banli kullaniciya mesaj gonderilemez.';
       return;
     }
 
@@ -269,10 +423,14 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
           this.supportReplyInput = '';
           this.isSupportSending = false;
           this.loadSupportMessages();
+          this.loadSupportUsers();
         },
-        error: () => {
+        error: (err) => {
           this.isSupportSending = false;
-          this.supportError = 'Yanit gonderilemedi.';
+          this.supportError =
+            typeof err?.error === 'string' && err.error
+              ? err.error
+              : 'Yanit gonderilemedi.';
         },
       });
   }
