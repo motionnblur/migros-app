@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -53,7 +54,7 @@ public class SupportChatService {
         UserEntity user = userEntityRepository.findByUserMail(userMail);
         assertNotBanned(user);
 
-        String trimmedMessage = message == null ? "" : message.trim();
+        String trimmedMessage = safeTrim(message);
         if (trimmedMessage.isEmpty()) {
             throw new GeneralException("Message cannot be empty");
         }
@@ -91,12 +92,16 @@ public class SupportChatService {
     }
 
     public void addManagementMessage(String userMail, String message) {
+        addManagementMessage(userMail, message, null);
+    }
+
+    public void addManagementMessage(String userMail, String message, String externalMessageId) {
         UserEntity user = userEntityRepository.findByUserMail(userMail);
         if (user == null) {
             throw new UserNotFoundException(userMail);
         }
 
-        String trimmedMessage = message == null ? "" : message.trim();
+        String trimmedMessage = safeTrim(message);
         if (trimmedMessage.isEmpty()) {
             throw new GeneralException("Message cannot be empty");
         }
@@ -105,6 +110,38 @@ public class SupportChatService {
         entity.setUserMail(userMail);
         entity.setSender("MANAGEMENT");
         entity.setMessage(trimmedMessage);
+        entity.setExternalMessageId(safeTrimToNull(externalMessageId));
+        supportMessageEntityRepository.save(entity);
+        supportChatWebSocketHandler.broadcastSupportUpdate(userMail);
+    }
+
+    @Transactional
+    public void editManagementMessage(String userMail, String externalMessageId, String message) {
+        UserEntity user = userEntityRepository.findByUserMail(userMail);
+        if (user == null) {
+            throw new UserNotFoundException(userMail);
+        }
+
+        String trimmedExternalMessageId = safeTrim(externalMessageId);
+        if (trimmedExternalMessageId.isEmpty()) {
+            throw new GeneralException("externalMessageId is required");
+        }
+
+        String trimmedMessage = safeTrim(message);
+        if (trimmedMessage.isEmpty()) {
+            throw new GeneralException("Message cannot be empty");
+        }
+
+        SupportMessageEntity entity = supportMessageEntityRepository
+                .findByUserMailAndExternalMessageId(userMail, trimmedExternalMessageId)
+                .orElseThrow(() -> new GeneralException("Editable support message not found"));
+
+        if (!"MANAGEMENT".equals(entity.getSender())) {
+            throw new GeneralException("Only management messages can be edited");
+        }
+
+        entity.setMessage(trimmedMessage);
+        entity.setEditedAt(LocalDateTime.now());
         supportMessageEntityRepository.save(entity);
         supportChatWebSocketHandler.broadcastSupportUpdate(userMail);
     }
@@ -171,7 +208,17 @@ public class SupportChatService {
                 entity.getId(),
                 entity.getSender(),
                 entity.getMessage(),
-                entity.getCreatedAt()
+                entity.getCreatedAt(),
+                entity.getEditedAt()
         );
+    }
+
+    private String safeTrim(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private String safeTrimToNull(String value) {
+        String trimmed = safeTrim(value);
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

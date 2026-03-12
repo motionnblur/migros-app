@@ -1,6 +1,7 @@
 package com.example.MigrosBackend.controller.internal;
 
 import com.example.MigrosBackend.dto.support.InternalSupportAgentMessageDto;
+import com.example.MigrosBackend.dto.support.InternalSupportEditAgentMessageDto;
 import com.example.MigrosBackend.dto.support.InternalSupportUserActionDto;
 import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.service.support.SupportChatService;
@@ -42,7 +43,28 @@ public class InternalSupportController {
             throw new GeneralException("userMail and message are required");
         }
 
-        supportChatService.addManagementMessage(userMail, message);
+        supportChatService.addManagementMessage(userMail, message, safeTrimToNull(dto.getExternalMessageId()));
+        return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("edit-agent-message")
+    public ResponseEntity<Void> editAgentMessage(
+            @RequestHeader(name = "x-internal-key", required = false) String internalKey,
+            @RequestBody InternalSupportEditAgentMessageDto dto
+    ) {
+        if (!isAuthorized(internalKey)) {
+            return ResponseEntity.status(401).build();
+        }
+
+        String userMail = safeTrim(dto.getUserMail());
+        String externalMessageId = safeTrim(dto.getExternalMessageId());
+        String message = safeTrim(dto.getMessage());
+
+        if (userMail.isEmpty() || externalMessageId.isEmpty() || message.isEmpty()) {
+            throw new GeneralException("userMail, externalMessageId and message are required");
+        }
+
+        supportChatService.editManagementMessage(userMail, externalMessageId, message);
         return ResponseEntity.accepted().build();
     }
 
@@ -109,5 +131,9 @@ public class InternalSupportController {
     private String safeTrim(String value) {
         return value == null ? "" : value.trim();
     }
-}
 
+    private String safeTrimToNull(String value) {
+        String trimmed = safeTrim(value);
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+}

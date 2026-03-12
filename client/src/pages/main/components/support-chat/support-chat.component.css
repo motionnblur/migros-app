@@ -90,3 +90,9 @@
     width: 100%;
   }
 }
+
+.chat-message-edited {
+  margin-left: 0.35rem;
+  font-size: 0.64rem;
+  color: #64748b;
+}

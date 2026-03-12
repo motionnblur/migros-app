@@ -14,4 +14,12 @@ public class SupportMessageDto {
     private String sender;
     private String message;
     private LocalDateTime createdAt;
+    private LocalDateTime editedAt;
+
+    public SupportMessageDto(Long id, String sender, String message, LocalDateTime createdAt) {
+        this.id = id;
+        this.sender = sender;
+        this.message = message;
+        this.createdAt = createdAt;
+    }
 }

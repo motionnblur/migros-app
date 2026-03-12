@@ -41,6 +41,8 @@ class SupportChatServiceTest {
     private TokenService tokenService;
     @Mock
     private SupportChatWebSocketHandler supportChatWebSocketHandler;
+    @Mock
+    private SupportInternalEventService supportInternalEventService;
 
     @InjectMocks
     private SupportChatService supportChatService;

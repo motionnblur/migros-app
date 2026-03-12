@@ -32,8 +32,22 @@ public class SupportMessageEntity {
     @Column(nullable = false, length = 2000)
     private String message;
 
+    @Column(unique = true)
+    private String externalMessageId;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
+
+    @Column
+    private LocalDateTime editedAt;
+
+    public SupportMessageEntity(Long id, String userMail, String sender, String message, LocalDateTime createdAt) {
+        this.id = id;
+        this.userMail = userMail;
+        this.sender = sender;
+        this.message = message;
+        this.createdAt = createdAt;
+    }
 
     @PrePersist
     public void prePersist() {

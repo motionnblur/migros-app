@@ -3,4 +3,5 @@ export interface IChatMessage {
   sender: 'USER' | 'MANAGEMENT';
   message: string;
   createdAt: string;
+  editedAt?: string | null;
 }

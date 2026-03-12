@@ -12,7 +12,10 @@
 
     <div class="chat-message" *ngFor="let message of supportMessages"
          [ngClass]="{ 'management': message.sender === 'MANAGEMENT' }">
-      <div class="chat-message-meta">{{ message.sender === 'MANAGEMENT' ? 'Yonetim' : 'Siz' }}</div>
+      <div class="chat-message-meta">
+        {{ message.sender === 'MANAGEMENT' ? 'Yonetim' : 'Siz' }}
+        <span class="chat-message-edited" *ngIf="message.editedAt">duzenlendi</span>
+      </div>
       <div class="chat-message-content">{{ message.message }}</div>
     </div>
   </div>

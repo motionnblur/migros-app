@@ -6,10 +6,13 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface SupportMessageEntityRepository extends JpaRepository<SupportMessageEntity, Long> {
     List<SupportMessageEntity> findByUserMailOrderByCreatedAtAscIdAsc(String userMail);
+
+    Optional<SupportMessageEntity> findByUserMailAndExternalMessageId(String userMail, String externalMessageId);
 
     @Query("SELECT DISTINCT s.userMail FROM SupportMessageEntity s ORDER BY s.userMail ASC")
     List<String> findDistinctUserMails();

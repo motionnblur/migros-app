@@ -7,8 +7,8 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class InternalSupportAgentMessageDto {
+public class InternalSupportEditAgentMessageDto {
     private String userMail;
-    private String message;
     private String externalMessageId;
+    private String message;
 }
