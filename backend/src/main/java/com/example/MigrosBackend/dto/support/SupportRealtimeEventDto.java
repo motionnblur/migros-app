@@ -10,4 +10,7 @@ import lombok.NoArgsConstructor;
 public class SupportRealtimeEventDto {
     private String type;
     private String userMail;
+    private String sender;
+    private Long messageId;
 }
+

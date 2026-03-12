@@ -8,11 +8,15 @@ import { ISupportRealtimeEvent } from '../../interfaces/support/ISupportRealtime
 export class SupportRealtimeService {
   private socket: WebSocket | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private connectUserMail = '';
   private readonly eventsSubject = new Subject<ISupportRealtimeEvent>();
   readonly events$: Observable<ISupportRealtimeEvent> =
     this.eventsSubject.asObservable();
 
-  connect() {
+  connect(userMail?: string) {
+    if (typeof userMail === 'string') {
+      this.connectUserMail = userMail;
+    }
     if (
       this.socket &&
       (this.socket.readyState === WebSocket.OPEN ||
@@ -21,12 +25,17 @@ export class SupportRealtimeService {
       return;
     }
 
-    this.socket = new WebSocket('ws://localhost:8080/ws/support');
+    const normalizedUserMail = (this.connectUserMail || '').trim().toLowerCase();
+    const socketUrl = normalizedUserMail
+      ? `ws://localhost:8080/ws/support?userMail=${encodeURIComponent(normalizedUserMail)}`
+      : 'ws://localhost:8080/ws/support';
+
+    this.socket = new WebSocket(socketUrl);
 
     this.socket.onmessage = (event: MessageEvent<string>) => {
       try {
         const data = JSON.parse(event.data) as ISupportRealtimeEvent;
-        if (data?.type === 'SUPPORT_UPDATED') {
+        if (data?.type === 'SUPPORT_UPDATED' || data?.type === 'SUPPORT_MESSAGE_CREATED') {
           this.eventsSubject.next(data);
         }
       } catch {
@@ -54,6 +63,8 @@ export class SupportRealtimeService {
       this.socket.close();
       this.socket = null;
     }
+
+    this.connectUserMail = '';
   }
 
   private scheduleReconnect() {
@@ -67,3 +78,4 @@ export class SupportRealtimeService {
     }, 3000);
   }
 }
+

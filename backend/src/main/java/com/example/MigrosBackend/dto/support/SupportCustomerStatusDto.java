@@ -11,4 +11,5 @@ public class SupportCustomerStatusDto {
     private String userMail;
     private Boolean isBanned;
     private Boolean hasConversation;
+    private Boolean isOnline;
 }

@@ -132,7 +132,8 @@ public class SupportChatService {
         return new SupportCustomerStatusDto(
                 normalizedUserMail,
                 Boolean.TRUE.equals(user.getBanned()),
-                supportMessageEntityRepository.existsByUserMail(normalizedUserMail)
+                supportMessageEntityRepository.existsByUserMail(normalizedUserMail),
+                supportChatWebSocketHandler.isUserOnline(normalizedUserMail)
         );
     }
 
@@ -149,7 +150,6 @@ public class SupportChatService {
     public void addManagementMessage(String userMail, String message) {
         addManagementMessage(userMail, message, null);
     }
-
     public void addManagementMessage(String userMail, String message, String externalMessageId) {
         UserEntity user = userEntityRepository.findByUserMail(userMail);
         if (user == null) {
@@ -168,10 +168,9 @@ public class SupportChatService {
         entity.setSender("MANAGEMENT");
         entity.setMessage(trimmedMessage);
         entity.setExternalMessageId(safeTrimToNull(externalMessageId));
-        supportMessageEntityRepository.save(entity);
-        supportChatWebSocketHandler.broadcastSupportUpdate(userMail);
+        entity = supportMessageEntityRepository.save(entity);
+        supportChatWebSocketHandler.broadcastSupportMessageCreated(userMail, "MANAGEMENT", entity.getId());
     }
-
     @Transactional
     public void editManagementMessage(String userMail, String externalMessageId, String message) {
         UserEntity user = userEntityRepository.findByUserMail(userMail);
@@ -202,7 +201,6 @@ public class SupportChatService {
         supportMessageEntityRepository.save(entity);
         supportChatWebSocketHandler.broadcastSupportUpdate(userMail);
     }
-
     @Transactional
     public void deleteManagementMessage(String userMail, String externalMessageId) {
         UserEntity user = userEntityRepository.findByUserMail(userMail);
@@ -226,7 +224,6 @@ public class SupportChatService {
         supportMessageEntityRepository.delete(entity);
         supportChatWebSocketHandler.broadcastSupportUpdate(userMail);
     }
-
     @Transactional
     public void editMessageForAdmin(String userMail, Long messageId, String message) {
         UserEntity user = userEntityRepository.findByUserMail(userMail);
@@ -260,7 +257,6 @@ public class SupportChatService {
         supportInternalEventService.publishSupportMessageEdited(userMail, supportServiceMessageId, trimmedMessage);
         supportChatWebSocketHandler.broadcastSupportUpdate(userMail);
     }
-
     @Transactional
     public void deleteMessageForAdmin(String userMail, Long messageId) {
         UserEntity user = userEntityRepository.findByUserMail(userMail);
@@ -286,7 +282,6 @@ public class SupportChatService {
         supportInternalEventService.publishSupportMessageDeleted(userMail, supportServiceMessageId);
         supportChatWebSocketHandler.broadcastSupportUpdate(userMail);
     }
-
     @Transactional
     public void closeChat(String userMail) {
         UserEntity user = userEntityRepository.findByUserMail(userMail);
@@ -401,3 +396,8 @@ public class SupportChatService {
         return trimmed.isEmpty() ? null : trimmed;
     }
 }
+
+
+
+
+

@@ -47,14 +47,19 @@ export class SupportChatComponent implements OnInit, OnDestroy {
 
       this.currentUserMail = this.authService.getUserMail();
 
-      this.supportRealtimeService.connect();
+      this.supportRealtimeService.connect(this.currentUserMail);
       this.supportRealtimeSub = this.supportRealtimeService.events$.subscribe(
         (event: ISupportRealtimeEvent) => {
-          if (!this.currentUserMail) {
+          const normalizedCurrent = (this.currentUserMail || '').trim().toLowerCase();
+          const normalizedEvent = (event?.userMail || '').trim().toLowerCase();
+          if (!normalizedCurrent || normalizedEvent !== normalizedCurrent) {
             return;
           }
 
-          if (event.userMail === this.currentUserMail) {
+          if (
+            event.type === 'SUPPORT_UPDATED' ||
+            event.type === 'SUPPORT_MESSAGE_CREATED'
+          ) {
             this.loadSupportMessages();
           }
         }
@@ -106,6 +111,7 @@ export class SupportChatComponent implements OnInit, OnDestroy {
     this.restService.getSupportMessages().subscribe({
       next: (messages: IChatMessage[]) => {
         this.supportMessages = messages;
+        this.updateLastSeenManagementMessage(messages);
         this.isSupportLoading = false;
       },
       error: (err) => {
@@ -130,5 +136,24 @@ export class SupportChatComponent implements OnInit, OnDestroy {
       clearInterval(this.supportPollingIntervalId);
       this.supportPollingIntervalId = null;
     }
+  }
+
+  private updateLastSeenManagementMessage(messages: IChatMessage[]) {
+    const normalizedUserMail = (this.currentUserMail || '').trim().toLowerCase();
+    if (!normalizedUserMail) {
+      return;
+    }
+
+    const latestManagementId = messages
+      .filter((message) => message.sender === 'MANAGEMENT')
+      .reduce((maxId, message) => Math.max(maxId, message.id), 0);
+
+    if (latestManagementId > 0) {
+      localStorage.setItem(this.getLastSeenKey(normalizedUserMail), String(latestManagementId));
+    }
+  }
+
+  private getLastSeenKey(userMail: string) {
+    return `support:lastSeenManagementMessageId:${userMail}`;
   }
 }

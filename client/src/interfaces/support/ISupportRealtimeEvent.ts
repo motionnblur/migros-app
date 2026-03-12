@@ -1,4 +1,8 @@
+export type SupportRealtimeEventType = 'SUPPORT_UPDATED' | 'SUPPORT_MESSAGE_CREATED';
+
 export interface ISupportRealtimeEvent {
-  type: 'SUPPORT_UPDATED';
+  type: SupportRealtimeEventType;
   userMail: string;
+  sender?: 'USER' | 'MANAGEMENT';
+  messageId?: number;
 }
