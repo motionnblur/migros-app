@@ -82,6 +82,24 @@ public class InternalSupportController {
         return ResponseEntity.accepted().build();
     }
 
+    @PostMapping("unban-user")
+    public ResponseEntity<Void> unbanUser(
+            @RequestHeader(name = "x-internal-key", required = false) String internalKey,
+            @RequestBody InternalSupportUserActionDto dto
+    ) {
+        if (!isAuthorized(internalKey)) {
+            return ResponseEntity.status(401).build();
+        }
+
+        String userMail = safeTrim(dto.getUserMail());
+        if (userMail.isEmpty()) {
+            throw new GeneralException("userMail is required");
+        }
+
+        supportChatService.unbanUser(userMail);
+        return ResponseEntity.accepted().build();
+    }
+
     private boolean isAuthorized(String internalKey) {
         return supportInternalKey == null
                 || supportInternalKey.isBlank()
@@ -92,3 +110,4 @@ public class InternalSupportController {
         return value == null ? "" : value.trim();
     }
 }
+
