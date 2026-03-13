@@ -6,6 +6,7 @@ import { CommonModule } from '@angular/common';
 import { Component } from '@angular/core';
 import { AuthService } from '../../../../services/auth/auth.service';
 import { ActivatedRoute, Router } from '@angular/router';
+import { supabaseImageUrl } from '../../../../app/config/supabase-assets';
 
 @Component({
   selector: 'app-product-buy',
@@ -15,6 +16,7 @@ import { ActivatedRoute, Router } from '@angular/router';
   styleUrl: './product-buy.component.css',
 })
 export class ProductBuyComponent extends ProductBuyBase {
+  readonly supabaseImageUrl = supabaseImageUrl;
   public selectedTabIndex: number = 0;
 
   public get discountedPrice(): number {

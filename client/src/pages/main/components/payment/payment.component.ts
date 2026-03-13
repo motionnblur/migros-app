@@ -2,6 +2,8 @@ import { Component, EventEmitter, OnInit, Output } from '@angular/core';
 import { loadStripe } from '@stripe/stripe-js';
 import { data } from '../../../../memory/global-data';
 
+const API_BASE_URL = 'https://migros-app.onrender.com';
+
 @Component({
   selector: 'app-payment',
   templateUrl: './payment.component.html',
@@ -51,7 +53,7 @@ export class PaymentComponent implements OnInit {
 
   // Call your backend API to create a charge
   processPayment(token: any) {
-    fetch('http://localhost:8080/payment/create-charge', {
+    fetch(`${API_BASE_URL}/payment/create-charge`, {
       method: 'POST',
       body: JSON.stringify({
         token: token.id,

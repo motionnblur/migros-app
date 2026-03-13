@@ -1,15 +1,17 @@
 package com.example.MigrosBackend.service.global;
 
 import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.ResponseEntity;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
+import org.springframework.web.client.RestTemplate;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -19,16 +21,27 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class MailServiceTest {
     @Mock
-    private JavaMailSender emailSender;
+    private RestTemplateBuilder restTemplateBuilder;
 
     @Mock
     private TemplateEngine templateEngine;
 
     @Mock
-    private MimeMessage mimeMessage;
+    private RestTemplate restTemplate;
 
-    @InjectMocks
     private MailService mailService;
+
+    @BeforeEach
+    void setUp() {
+        when(restTemplateBuilder.rootUri("https://api.resend.com")).thenReturn(restTemplateBuilder);
+        when(restTemplateBuilder.build()).thenReturn(restTemplate);
+        mailService = new MailService(
+                restTemplateBuilder,
+                templateEngine,
+                "test_resend_key",
+                "onboarding@resend.dev"
+        );
+    }
 
     @Test
     void sendMimeMessage_Success() throws MessagingException {
@@ -42,8 +55,9 @@ class MailServiceTest {
         // 1. Mock Thymeleaf processing
         when(templateEngine.process(eq(templateName), any(Context.class))).thenReturn(processedHtml);
 
-        // 2. Mock JavaMailSender to return our mocked MimeMessage
-        when(emailSender.createMimeMessage()).thenReturn(mimeMessage);
+        // 2. Mock Resend API success response
+        when(restTemplate.postForEntity(eq("/emails"), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(ResponseEntity.ok("{}"));
 
         // Act
         mailService.sendMimeMessage(to, subject, templateName, context);
@@ -52,8 +66,8 @@ class MailServiceTest {
         // Verify Thymeleaf was called
         verify(templateEngine, times(1)).process(eq(templateName), any(Context.class));
 
-        // Verify the message was actually sent
-        verify(emailSender, times(1)).send(mimeMessage);
+        // Verify Resend API call was made
+        verify(restTemplate, times(1)).postForEntity(eq("/emails"), any(HttpEntity.class), eq(String.class));
     }
 
     @Test
@@ -68,7 +82,7 @@ class MailServiceTest {
                 mailService.sendMimeMessage("test@test.com", "Sub", "wrong-temp", context)
         );
 
-        // Verify emailSender.send was NEVER called because template failed first
-        verify(emailSender, never()).send(any(MimeMessage.class));
+        // Verify Resend API was NEVER called because template failed first
+        verify(restTemplate, never()).postForEntity(anyString(), any(HttpEntity.class), eq(String.class));
     }
 }

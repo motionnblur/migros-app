@@ -5,7 +5,7 @@
       <div class="d-flex flex-column flex-md-row align-items-center justify-content-between gap-3">
 
         <a class="logo-link" [routerLink]="['/']">
-          <img src="migros_header.png" height="40" alt="Logo" class="d-block">
+          <img [src]="supabaseImageUrl('migros_header.png')" height="40" alt="Logo" class="d-block">
         </a>
 
         <div class="d-flex align-items-center gap-2 gap-md-3">
@@ -68,10 +68,10 @@
 
     <div class="bg-light-gray border-bottom overflow-hidden d-none d-md-block">
       <div class="container-fluid p-0">
-        <img src="migros_header2.png" class="img-fluid w-100 d-block" style="max-height: 80px; object-fit: cover;">
+        <img [src]="supabaseImageUrl('migros_header2.png')" class="img-fluid w-100 d-block" style="max-height: 80px; object-fit: cover;">
       </div>
       <div class="bg-white py-2 text-center border-bottom shadow-sm">
-        <img src="migros_header_bottom.png" class="img-fluid" style="max-height: 40px;">
+        <img [src]="supabaseImageUrl('migros_header_bottom.png')" class="img-fluid" style="max-height: 40px;">
       </div>
     </div>
   </header>
@@ -85,11 +85,11 @@
   <footer class="bg-white border-top mt-auto py-5">
     <div class="container">
       <div class="text-center mb-5">
-        <img src="footer/migros-footer-main.png" class="img-fluid rounded shadow-sm" alt="Footer Content">
+        <img [src]="supabaseImageUrl('footer/migros-footer-main.png')" class="img-fluid rounded shadow-sm" alt="Footer Content">
       </div>
       <div class="d-flex flex-column flex-md-row justify-content-between align-items-center border-top pt-4 gap-3">
-        <img src="footer/migros-footer.png" class="img-fluid" style="max-height: 40px;">
-        <img src="footer/migros-footer2.png" class="img-fluid" style="max-height: 35px;">
+        <img [src]="supabaseImageUrl('footer/migros-footer.png')" class="img-fluid" style="max-height: 40px;">
+        <img [src]="supabaseImageUrl('footer/migros-footer2.png')" class="img-fluid" style="max-height: 35px;">
       </div>
     </div>
   </footer>

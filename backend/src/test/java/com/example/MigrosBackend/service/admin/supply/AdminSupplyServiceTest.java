@@ -113,7 +113,7 @@ class AdminSupplyServiceTest {
                 "selectedImage", "test.png", "image/png", "some-image-data".getBytes());
         Path mockPath = Paths.get("UploadFolder/image_123.png");
 
-        when(fileService.writeFileToDisk(any(), anyString(), anyString())).thenReturn(mockPath);
+        when(fileService.writeFileToDisk(any(), anyString())).thenReturn(mockPath);
         when(categoryEntityRepository.findByCategoryId(10)).thenReturn(category);
         when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(admin));
 
@@ -160,7 +160,7 @@ class AdminSupplyServiceTest {
         MockMultipartFile file = new MockMultipartFile(
                 "selectedImage", "test.png", "image/png", "data".getBytes());
 
-        when(fileService.writeFileToDisk(any(), anyString(), anyString())).thenThrow(new IOException());
+        when(fileService.writeFileToDisk(any(), anyString())).thenThrow(new IOException());
 
         assertThrows(FileUploadFailedException.class, () ->
                 adminSupplyService.uploadProduct(1L, "Water", "Still", 5.0f, 100, 0.1f, "Fresh", 10, file)
@@ -190,7 +190,7 @@ class AdminSupplyServiceTest {
         existingImage.setImagePath("old/path.png");
 
         Path mockPath = Paths.get("UploadFolder/new_image.png");
-        when(fileService.writeFileToDisk(any(), anyString(), anyString())).thenReturn(mockPath);
+        when(fileService.writeFileToDisk(any(), anyString())).thenReturn(mockPath);
         when(categoryEntityRepository.findByCategoryId(categoryId)).thenReturn(localCategory);
         when(adminEntityRepository.findById(adminId)).thenReturn(Optional.of(localAdmin));
         when(productEntityRepository.findById(productId)).thenReturn(Optional.of(existingProduct));
@@ -217,7 +217,7 @@ class AdminSupplyServiceTest {
 
         adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", 10f, 5, 0f, "Desc", 1, null);
 
-        verify(fileService, never()).writeFileToDisk(any(), anyString(), anyString());
+        verify(fileService, never()).writeFileToDisk(any(), anyString());
         verify(productImageEntityRepository, never()).findByProductEntityId(anyLong());
         verify(productEntityRepository).save(product);
     }
@@ -253,7 +253,7 @@ class AdminSupplyServiceTest {
         when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(new AdminEntity()));
         when(categoryEntityRepository.findByCategoryId(1)).thenReturn(new CategoryEntity());
         when(productEntityRepository.findById(100L)).thenReturn(Optional.of(new ProductEntity()));
-        when(fileService.writeFileToDisk(any(), anyString(), anyString())).thenThrow(new IOException());
+        when(fileService.writeFileToDisk(any(), anyString())).thenThrow(new IOException());
 
         assertThrows(FileUploadFailedException.class, () ->
                 adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", 10f, 5, 0f, "Desc", 1, file)
@@ -442,7 +442,6 @@ class AdminSupplyServiceTest {
         verify(productDescriptionEntityRepository).deleteById(88L);
     }
 }
-
 
 
 

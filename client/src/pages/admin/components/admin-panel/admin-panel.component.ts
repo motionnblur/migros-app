@@ -16,6 +16,7 @@ import { ISupportCustomerSummary } from '../../../../interfaces/support/ISupport
 import { Subscription } from 'rxjs';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../../../services/auth/auth.service';
+import { supabaseImageUrl } from '../../../../app/config/supabase-assets';
 
 @Component({
   selector: 'app-admin-panel',
@@ -35,6 +36,7 @@ import { AuthService } from '../../../../services/auth/auth.service';
   styleUrl: './admin-panel.component.css',
 })
 export class AdminPanelComponent implements OnInit, OnDestroy {
+  readonly supabaseImageUrl = supabaseImageUrl;
   productId!: number;
   hasProductAdderOpened = false;
   hasProductsOpened = false;

@@ -1,6 +1,10 @@
 <div class="category-button" (click)="openItemPage()">
   <div class="category-button__image__container">
-    <img class="category-button__image" src="{{ image }}" />
+    <img
+      class="category-button__image"
+      [src]="supabaseImageUrl(image)"
+      (error)="onImageError($event)"
+    />
   </div>
 
   <div class="category-button__title">{{ name }}</div>

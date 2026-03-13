@@ -27,7 +27,7 @@ export class AuthService {
 
   public refreshUserSession(): Observable<boolean> {
     return this.http
-      .get<UserSessionResponse>('http://localhost:8080/user/session')
+      .get<UserSessionResponse>('https://migros-app.onrender.com/user/session')
       .pipe(
         tap((session) => {
           this.userMail = session?.userMail ?? '';
@@ -44,7 +44,7 @@ export class AuthService {
 
   public refreshAdminSession(): Observable<boolean> {
     return this.http
-      .get<AdminSessionResponse>('http://localhost:8080/admin/session')
+      .get<AdminSessionResponse>('https://migros-app.onrender.com/admin/session')
       .pipe(
         tap((session) => {
           this.adminName = session?.adminName ?? '';
@@ -76,7 +76,7 @@ export class AuthService {
   }
 
   public logout(onComplete?: () => void): void {
-    this.http.post('http://localhost:8080/user/logout', {}).subscribe({
+    this.http.post('https://migros-app.onrender.com/user/logout', {}).subscribe({
       next: () => {
         this.userMail = '';
         this.userLoggedInSubject.next(false);
@@ -91,7 +91,7 @@ export class AuthService {
   }
 
   public logoutAdmin(onComplete?: () => void): void {
-    this.http.post('http://localhost:8080/admin/logout', {}).subscribe({
+    this.http.post('https://migros-app.onrender.com/admin/logout', {}).subscribe({
       next: () => {
         this.adminName = '';
         this.adminLoggedInSubject.next(false);

@@ -11,7 +11,7 @@ export class SignService {
   adminLogin(adminName: string, adminPassword: string) {
     return this.http
       .post(
-        'http://localhost:8080/admin/login',
+        'https://migros-app.onrender.com/admin/login',
         {
           adminName,
           adminPassword,

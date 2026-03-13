@@ -15,6 +15,7 @@ import com.example.MigrosBackend.service.global.MailService;
 import com.example.MigrosBackend.service.global.TokenService;
 import jakarta.mail.MessagingException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.thymeleaf.context.Context;
 
@@ -30,6 +31,7 @@ public class UserSignupService {
     private final MailService mailService;
     private final TokenService tokenService;
     private final PasswordValidator passwordValidator;
+    private final String publicBaseUrl;
 
     private final ConcurrentHashMap<String, UserEntity> tokenToUserMap = new ConcurrentHashMap<>();
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
@@ -37,12 +39,14 @@ public class UserSignupService {
     @Autowired
     public UserSignupService(UserEntityRepository userEntityRepository, EncryptService encryptService,
                              MailService mailService, TokenService tokenService,
-                             PasswordValidator passwordValidator) {
+                             PasswordValidator passwordValidator,
+                             @Value("${app.public-base-url:https://migros-app.onrender.com}") String publicBaseUrl) {
         this.userEntityRepository = userEntityRepository;
         this.encryptService = encryptService;
         this.mailService = mailService;
         this.tokenService = tokenService;
         this.passwordValidator = passwordValidator;
+        this.publicBaseUrl = normalizeBaseUrl(publicBaseUrl);
     }
 
     public void signup(UserSignDto userSignDto) {
@@ -57,7 +61,7 @@ public class UserSignupService {
         userEntityToCreate.setUserPassword(encryptService.getEncryptedPassword(userSignDto.getUserPassword()));
 
         String key = Long.toHexString(Double.doubleToLongBits(Math.random()));
-        String confirmationLink = "http://localhost:8080/user/signup/confirm?token=" + key;
+        String confirmationLink = publicBaseUrl + "/user/signup/confirm?token=" + key;
         tokenToUserMap.put(key, userEntityToCreate);
 
         scheduler.schedule(() -> {
@@ -92,5 +96,18 @@ public class UserSignupService {
         } else {
             throw new TokenNotFoundException();
         }
+    }
+
+    private String normalizeBaseUrl(String value) {
+        String normalized = value == null ? "" : value.trim();
+        if (normalized.isEmpty()) {
+            return "https://migros-app.onrender.com";
+        }
+
+        while (normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+
+        return normalized;
     }
 }

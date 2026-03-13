@@ -99,7 +99,7 @@ public class AdminSupplyService {
         String fileNameToSave = "image_" + System.currentTimeMillis() + ".png";
         Path savedFilePath;
         try {
-            savedFilePath = fileService.writeFileToDisk(selectedImage.getBytes(), fileNameToSave, "UploadFolder");
+            savedFilePath = fileService.writeFileToDisk(selectedImage.getBytes(), fileNameToSave);
         } catch (IOException e) {
             throw new FileUploadFailedException("Failed to read file bytes");
         }
@@ -160,7 +160,7 @@ public class AdminSupplyService {
             String fileNameToSave = "image_" + System.currentTimeMillis() + ".png";
             Path savedFilePath;
             try {
-                savedFilePath = fileService.writeFileToDisk(selectedImage.getBytes(), fileNameToSave, "UploadFolder");
+                savedFilePath = fileService.writeFileToDisk(selectedImage.getBytes(), fileNameToSave);
             } catch (IOException e) {
                 throw new FileUploadFailedException("Failed to read file bytes");
             }

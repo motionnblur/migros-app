@@ -30,6 +30,7 @@ import com.example.MigrosBackend.repository.product.ProductImageEntityRepository
 import com.example.MigrosBackend.repository.user.OrderEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderGroupEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
+import com.example.MigrosBackend.service.global.FileService;
 import com.example.MigrosBackend.service.global.TokenService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
@@ -40,7 +41,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.file.Paths;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -58,6 +59,7 @@ public class UserSupplyService {
     private final OrderEntityRepository orderEntityRepository;
     private final OrderGroupEntityRepository orderGroupEntityRepository;
     private final ProductDescriptionEntityRepository productDescriptionEntityRepository;
+    private final FileService fileService;
 
     @Autowired
     public UserSupplyService(
@@ -68,7 +70,8 @@ public class UserSupplyService {
             TokenService tokenService,
             OrderEntityRepository orderEntityRepository,
             OrderGroupEntityRepository orderGroupEntityRepository,
-            ProductDescriptionEntityRepository productDescriptionEntityRepository
+            ProductDescriptionEntityRepository productDescriptionEntityRepository,
+            FileService fileService
     ) {
         this.categoryEntityRepository = categoryEntityRepository;
         this.productEntityRepository = productEntityRepository;
@@ -78,6 +81,7 @@ public class UserSupplyService {
         this.orderEntityRepository = orderEntityRepository;
         this.orderGroupEntityRepository = orderGroupEntityRepository;
         this.productDescriptionEntityRepository = productDescriptionEntityRepository;
+        this.fileService = fileService;
     }
 
     public List<String> getAllCategoryNames() {
@@ -116,11 +120,16 @@ public class UserSupplyService {
     }
 
     public Resource getProductImage(Long itemId) {
-        ProductImageEntity productImageEntity = productImageEntityRepository.findByProductEntityId(itemId).get(0);
-        String filename = productImageEntity.getImagePath();
+        List<ProductImageEntity> images = productImageEntityRepository.findByProductEntityId(itemId);
+        if (images.isEmpty()) {
+            throw new FileNotFoundException();
+        }
+
+        String storedPath = images.get(0).getImagePath();
 
         try {
-            Resource resource = new UrlResource(Paths.get(filename).toUri());
+            Path resolvedPath = fileService.resolveImagePath(storedPath);
+            Resource resource = new UrlResource(resolvedPath.toUri());
             if (resource.exists() && resource.isReadable()) {
                 return resource;
             }

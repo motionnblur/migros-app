@@ -8,6 +8,7 @@ import { RestService } from '../../services/rest/rest.service';
 import { SupportRealtimeService } from '../../services/support-realtime/support-realtime.service';
 import { IChatMessage } from '../../interfaces/IChatMessage';
 import { ISupportRealtimeEvent } from '../../interfaces/support/ISupportRealtimeEvent';
+import { supabaseImageUrl } from '../../app/config/supabase-assets';
 
 @Component({
   selector: 'app-main',
@@ -17,6 +18,7 @@ import { ISupportRealtimeEvent } from '../../interfaces/support/ISupportRealtime
   styleUrl: './main.component.css',
 })
 export class MainComponent implements OnInit, OnDestroy {
+  readonly supabaseImageUrl = supabaseImageUrl;
   isUserSigned = false;
   loginText = 'Uye Ol veya Giris Yap';
 

@@ -26,7 +26,7 @@ export class RestService {
 
   getProductPageData(categoryId: number, page: number, productRange: number) {
     return this.http.get(
-      `http://localhost:8080/user/supply/getProductsFromCategory`,
+      `https://migros-app.onrender.com/user/supply/getProductsFromCategory`,
       {
         params: { categoryId, page, productRange },
         responseType: 'json',
@@ -39,7 +39,7 @@ export class RestService {
     productRange: number
   ) {
     return this.http.get(
-      `http://localhost:8080/admin/supply/getProductsFromCategory`,
+      `https://migros-app.onrender.com/admin/supply/getProductsFromCategory`,
       {
         params: { categoryId, page, productRange },
         responseType: 'json',
@@ -48,7 +48,7 @@ export class RestService {
   }
   getProductCountsFromCategory(categoryId: number) {
     return this.http.get(
-      `http://localhost:8080/user/supply/getProductCountsFromCategory`,
+      `https://migros-app.onrender.com/user/supply/getProductCountsFromCategory`,
       {
         params: { categoryId },
         responseType: 'json',
@@ -57,7 +57,7 @@ export class RestService {
   }
   getProductCountsFromCategoryAdmin(categoryId: number) {
     return this.http.get(
-      `http://localhost:8080/admin/supply/getProductCountsFromCategory`,
+      `https://migros-app.onrender.com/admin/supply/getProductCountsFromCategory`,
       {
         params: { categoryId },
         responseType: 'json',
@@ -66,7 +66,7 @@ export class RestService {
   }
   getProductCountsFromSubCategory(subcategoryName: string) {
     return this.http.get(
-      `http://localhost:8080/user/supply/getProductCountsFromSubCategory`,
+      `https://migros-app.onrender.com/user/supply/getProductCountsFromSubCategory`,
       {
         params: { subcategoryName },
         responseType: 'json',
@@ -74,14 +74,14 @@ export class RestService {
     );
   }
   getProductImage(productId: number) {
-    return this.http.get(`http://localhost:8080/user/supply/getProductImage`, {
+    return this.http.get(`https://migros-app.onrender.com/user/supply/getProductImage`, {
       params: { productId },
       responseType: 'blob',
     });
   }
   getProductData(productId: number) {
     return this.http
-      .get(`http://localhost:8080/user/supply/getProductDataWithProductId`, {
+      .get(`https://migros-app.onrender.com/user/supply/getProductDataWithProductId`, {
         params: { productId },
         responseType: 'json',
       })
@@ -89,7 +89,7 @@ export class RestService {
   }
   getProductDataForUserCart(productId: number) {
     return this.http
-      .get(`http://localhost:8080/user/supply/getProductData`, {
+      .get(`https://migros-app.onrender.com/user/supply/getProductData`, {
         params: { productId },
         responseType: 'json',
       })
@@ -97,14 +97,14 @@ export class RestService {
   }
   getAllProductsFromUserCart() {
     return this.http
-      .get(`http://localhost:8080/user/supply/getProductData`, {
+      .get(`https://migros-app.onrender.com/user/supply/getProductData`, {
         responseType: 'json',
       })
       .pipe(map((response) => response as IUserCartItemDto[]));
   }
   getAllAdminProducts(adminId: number, page: number, productRange: number) {
     return this.http
-      .get(`http://localhost:8080/admin/panel/getAllAdminProducts`, {
+      .get(`https://migros-app.onrender.com/admin/panel/getAllAdminProducts`, {
         params: {
           adminId,
           page,
@@ -129,7 +129,7 @@ export class RestService {
     formData.append('categoryValue', productData.categoryValue.toString());
 
     return this.http
-      .post('http://localhost:8080/admin/panel/uploadProduct', formData, {
+      .post('https://migros-app.onrender.com/admin/panel/uploadProduct', formData, {
         responseType: 'text',
         observe: 'response',
       })
@@ -151,7 +151,7 @@ export class RestService {
     formData.append('categoryValue', productData.categoryValue.toString());
 
     return this.http
-      .post('http://localhost:8080/admin/panel/updateProduct', formData, {
+      .post('https://migros-app.onrender.com/admin/panel/updateProduct', formData, {
         responseType: 'text',
         observe: 'response',
       })
@@ -159,7 +159,7 @@ export class RestService {
   }
   updateOrderStatus(orderId: number, status: string) {
     return this.http
-      .get(`http://localhost:8080/admin/panel/updateOrderStatus`, {
+      .get(`https://migros-app.onrender.com/admin/panel/updateOrderStatus`, {
         params: { orderId, status },
         responseType: 'text',
         observe: 'response',
@@ -178,7 +178,7 @@ export class RestService {
 
     return this.http
       .post(
-        'http://localhost:8080/user/profile/uploadUserProfileTable',
+        'https://migros-app.onrender.com/user/profile/uploadUserProfileTable',
         formData,
         {
           responseType: 'text',
@@ -189,7 +189,7 @@ export class RestService {
   }
   getUserProfileTableData() {
     return this.http
-      .get(`http://localhost:8080/user/profile/getUserProfileTable`, {
+      .get(`https://migros-app.onrender.com/user/profile/getUserProfileTable`, {
         responseType: 'json',
       })
       .pipe(map((response) => response as IUserProfileTable));
@@ -197,7 +197,7 @@ export class RestService {
 
   deleteProduct(productId: number) {
     return this.http
-      .delete('http://localhost:8080/admin/panel/deleteProduct', {
+      .delete('https://migros-app.onrender.com/admin/panel/deleteProduct', {
         params: { productId },
         responseType: 'text',
         observe: 'response',
@@ -211,7 +211,7 @@ export class RestService {
       descriptionList: productDescription.descriptionList,
     };
     return this.http
-      .post('http://localhost:8080/admin/panel/addProductDescription', data, {
+      .post('https://migros-app.onrender.com/admin/panel/addProductDescription', data, {
         responseType: 'text',
         observe: 'response',
       })
@@ -219,7 +219,7 @@ export class RestService {
   }
   getProductDescription(productId: number) {
     return this.http
-      .get(`http://localhost:8080/user/supply/getProductDescription`, {
+      .get(`https://migros-app.onrender.com/user/supply/getProductDescription`, {
         params: { productId },
         responseType: 'json',
       })
@@ -227,7 +227,7 @@ export class RestService {
   }
   deleteProductDescription(descriptionId: number) {
     return this.http
-      .delete('http://localhost:8080/admin/panel/deleteProductDescription', {
+      .delete('https://migros-app.onrender.com/admin/panel/deleteProductDescription', {
         params: { descriptionId },
         responseType: 'text',
         observe: 'response',
@@ -236,7 +236,7 @@ export class RestService {
   }
   getSubCategories(categoryId: number) {
     return this.http
-      .get(`http://localhost:8080/user/supply/getSubCategories`, {
+      .get(`https://migros-app.onrender.com/user/supply/getSubCategories`, {
         params: { categoryId },
         responseType: 'json',
       })
@@ -248,7 +248,7 @@ export class RestService {
     productRange: number
   ) {
     return this.http
-      .get(`http://localhost:8080/user/supply/getProductsFromSubcategory`, {
+      .get(`https://migros-app.onrender.com/user/supply/getProductsFromSubcategory`, {
         params: { subcategoryName, page, productRange },
         responseType: 'json',
       })
@@ -256,7 +256,7 @@ export class RestService {
   }
   signUser(userSignDto: ISignDto) {
     return this.http
-      .post('http://localhost:8080/user/signup', userSignDto, {
+      .post('https://migros-app.onrender.com/user/signup', userSignDto, {
         responseType: 'text',
         observe: 'response',
       })
@@ -264,7 +264,7 @@ export class RestService {
   }
   loginUser(userLoginDto: ISignDto) {
     return this.http
-      .post('http://localhost:8080/user/login', userLoginDto, {
+      .post('https://migros-app.onrender.com/user/login', userLoginDto, {
         responseType: 'text',
         observe: 'response',
       })
@@ -272,7 +272,7 @@ export class RestService {
   }
   addProductToUserCart(productId: number) {
     return this.http
-      .get(`http://localhost:8080/user/supply/addProductToUserCart`, {
+      .get(`https://migros-app.onrender.com/user/supply/addProductToUserCart`, {
         params: { productId },
         responseType: 'text',
         observe: 'response',
@@ -281,7 +281,7 @@ export class RestService {
   }
   removeProductFromUserCart(productId: number) {
     return this.http
-      .delete(`http://localhost:8080/user/supply/removeProductFromUserCart`, {
+      .delete(`https://migros-app.onrender.com/user/supply/removeProductFromUserCart`, {
         params: { productId },
         responseType: 'text',
         observe: 'response',
@@ -290,7 +290,7 @@ export class RestService {
   }
   updateProductCountInUserCart(productId: number, count: number) {
     return this.http
-      .get(`http://localhost:8080/user/supply/updateProductCountInUserCart`, {
+      .get(`https://migros-app.onrender.com/user/supply/updateProductCountInUserCart`, {
         params: { productId, count },
         responseType: 'text',
         observe: 'response',
@@ -299,7 +299,7 @@ export class RestService {
   }
   getAllOrders(page: number, productRange: number) {
     return this.http
-      .get(`http://localhost:8080/admin/panel/getAllOrders`, {
+      .get(`https://migros-app.onrender.com/admin/panel/getAllOrders`, {
         params: { page, productRange },
         responseType: 'json',
       })
@@ -307,7 +307,7 @@ export class RestService {
   }
   getUserProfileData(orderId: number) {
     return this.http
-      .get(`http://localhost:8080/admin/panel/getUserProfileData`, {
+      .get(`https://migros-app.onrender.com/admin/panel/getUserProfileData`, {
         params: { orderId },
         responseType: 'json',
       })
@@ -315,14 +315,14 @@ export class RestService {
   }
   getAllOrderIds() {
     return this.http
-      .get(`http://localhost:8080/user/supply/getAllOrderIds`, {
+      .get(`https://migros-app.onrender.com/user/supply/getAllOrderIds`, {
         responseType: 'json',
       })
       .pipe(map((response) => response as number[]));
   }
   getOrderStatusByOrderId(orderId: number) {
     return this.http
-      .get(`http://localhost:8080/user/supply/getOrderStatusByOrderId`, {
+      .get(`https://migros-app.onrender.com/user/supply/getOrderStatusByOrderId`, {
         params: { orderId },
         responseType: 'text',
       })
@@ -330,7 +330,7 @@ export class RestService {
   }
   calcelOrder(orderId: number) {
     return this.http
-      .delete(`http://localhost:8080/user/supply/cancelOrder`, {
+      .delete(`https://migros-app.onrender.com/user/supply/cancelOrder`, {
         params: { orderId },
         responseType: 'text',
         observe: 'response',
@@ -339,7 +339,7 @@ export class RestService {
   }
   getSupportMessages() {
     return this.http
-      .get(`http://localhost:8080/user/support/messages`, {
+      .get(`https://migros-app.onrender.com/user/support/messages`, {
         responseType: 'json',
       })
       .pipe(map((response) => response as IChatMessage[]));
@@ -348,7 +348,7 @@ export class RestService {
   sendSupportMessage(message: string) {
     return this.http
       .post(
-        `http://localhost:8080/user/support/send`,
+        `https://migros-app.onrender.com/user/support/send`,
         { message },
         {
           responseType: 'text',
@@ -360,7 +360,7 @@ export class RestService {
 
   getSupportUsersForAdmin() {
     return this.http
-      .get(`http://localhost:8080/admin/panel/support/users`, {
+      .get(`https://migros-app.onrender.com/admin/panel/support/users`, {
         responseType: 'json',
       })
       .pipe(map((response) => response as string[]));
@@ -369,7 +369,7 @@ export class RestService {
 
   searchSupportCustomersForAdmin(query: string, limit: number = 20) {
     return this.http
-      .get(`http://localhost:8080/admin/panel/support/customers`, {
+      .get(`https://migros-app.onrender.com/admin/panel/support/customers`, {
         params: { query, limit },
         responseType: 'json',
       })
@@ -378,7 +378,7 @@ export class RestService {
 
   getBannedSupportUsersForAdmin() {
     return this.http
-      .get(`http://localhost:8080/admin/panel/support/banned-users`, {
+      .get(`https://migros-app.onrender.com/admin/panel/support/banned-users`, {
         responseType: 'json',
       })
       .pipe(map((response) => response as string[]));
@@ -386,7 +386,7 @@ export class RestService {
 
   getSupportMessagesForAdmin(userMail: string) {
     return this.http
-      .get(`http://localhost:8080/admin/panel/support/messages`, {
+      .get(`https://migros-app.onrender.com/admin/panel/support/messages`, {
         params: { userMail },
         responseType: 'json',
       })
@@ -395,7 +395,7 @@ export class RestService {
   sendSupportReplyFromAdmin(userMail: string, message: string) {
     return this.http
       .post(
-        `http://localhost:8080/admin/panel/support/reply`,
+        `https://migros-app.onrender.com/admin/panel/support/reply`,
         { userMail, message },
         {
           responseType: 'text',
@@ -407,7 +407,7 @@ export class RestService {
   editSupportMessageForAdmin(userMail: string, messageId: number, message: string) {
     return this.http
       .patch(
-        `http://localhost:8080/admin/panel/support/messages/${messageId}`,
+        `https://migros-app.onrender.com/admin/panel/support/messages/${messageId}`,
         { userMail, message },
         {
           responseType: 'text',
@@ -419,7 +419,7 @@ export class RestService {
 
   deleteSupportMessageForAdmin(userMail: string, messageId: number) {
     return this.http
-      .delete(`http://localhost:8080/admin/panel/support/messages/${messageId}`, {
+      .delete(`https://migros-app.onrender.com/admin/panel/support/messages/${messageId}`, {
         params: { userMail },
         responseType: 'text',
         observe: 'response',
@@ -429,7 +429,7 @@ export class RestService {
   closeSupportChatForAdmin(userMail: string) {
     return this.http
       .post(
-        `http://localhost:8080/admin/panel/support/close`,
+        `https://migros-app.onrender.com/admin/panel/support/close`,
         null,
         {
           params: { userMail },
@@ -442,7 +442,7 @@ export class RestService {
   banSupportUserFromAdmin(userMail: string) {
     return this.http
       .post(
-        `http://localhost:8080/admin/panel/support/ban`,
+        `https://migros-app.onrender.com/admin/panel/support/ban`,
         null,
         {
           params: { userMail },
@@ -455,7 +455,7 @@ export class RestService {
   unbanSupportUserFromAdmin(userMail: string) {
     return this.http
       .post(
-        `http://localhost:8080/admin/panel/support/unban`,
+        `https://migros-app.onrender.com/admin/panel/support/unban`,
         null,
         {
           params: { userMail },
@@ -468,7 +468,7 @@ export class RestService {
 
   deleteOrder(orderId: number) {
     return this.http
-      .delete('http://localhost:8080/admin/panel/deleteOrder', {
+      .delete('https://migros-app.onrender.com/admin/panel/deleteOrder', {
         params: { orderId },
         responseType: 'text',
         observe: 'response',
@@ -477,14 +477,14 @@ export class RestService {
   }
   getUserOrders() {
     return this.http
-      .get(`http://localhost:8080/user/supply/getUserOrders`, {
+      .get(`https://migros-app.onrender.com/user/supply/getUserOrders`, {
         responseType: 'json',
       })
       .pipe(map((response) => response as IUserOrderDetail[]));
   }
   getUserOrderGroups() {
     return this.http
-      .get(`http://localhost:8080/user/supply/getUserOrderGroups`, {
+      .get(`https://migros-app.onrender.com/user/supply/getUserOrderGroups`, {
         responseType: 'json',
       })
       .pipe(map((response) => response as IUserOrderGroup[]));

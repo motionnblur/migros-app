@@ -8,6 +8,7 @@ import {
 import { RestService } from '../../../../services/rest/rest.service';
 import { data } from '../../../../memory/global-data';
 import { EventService } from '../../../../services/event/event.service';
+import { supabaseImageUrl } from '../../../../app/config/supabase-assets';
 
 @Component({
   selector: 'app-product-page-switcher',
@@ -17,6 +18,7 @@ import { EventService } from '../../../../services/event/event.service';
   styleUrl: './product-page-switcher.component.css',
 })
 export class ProductPageSwitcherComponent {
+  readonly supabaseImageUrl = supabaseImageUrl;
   @Output() changePageEvent = new EventEmitter<number>();
   @Output() changePageToFirstEvent = new EventEmitter<void>();
   @Output() changePageToLastEvent = new EventEmitter<number>();

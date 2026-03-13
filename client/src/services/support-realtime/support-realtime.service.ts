@@ -2,6 +2,8 @@ import { Injectable } from '@angular/core';
 import { Observable, Subject } from 'rxjs';
 import { ISupportRealtimeEvent } from '../../interfaces/support/ISupportRealtimeEvent';
 
+const WS_BASE_URL = 'wss://migros-app.onrender.com';
+
 @Injectable({
   providedIn: 'root',
 })
@@ -27,8 +29,8 @@ export class SupportRealtimeService {
 
     const normalizedUserMail = (this.connectUserMail || '').trim().toLowerCase();
     const socketUrl = normalizedUserMail
-      ? `ws://localhost:8080/ws/support?userMail=${encodeURIComponent(normalizedUserMail)}`
-      : 'ws://localhost:8080/ws/support';
+      ? `${WS_BASE_URL}/ws/support?userMail=${encodeURIComponent(normalizedUserMail)}`
+      : `${WS_BASE_URL}/ws/support`;
 
     this.socket = new WebSocket(socketUrl);
 

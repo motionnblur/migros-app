@@ -10,8 +10,6 @@ import java.nio.file.Path;
 import static org.junit.jupiter.api.Assertions.*;
 
 class FileServiceTest {
-    private final FileService fileService = new FileService();
-
     // JUnit 5 creates a clean temporary directory for this test automatically
     @TempDir
     Path tempDir;
@@ -21,10 +19,10 @@ class FileServiceTest {
         // Arrange
         byte[] content = "Hello, World!".getBytes();
         String fileName = "testFile.txt";
-        String directory = tempDir.toString(); // Use the temp directory path
+        FileService fileService = new FileService(tempDir.toString());
 
         // Act
-        Path resultPath = fileService.writeFileToDisk(content, fileName, directory);
+        Path resultPath = fileService.writeFileToDisk(content, fileName);
 
         // Assert
         // 1. Verify the returned path is correct
@@ -44,12 +42,13 @@ class FileServiceTest {
         // Arrange
         byte[] content = "data".getBytes();
         String fileName = "test.txt";
-        // A path that likely doesn't exist or is inaccessible
-        String invalidDirectory = "/invalid_path_that_does_not_exist/secret_folder";
+        Path invalidDirectory = tempDir.resolve("not-a-directory");
+        assertDoesNotThrow(() -> Files.createFile(invalidDirectory));
+        FileService fileService = new FileService(invalidDirectory.toString());
 
         // Act & Assert
         assertThrows(IOException.class, () ->
-                fileService.writeFileToDisk(content, fileName, invalidDirectory)
+                fileService.writeFileToDisk(content, fileName)
         );
     }
 }
