@@ -1,6 +1,7 @@
 package com.example.MigrosBackend.service.user.sign;
 
 import com.example.MigrosBackend.dto.user.sign.UserSignDto;
+import com.example.MigrosBackend.entity.user.PendingSignupEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.exception.shared.TokenNotFoundException;
 import com.example.MigrosBackend.exception.shared.WrongPasswordException;
@@ -8,6 +9,7 @@ import com.example.MigrosBackend.exception.user.MailSendingFailedException;
 import com.example.MigrosBackend.exception.user.UserAlreadyExistsException;
 import com.example.MigrosBackend.exception.user.WeakPasswordException;
 import com.example.MigrosBackend.helper.PasswordValidator;
+import com.example.MigrosBackend.repository.user.PendingSignupEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
 import com.example.MigrosBackend.service.global.EncryptService;
 import com.example.MigrosBackend.service.global.MailService;
@@ -16,13 +18,12 @@ import jakarta.mail.MessagingException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.thymeleaf.context.Context;
 
-import java.util.concurrent.ConcurrentHashMap;
+import java.time.LocalDateTime;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -33,6 +34,8 @@ class UserSignupServiceTest {
     @Mock
     private UserEntityRepository userEntityRepository;
     @Mock
+    private PendingSignupEntityRepository pendingSignupEntityRepository;
+    @Mock
     private EncryptService encryptService;
     @Mock
     private MailService mailService;
@@ -41,7 +44,6 @@ class UserSignupServiceTest {
     @Mock
     private PasswordValidator passwordValidator;
 
-    @InjectMocks
     private UserSignupService userSignupService;
 
     private UserSignDto signupDto;
@@ -51,6 +53,16 @@ class UserSignupServiceTest {
         signupDto = new UserSignDto();
         signupDto.setUserMail("test@example.com");
         signupDto.setUserPassword("StrongPass123!");
+        userSignupService = new UserSignupService(
+                userEntityRepository,
+                pendingSignupEntityRepository,
+                encryptService,
+                mailService,
+                tokenService,
+                passwordValidator,
+                "http://localhost:4200",
+                15
+        );
     }
 
     @Test
@@ -65,6 +77,8 @@ class UserSignupServiceTest {
 
         // Assert
         verify(encryptService).getEncryptedPassword(signupDto.getUserPassword());
+        verify(pendingSignupEntityRepository).deleteByUserMail(signupDto.getUserMail());
+        verify(pendingSignupEntityRepository).save(any(PendingSignupEntity.class));
         verify(mailService).sendMimeMessage(eq(signupDto.getUserMail()), anyString(), anyString(), any(Context.class));
     }
 
@@ -142,24 +156,36 @@ class UserSignupServiceTest {
 
     @Test
     void confirm_Success_Coverage() {
-        // 1. Setup dummy data
         String testToken = "test-token-123";
-        UserEntity dummyUser = new UserEntity();
-        dummyUser.setUserMail("test@mail.com");
+        PendingSignupEntity pendingSignupEntity = new PendingSignupEntity(
+                testToken,
+                "test@mail.com",
+                "hashed_password",
+                LocalDateTime.now().plusMinutes(10)
+        );
 
-        // 2. USE REFLECTION to access the private map
-        ConcurrentHashMap<String, UserEntity> map = (ConcurrentHashMap<String, UserEntity>)
-                ReflectionTestUtils.getField(userSignupService, "tokenToUserMap");
+        when(pendingSignupEntityRepository.findById(testToken)).thenReturn(Optional.of(pendingSignupEntity));
 
-        // 3. Manually put the user in the map so 'confirm' finds it
-        map.put(testToken, dummyUser);
-
-        // 4. Act
         userSignupService.confirm(testToken);
 
-        // 5. Assert (This ensures the 'if' block is covered)
-        verify(userEntityRepository, times(1)).save(dummyUser);
-        assertFalse(map.containsKey(testToken));
+        verify(userEntityRepository, times(1)).save(any(UserEntity.class));
+        verify(pendingSignupEntityRepository, times(1)).deleteById(testToken);
+    }
+
+    @Test
+    void confirm_ThrowsException_WhenTokenExpired() {
+        String testToken = "expired-token";
+        PendingSignupEntity expiredToken = new PendingSignupEntity(
+                testToken,
+                "test@mail.com",
+                "hashed_password",
+                LocalDateTime.now().minusMinutes(1)
+        );
+
+        when(pendingSignupEntityRepository.findById(testToken)).thenReturn(Optional.of(expiredToken));
+
+        assertThrows(TokenNotFoundException.class, () -> userSignupService.confirm(testToken));
+        verify(pendingSignupEntityRepository).deleteById(testToken);
     }
 
     @Test
