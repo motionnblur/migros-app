@@ -60,46 +60,44 @@ This application provides a basic platform for users to browse products, add the
 Before you begin, ensure you have the following installed:
 
 * **Docker**
+* **Node.js / npm** (for frontend local development)
+* **Java 21** (for backend local development)
 
 ## :airplane: Setup
 
-Before getting started, you need __configs__ folder (migros-app/configs). It's a secret folder that should't be available for the public, so you'll need to create your own.
-1. Create an empty folder named __configs__
-2. Go into that folder
-3. Create two empty file named __postgres.env__ and __spring.env__
+`configs/postgres.env` and `configs/spring.env` are already included for local development.
 
-For postgres.env file, contents should be in that way:
-* POSTGRES_USER=postgres (your postgres name)
-* POSTGRES_PASSWORD=1 (your postgress password)
-* POSTGRES_DB=migros_db (the database name of the project)
+Sample values:
 
-For spring.env file, contents should be in that way:
-* SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/(the database name of the project, migros_db, as an example.)
-* SPRING_DATASOURCE_USERNAME=postgres (your postgres name)
-* SPRING_DATASOURCE_PASSWORD=1 (your postgress password)
-
-For testing purposes:
-* spring.env:
-```
-SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/migros_db
-SPRING_DATASOURCE_USERNAME=postgres
-SPRING_DATASOURCE_PASSWORD=1
-```
-* postgres.env:
-```
+* `configs/postgres.env`
+```env
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=1
 POSTGRES_DB=migros_db
 ```
+
+* `configs/spring.env`
+```env
+SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/migros_db
+SPRING_DATASOURCE_USERNAME=postgres
+SPRING_DATASOURCE_PASSWORD=1
+APP_PUBLIC_BASE_URL=http://localhost:5000
+APP_ALLOWED_ORIGINS=http://localhost:4200,http://localhost:5000
+APP_ALLOWED_ORIGIN_PATTERNS=http://localhost:*,http://127.0.0.1:*
+APP_MAIL_PROVIDER=smtp
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=your_smtp_username
+MAIL_PASSWORD=your_smtp_password
+APP_MAIL_FROM=your_smtp_username
+```
+
 * Default admin name: admin
 * Default admin password: admin
 
 ## :rocket: Running the application
-Firstly you need to initialize node packages in order the client to run, go into client folder and type:
-```
-npm i
-```
-To start the development server, just type the command below in your favorite terminal:
+
+### Option A: Full Docker stack
 ```
 docker compose --env-file configs/postgres.env --env-file configs/spring.env up
 ```
@@ -108,8 +106,39 @@ After startup:
 * Client UI: http://localhost:5000
 * API entrypoint (Nginx reverse proxy + rate limiting): http://localhost:8080
 
-Nginx now applies per-IP throttling before requests reach Spring Boot (including stricter limits for login, payment, and support send endpoints) and returns HTTP 429 when limits are exceeded.
+### Option B: Hybrid local development (recommended)
 
+Run infrastructure with Docker, run app servers directly for faster iteration:
+
+1. Start database:
+```
+docker compose --env-file configs/postgres.env up postgres
+```
+
+2. Start backend (Spring profile defaults to `local`):
+```
+cd backend
+./mvnw spring-boot:run
+```
+
+3. Start frontend:
+```
+cd client
+npm i
+npm start
+```
+
+In this mode:
+* Frontend: http://localhost:4200
+* Backend: http://localhost:8080
+
+For production deployments, set `SPRING_PROFILES_ACTIVE=prod` and provide the required `SPRING_DATASOURCE_*`, `APP_ALLOWED_ORIGINS`, and `APP_PUBLIC_BASE_URL` variables.
+For mail provider:
+* Local profile defaults to SMTP (`APP_MAIL_PROVIDER=smtp`)
+* Prod profile defaults to Resend (`APP_MAIL_PROVIDER=resend`)
+* You can override with `APP_MAIL_PROVIDER=auto` to use Resend when `RESEND_API_KEY` is present, otherwise SMTP
+
+Nginx now applies per-IP throttling before requests reach Spring Boot (including stricter limits for login, payment, and support send endpoints) and returns HTTP 429 when limits are exceeded.
 ## :camera: Screenshots
 
 * Current code coverage
@@ -152,3 +181,4 @@ Nginx now applies per-IP throttling before requests reach Spring Boot (including
 <img width="1881" height="943" alt="Screenshot 2026-03-05 203236" src="https://github.com/user-attachments/assets/6d87cb4f-d431-4d72-a0b0-3b939300f442" />
 
 <img width="1884" height="943" alt="Screenshot 2026-03-05 202718" src="https://github.com/user-attachments/assets/a752d917-0444-4a87-80d9-f43b16ca6616" />
+

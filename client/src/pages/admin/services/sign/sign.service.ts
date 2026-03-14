@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { map } from 'rxjs';
+import { apiUrl } from '../../../../app/config/backend.config';
 
 @Injectable({
   providedIn: 'root',
@@ -11,7 +12,7 @@ export class SignService {
   adminLogin(adminName: string, adminPassword: string) {
     return this.http
       .post(
-        'https://migros-app.onrender.com/admin/login',
+        apiUrl('/admin/login'),
         {
           adminName,
           adminPassword,
