@@ -2,6 +2,7 @@ package com.example.MigrosBackend.service.global;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.Date;
@@ -9,7 +10,9 @@ import java.util.Date;
 @Service
 public class TokenService {
     private static final long TOKEN_TTL_MILLIS = 1000L * 60 * 3;
-    private String secretKey = "2D4A614E645267556B58703273357638792F423F4428472B4B6250655368566D";
+
+    @Value("${jwt.secret}")
+    private String secretKey;
 
     public String generateToken(String username) {
         return Jwts.builder()
