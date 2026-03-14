@@ -4,6 +4,9 @@ This is a basic e-commerce mvp application i built using Angular for the fronten
 
 It's a very basic migros clone that i built for my learning purposes. See: www.migros.com.tr
 
+You can visit the site: https://migros-app-client.onrender.com
+* Note: You probably will not be able to access the site because I am creating it for learning purposes; I do not have any professional goals in doing this.
+
 ## :clipboard: Table of Contents
 
 - [Overview](#overview)
