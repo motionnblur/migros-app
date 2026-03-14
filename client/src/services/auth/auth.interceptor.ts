@@ -1,9 +1,8 @@
 import { HttpInterceptorFn } from '@angular/common/http';
-
-const BACKEND_ORIGIN = 'https://migros-app.onrender.com';
+import { shouldAttachCredentials } from '../../app/config/backend.config';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
-  if (req.url.startsWith(BACKEND_ORIGIN)) {
+  if (shouldAttachCredentials(req.url)) {
     req = req.clone({ withCredentials: true });
   }
 

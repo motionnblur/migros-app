@@ -17,6 +17,7 @@ import { IUserOrderDetail } from '../../interfaces/IUserOrderDetail';
 import { IUserOrderGroup } from '../../interfaces/IUserOrderGroup';
 import { IProductPreview } from '../../interfaces/IProductPreview';
 import { ISupportCustomerSummary } from '../../interfaces/support/ISupportCustomerSummary';
+import { API_BASE_URL } from '../../app/config/backend.config';
 
 @Injectable({
   providedIn: 'root',
@@ -26,7 +27,7 @@ export class RestService {
 
   getProductPageData(categoryId: number, page: number, productRange: number) {
     return this.http.get(
-      `https://migros-app.onrender.com/user/supply/getProductsFromCategory`,
+      `${API_BASE_URL}/user/supply/getProductsFromCategory`,
       {
         params: { categoryId, page, productRange },
         responseType: 'json',
@@ -39,7 +40,7 @@ export class RestService {
     productRange: number
   ) {
     return this.http.get(
-      `https://migros-app.onrender.com/admin/supply/getProductsFromCategory`,
+      `${API_BASE_URL}/admin/supply/getProductsFromCategory`,
       {
         params: { categoryId, page, productRange },
         responseType: 'json',
@@ -48,7 +49,7 @@ export class RestService {
   }
   getProductCountsFromCategory(categoryId: number) {
     return this.http.get(
-      `https://migros-app.onrender.com/user/supply/getProductCountsFromCategory`,
+      `${API_BASE_URL}/user/supply/getProductCountsFromCategory`,
       {
         params: { categoryId },
         responseType: 'json',
@@ -57,7 +58,7 @@ export class RestService {
   }
   getProductCountsFromCategoryAdmin(categoryId: number) {
     return this.http.get(
-      `https://migros-app.onrender.com/admin/supply/getProductCountsFromCategory`,
+      `${API_BASE_URL}/admin/supply/getProductCountsFromCategory`,
       {
         params: { categoryId },
         responseType: 'json',
@@ -66,7 +67,7 @@ export class RestService {
   }
   getProductCountsFromSubCategory(subcategoryName: string) {
     return this.http.get(
-      `https://migros-app.onrender.com/user/supply/getProductCountsFromSubCategory`,
+      `${API_BASE_URL}/user/supply/getProductCountsFromSubCategory`,
       {
         params: { subcategoryName },
         responseType: 'json',
@@ -74,14 +75,14 @@ export class RestService {
     );
   }
   getProductImage(productId: number) {
-    return this.http.get(`https://migros-app.onrender.com/user/supply/getProductImage`, {
+    return this.http.get(`${API_BASE_URL}/user/supply/getProductImage`, {
       params: { productId },
       responseType: 'blob',
     });
   }
   getProductData(productId: number) {
     return this.http
-      .get(`https://migros-app.onrender.com/user/supply/getProductDataWithProductId`, {
+      .get(`${API_BASE_URL}/user/supply/getProductDataWithProductId`, {
         params: { productId },
         responseType: 'json',
       })
@@ -89,7 +90,7 @@ export class RestService {
   }
   getProductDataForUserCart(productId: number) {
     return this.http
-      .get(`https://migros-app.onrender.com/user/supply/getProductData`, {
+      .get(`${API_BASE_URL}/user/supply/getProductData`, {
         params: { productId },
         responseType: 'json',
       })
@@ -97,14 +98,14 @@ export class RestService {
   }
   getAllProductsFromUserCart() {
     return this.http
-      .get(`https://migros-app.onrender.com/user/supply/getProductData`, {
+      .get(`${API_BASE_URL}/user/supply/getProductData`, {
         responseType: 'json',
       })
       .pipe(map((response) => response as IUserCartItemDto[]));
   }
   getAllAdminProducts(adminId: number, page: number, productRange: number) {
     return this.http
-      .get(`https://migros-app.onrender.com/admin/panel/getAllAdminProducts`, {
+      .get(`${API_BASE_URL}/admin/panel/getAllAdminProducts`, {
         params: {
           adminId,
           page,
@@ -129,7 +130,7 @@ export class RestService {
     formData.append('categoryValue', productData.categoryValue.toString());
 
     return this.http
-      .post('https://migros-app.onrender.com/admin/panel/uploadProduct', formData, {
+      .post(`${API_BASE_URL}/admin/panel/uploadProduct`, formData, {
         responseType: 'text',
         observe: 'response',
       })
@@ -151,7 +152,7 @@ export class RestService {
     formData.append('categoryValue', productData.categoryValue.toString());
 
     return this.http
-      .post('https://migros-app.onrender.com/admin/panel/updateProduct', formData, {
+      .post(`${API_BASE_URL}/admin/panel/updateProduct`, formData, {
         responseType: 'text',
         observe: 'response',
       })
@@ -159,7 +160,7 @@ export class RestService {
   }
   updateOrderStatus(orderId: number, status: string) {
     return this.http
-      .get(`https://migros-app.onrender.com/admin/panel/updateOrderStatus`, {
+      .get(`${API_BASE_URL}/admin/panel/updateOrderStatus`, {
         params: { orderId, status },
         responseType: 'text',
         observe: 'response',
@@ -178,7 +179,7 @@ export class RestService {
 
     return this.http
       .post(
-        'https://migros-app.onrender.com/user/profile/uploadUserProfileTable',
+        `${API_BASE_URL}/user/profile/uploadUserProfileTable`,
         formData,
         {
           responseType: 'text',
@@ -189,7 +190,7 @@ export class RestService {
   }
   getUserProfileTableData() {
     return this.http
-      .get(`https://migros-app.onrender.com/user/profile/getUserProfileTable`, {
+      .get(`${API_BASE_URL}/user/profile/getUserProfileTable`, {
         responseType: 'json',
       })
       .pipe(map((response) => response as IUserProfileTable));
@@ -197,7 +198,7 @@ export class RestService {
 
   deleteProduct(productId: number) {
     return this.http
-      .delete('https://migros-app.onrender.com/admin/panel/deleteProduct', {
+      .delete(`${API_BASE_URL}/admin/panel/deleteProduct`, {
         params: { productId },
         responseType: 'text',
         observe: 'response',
@@ -211,7 +212,7 @@ export class RestService {
       descriptionList: productDescription.descriptionList,
     };
     return this.http
-      .post('https://migros-app.onrender.com/admin/panel/addProductDescription', data, {
+      .post(`${API_BASE_URL}/admin/panel/addProductDescription`, data, {
         responseType: 'text',
         observe: 'response',
       })
@@ -219,7 +220,7 @@ export class RestService {
   }
   getProductDescription(productId: number) {
     return this.http
-      .get(`https://migros-app.onrender.com/user/supply/getProductDescription`, {
+      .get(`${API_BASE_URL}/user/supply/getProductDescription`, {
         params: { productId },
         responseType: 'json',
       })
@@ -227,7 +228,7 @@ export class RestService {
   }
   deleteProductDescription(descriptionId: number) {
     return this.http
-      .delete('https://migros-app.onrender.com/admin/panel/deleteProductDescription', {
+      .delete(`${API_BASE_URL}/admin/panel/deleteProductDescription`, {
         params: { descriptionId },
         responseType: 'text',
         observe: 'response',
@@ -236,7 +237,7 @@ export class RestService {
   }
   getSubCategories(categoryId: number) {
     return this.http
-      .get(`https://migros-app.onrender.com/user/supply/getSubCategories`, {
+      .get(`${API_BASE_URL}/user/supply/getSubCategories`, {
         params: { categoryId },
         responseType: 'json',
       })
@@ -248,7 +249,7 @@ export class RestService {
     productRange: number
   ) {
     return this.http
-      .get(`https://migros-app.onrender.com/user/supply/getProductsFromSubcategory`, {
+      .get(`${API_BASE_URL}/user/supply/getProductsFromSubcategory`, {
         params: { subcategoryName, page, productRange },
         responseType: 'json',
       })
@@ -256,7 +257,7 @@ export class RestService {
   }
   signUser(userSignDto: ISignDto) {
     return this.http
-      .post('https://migros-app.onrender.com/user/signup', userSignDto, {
+      .post(`${API_BASE_URL}/user/signup`, userSignDto, {
         responseType: 'text',
         observe: 'response',
       })
@@ -264,7 +265,7 @@ export class RestService {
   }
   loginUser(userLoginDto: ISignDto) {
     return this.http
-      .post('https://migros-app.onrender.com/user/login', userLoginDto, {
+      .post(`${API_BASE_URL}/user/login`, userLoginDto, {
         responseType: 'text',
         observe: 'response',
       })
@@ -272,7 +273,7 @@ export class RestService {
   }
   addProductToUserCart(productId: number) {
     return this.http
-      .get(`https://migros-app.onrender.com/user/supply/addProductToUserCart`, {
+      .get(`${API_BASE_URL}/user/supply/addProductToUserCart`, {
         params: { productId },
         responseType: 'text',
         observe: 'response',
@@ -281,7 +282,7 @@ export class RestService {
   }
   removeProductFromUserCart(productId: number) {
     return this.http
-      .delete(`https://migros-app.onrender.com/user/supply/removeProductFromUserCart`, {
+      .delete(`${API_BASE_URL}/user/supply/removeProductFromUserCart`, {
         params: { productId },
         responseType: 'text',
         observe: 'response',
@@ -290,7 +291,7 @@ export class RestService {
   }
   updateProductCountInUserCart(productId: number, count: number) {
     return this.http
-      .get(`https://migros-app.onrender.com/user/supply/updateProductCountInUserCart`, {
+      .get(`${API_BASE_URL}/user/supply/updateProductCountInUserCart`, {
         params: { productId, count },
         responseType: 'text',
         observe: 'response',
@@ -299,7 +300,7 @@ export class RestService {
   }
   getAllOrders(page: number, productRange: number) {
     return this.http
-      .get(`https://migros-app.onrender.com/admin/panel/getAllOrders`, {
+      .get(`${API_BASE_URL}/admin/panel/getAllOrders`, {
         params: { page, productRange },
         responseType: 'json',
       })
@@ -307,7 +308,7 @@ export class RestService {
   }
   getUserProfileData(orderId: number) {
     return this.http
-      .get(`https://migros-app.onrender.com/admin/panel/getUserProfileData`, {
+      .get(`${API_BASE_URL}/admin/panel/getUserProfileData`, {
         params: { orderId },
         responseType: 'json',
       })
@@ -315,14 +316,14 @@ export class RestService {
   }
   getAllOrderIds() {
     return this.http
-      .get(`https://migros-app.onrender.com/user/supply/getAllOrderIds`, {
+      .get(`${API_BASE_URL}/user/supply/getAllOrderIds`, {
         responseType: 'json',
       })
       .pipe(map((response) => response as number[]));
   }
   getOrderStatusByOrderId(orderId: number) {
     return this.http
-      .get(`https://migros-app.onrender.com/user/supply/getOrderStatusByOrderId`, {
+      .get(`${API_BASE_URL}/user/supply/getOrderStatusByOrderId`, {
         params: { orderId },
         responseType: 'text',
       })
@@ -330,7 +331,7 @@ export class RestService {
   }
   calcelOrder(orderId: number) {
     return this.http
-      .delete(`https://migros-app.onrender.com/user/supply/cancelOrder`, {
+      .delete(`${API_BASE_URL}/user/supply/cancelOrder`, {
         params: { orderId },
         responseType: 'text',
         observe: 'response',
@@ -339,7 +340,7 @@ export class RestService {
   }
   getSupportMessages() {
     return this.http
-      .get(`https://migros-app.onrender.com/user/support/messages`, {
+      .get(`${API_BASE_URL}/user/support/messages`, {
         responseType: 'json',
       })
       .pipe(map((response) => response as IChatMessage[]));
@@ -348,7 +349,7 @@ export class RestService {
   sendSupportMessage(message: string) {
     return this.http
       .post(
-        `https://migros-app.onrender.com/user/support/send`,
+        `${API_BASE_URL}/user/support/send`,
         { message },
         {
           responseType: 'text',
@@ -360,7 +361,7 @@ export class RestService {
 
   getSupportUsersForAdmin() {
     return this.http
-      .get(`https://migros-app.onrender.com/admin/panel/support/users`, {
+      .get(`${API_BASE_URL}/admin/panel/support/users`, {
         responseType: 'json',
       })
       .pipe(map((response) => response as string[]));
@@ -369,7 +370,7 @@ export class RestService {
 
   searchSupportCustomersForAdmin(query: string, limit: number = 20) {
     return this.http
-      .get(`https://migros-app.onrender.com/admin/panel/support/customers`, {
+      .get(`${API_BASE_URL}/admin/panel/support/customers`, {
         params: { query, limit },
         responseType: 'json',
       })
@@ -378,7 +379,7 @@ export class RestService {
 
   getBannedSupportUsersForAdmin() {
     return this.http
-      .get(`https://migros-app.onrender.com/admin/panel/support/banned-users`, {
+      .get(`${API_BASE_URL}/admin/panel/support/banned-users`, {
         responseType: 'json',
       })
       .pipe(map((response) => response as string[]));
@@ -386,7 +387,7 @@ export class RestService {
 
   getSupportMessagesForAdmin(userMail: string) {
     return this.http
-      .get(`https://migros-app.onrender.com/admin/panel/support/messages`, {
+      .get(`${API_BASE_URL}/admin/panel/support/messages`, {
         params: { userMail },
         responseType: 'json',
       })
@@ -395,7 +396,7 @@ export class RestService {
   sendSupportReplyFromAdmin(userMail: string, message: string) {
     return this.http
       .post(
-        `https://migros-app.onrender.com/admin/panel/support/reply`,
+        `${API_BASE_URL}/admin/panel/support/reply`,
         { userMail, message },
         {
           responseType: 'text',
@@ -407,7 +408,7 @@ export class RestService {
   editSupportMessageForAdmin(userMail: string, messageId: number, message: string) {
     return this.http
       .patch(
-        `https://migros-app.onrender.com/admin/panel/support/messages/${messageId}`,
+        `${API_BASE_URL}/admin/panel/support/messages/${messageId}`,
         { userMail, message },
         {
           responseType: 'text',
@@ -419,7 +420,7 @@ export class RestService {
 
   deleteSupportMessageForAdmin(userMail: string, messageId: number) {
     return this.http
-      .delete(`https://migros-app.onrender.com/admin/panel/support/messages/${messageId}`, {
+      .delete(`${API_BASE_URL}/admin/panel/support/messages/${messageId}`, {
         params: { userMail },
         responseType: 'text',
         observe: 'response',
@@ -429,7 +430,7 @@ export class RestService {
   closeSupportChatForAdmin(userMail: string) {
     return this.http
       .post(
-        `https://migros-app.onrender.com/admin/panel/support/close`,
+        `${API_BASE_URL}/admin/panel/support/close`,
         null,
         {
           params: { userMail },
@@ -442,7 +443,7 @@ export class RestService {
   banSupportUserFromAdmin(userMail: string) {
     return this.http
       .post(
-        `https://migros-app.onrender.com/admin/panel/support/ban`,
+        `${API_BASE_URL}/admin/panel/support/ban`,
         null,
         {
           params: { userMail },
@@ -455,7 +456,7 @@ export class RestService {
   unbanSupportUserFromAdmin(userMail: string) {
     return this.http
       .post(
-        `https://migros-app.onrender.com/admin/panel/support/unban`,
+        `${API_BASE_URL}/admin/panel/support/unban`,
         null,
         {
           params: { userMail },
@@ -468,7 +469,7 @@ export class RestService {
 
   deleteOrder(orderId: number) {
     return this.http
-      .delete('https://migros-app.onrender.com/admin/panel/deleteOrder', {
+      .delete(`${API_BASE_URL}/admin/panel/deleteOrder`, {
         params: { orderId },
         responseType: 'text',
         observe: 'response',
@@ -477,14 +478,14 @@ export class RestService {
   }
   getUserOrders() {
     return this.http
-      .get(`https://migros-app.onrender.com/user/supply/getUserOrders`, {
+      .get(`${API_BASE_URL}/user/supply/getUserOrders`, {
         responseType: 'json',
       })
       .pipe(map((response) => response as IUserOrderDetail[]));
   }
   getUserOrderGroups() {
     return this.http
-      .get(`https://migros-app.onrender.com/user/supply/getUserOrderGroups`, {
+      .get(`${API_BASE_URL}/user/supply/getUserOrderGroups`, {
         responseType: 'json',
       })
       .pipe(map((response) => response as IUserOrderGroup[]));
@@ -502,5 +503,3 @@ export class RestService {
     return normalized;
   }
 }
-
-
