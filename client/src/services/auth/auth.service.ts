@@ -2,6 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, of } from 'rxjs';
 import { catchError, map, tap } from 'rxjs/operators';
+import { apiUrl } from '../../app/config/backend.config';
 
 interface UserSessionResponse {
   userMail: string;
@@ -27,7 +28,7 @@ export class AuthService {
 
   public refreshUserSession(): Observable<boolean> {
     return this.http
-      .get<UserSessionResponse>('https://migros-app.onrender.com/user/session')
+      .get<UserSessionResponse>(apiUrl('/user/session'))
       .pipe(
         tap((session) => {
           this.userMail = session?.userMail ?? '';
@@ -44,7 +45,7 @@ export class AuthService {
 
   public refreshAdminSession(): Observable<boolean> {
     return this.http
-      .get<AdminSessionResponse>('https://migros-app.onrender.com/admin/session')
+      .get<AdminSessionResponse>(apiUrl('/admin/session'))
       .pipe(
         tap((session) => {
           this.adminName = session?.adminName ?? '';
@@ -76,7 +77,7 @@ export class AuthService {
   }
 
   public logout(onComplete?: () => void): void {
-    this.http.post('https://migros-app.onrender.com/user/logout', {}).subscribe({
+    this.http.post(apiUrl('/user/logout'), {}).subscribe({
       next: () => {
         this.userMail = '';
         this.userLoggedInSubject.next(false);
@@ -91,7 +92,7 @@ export class AuthService {
   }
 
   public logoutAdmin(onComplete?: () => void): void {
-    this.http.post('https://migros-app.onrender.com/admin/logout', {}).subscribe({
+    this.http.post(apiUrl('/admin/logout'), {}).subscribe({
       next: () => {
         this.adminName = '';
         this.adminLoggedInSubject.next(false);

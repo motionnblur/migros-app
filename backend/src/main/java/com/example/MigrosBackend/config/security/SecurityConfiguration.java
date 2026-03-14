@@ -22,13 +22,17 @@ import java.util.stream.Collectors;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfiguration {
-    private final List<String> allowedOrigins;
+    private final List<String> allowedOriginPatterns;
 
-    public SecurityConfiguration(@Value("${app.allowed-origins}") String allowedOriginsValue) {
-        this.allowedOrigins = Arrays.stream(allowedOriginsValue.split(","))
-                .map(String::trim)
-                .filter(origin -> !origin.isEmpty())
-                .collect(Collectors.toList());
+    public SecurityConfiguration(
+            @Value("${app.allowed-origins:}") String allowedOriginsValue,
+            @Value("${app.allowed-origin-patterns:}") String allowedOriginPatternsValue
+    ) {
+        List<String> parsedPatterns = parseCsvList(allowedOriginPatternsValue);
+        if (parsedPatterns.isEmpty()) {
+            parsedPatterns = parseCsvList(allowedOriginsValue);
+        }
+        this.allowedOriginPatterns = parsedPatterns;
     }
 
     @Bean
@@ -69,13 +73,21 @@ public class SecurityConfiguration {
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(allowedOrigins);
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));
+        configuration.setAllowedOriginPatterns(allowedOriginPatterns);
+        configuration.setAllowedMethods(Arrays.asList("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
+    }
+
+    private List<String> parseCsvList(String value) {
+        return Arrays.stream((value == null ? "" : value).split(","))
+                .map(String::trim)
+                .filter(entry -> !entry.isEmpty())
+                .collect(Collectors.toList());
     }
 }
 

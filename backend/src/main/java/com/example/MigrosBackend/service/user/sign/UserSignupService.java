@@ -40,7 +40,7 @@ public class UserSignupService {
     public UserSignupService(UserEntityRepository userEntityRepository, EncryptService encryptService,
                              MailService mailService, TokenService tokenService,
                              PasswordValidator passwordValidator,
-                             @Value("${app.public-base-url:https://migros-app.onrender.com}") String publicBaseUrl) {
+                             @Value("${app.public-base-url}") String publicBaseUrl) {
         this.userEntityRepository = userEntityRepository;
         this.encryptService = encryptService;
         this.mailService = mailService;
@@ -101,7 +101,7 @@ public class UserSignupService {
     private String normalizeBaseUrl(String value) {
         String normalized = value == null ? "" : value.trim();
         if (normalized.isEmpty()) {
-            return "https://migros-app.onrender.com";
+            throw new IllegalStateException("app.public-base-url must be configured");
         }
 
         while (normalized.endsWith("/")) {

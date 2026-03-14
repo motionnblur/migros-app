@@ -16,23 +16,32 @@ import java.util.stream.Collectors;
 @EnableWebSocket
 public class WebSocketConfig implements WebSocketConfigurer {
     private final SupportChatWebSocketHandler supportChatWebSocketHandler;
-    private final List<String> allowedOrigins;
+    private final List<String> allowedOriginPatterns;
 
     @Autowired
     public WebSocketConfig(
             SupportChatWebSocketHandler supportChatWebSocketHandler,
-            @Value("${app.allowed-origins}") String allowedOriginsValue
+            @Value("${app.allowed-origins:}") String allowedOriginsValue,
+            @Value("${app.allowed-origin-patterns:}") String allowedOriginPatternsValue
     ) {
         this.supportChatWebSocketHandler = supportChatWebSocketHandler;
-        this.allowedOrigins = Arrays.stream(allowedOriginsValue.split(","))
-                .map(String::trim)
-                .filter(origin -> !origin.isEmpty())
-                .collect(Collectors.toList());
+        List<String> parsedPatterns = parseCsvList(allowedOriginPatternsValue);
+        if (parsedPatterns.isEmpty()) {
+            parsedPatterns = parseCsvList(allowedOriginsValue);
+        }
+        this.allowedOriginPatterns = parsedPatterns;
     }
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(supportChatWebSocketHandler, "/ws/support")
-                .setAllowedOrigins(allowedOrigins.toArray(String[]::new));
+                .setAllowedOriginPatterns(allowedOriginPatterns.toArray(String[]::new));
+    }
+
+    private List<String> parseCsvList(String value) {
+        return Arrays.stream((value == null ? "" : value).split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isEmpty())
+                .collect(Collectors.toList());
     }
 }

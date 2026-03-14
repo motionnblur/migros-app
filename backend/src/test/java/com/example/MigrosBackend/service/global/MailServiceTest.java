@@ -9,6 +9,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 import org.springframework.web.client.RestTemplate;
@@ -29,6 +30,9 @@ class MailServiceTest {
     @Mock
     private RestTemplate restTemplate;
 
+    @Mock
+    private JavaMailSender javaMailSender;
+
     private MailService mailService;
 
     @BeforeEach
@@ -36,10 +40,13 @@ class MailServiceTest {
         when(restTemplateBuilder.rootUri("https://api.resend.com")).thenReturn(restTemplateBuilder);
         when(restTemplateBuilder.build()).thenReturn(restTemplate);
         mailService = new MailService(
+                javaMailSender,
                 restTemplateBuilder,
                 templateEngine,
+                "resend",
                 "test_resend_key",
-                "onboarding@resend.dev"
+                "onboarding@resend.dev",
+                "smtp@example.com"
         );
     }
 
