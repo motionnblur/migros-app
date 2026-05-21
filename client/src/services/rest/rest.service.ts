@@ -23,6 +23,12 @@ import { API_BASE_URL } from '../../app/config/backend.config';
   providedIn: 'root',
 })
 export class RestService {
+  getVerifyUser(userMail: string) {
+    return this.http.get(`${API_BASE_URL}/user/verifyUserMail`, {
+      params: { userMail },
+      responseType: 'json',
+    });
+  }
   constructor(private http: HttpClient) {}
 
   getProductPageData(categoryId: number, page: number, productRange: number) {
@@ -31,20 +37,20 @@ export class RestService {
       {
         params: { categoryId, page, productRange },
         responseType: 'json',
-      }
+      },
     );
   }
   getProductPageDataAdmin(
     categoryId: number,
     page: number,
-    productRange: number
+    productRange: number,
   ) {
     return this.http.get(
       `${API_BASE_URL}/admin/supply/getProductsFromCategory`,
       {
         params: { categoryId, page, productRange },
         responseType: 'json',
-      }
+      },
     );
   }
   getProductCountsFromCategory(categoryId: number) {
@@ -53,7 +59,7 @@ export class RestService {
       {
         params: { categoryId },
         responseType: 'json',
-      }
+      },
     );
   }
   getProductCountsFromCategoryAdmin(categoryId: number) {
@@ -62,7 +68,7 @@ export class RestService {
       {
         params: { categoryId },
         responseType: 'json',
-      }
+      },
     );
   }
   getProductCountsFromSubCategory(subcategoryName: string) {
@@ -71,7 +77,7 @@ export class RestService {
       {
         params: { subcategoryName },
         responseType: 'json',
-      }
+      },
     );
   }
   getProductImage(productId: number) {
@@ -118,12 +124,21 @@ export class RestService {
   uploadProductData(productData: IProductUploader) {
     const formData = new FormData();
     formData.append('adminId', productData.adminId.toString());
-    formData.append('productName', this.normalizeStringField(productData.productName));
-    formData.append('subCategoryName', this.normalizeStringField(productData.subCategoryName));
+    formData.append(
+      'productName',
+      this.normalizeStringField(productData.productName),
+    );
+    formData.append(
+      'subCategoryName',
+      this.normalizeStringField(productData.subCategoryName),
+    );
     formData.append('productPrice', productData.productPrice.toString());
     formData.append('productCount', productData.productCount.toString());
     formData.append('productDiscount', productData.productDiscount.toString());
-    formData.append('productDescription', this.normalizeOptionalStringField(productData.productDescription));
+    formData.append(
+      'productDescription',
+      this.normalizeOptionalStringField(productData.productDescription),
+    );
     if (productData.selectedImage) {
       formData.append('selectedImage', productData.selectedImage);
     }
@@ -140,12 +155,21 @@ export class RestService {
     const formData = new FormData();
     formData.append('adminId', productData.adminId.toString());
     formData.append('productId', productData.productId.toString());
-    formData.append('productName', this.normalizeStringField(productData.productName));
-    formData.append('subCategoryName', this.normalizeStringField(productData.subCategoryName));
+    formData.append(
+      'productName',
+      this.normalizeStringField(productData.productName),
+    );
+    formData.append(
+      'subCategoryName',
+      this.normalizeStringField(productData.subCategoryName),
+    );
     formData.append('productPrice', productData.productPrice.toString());
     formData.append('productCount', productData.productCount.toString());
     formData.append('productDiscount', productData.productDiscount.toString());
-    formData.append('productDescription', this.normalizeOptionalStringField(productData.productDescription));
+    formData.append(
+      'productDescription',
+      this.normalizeOptionalStringField(productData.productDescription),
+    );
     if (productData.selectedImage) {
       formData.append('selectedImage', productData.selectedImage);
     }
@@ -178,14 +202,10 @@ export class RestService {
     formData.append('userPostalCode', table.userPostalCode);
 
     return this.http
-      .post(
-        `${API_BASE_URL}/user/profile/uploadUserProfileTable`,
-        formData,
-        {
-          responseType: 'text',
-          observe: 'response',
-        }
-      )
+      .post(`${API_BASE_URL}/user/profile/uploadUserProfileTable`, formData, {
+        responseType: 'text',
+        observe: 'response',
+      })
       .pipe(map((response) => response.status === 200));
   }
   getUserProfileTableData() {
@@ -246,7 +266,7 @@ export class RestService {
   getProducstFromSubCategory(
     subcategoryName: string,
     page: number,
-    productRange: number
+    productRange: number,
   ) {
     return this.http
       .get(`${API_BASE_URL}/user/supply/getProductsFromSubcategory`, {
@@ -354,7 +374,7 @@ export class RestService {
         {
           responseType: 'text',
           observe: 'response',
-        }
+        },
       )
       .pipe(map((response) => response.status === 200));
   }
@@ -366,7 +386,6 @@ export class RestService {
       })
       .pipe(map((response) => response as string[]));
   }
-
 
   searchSupportCustomersForAdmin(query: string, limit: number = 20) {
     return this.http
@@ -401,11 +420,15 @@ export class RestService {
         {
           responseType: 'text',
           observe: 'response',
-        }
+        },
       )
       .pipe(map((response) => response.status === 200));
   }
-  editSupportMessageForAdmin(userMail: string, messageId: number, message: string) {
+  editSupportMessageForAdmin(
+    userMail: string,
+    messageId: number,
+    message: string,
+  ) {
     return this.http
       .patch(
         `${API_BASE_URL}/admin/panel/support/messages/${messageId}`,
@@ -413,7 +436,7 @@ export class RestService {
         {
           responseType: 'text',
           observe: 'response',
-        }
+        },
       )
       .pipe(map((response) => response.status === 200));
   }
@@ -429,41 +452,29 @@ export class RestService {
   }
   closeSupportChatForAdmin(userMail: string) {
     return this.http
-      .post(
-        `${API_BASE_URL}/admin/panel/support/close`,
-        null,
-        {
-          params: { userMail },
-          responseType: 'text',
-          observe: 'response',
-        }
-      )
+      .post(`${API_BASE_URL}/admin/panel/support/close`, null, {
+        params: { userMail },
+        responseType: 'text',
+        observe: 'response',
+      })
       .pipe(map((response) => response.status === 200));
   }
   banSupportUserFromAdmin(userMail: string) {
     return this.http
-      .post(
-        `${API_BASE_URL}/admin/panel/support/ban`,
-        null,
-        {
-          params: { userMail },
-          responseType: 'text',
-          observe: 'response',
-        }
-      )
+      .post(`${API_BASE_URL}/admin/panel/support/ban`, null, {
+        params: { userMail },
+        responseType: 'text',
+        observe: 'response',
+      })
       .pipe(map((response) => response.status === 200));
   }
   unbanSupportUserFromAdmin(userMail: string) {
     return this.http
-      .post(
-        `${API_BASE_URL}/admin/panel/support/unban`,
-        null,
-        {
-          params: { userMail },
-          responseType: 'text',
-          observe: 'response',
-        }
-      )
+      .post(`${API_BASE_URL}/admin/panel/support/unban`, null, {
+        params: { userMail },
+        responseType: 'text',
+        observe: 'response',
+      })
       .pipe(map((response) => response.status === 200));
   }
 
@@ -497,7 +508,10 @@ export class RestService {
 
   private normalizeOptionalStringField(value: string): string {
     const normalized = (value ?? '').trim();
-    if (normalized.toLowerCase() === 'undefined' || normalized.toLowerCase() === 'null') {
+    if (
+      normalized.toLowerCase() === 'undefined' ||
+      normalized.toLowerCase() === 'null'
+    ) {
       return '';
     }
     return normalized;

@@ -50,6 +50,12 @@ public class UserSignController {
         return ResponseEntity.ok("Your account has been created successfully, you can close this page now.");
     }
 
+    @GetMapping("signup/confirmUserMail")
+    private ResponseEntity<String> confirmUserMail(@RequestParam String token) {
+        userSignupService.confirmUserMail(token);
+        return ResponseEntity.ok("Your mail has been verified successfully, you can close this page now.");
+    }
+
     @PostMapping("login")
     private ResponseEntity<Void> login(@RequestBody UserSignDto userSignDto) {
         String token = userSignupService.login(userSignDto);
@@ -71,5 +77,11 @@ public class UserSignController {
         String userToken = authTokenResolver.requireToken(token);
         String userMail = tokenService.extractUsername(userToken);
         return ResponseEntity.ok(Map.of("userMail", userMail));
+    }
+
+    @GetMapping("verifyUserMail")
+    private ResponseEntity<String> verifyUserMail(@RequestParam String userMail) {
+        userSignupService.verifyUserMail(userMail);
+        return ResponseEntity.ok("Your mail has been verified successfully, you can close this page now.");
     }
 }

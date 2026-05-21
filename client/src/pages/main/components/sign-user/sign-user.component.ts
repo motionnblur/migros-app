@@ -26,7 +26,9 @@ import { ActivatedRoute, Router } from '@angular/router';
   styleUrl: './sign-user.component.css',
 })
 export class SignUserComponent {
-  isSignPhaseActive: boolean = true;
+  isSignPhaseActive: boolean = false;
+  isLoginPhaseActive: boolean = true;
+  isResetPasswordPhaseActive: boolean = false;
   userMail!: string;
   userPassword!: string;
   userPasswordConfirm!: string;
@@ -36,18 +38,28 @@ export class SignUserComponent {
     private restService: RestService,
     private authService: AuthService,
     private router: Router,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
   ) {}
 
   @Output() closeComponentEvent = new EventEmitter<void>();
   @Output() userLoginEvent = new EventEmitter<void>();
 
   public openSign() {
-    this.isSignPhaseActive = false;
+    this.isSignPhaseActive = true;
+    this.isLoginPhaseActive = false;
+    this.isResetPasswordPhaseActive = false;
     this.clearFields();
   }
   public openLogin() {
-    this.isSignPhaseActive = true;
+    this.isSignPhaseActive = false;
+    this.isLoginPhaseActive = true;
+    this.isResetPasswordPhaseActive = false;
+    this.clearFields();
+  }
+  public openResetPassword() {
+    this.isResetPasswordPhaseActive = true;
+    this.isSignPhaseActive = false;
+    this.isLoginPhaseActive = false;
     this.clearFields();
   }
   private clearFields() {
@@ -90,7 +102,7 @@ export class SignUserComponent {
       .subscribe({
         next: () => {
           alert(
-            'Confirmation mail has been sent to your mailbox. Please click the link to activate your account in 5 minutes.'
+            'Confirmation mail has been sent to your mailbox. Please click the link to activate your account in 5 minutes.',
           );
         },
         error: (errorObj) => {
@@ -133,5 +145,17 @@ export class SignUserComponent {
       });
 
     this.clearFields();
+  }
+
+  public verifyUser() {
+    this.restService.getVerifyUser(this.userMail).subscribe({
+      next: () => {
+        this.userLoginEvent.emit();
+        this.closeModal();
+      },
+      error: () => {
+        console.error('Error verifying user');
+      },
+    });
   }
 }

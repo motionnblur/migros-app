@@ -127,6 +127,19 @@ public class UserSignupService {
         deletePendingSignup(token);
     }
 
+    @Transactional
+    public void confirmUserMail(String token) {
+        PendingSignupEntity pendingSignup = findPendingSignupByToken(token);
+        if (pendingSignup == null) {
+            throw new TokenNotFoundException();
+        }
+
+        if (pendingSignup.getExpiresAt() == null || pendingSignup.getExpiresAt().isBefore(LocalDateTime.now())) {
+            deletePendingSignup(token);
+            throw new TokenNotFoundException();
+        }
+    }
+
     private String normalizeBaseUrl(String value) {
         String normalized = value == null ? "" : value.trim();
         if (normalized.isEmpty()) {
@@ -190,5 +203,33 @@ public class UserSignupService {
     private void scheduleFallbackTokenExpiry(String token) {
         long ttlSeconds = Math.max(1, confirmationTokenTtlMinutes * 60);
         scheduler.schedule(() -> fallbackPendingSignups.remove(token), ttlSeconds, TimeUnit.SECONDS);
+    }
+
+    public void verifyUserMail(String userMail) {
+        UserEntity userEntity = userEntityRepository.findByUserMail(userMail);
+        if (userEntity == null) throw new UserMailNotFoundException(userMail);
+
+        String key = UUID.randomUUID().toString().replace("-", "");
+        String confirmationLink = publicBaseUrl + "/user/signup/confirmUserMail?token=" + key;
+
+        PendingSignupEntity pendingSignup = new PendingSignupEntity();
+        pendingSignup.setToken(key);
+        pendingSignup.setUserMail(userEntity.getUserMail()); // Burada userEntity kullanıldı
+
+        // Şifreyi de veritabanından gelen kullanıcıdan alıyoruz
+        pendingSignup.setUserPassword(userEntity.getUserPassword());
+        pendingSignup.setExpiresAt(LocalDateTime.now().plusMinutes(confirmationTokenTtlMinutes));
+
+        // 3. Kaydet
+        storePendingSignup(pendingSignup);
+
+        Context context = new Context();
+        context.setVariable("confirmationLink", confirmationLink);
+
+        try {
+            mailService.sendMimeMessage(userMail, "Welcome to Migros!", "confirmation-email", context);
+        } catch (MessagingException e) {
+            throw new MailSendingFailedException();
+        }
     }
 }

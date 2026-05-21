@@ -82,7 +82,7 @@
         <span
           class="text-warning fw-bold"
           style="cursor: pointer"
-          (click)="openSign()"
+          (click)="openLogin()"
           >Giriş Yap</span
         >
       </div>
@@ -91,7 +91,7 @@
 
   <!-- Login Phase -->
   <div
-    *ngIf="!isSignPhaseActive"
+    *ngIf="isLoginPhaseActive"
     id="login-component-content"
     class="p-4 border rounded shadow-sm bg-light"
   >
@@ -146,7 +146,7 @@
         <span
           class="text-warning fw-bold"
           style="cursor: pointer"
-          (click)="openLogin()"
+          (click)="openSign()"
           >üye ol</span
         >
       </div>
@@ -155,8 +155,50 @@
         <span
           class="text-warning fw-bold"
           style="cursor: pointer"
-          (click)="openLogin()"
+          (click)="openResetPassword()"
           >unuttun?</span
+        >
+      </div>
+    </form>
+  </div>
+
+  <!-- Reset Password Phase -->
+  <div
+    *ngIf="isResetPasswordPhaseActive"
+    id="login-component-content"
+    class="p-4 border rounded shadow-sm bg-light"
+  >
+    <h4 class="mb-3">Şifrenizi sıfırlayın</h4>
+    <form>
+      <!-- Email -->
+      <div class="mb-3">
+        <label for="loginEmail2" class="form-label">E-Posta adresiniz</label>
+        <input
+          type="email"
+          class="form-control"
+          id="loginEmail2"
+          [(ngModel)]="userMail"
+          name="emailLogin"
+        />
+      </div>
+
+      <!-- Submit -->
+      <button
+        id="login-button"
+        type="button"
+        class="btn btn-success w-100"
+        (click)="verifyUser()"
+      >
+        Doğrula
+      </button>
+
+      <div id="login-text" class="mt-3 text-center">
+        Üye değilsen
+        <span
+          class="text-warning fw-bold"
+          style="cursor: pointer"
+          (click)="openLogin()"
+          >üye ol</span
         >
       </div>
     </form>
