@@ -1,6 +1,10 @@
 <div id="login-component" (click)="closeComponent($event)">
   <!-- Sign Up Phase -->
-  <div *ngIf="isSignPhaseActive" id="login-component-content" class="p-4 border rounded shadow-sm bg-light">
+  <div
+    *ngIf="isSignPhaseActive"
+    id="login-component-content"
+    class="p-4 border rounded shadow-sm bg-light"
+  >
     <h4 class="mb-3">Üye Ol</h4>
     <form>
       <!-- Email -->
@@ -32,13 +36,18 @@
           class="btn btn-sm btn-outline-secondary position-absolute top-0 end-0 mt-4 me-2"
           (click)="passwordVisible = !passwordVisible"
         >
-          <i class="bi" [ngClass]="passwordVisible ? 'bi-eye-slash' : 'bi-eye'"></i>
+          <i
+            class="bi"
+            [ngClass]="passwordVisible ? 'bi-eye-slash' : 'bi-eye'"
+          ></i>
         </button>
       </div>
 
       <!-- Confirm Password -->
       <div class="mb-3">
-        <label for="loginPasswordConfirm" class="form-label">Şifreyi Onayla</label>
+        <label for="loginPasswordConfirm" class="form-label"
+          >Şifreyi Onayla</label
+        >
         <input
           [type]="passwordVisible ? 'text' : 'password'"
           class="form-control"
@@ -51,24 +60,41 @@
           class="btn btn-sm btn-outline-secondary position-absolute top-0 end-0 mt-4 me-2"
           (click)="passwordVisible = !passwordVisible"
         >
-          <i class="bi" [ngClass]="passwordVisible ? 'bi-eye-slash' : 'bi-eye'"></i>
+          <i
+            class="bi"
+            [ngClass]="passwordVisible ? 'bi-eye-slash' : 'bi-eye'"
+          ></i>
         </button>
       </div>
 
       <!-- Submit -->
-      <button id="login-button" type="button" class="btn btn-primary w-100" (click)="signUser()">
+      <button
+        id="login-button"
+        type="button"
+        class="btn btn-primary w-100"
+        (click)="signUser()"
+      >
         Üye Ol
       </button>
 
       <div id="login-text" class="mt-3 text-center">
         Zaten üyeysen
-        <span class="text-warning fw-bold" style="cursor: pointer" (click)="openSign()">Giriş Yap</span>
+        <span
+          class="text-warning fw-bold"
+          style="cursor: pointer"
+          (click)="openSign()"
+          >Giriş Yap</span
+        >
       </div>
     </form>
   </div>
 
   <!-- Login Phase -->
-  <div *ngIf="!isSignPhaseActive" id="login-component-content" class="p-4 border rounded shadow-sm bg-light">
+  <div
+    *ngIf="!isSignPhaseActive"
+    id="login-component-content"
+    class="p-4 border rounded shadow-sm bg-light"
+  >
     <h4 class="mb-3">Giriş Yap</h4>
     <form>
       <!-- Email -->
@@ -98,18 +124,40 @@
           class="btn btn-sm btn-outline-secondary position-absolute top-0 end-0 mt-4 me-2"
           (click)="passwordVisible = !passwordVisible"
         >
-          <i class="bi" [ngClass]="passwordVisible ? 'bi-eye-slash' : 'bi-eye'"></i>
+          <i
+            class="bi"
+            [ngClass]="passwordVisible ? 'bi-eye-slash' : 'bi-eye'"
+          ></i>
         </button>
       </div>
 
       <!-- Submit -->
-      <button id="login-button" type="button" class="btn btn-success w-100" (click)="loginUser()">
+      <button
+        id="login-button"
+        type="button"
+        class="btn btn-success w-100"
+        (click)="loginUser()"
+      >
         Giriş Yap
       </button>
 
       <div id="login-text" class="mt-3 text-center">
         Üye değilsen
-        <span class="text-warning fw-bold" style="cursor: pointer" (click)="openLogin()">Üye Ol</span>
+        <span
+          class="text-warning fw-bold"
+          style="cursor: pointer"
+          (click)="openLogin()"
+          >Üye Ol</span
+        >
+      </div>
+      <div id="login-text" class="mt-3 text-center">
+        Şifreni mi
+        <span
+          class="text-warning fw-bold"
+          style="cursor: pointer"
+          (click)="openLogin()"
+          >unuttun?</span
+        >
       </div>
     </form>
   </div>
