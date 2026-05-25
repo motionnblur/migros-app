@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Output } from '@angular/core';
+import { Component, EventEmitter, OnInit, Output } from '@angular/core';
 import { RestService } from '../../../../services/rest/rest.service';
 import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
@@ -25,7 +25,7 @@ import { ActivatedRoute, Router } from '@angular/router';
   templateUrl: './sign-user.component.html',
   styleUrl: './sign-user.component.css',
 })
-export class SignUserComponent {
+export class SignUserComponent implements OnInit {
   isSignPhaseActive: boolean = false;
   isLoginPhaseActive: boolean = true;
   isResetPasswordPhaseActive: boolean = false;
@@ -33,6 +33,7 @@ export class SignUserComponent {
   userPassword!: string;
   userPasswordConfirm!: string;
   passwordVisible = false;
+  resetToken: string | null = null;
 
   constructor(
     private restService: RestService,
@@ -40,6 +41,13 @@ export class SignUserComponent {
     private router: Router,
     private route: ActivatedRoute,
   ) {}
+
+  ngOnInit() {
+    this.resetToken = this.route.snapshot.paramMap.get('token');
+    if (this.resetToken) {
+      this.isResetPasswordPhaseActive = true; // reset password div’i aç
+    }
+  }
 
   public openSign() {
     this.isSignPhaseActive = true;

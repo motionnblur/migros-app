@@ -33,6 +33,7 @@ import java.util.concurrent.TimeUnit;
 
 @Service
 public class UserSignupService {
+
     private static final Logger log = LoggerFactory.getLogger(UserSignupService.class);
 
     private final UserEntityRepository userEntityRepository;
@@ -49,12 +50,12 @@ public class UserSignupService {
 
     @Autowired
     public UserSignupService(UserEntityRepository userEntityRepository,
-                             PendingSignupEntityRepository pendingSignupEntityRepository,
-                             EncryptService encryptService,
-                             MailService mailService, TokenService tokenService,
-                             PasswordValidator passwordValidator,
-                             @Value("${app.public-base-url}") String publicBaseUrl,
-                             @Value("${app.signup.confirmation.ttl-minutes:15}") long confirmationTokenTtlMinutes) {
+            PendingSignupEntityRepository pendingSignupEntityRepository,
+            EncryptService encryptService,
+            MailService mailService, TokenService tokenService,
+            PasswordValidator passwordValidator,
+            @Value("${app.public-base-url}") String publicBaseUrl,
+            @Value("${app.signup.confirmation.ttl-minutes:15}") long confirmationTokenTtlMinutes) {
         this.userEntityRepository = userEntityRepository;
         this.pendingSignupEntityRepository = pendingSignupEntityRepository;
         this.encryptService = encryptService;
@@ -67,11 +68,13 @@ public class UserSignupService {
 
     @Transactional
     public void signup(UserSignDto userSignDto) {
-        if (userEntityRepository.existsByUserMail(userSignDto.getUserMail()))
+        if (userEntityRepository.existsByUserMail(userSignDto.getUserMail())) {
             throw new UserAlreadyExistsException(userSignDto.getUserMail());
+        }
 
-        if (!passwordValidator.isPasswordStrongEnough(userSignDto.getUserPassword()))
+        if (!passwordValidator.isPasswordStrongEnough(userSignDto.getUserPassword())) {
             throw new WeakPasswordException();
+        }
 
         UserEntity userEntityToCreate = new UserEntity();
         userEntityToCreate.setUserMail(userSignDto.getUserMail());
@@ -99,10 +102,13 @@ public class UserSignupService {
 
     public String login(UserSignDto userSignDto) {
         UserEntity userEntity = userEntityRepository.findByUserMail(userSignDto.getUserMail());
-        if (userEntity == null) throw new UserMailNotFoundException(userSignDto.getUserMail());
+        if (userEntity == null) {
+            throw new UserMailNotFoundException(userSignDto.getUserMail());
+        }
 
-        if (!encryptService.checkIfPasswordMatches(userSignDto.getUserPassword(), userEntity.getUserPassword()))
+        if (!encryptService.checkIfPasswordMatches(userSignDto.getUserPassword(), userEntity.getUserPassword())) {
             throw new WrongPasswordException();
+        }
 
         return tokenService.generateToken(userEntity.getUserMail());
     }
@@ -165,8 +171,8 @@ public class UserSignupService {
             }
         }
 
-        fallbackPendingSignups.entrySet().removeIf(entry ->
-                pendingSignup.getUserMail().equals(entry.getValue().getUserMail()));
+        fallbackPendingSignups.entrySet().removeIf(entry
+                -> pendingSignup.getUserMail().equals(entry.getValue().getUserMail()));
         fallbackPendingSignups.put(pendingSignup.getToken(), pendingSignup);
         scheduleFallbackTokenExpiry(pendingSignup.getToken());
     }
@@ -207,10 +213,12 @@ public class UserSignupService {
 
     public void verifyUserMail(String userMail) {
         UserEntity userEntity = userEntityRepository.findByUserMail(userMail);
-        if (userEntity == null) throw new UserMailNotFoundException(userMail);
+        if (userEntity == null) {
+            throw new UserMailNotFoundException(userMail);
+        }
 
         String key = UUID.randomUUID().toString().replace("-", "");
-        String confirmationLink = publicBaseUrl + "/user/signup/confirmUserMail?token=" + key;
+        String confirmationLink = "http://localhost:4200/reset-password/" + key;
 
         PendingSignupEntity pendingSignup = new PendingSignupEntity();
         pendingSignup.setToken(key);
