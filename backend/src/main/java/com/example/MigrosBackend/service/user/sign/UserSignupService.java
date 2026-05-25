@@ -1,5 +1,6 @@
 package com.example.MigrosBackend.service.user.sign;
 
+import com.example.MigrosBackend.dto.user.sign.ResetPasswordDto;
 import com.example.MigrosBackend.dto.user.sign.UserSignDto;
 import com.example.MigrosBackend.entity.user.PendingSignupEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
@@ -209,6 +210,42 @@ public class UserSignupService {
     private void scheduleFallbackTokenExpiry(String token) {
         long ttlSeconds = Math.max(1, confirmationTokenTtlMinutes * 60);
         scheduler.schedule(() -> fallbackPendingSignups.remove(token), ttlSeconds, TimeUnit.SECONDS);
+    }
+
+    @Transactional
+    public void resetPassword(ResetPasswordDto resetPasswordDto) {
+        if (resetPasswordDto == null
+                || resetPasswordDto.getToken() == null
+                || resetPasswordDto.getToken().isBlank()) {
+            throw new TokenNotFoundException();
+        }
+
+        String token = resetPasswordDto.getToken();
+        PendingSignupEntity pendingSignup = findPendingSignupByToken(token);
+        if (pendingSignup == null) {
+            throw new TokenNotFoundException();
+        }
+
+        if (pendingSignup.getExpiresAt() == null
+                || pendingSignup.getExpiresAt().isBefore(LocalDateTime.now())) {
+            deletePendingSignup(token);
+            throw new TokenNotFoundException();
+        }
+
+        if (!passwordValidator.isPasswordStrongEnough(resetPasswordDto.getUserPassword())) {
+            throw new WeakPasswordException();
+        }
+
+        UserEntity userEntity = userEntityRepository.findByUserMail(pendingSignup.getUserMail());
+        if (userEntity == null) {
+            deletePendingSignup(token);
+            throw new UserMailNotFoundException(pendingSignup.getUserMail());
+        }
+
+        userEntity.setUserPassword(encryptService.getEncryptedPassword(resetPasswordDto.getUserPassword()));
+        userEntityRepository.save(userEntity);
+
+        deletePendingSignup(token);
     }
 
     public void verifyUserMail(String userMail) {

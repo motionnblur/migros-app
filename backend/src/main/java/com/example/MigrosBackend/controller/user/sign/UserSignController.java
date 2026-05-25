@@ -2,6 +2,7 @@ package com.example.MigrosBackend.controller.user.sign;
 
 import com.example.MigrosBackend.config.security.AuthCookieService;
 import com.example.MigrosBackend.config.security.AuthCookies;
+import com.example.MigrosBackend.dto.user.sign.ResetPasswordDto;
 import com.example.MigrosBackend.dto.user.sign.UserSignDto;
 import com.example.MigrosBackend.helper.AuthTokenResolver;
 import com.example.MigrosBackend.service.global.TokenService;
@@ -83,6 +84,12 @@ public class UserSignController {
     @GetMapping("verifyUserMail")
     private ResponseEntity<Void> verifyUserMail(@RequestParam String userMail) {
         userSignupService.verifyUserMail(userMail);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("resetPassword")
+    private ResponseEntity<Void> resetPassword(@RequestBody ResetPasswordDto resetPasswordDto) {
+        userSignupService.resetPassword(resetPasswordDto);
         return ResponseEntity.ok().build();
     }
 }
