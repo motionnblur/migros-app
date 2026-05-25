@@ -203,4 +203,82 @@
       </div>
     </form>
   </div>
+
+  <!-- New Password Phase -->
+  <div
+    *ngIf="isNewPasswordPhaseActive"
+    id="login-component-content"
+    class="p-4 border rounded shadow-sm bg-light"
+  >
+    <h4 class="mb-3">Yeni şifrenizi belirleyin</h4>
+    <form>
+      <!-- New Password -->
+      <div class="mb-3">
+        <label for="newPassword" class="form-label">Yeni Şifre</label>
+        <input
+          [type]="passwordVisible ? 'text' : 'password'"
+          class="form-control"
+          id="newPassword"
+          [(ngModel)]="userPassword"
+          name="newPassword"
+        />
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary position-absolute top-0 end-0 mt-4 me-2"
+          (click)="passwordVisible = !passwordVisible"
+        >
+          <i
+            class="bi"
+            [ngClass]="passwordVisible ? 'bi-eye-slash' : 'bi-eye'"
+          ></i>
+        </button>
+      </div>
+
+      <!-- Confirm New Password -->
+      <div class="mb-3">
+        <label for="newPasswordConfirm" class="form-label"
+          >Yeni Şifreyi Onayla</label
+        >
+        <input
+          [type]="passwordVisible ? 'text' : 'password'"
+          class="form-control"
+          id="newPasswordConfirm"
+          [(ngModel)]="userPasswordConfirm"
+          name="newPasswordConfirm"
+        />
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary position-absolute top-0 end-0 mt-4 me-2"
+          (click)="passwordVisible = !passwordVisible"
+        >
+          <i
+            class="bi"
+            [ngClass]="passwordVisible ? 'bi-eye-slash' : 'bi-eye'"
+          ></i>
+        </button>
+      </div>
+
+      <!-- Submit -->
+      <button
+        id="login-button"
+        type="button"
+        class="btn btn-success w-100"
+        (click)="resetPassword()"
+      >
+        Şifreyi Güncelle
+      </button>
+
+      <div id="login-text" class="mt-3 text-center">
+        Giriş ekranına
+        <span
+          class="text-warning fw-bold"
+          style="cursor: pointer"
+          (click)="openLogin()"
+          >dön</span
+        >
+      </div>
+    </form>
+  </div>
+
+
 </div>

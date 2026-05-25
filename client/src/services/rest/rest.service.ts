@@ -291,6 +291,14 @@ export class RestService {
       })
       .pipe(map((response) => response.status === 200));
   }
+  resetPassword(payload: { token: string; userPassword: string }) {
+    return this.http
+      .post(`${API_BASE_URL}/user/resetPassword`, payload, {
+        responseType: 'text',
+        observe: 'response',
+      })
+      .pipe(map((response) => response.status === 200));
+  }
   addProductToUserCart(productId: number) {
     return this.http
       .get(`${API_BASE_URL}/user/supply/addProductToUserCart`, {

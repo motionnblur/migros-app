@@ -29,6 +29,7 @@ export class SignUserComponent implements OnInit {
   isSignPhaseActive: boolean = false;
   isLoginPhaseActive: boolean = true;
   isResetPasswordPhaseActive: boolean = false;
+  isNewPasswordPhaseActive: boolean = false;
   userMail!: string;
   userPassword!: string;
   userPasswordConfirm!: string;
@@ -45,7 +46,10 @@ export class SignUserComponent implements OnInit {
   ngOnInit() {
     this.resetToken = this.route.snapshot.paramMap.get('token');
     if (this.resetToken) {
-      this.isResetPasswordPhaseActive = true; // reset password div’i aç
+      this.isSignPhaseActive = false;
+      this.isLoginPhaseActive = false;
+      this.isResetPasswordPhaseActive = false;
+      this.isNewPasswordPhaseActive = true;
     }
   }
 
@@ -53,18 +57,21 @@ export class SignUserComponent implements OnInit {
     this.isSignPhaseActive = true;
     this.isLoginPhaseActive = false;
     this.isResetPasswordPhaseActive = false;
+    this.isNewPasswordPhaseActive = false;
     this.clearFields();
   }
   public openLogin() {
     this.isSignPhaseActive = false;
     this.isLoginPhaseActive = true;
     this.isResetPasswordPhaseActive = false;
+    this.isNewPasswordPhaseActive = false;
     this.clearFields();
   }
   public openResetPassword() {
     this.isResetPasswordPhaseActive = true;
     this.isSignPhaseActive = false;
     this.isLoginPhaseActive = false;
+    this.isNewPasswordPhaseActive = false;
     this.clearFields();
   }
   private clearFields() {
@@ -162,5 +169,39 @@ export class SignUserComponent implements OnInit {
         console.error('Error verifying user');
       },
     });
+  }
+
+  public resetPassword() {
+    if (!this.resetToken) {
+      alert('Geçersiz veya eksik sıfırlama bağlantısı.');
+      return;
+    }
+    if (!this.userPassword || !this.userPasswordConfirm) {
+      alert('Please fill in all fields correctly');
+      return;
+    }
+    if (this.userPassword !== this.userPasswordConfirm) {
+      alert('Passwords do not match');
+      return;
+    }
+
+    this.restService
+      .resetPassword({
+        token: this.resetToken,
+        userPassword: this.userPassword,
+      })
+      .subscribe({
+        next: () => {
+          alert('Şifreniz başarıyla güncellendi. Lütfen giriş yapın.');
+          this.clearFields();
+          this.resetToken = null;
+          this.openLogin();
+          this.router.navigate(['/']);
+        },
+        error: (errorObj) => {
+          console.error('Error resetting password');
+          alert(errorObj.error ?? 'Şifre sıfırlanırken bir hata oluştu.');
+        },
+      });
   }
 }
