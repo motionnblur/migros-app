@@ -145,6 +145,9 @@ export class SignUserComponent {
   public verifyUser() {
     this.restService.getVerifyUser(this.userMail).subscribe({
       next: () => {
+        alert(
+          'Mailinize gelen linki kullanarak şifrenizi sıfırlayabilirsiniz.',
+        );
         this.closeModal();
       },
       error: () => {
