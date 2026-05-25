@@ -22,6 +22,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("user")
 public class UserSignController {
+
     private final UserSignupService userSignupService;
     private final TokenService tokenService;
     private final AuthCookieService authCookieService;
@@ -29,9 +30,9 @@ public class UserSignController {
 
     @Autowired
     public UserSignController(UserSignupService userSignupService,
-                              TokenService tokenService,
-                              AuthCookieService authCookieService,
-                              AuthTokenResolver authTokenResolver) {
+            TokenService tokenService,
+            AuthCookieService authCookieService,
+            AuthTokenResolver authTokenResolver) {
         this.userSignupService = userSignupService;
         this.tokenService = tokenService;
         this.authCookieService = authCookieService;
@@ -80,8 +81,8 @@ public class UserSignController {
     }
 
     @GetMapping("verifyUserMail")
-    private ResponseEntity<String> verifyUserMail(@RequestParam String userMail) {
+    private ResponseEntity<Void> verifyUserMail(@RequestParam String userMail) {
         userSignupService.verifyUserMail(userMail);
-        return ResponseEntity.ok("Your mail has been verified successfully, you can close this page now.");
+        return ResponseEntity.ok().build();
     }
 }

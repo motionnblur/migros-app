@@ -148,7 +148,7 @@ export class SignUserComponent {
         alert(
           'Mailinize gelen linki kullanarak şifrenizi sıfırlayabilirsiniz.',
         );
-        this.closeModal();
+        //this.closeModal();
       },
       error: () => {
         console.error('Error verifying user');
