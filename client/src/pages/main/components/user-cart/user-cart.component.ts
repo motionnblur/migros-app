@@ -21,7 +21,6 @@ import { ActivatedRoute, Router } from '@angular/router';
 })
 export class UserCartComponent {
   @ViewChild('buyButton') buyButtonRef!: ElementRef<HTMLButtonElement>;
-  @Output() closeComponentEvent = new EventEmitter<void>();
 
   items: IUserCartItemDto[] = [];
   itemsToDelete: number[] = [];
@@ -39,7 +38,7 @@ export class UserCartComponent {
   constructor(
     private restService: RestService,
     private router: Router,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
   ) {
     this.loadCart();
   }
@@ -60,10 +59,12 @@ export class UserCartComponent {
         this.totalPrice = this.calculateTotal(data);
 
         this.items.forEach((item) => {
-          this.restService.getProductImage(item.productId).subscribe((blob: Blob) => {
-            const url: string = window.URL.createObjectURL(blob);
-            item.productImageUrl = url;
-          });
+          this.restService
+            .getProductImage(item.productId)
+            .subscribe((blob: Blob) => {
+              const url: string = window.URL.createObjectURL(blob);
+              item.productImageUrl = url;
+            });
         });
       },
       error: (error: any) => {
@@ -75,7 +76,7 @@ export class UserCartComponent {
   private calculateTotal(items: IUserCartItemDto[]): number {
     return items.reduce(
       (total, item) => total + item.productPrice * item.productCount,
-      0
+      0,
     );
   }
 
@@ -86,7 +87,9 @@ export class UserCartComponent {
 
     this.itemCountMap.forEach((count, productId) => {
       if (count > 0) {
-        this.restService.updateProductCountInUserCart(productId, count).subscribe();
+        this.restService
+          .updateProductCountInUserCart(productId, count)
+          .subscribe();
       }
     });
 
@@ -98,11 +101,12 @@ export class UserCartComponent {
     this.router.navigate([{ outlets: { modal: null } }], {
       relativeTo: this.route.parent ?? this.route,
     });
-    this.closeComponentEvent.emit();
   }
 
   public removeProductFromUserCart(productId: number) {
-    const itemToRemove = this.items.find((item) => item.productId === productId);
+    const itemToRemove = this.items.find(
+      (item) => item.productId === productId,
+    );
     if (itemToRemove) {
       this.totalPrice -= itemToRemove.productPrice * itemToRemove.productCount;
     }
@@ -154,7 +158,9 @@ export class UserCartComponent {
     }
 
     if (this.items.some((item) => item.productCount > item.availableStock)) {
-      alert('Sepetteki bir veya daha fazla urunun stogu yetersiz. Lutfen sepeti guncelleyin.');
+      alert(
+        'Sepetteki bir veya daha fazla urunun stogu yetersiz. Lutfen sepeti guncelleyin.',
+      );
       return;
     }
 

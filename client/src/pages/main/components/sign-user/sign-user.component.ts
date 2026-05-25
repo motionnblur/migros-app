@@ -41,9 +41,6 @@ export class SignUserComponent {
     private route: ActivatedRoute,
   ) {}
 
-  @Output() closeComponentEvent = new EventEmitter<void>();
-  @Output() userLoginEvent = new EventEmitter<void>();
-
   public openSign() {
     this.isSignPhaseActive = true;
     this.isLoginPhaseActive = false;
@@ -77,7 +74,6 @@ export class SignUserComponent {
     this.router.navigate([{ outlets: { modal: null } }], {
       relativeTo: this.route.parent ?? this.route,
     });
-    this.closeComponentEvent.emit();
   }
 
   public signUser() {
@@ -135,7 +131,6 @@ export class SignUserComponent {
           }
 
           this.authService.refreshUserSession().subscribe(() => {
-            this.userLoginEvent.emit();
             this.closeModal();
           });
         },
@@ -150,7 +145,6 @@ export class SignUserComponent {
   public verifyUser() {
     this.restService.getVerifyUser(this.userMail).subscribe({
       next: () => {
-        this.userLoginEvent.emit();
         this.closeModal();
       },
       error: () => {

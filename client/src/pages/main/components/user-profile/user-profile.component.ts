@@ -13,8 +13,6 @@ import { ActivatedRoute, Router } from '@angular/router';
   styleUrl: './user-profile.component.css',
 })
 export class UserProfileComponent {
-  @Output() closeComponentEvent = new EventEmitter<void>();
-
   @HostListener('document:keydown.escape', ['$event'])
   onKeydownHandler(event: KeyboardEvent) {
     this.closeProfileComponent();
@@ -32,7 +30,7 @@ export class UserProfileComponent {
   constructor(
     private restService: RestService,
     private router: Router,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
   ) {
     this.restService.getUserProfileTableData().subscribe({
       next: (data: IUserProfileTable) => {
@@ -54,7 +52,6 @@ export class UserProfileComponent {
     this.router.navigate([{ outlets: { modal: null } }], {
       relativeTo: this.route.parent ?? this.route,
     });
-    this.closeComponentEvent.emit();
   }
 
   public uploadTableData() {
@@ -68,7 +65,10 @@ export class UserProfileComponent {
       userPostalCode: this.userPostalCode,
     };
 
-    if (this.baseTableData && JSON.stringify(this.baseTableData) === JSON.stringify(table)) {
+    if (
+      this.baseTableData &&
+      JSON.stringify(this.baseTableData) === JSON.stringify(table)
+    ) {
       this.closeProfileComponent();
       return;
     }
