@@ -1,3 +1,5 @@
+import { environment } from '../../environments/environment';
+
 const DEFAULT_SUPABASE_IMAGE_BASE_URL =
   'https://mskiasfajbnrpwkqdbwn.supabase.co/storage/v1/object/public/migros-app-images/public/';
 
@@ -36,4 +38,23 @@ export function supabaseImageUrl(path: string): string {
 
   const cleanedPath = normalizedPath.replace(/^\/+/, '');
   return `${SUPABASE_IMAGE_BASE_URL}${cleanedPath}`;
+}
+
+const LOCAL_ASSET_ALIASES: Record<string, string> = {
+  'discover-items/stkvlt.png': 'discover-items/süt-kahvaltilik.png',
+  'discover-items/cicek.png': 'discover-items/çiçek.png',
+};
+
+export function staticImageUrl(path: string, production = environment.production): string {
+  const normalizedPath = (path || '').trim();
+  if (!normalizedPath || /^https?:\/\//i.test(normalizedPath)) {
+    return production ? supabaseImageUrl(normalizedPath) : normalizedPath;
+  }
+
+  if (production) {
+    return supabaseImageUrl(normalizedPath);
+  }
+
+  const cleanedPath = normalizedPath.replace(/^\/+/, '');
+  return `/${LOCAL_ASSET_ALIASES[cleanedPath] ?? cleanedPath}`;
 }

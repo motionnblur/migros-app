@@ -28,7 +28,7 @@
         >
           <img
             class="product-edit__buy-view__head-right-3__image"
-            [src]="supabaseImageUrl('moneyy.png')"
+            [src]="staticImageUrl('moneyy.png')"
           />
         </div>
         <div class="product-edit__buy-view__head-right-4 line-bottom">
@@ -60,7 +60,7 @@
             {{ item.descriptionTabName }}
           </div>
           <div (click)="deleteProductTab($event, i)">
-                    <img [src]="supabaseImageUrl('delete.png')" />
+                    <img [src]="staticImageUrl('delete.png')" />
           </div>
         </div>
 
@@ -70,7 +70,7 @@
         class="product-edit__buy-view__tail-head__plus"
         (click)="createProductTab()"
       >
-                    <img [src]="supabaseImageUrl('plus.png')" />
+                    <img [src]="staticImageUrl('plus.png')" />
       </div>
     </div>
     <div

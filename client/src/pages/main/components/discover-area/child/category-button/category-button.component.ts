@@ -1,6 +1,7 @@
 import { Component, Input } from '@angular/core';
 import { Router } from '@angular/router';
-import { supabaseImageUrl } from '../../../../../../app/config/supabase-assets';
+import { environment } from '../../../../../../environments/environment';
+import { staticImageUrl, supabaseImageUrl } from '../../../../../../app/config/supabase-assets';
 
 @Component({
   selector: 'app-category-button',
@@ -10,7 +11,7 @@ import { supabaseImageUrl } from '../../../../../../app/config/supabase-assets';
   styleUrl: './category-button.component.css',
 })
 export class CategoryButtonComponent {
-  readonly supabaseImageUrl = supabaseImageUrl;
+  readonly staticImageUrl = staticImageUrl;
   @Input() image: string = '/discover-items/meyve.png';
   @Input() name: string = 'Name';
   @Input() categoryId!: number;
@@ -22,6 +23,10 @@ export class CategoryButtonComponent {
   }
 
   onImageError(event: Event) {
+    if (!environment.production) {
+      return;
+    }
+
     const target = event.target as HTMLImageElement | null;
     if (!target || target.dataset['supabaseFallbackTried'] === '1') {
       return;
@@ -34,6 +39,6 @@ export class CategoryButtonComponent {
 
     target.dataset['supabaseFallbackTried'] = '1';
     const fallbackPath = imagePath.replace(/^discover-items\//, '');
-    target.src = this.supabaseImageUrl(fallbackPath);
+    target.src = supabaseImageUrl(fallbackPath);
   }
 }

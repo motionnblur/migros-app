@@ -6,7 +6,7 @@ import { EventService } from '../../../../services/event/event.service';
 import { IDescription } from '../../../../interfaces/IDescription';
 import { IProductDescriptionTab } from '../../../../interfaces/IProductDescriptionTab';
 import { IProductDescription } from '../../../../interfaces/IProductDescription';
-import { supabaseImageUrl } from '../../../../app/config/supabase-assets';
+import { staticImageUrl } from '../../../../app/config/supabase-assets';
 
 @Component({
   selector: 'app-product-edit',
@@ -15,7 +15,7 @@ import { supabaseImageUrl } from '../../../../app/config/supabase-assets';
   styleUrl: './product-edit.component.css',
 })
 export class ProductEditComponent extends ProductBuyBase {
-  readonly supabaseImageUrl = supabaseImageUrl;
+  readonly staticImageUrl = staticImageUrl;
   @Input() selectedImage: File | null = null;
   @Output() hasEscapePressed = new EventEmitter<boolean>();
   currentSelectedTabIndis: number = 0;

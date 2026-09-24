@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { SignService } from '../../services/sign/sign.service';
 import { AuthService } from '../../../../services/auth/auth.service';
-import { supabaseImageUrl } from '../../../../app/config/supabase-assets';
+import { staticImageUrl } from '../../../../app/config/supabase-assets';
 
 @Component({
   selector: 'app-admin-login',
@@ -14,7 +14,7 @@ import { supabaseImageUrl } from '../../../../app/config/supabase-assets';
   styleUrl: './admin-login.component.css',
 })
 export class AdminLoginComponent {
-  readonly supabaseImageUrl = supabaseImageUrl;
+  readonly staticImageUrl = staticImageUrl;
   passwordVisible: boolean = false;
   adminName: string = '';
   adminPassword: string = '';
