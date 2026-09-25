@@ -87,9 +87,8 @@ class UserSupplyServiceTest {
     }
 
     private void stubAuthenticatedUser() {
-        when(tokenService.extractUsername(TOKEN)).thenReturn(USER_MAIL);
+        when(tokenService.validateAndExtractUser(TOKEN)).thenReturn(USER_MAIL);
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(user);
-        when(tokenService.validateToken(TOKEN, USER_MAIL)).thenReturn(true);
     }
 
     @Test

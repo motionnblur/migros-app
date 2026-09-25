@@ -55,6 +55,6 @@ public class AdminSignupService {
             throw new WrongPasswordException();
         }
 
-        return tokenService.generateToken(adminEntity.getAdminName());
+        return tokenService.generateAdminToken(adminEntity.getAdminName());
     }
 }

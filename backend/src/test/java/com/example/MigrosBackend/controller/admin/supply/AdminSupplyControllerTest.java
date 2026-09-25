@@ -2,6 +2,7 @@ package com.example.MigrosBackend.controller.admin.supply;
 
 import com.example.MigrosBackend.dto.user.product.ProductPreviewDto;
 import com.example.MigrosBackend.service.admin.supply.AdminSupplyService;
+import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
 import com.example.MigrosBackend.service.user.supply.UserSupplyService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,6 +33,9 @@ class AdminSupplyControllerTest {
 
     @MockBean
     private UserSupplyService userSupplyService;
+
+    @MockBean
+    private AdminEntityRepository adminEntityRepository;
 
     @MockBean
     private TokenService tokenService;

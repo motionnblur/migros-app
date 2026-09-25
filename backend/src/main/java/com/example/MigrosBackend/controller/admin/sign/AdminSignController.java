@@ -57,7 +57,7 @@ public class AdminSignController {
     private ResponseEntity<Map<String, String>> session(
             @CookieValue(name = AuthCookies.ADMIN_SESSION_COOKIE_NAME, required = false) String token) {
         String adminToken = authTokenResolver.requireToken(token);
-        String adminName = tokenService.extractUsername(adminToken);
+        String adminName = tokenService.validateAndExtractAdmin(adminToken);
         return ResponseEntity.ok(Map.of("adminName", adminName));
     }
 }

@@ -1,6 +1,8 @@
 package com.example.MigrosBackend.filter;
 
 import com.example.MigrosBackend.config.security.AuthCookies;
+import com.example.MigrosBackend.exception.shared.InvalidTokenException;
+import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -15,13 +17,19 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 
 @Component
 public class JwtRequestFilter extends OncePerRequestFilter {
-    private final TokenService tokenService;
+    private static final String ROLE_ADMIN = "ROLE_ADMIN";
+    private static final String ROLE_USER = "ROLE_USER";
 
-    public JwtRequestFilter(TokenService tokenService) {
+    private final TokenService tokenService;
+    private final AdminEntityRepository adminEntityRepository;
+
+    public JwtRequestFilter(TokenService tokenService, AdminEntityRepository adminEntityRepository) {
         this.tokenService = tokenService;
+        this.adminEntityRepository = adminEntityRepository;
     }
 
     @Override
@@ -34,52 +42,57 @@ public class JwtRequestFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        String requestPath = resolveRequestPath(request);
-        boolean isAdminPath = requestPath.startsWith("/admin");
-        String jwt = resolveToken(request, isAdminPath);
-        String username = null;
-
-        if (jwt != null) {
-            try {
-                username = tokenService.extractUsername(jwt);
-            } catch (Exception ex) {
-                filterChain.doFilter(request, response);
-                return;
+        resolveAuthentication(request).ifPresent(authentication -> {
+            if (SecurityContextHolder.getContext().getAuthentication() == null) {
+                SecurityContextHolder.getContext().setAuthentication(authentication);
             }
-        }
+        });
 
-        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            if (tokenService.validateToken(jwt, username)) {
-                List<SimpleGrantedAuthority> authorities;
-
-                if (isAdminPath) {
-                    authorities = List.of(new SimpleGrantedAuthority("ROLE_ADMIN"));
-                } else if ("admin".equalsIgnoreCase(username)) {
-                    authorities = List.of(new SimpleGrantedAuthority("ROLE_ADMIN"));
-                } else {
-                    authorities = List.of(new SimpleGrantedAuthority("ROLE_USER"));
-                }
-
-                UsernamePasswordAuthenticationToken authToken =
-                        new UsernamePasswordAuthenticationToken(username, null, authorities);
-
-                SecurityContextHolder.getContext().setAuthentication(authToken);
-            }
-        }
         filterChain.doFilter(request, response);
     }
 
-    private String resolveToken(HttpServletRequest request, boolean isAdminPath) {
-        if (isAdminPath) {
-            return getCookieToken(request, AuthCookies.ADMIN_SESSION_COOKIE_NAME);
+    private Optional<UsernamePasswordAuthenticationToken> resolveAuthentication(HttpServletRequest request) {
+        if (resolveRequestPath(request).startsWith("/admin")) {
+            return authenticateAdmin(request);
         }
 
-        final String authHeader = request.getHeader("Authorization");
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            return authHeader.substring(7);
+        return authenticateUser(request);
+    }
+
+    private Optional<UsernamePasswordAuthenticationToken> authenticateAdmin(HttpServletRequest request) {
+        String token = getCookieToken(request, AuthCookies.ADMIN_SESSION_COOKIE_NAME);
+        if (token == null) {
+            return Optional.empty();
         }
 
-        return getCookieToken(request, AuthCookies.USER_SESSION_COOKIE_NAME);
+        try {
+            String adminName = tokenService.validateAndExtractAdmin(token);
+            if (adminEntityRepository.findByAdminName(adminName) == null) {
+                return Optional.empty();
+            }
+            return Optional.of(buildAuthentication(adminName, ROLE_ADMIN));
+        } catch (InvalidTokenException ex) {
+            return Optional.empty();
+        }
+    }
+
+    private Optional<UsernamePasswordAuthenticationToken> authenticateUser(HttpServletRequest request) {
+        String token = getCookieToken(request, AuthCookies.USER_SESSION_COOKIE_NAME);
+        if (token == null) {
+            return Optional.empty();
+        }
+
+        try {
+            String userMail = tokenService.validateAndExtractUser(token);
+            return Optional.of(buildAuthentication(userMail, ROLE_USER));
+        } catch (InvalidTokenException ex) {
+            return Optional.empty();
+        }
+    }
+
+    private UsernamePasswordAuthenticationToken buildAuthentication(String subject, String role) {
+        List<SimpleGrantedAuthority> authorities = List.of(new SimpleGrantedAuthority(role));
+        return new UsernamePasswordAuthenticationToken(subject, null, authorities);
     }
 
     private String getCookieToken(HttpServletRequest request, String cookieName) {

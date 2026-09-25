@@ -62,9 +62,8 @@ class SupportChatServiceTest {
         SupportMessageEntity first = new SupportMessageEntity(1L, USER_MAIL, "USER", "Hello", LocalDateTime.now().minusMinutes(1));
         SupportMessageEntity second = new SupportMessageEntity(2L, USER_MAIL, "MANAGEMENT", "Hi there", LocalDateTime.now());
 
-        when(tokenService.extractUsername(TOKEN)).thenReturn(USER_MAIL);
+        when(tokenService.validateAndExtractUser(TOKEN)).thenReturn(USER_MAIL);
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(user);
-        when(tokenService.validateToken(TOKEN, USER_MAIL)).thenReturn(true);
         when(supportMessageEntityRepository.findByUserMailOrderByCreatedAtAscIdAsc(USER_MAIL))
                 .thenReturn(Arrays.asList(first, second));
 
@@ -80,9 +79,7 @@ class SupportChatServiceTest {
 
     @Test
     void getMessagesForUser_shouldThrowInvalidToken_whenTokenInvalid() {
-        when(tokenService.extractUsername(TOKEN)).thenReturn(USER_MAIL);
-        when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(user);
-        when(tokenService.validateToken(TOKEN, USER_MAIL)).thenReturn(false);
+        when(tokenService.validateAndExtractUser(TOKEN)).thenThrow(new InvalidTokenException());
 
         assertThrows(InvalidTokenException.class, () -> supportChatService.getMessagesForUser(TOKEN));
     }
@@ -90,9 +87,8 @@ class SupportChatServiceTest {
     @Test
     void getMessagesForUser_shouldThrowGeneralException_whenUserBanned() {
         user.setBanned(true);
-        when(tokenService.extractUsername(TOKEN)).thenReturn(USER_MAIL);
+        when(tokenService.validateAndExtractUser(TOKEN)).thenReturn(USER_MAIL);
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(user);
-        when(tokenService.validateToken(TOKEN, USER_MAIL)).thenReturn(true);
 
         GeneralException ex = assertThrows(GeneralException.class, () -> supportChatService.getMessagesForUser(TOKEN));
         assertEquals("You are banned from live support.", ex.getMessage());
@@ -100,9 +96,8 @@ class SupportChatServiceTest {
 
     @Test
     void addUserMessage_shouldThrowGeneralException_whenMessageBlank() {
-        when(tokenService.extractUsername(TOKEN)).thenReturn(USER_MAIL);
+        when(tokenService.validateAndExtractUser(TOKEN)).thenReturn(USER_MAIL);
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(user);
-        when(tokenService.validateToken(TOKEN, USER_MAIL)).thenReturn(true);
 
         assertThrows(GeneralException.class, () -> supportChatService.addUserMessage(TOKEN, "   "));
         verify(supportMessageEntityRepository, never()).save(any());
@@ -111,9 +106,8 @@ class SupportChatServiceTest {
 
     @Test
     void addUserMessage_shouldTrimAndPersist_andBroadcast() {
-        when(tokenService.extractUsername(TOKEN)).thenReturn(USER_MAIL);
+        when(tokenService.validateAndExtractUser(TOKEN)).thenReturn(USER_MAIL);
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(user);
-        when(tokenService.validateToken(TOKEN, USER_MAIL)).thenReturn(true);
 
         supportChatService.addUserMessage(TOKEN, "  hello  ");
 
@@ -128,7 +122,7 @@ class SupportChatServiceTest {
 
     @Test
     void addUserMessage_shouldThrowUserNotFound_whenTokenUserMissing() {
-        when(tokenService.extractUsername(TOKEN)).thenReturn(USER_MAIL);
+        when(tokenService.validateAndExtractUser(TOKEN)).thenReturn(USER_MAIL);
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(null);
 
         assertThrows(UserNotFoundException.class, () -> supportChatService.addUserMessage(TOKEN, "msg"));

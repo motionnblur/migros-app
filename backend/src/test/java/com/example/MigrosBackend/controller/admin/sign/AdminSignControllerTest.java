@@ -7,6 +7,7 @@ import com.example.MigrosBackend.exception.admin.AdminNotFoundException;
 import com.example.MigrosBackend.exception.shared.WrongPasswordException;
 import com.example.MigrosBackend.helper.AuthTokenResolver;
 import com.example.MigrosBackend.service.admin.sign.AdminSignupService;
+import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
@@ -46,6 +47,9 @@ class AdminSignControllerTest {
 
     @MockBean
     private AuthTokenResolver authTokenResolver;
+
+    @MockBean
+    private AdminEntityRepository adminEntityRepository;
 
     @MockBean
     private TokenService tokenService;
@@ -123,7 +127,7 @@ class AdminSignControllerTest {
     @Test
     void session_shouldReturnAdminName() throws Exception {
         when(authTokenResolver.requireToken("session-token")).thenReturn("session-token");
-        when(tokenService.extractUsername("session-token")).thenReturn("admin");
+        when(tokenService.validateAndExtractAdmin("session-token")).thenReturn("admin");
 
         mockMvc.perform(get("/admin/session")
                         .cookie(new Cookie(AuthCookies.ADMIN_SESSION_COOKIE_NAME, "session-token")))

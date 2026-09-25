@@ -89,11 +89,11 @@ class AdminSignupServiceTest {
         when(adminEntityRepository.findByAdminName(dto.getAdminName())).thenReturn(entity);
         when(encryptService.checkIfPasswordMatches(dto.getAdminPassword(), entity.getAdminPassword()))
                 .thenReturn(true);
-        when(tokenService.generateToken(entity.getAdminName())).thenReturn("mockToken");
+        when(tokenService.generateAdminToken(entity.getAdminName())).thenReturn("mockToken");
 
         String token = adminSignupService.login(dto, request);
 
         assertEquals("mockToken", token);
-        verify(tokenService).generateToken(entity.getAdminName());
+        verify(tokenService).generateAdminToken(entity.getAdminName());
     }
 }

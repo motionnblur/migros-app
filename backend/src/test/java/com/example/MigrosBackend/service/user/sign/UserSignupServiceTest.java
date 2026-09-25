@@ -128,7 +128,7 @@ class UserSignupServiceTest {
 
         when(userEntityRepository.findByUserMail(signupDto.getUserMail())).thenReturn(existingUser);
         when(encryptService.checkIfPasswordMatches(signupDto.getUserPassword(), "hashed_password")).thenReturn(true);
-        when(tokenService.generateToken(signupDto.getUserMail())).thenReturn("jwt_token_xyz");
+        when(tokenService.generateUserToken(signupDto.getUserMail())).thenReturn("jwt_token_xyz");
 
         // Act
         String token = userSignupService.login(signupDto);

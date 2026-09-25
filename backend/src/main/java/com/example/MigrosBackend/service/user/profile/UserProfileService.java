@@ -2,7 +2,6 @@ package com.example.MigrosBackend.service.user.profile;
 
 import com.example.MigrosBackend.dto.user.UserProfileTableDto;
 import com.example.MigrosBackend.entity.user.UserEntity;
-import com.example.MigrosBackend.exception.shared.InvalidTokenException;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
 import org.springframework.stereotype.Service;
@@ -20,9 +19,7 @@ public class UserProfileService {
 
     public void uploadUserProfileTable(String userFirstName, String userLastName, String userAddress, String userAddress2,
                                        String userTown, String userCountry, String userPostalCode, String token) {
-        String userName = tokenService.extractUsername(token);
-        if (!tokenService.validateToken(token, userName))
-            throw new InvalidTokenException();
+        String userName = tokenService.validateAndExtractUser(token);
 
         UserEntity user = userEntityRepository.findByUserMail(userName);
         user.setUserName(userFirstName);
@@ -37,9 +34,7 @@ public class UserProfileService {
     }
 
     public UserProfileTableDto getUserProfileTable(String token) {
-        String userName = tokenService.extractUsername(token);
-        if (!tokenService.validateToken(token, userName))
-            throw new InvalidTokenException();
+        String userName = tokenService.validateAndExtractUser(token);
 
         UserEntity user = userEntityRepository.findByUserMail(userName);
         UserProfileTableDto userProfileTableDto = new UserProfileTableDto();

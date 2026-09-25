@@ -11,6 +11,7 @@ import com.example.MigrosBackend.dto.user.product.ProductPreviewDto;
 import com.example.MigrosBackend.dto.user.product.UserCartItemDto;
 import com.example.MigrosBackend.exception.shared.TokenNotFoundException;
 import com.example.MigrosBackend.helper.AuthTokenResolver;
+import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
 import com.example.MigrosBackend.service.user.supply.UserSupplyService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -48,6 +49,9 @@ class UserSupplyControllerTest {
 
     @MockBean
     private AuthTokenResolver authTokenResolver;
+
+    @MockBean
+    private AdminEntityRepository adminEntityRepository;
 
     @MockBean
     private TokenService tokenService;

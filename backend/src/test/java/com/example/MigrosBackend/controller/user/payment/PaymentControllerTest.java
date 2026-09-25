@@ -3,6 +3,7 @@ package com.example.MigrosBackend.controller.user.payment;
 import com.example.MigrosBackend.config.security.AuthCookies;
 import com.example.MigrosBackend.exception.shared.TokenNotFoundException;
 import com.example.MigrosBackend.helper.AuthTokenResolver;
+import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
 import com.example.MigrosBackend.service.user.payment.UserPaymentService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,6 +40,9 @@ class PaymentControllerTest {
 
     @MockBean
     private AuthTokenResolver authTokenResolver;
+
+    @MockBean
+    private AdminEntityRepository adminEntityRepository;
 
     @MockBean
     private TokenService tokenService;

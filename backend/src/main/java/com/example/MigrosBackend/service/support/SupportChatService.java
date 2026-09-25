@@ -7,7 +7,6 @@ import com.example.MigrosBackend.entity.user.SupportMessageEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.exception.admin.UserNotFoundException;
 import com.example.MigrosBackend.exception.shared.GeneralException;
-import com.example.MigrosBackend.exception.shared.InvalidTokenException;
 import com.example.MigrosBackend.exception.shared.SupportSyncConflictException;
 import com.example.MigrosBackend.exception.shared.SupportUserBannedException;
 import com.example.MigrosBackend.repository.user.SupportMessageEntityRepository;
@@ -319,15 +318,11 @@ public class SupportChatService {
     }
 
     private String getValidUserMailFromToken(String token) {
-        String userMail = tokenService.extractUsername(token);
+        String userMail = tokenService.validateAndExtractUser(token);
         UserEntity user = userEntityRepository.findByUserMail(userMail);
 
         if (user == null) {
             throw new UserNotFoundException(userMail);
-        }
-
-        if (!tokenService.validateToken(token, user.getUserMail())) {
-            throw new InvalidTokenException();
         }
 
         return userMail;

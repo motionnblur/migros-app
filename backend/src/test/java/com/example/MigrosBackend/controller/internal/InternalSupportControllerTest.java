@@ -3,6 +3,7 @@ package com.example.MigrosBackend.controller.internal;
 import com.example.MigrosBackend.dto.support.InternalSupportAgentMessageDto;
 import com.example.MigrosBackend.dto.support.InternalSupportDeleteAgentMessageDto;
 import com.example.MigrosBackend.dto.support.InternalSupportEditAgentMessageDto;
+import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
 import com.example.MigrosBackend.service.support.SupportChatService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,6 +33,9 @@ class InternalSupportControllerTest {
 
     @MockBean
     private SupportChatService supportChatService;
+
+    @MockBean
+    private AdminEntityRepository adminEntityRepository;
 
     @MockBean
     private TokenService tokenService;

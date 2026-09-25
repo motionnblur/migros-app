@@ -111,7 +111,7 @@ public class UserSignupService {
             throw new WrongPasswordException();
         }
 
-        return tokenService.generateToken(userEntity.getUserMail());
+        return tokenService.generateUserToken(userEntity.getUserMail());
     }
 
     @Transactional

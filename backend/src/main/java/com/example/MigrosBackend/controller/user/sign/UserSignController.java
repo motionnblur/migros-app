@@ -77,7 +77,7 @@ public class UserSignController {
     private ResponseEntity<Map<String, String>> session(
             @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
         String userToken = authTokenResolver.requireToken(token);
-        String userMail = tokenService.extractUsername(userToken);
+        String userMail = tokenService.validateAndExtractUser(userToken);
         return ResponseEntity.ok(Map.of("userMail", userMail));
     }
 

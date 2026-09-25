@@ -2,7 +2,10 @@ package com.example.MigrosBackend.controller.admin.supply;
 
 import com.example.MigrosBackend.config.security.AuthCookies;
 import com.example.MigrosBackend.config.security.SecurityConfiguration;
+import com.example.MigrosBackend.entity.admin.AdminEntity;
+import com.example.MigrosBackend.exception.shared.InvalidTokenException;
 import com.example.MigrosBackend.filter.JwtRequestFilter;
+import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.service.admin.supply.AdminSupplyService;
 import com.example.MigrosBackend.service.global.TokenService;
 import com.example.MigrosBackend.service.user.supply.UserSupplyService;
@@ -15,6 +18,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -36,25 +40,42 @@ class AdminSupplySecurityTest {
     @MockBean
     private TokenService tokenService;
 
+    @MockBean
+    private AdminEntityRepository adminEntityRepository;
+
     @Test
-    void userBearerToken_CannotAccessAdminSupplyEndpoint() throws Exception {
-        String userToken = "user.bearer.token";
-        when(tokenService.extractUsername(userToken)).thenReturn("customer@example.com");
-        when(tokenService.validateToken(userToken, "customer@example.com")).thenReturn(true);
+    void userToken_InAdminCookie_CannotAccessAdminSupplyEndpoint() throws Exception {
+        String userToken = "user.jwt.token";
+        when(tokenService.validateAndExtractAdmin(userToken)).thenThrow(new InvalidTokenException());
 
         mockMvc.perform(get("/admin/supply/addCategory")
                         .param("categoryName", "Electronics")
-                        .header("Authorization", "Bearer " + userToken))
+                        .cookie(new Cookie(AuthCookies.ADMIN_SESSION_COOKIE_NAME, userToken)))
+                .andExpect(status().isForbidden());
+
+        verify(adminEntityRepository, never()).findByAdminName(any());
+        verify(adminSupplyService, never()).addCategory(anyString());
+    }
+
+    @Test
+    void adminToken_WithoutAdminRecord_CannotAccessAdminSupplyEndpoint() throws Exception {
+        String adminToken = "ghost.admin.token";
+        when(tokenService.validateAndExtractAdmin(adminToken)).thenReturn("ghost@example.com");
+        when(adminEntityRepository.findByAdminName("ghost@example.com")).thenReturn(null);
+
+        mockMvc.perform(get("/admin/supply/addCategory")
+                        .param("categoryName", "Electronics")
+                        .cookie(new Cookie(AuthCookies.ADMIN_SESSION_COOKIE_NAME, adminToken)))
                 .andExpect(status().isForbidden());
 
         verify(adminSupplyService, never()).addCategory(anyString());
     }
 
     @Test
-    void adminCookie_CanAccessAdminSupplyEndpoint() throws Exception {
-        String adminToken = "admin.cookie.token";
-        when(tokenService.extractUsername(adminToken)).thenReturn("manager@example.com");
-        when(tokenService.validateToken(adminToken, "manager@example.com")).thenReturn(true);
+    void validAdminToken_CanAccessAdminSupplyEndpoint() throws Exception {
+        String adminToken = "admin.jwt.token";
+        when(tokenService.validateAndExtractAdmin(adminToken)).thenReturn("manager@example.com");
+        when(adminEntityRepository.findByAdminName("manager@example.com")).thenReturn(new AdminEntity());
 
         mockMvc.perform(get("/admin/supply/addCategory")
                         .param("categoryName", "Electronics")
@@ -62,6 +83,17 @@ class AdminSupplySecurityTest {
                 .andExpect(status().isOk());
 
         verify(adminSupplyService).addCategory("Electronics");
+    }
+
+    @Test
+    void bearerHeader_CannotAuthenticateAdminPath() throws Exception {
+        mockMvc.perform(get("/admin/supply/addCategory")
+                        .param("categoryName", "Electronics")
+                        .header("Authorization", "Bearer some.jwt.token"))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(tokenService);
+        verify(adminSupplyService, never()).addCategory(anyString());
     }
 
     @Test

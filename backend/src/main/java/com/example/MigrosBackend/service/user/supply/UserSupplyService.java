@@ -19,8 +19,6 @@ import com.example.MigrosBackend.exception.admin.ProductNotFoundException;
 import com.example.MigrosBackend.exception.admin.UserNotFoundException;
 import com.example.MigrosBackend.exception.shared.FileNotFoundException;
 import com.example.MigrosBackend.exception.shared.GeneralException;
-import com.example.MigrosBackend.exception.shared.InvalidTokenException;
-import com.example.MigrosBackend.exception.shared.TokenNotFoundException;
 import com.example.MigrosBackend.exception.user.CategoryHasNoProductException;
 import com.example.MigrosBackend.exception.user.CategoryNotFoundException;
 import com.example.MigrosBackend.repository.category.CategoryEntityRepository;
@@ -524,18 +522,11 @@ public class UserSupplyService {
         });
     }
     private UserEntity getValidatedUserFromToken(String token) {
-        String userName = tokenService.extractUsername(token);
-        if (userName == null || userName.isBlank()) {
-            throw new TokenNotFoundException();
-        }
+        String userName = tokenService.validateAndExtractUser(token);
 
         UserEntity user = userEntityRepository.findByUserMail(userName);
         if (user == null) {
             throw new UserNotFoundException(userName);
-        }
-
-        if (!tokenService.validateToken(token, user.getUserMail())) {
-            throw new InvalidTokenException();
         }
 
         return user;

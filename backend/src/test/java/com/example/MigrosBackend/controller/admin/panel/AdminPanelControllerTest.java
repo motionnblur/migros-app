@@ -9,6 +9,7 @@ import com.example.MigrosBackend.dto.order.OrderPageDto;
 import com.example.MigrosBackend.dto.user.UserProfileTableDto;
 import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.service.admin.supply.AdminSupplyService;
+import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
 import com.example.MigrosBackend.service.user.supply.UserOrderService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -44,6 +45,9 @@ class AdminPanelControllerTest {
 
     @MockBean
     private UserOrderService userOrderService;
+
+    @MockBean
+    private AdminEntityRepository adminEntityRepository;
 
     @MockBean
     private TokenService tokenService;

@@ -5,6 +5,7 @@ import com.example.MigrosBackend.config.security.AuthCookies;
 import com.example.MigrosBackend.dto.user.sign.UserSignDto;
 import com.example.MigrosBackend.exception.shared.TokenNotFoundException;
 import com.example.MigrosBackend.helper.AuthTokenResolver;
+import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
 import com.example.MigrosBackend.service.user.sign.UserSignupService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -50,6 +51,9 @@ class UserSignControllerTest {
 
     @MockBean
     private AuthTokenResolver authTokenResolver;
+
+    @MockBean
+    private AdminEntityRepository adminEntityRepository;
 
     @MockBean
     private TokenService tokenService;
@@ -124,7 +128,7 @@ class UserSignControllerTest {
     @Test
     void session_shouldReturnUserMail() throws Exception {
         when(authTokenResolver.requireToken("session-token")).thenReturn("session-token");
-        when(tokenService.extractUsername("session-token")).thenReturn("test@example.com");
+        when(tokenService.validateAndExtractUser("session-token")).thenReturn("test@example.com");
 
         mockMvc.perform(get("/user/session")
                         .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "session-token")))

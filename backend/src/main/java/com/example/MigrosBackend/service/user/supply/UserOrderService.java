@@ -279,9 +279,9 @@ public class UserOrderService {
         }
     }
     private UserEntity getValidatedUser(String userToken) {
-        String userName = tokenService.extractUsername(userToken);
+        String userName = tokenService.validateAndExtractUser(userToken);
         UserEntity user = userEntityRepository.findByUserMail(userName);
-        if (user == null || !tokenService.validateToken(userToken, user.getUserMail())) {
+        if (user == null) {
             throw new UserNotFoundException("User not found for active session");
         }
         return user;

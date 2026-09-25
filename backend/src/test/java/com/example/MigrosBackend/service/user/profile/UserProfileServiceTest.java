@@ -40,8 +40,7 @@ class UserProfileServiceTest {
     @Test
     void getUserProfileTable_Success() {
         // Arrange
-        when(tokenService.extractUsername(testToken)).thenReturn(testEmail);
-        when(tokenService.validateToken(testToken, testEmail)).thenReturn(true);
+        when(tokenService.validateAndExtractUser(testToken)).thenReturn(testEmail);
         when(userEntityRepository.findByUserMail(testEmail)).thenReturn(mockUser);
 
         // Act
@@ -51,14 +50,13 @@ class UserProfileServiceTest {
         assertNotNull(result);
         assertEquals("John", result.getUserFirstName());
         assertEquals("Doe", result.getUserLastName());
-        verify(tokenService).validateToken(testToken, testEmail);
+        verify(tokenService).validateAndExtractUser(testToken);
     }
 
     @Test
     void uploadUserProfileTable_Success() {
         // Arrange
-        when(tokenService.extractUsername(testToken)).thenReturn(testEmail);
-        when(tokenService.validateToken(testToken, testEmail)).thenReturn(true);
+        when(tokenService.validateAndExtractUser(testToken)).thenReturn(testEmail);
         when(userEntityRepository.findByUserMail(testEmail)).thenReturn(mockUser);
 
         // Act
@@ -77,8 +75,7 @@ class UserProfileServiceTest {
     @Test
     void shouldThrowInvalidTokenException_WhenTokenIsInvalid() {
         // Arrange
-        when(tokenService.extractUsername(testToken)).thenReturn(testEmail);
-        when(tokenService.validateToken(testToken, testEmail)).thenReturn(false);
+        when(tokenService.validateAndExtractUser(testToken)).thenThrow(new InvalidTokenException());
 
         // Act & Assert
         assertThrows(InvalidTokenException.class, () ->

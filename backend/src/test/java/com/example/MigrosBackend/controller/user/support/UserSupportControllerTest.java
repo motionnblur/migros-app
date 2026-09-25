@@ -4,6 +4,7 @@ import com.example.MigrosBackend.config.security.AuthCookies;
 import com.example.MigrosBackend.dto.user.support.SupportMessageDto;
 import com.example.MigrosBackend.dto.user.support.SupportSendMessageDto;
 import com.example.MigrosBackend.helper.AuthTokenResolver;
+import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
 import com.example.MigrosBackend.service.support.SupportChatService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -40,6 +41,9 @@ class UserSupportControllerTest {
 
     @MockBean
     private AuthTokenResolver authTokenResolver;
+
+    @MockBean
+    private AdminEntityRepository adminEntityRepository;
 
     @MockBean
     private TokenService tokenService;

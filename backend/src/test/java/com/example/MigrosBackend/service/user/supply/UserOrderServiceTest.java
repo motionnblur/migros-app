@@ -64,9 +64,8 @@ class UserOrderServiceTest {
     }
 
     private void stubAuthenticatedUser() {
-        when(tokenService.extractUsername(TOKEN)).thenReturn(EMAIL);
+        when(tokenService.validateAndExtractUser(TOKEN)).thenReturn(EMAIL);
         when(userEntityRepository.findByUserMail(EMAIL)).thenReturn(user);
-        when(tokenService.validateToken(TOKEN, EMAIL)).thenReturn(true);
     }
 
     @Test
