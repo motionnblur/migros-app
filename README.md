@@ -92,8 +92,13 @@ MAIL_PASSWORD=your_smtp_password
 APP_MAIL_FROM=your_smtp_username
 ```
 
-* Default admin name: admin
-* Default admin password: admin
+* Local development credentials (only created when the active profile set is exactly `local`): admin / admin
+
+> The `admin` / `admin` account is a **local-development-only** convenience. It is
+> created only when the active Spring profile set is exactly `{local}`. Any other
+> combination (no profile, `prod`, `prod,local`, `local,staging`, ...) is treated
+> as non-local: the backend never creates an administrator and refuses to start if
+> a legacy default credential exists. See [Administrator provisioning](#administrator-provisioning).
 
 ## :rocket: Running the application
 
@@ -115,11 +120,16 @@ Run infrastructure with Docker, run app servers directly for faster iteration:
 docker compose --env-file configs/postgres.env up postgres
 ```
 
-2. Start backend (Spring profile defaults to `local`):
+2. Start backend (explicitly activate the `local` profile):
 ```
 cd backend
-./mvnw spring-boot:run
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local
 ```
+If you run `./mvnw spring-boot:run` without `local`, the backend starts with the
+secure default profile: it will **not** create the `admin` / `admin` account, and
+it will refuse to start if a legacy `admin` / `admin` row already exists. The same
+applies when additional profiles are active (`prod,local`, `local,staging`, ...):
+local development is only recognized when `local` is the **only** active profile.
 
 3. Start frontend:
 ```
@@ -133,12 +143,65 @@ In this mode:
 * Backend: http://localhost:8080
 
 For production deployments, set `SPRING_PROFILES_ACTIVE=prod` and provide the required `SPRING_DATASOURCE_*`, `APP_ALLOWED_ORIGINS`, and `APP_PUBLIC_BASE_URL` variables.
+
 For mail provider:
 * Local profile defaults to SMTP (`APP_MAIL_PROVIDER=smtp`)
 * Prod profile defaults to Resend (`APP_MAIL_PROVIDER=resend`)
 * You can override with `APP_MAIL_PROVIDER=auto` to use Resend when `RESEND_API_KEY` is present, otherwise SMTP
 
 Nginx now applies per-IP throttling before requests reach Spring Boot (including stricter limits for login, payment, and support send endpoints) and returns HTTP 429 when limits are exceeded.
+
+## Administrator provisioning
+
+Production requires the `prod` profile to be explicitly activated:
+
+```
+SPRING_PROFILES_ACTIVE=prod
+```
+
+The backend does **not** create an administrator in production. In fact, it only
+ever creates one when the active profile set is exactly `{local}`. In every other
+environment — including when `local` is combined with another profile such as
+`prod,local` — it never creates an administrator and instead validates the stored
+credentials before serving traffic. Provision one manually:
+
+1. Generate a BCrypt hash externally with a trusted tool, using a strong, unique
+   password. For example with `htpasswd`:
+
+   ```sh
+   htpasswd -bnBC 12 "" 'your-strong-unique-password' | tr -d ':\n'
+   ```
+
+   Do not reuse the `admin` / `admin` development password, and never commit the
+   generated hash or the plaintext password to the repository.
+
+2. Insert the administrator row directly into the database (no admin-registration
+   endpoint exists):
+
+   ```sql
+   INSERT INTO admin_entity (admin_name, admin_password)
+   VALUES ('operations-admin', '$2y$12$...externally-generated-bcrypt-hash...');
+   ```
+
+### Recovering from a legacy `admin` / `admin` account
+
+If a non-`local` environment (any active-profile set other than exactly `{local}`)
+already contains the legacy default credential, startup fails with an
+`IllegalStateException` before the web server begins serving traffic, instructing
+you to rotate or remove it. Before restarting production, either rotate the
+password or delete the row:
+
+```sql
+-- Rotate to a strong password hash generated as described above
+UPDATE admin_entity SET admin_password = '$2y$12$...new-hash...' WHERE admin_name = 'admin';
+
+-- Or remove the legacy account entirely (after provisioning a replacement admin)
+DELETE FROM admin_entity WHERE admin_name = 'admin';
+```
+
+Do not restart production until the legacy `admin` / `admin` hash has been
+rotated or removed.
+
 ## :camera: Screenshots
 
 * Current code coverage

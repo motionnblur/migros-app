@@ -65,13 +65,21 @@ Backend packages follow a mostly standard layered layout:
   - UI still polls support messages (`support-chat.component.ts`) for robustness.
 
 ## Runtime and Profiles
-- Default Spring profile is `local` (`application.properties`).
+- No Spring profile is active by default (`application.properties` no longer sets `spring.profiles.default`). The omitted profile behaves as non-local.
+- Local development is recognized only when the active-profile set is exactly `{local}`. Profiles are additive, so `@Profile("local")` / `@Profile("!local")` are not sufficient: `prod,local` must be treated as non-local.
+  - `config/AdminStartupProfilePolicy` centralizes this decision (`isLocalDevelopment()`), and both the seeder and the guard consult it so they cannot disagree.
+  - `config/AdministratorStartupConfiguration` holds both startup components:
+    - `localDefaultAdministratorInitializer` (a `CommandLineRunner`) performs no database write unless the policy reports exact-local; when it writes, it seeds `admin` / `admin` only if absent.
+    - `nonLocalDefaultAdministratorGuard` (a `SmartInitializingSingleton`, so it runs after repositories are initialized but before the web server lifecycle starts) fails startup with `IllegalStateException` if the policy is non-local and an `admin` account still matches the default password.
+  - `config/StartupConfiguration` seeds categories in every profile.
 - `application-local.properties` configures local DB defaults and permissive cookie settings.
-- `application-prod.properties` expects explicit datasource/origin values and secure cookie defaults.
+- `application-prod.properties` expects explicit datasource/origin values and secure cookie defaults. Production requires `SPRING_PROFILES_ACTIVE=prod`.
+- Production administrators are provisioned manually in `admin_entity` with an externally generated BCrypt hash; there is no admin-registration or bootstrap endpoint.
 - Important env vars include:
+  - `SPRING_PROFILES_ACTIVE`
   - `SPRING_DATASOURCE_*`
   - `APP_ALLOWED_ORIGINS`, `APP_ALLOWED_ORIGIN_PATTERNS`
-  - `JWT_SECRET`
+  - `JWT_USER_SECRET`, `JWT_ADMIN_SECRET`
   - `STRIPE_API_KEY`
   - `SUPPORT_SERVICE_BASE_URL`, `SUPPORT_SERVICE_INTERNAL_KEY`, `SUPPORT_INTERNAL_KEY`
   - `APP_UPLOAD_DIR`
@@ -81,8 +89,9 @@ Backend packages follow a mostly standard layered layout:
   - `docker compose --env-file configs/postgres.env --env-file configs/spring.env up`
 - Hybrid (recommended):
   - `docker compose --env-file configs/postgres.env up postgres`
-  - `cd backend && ./mvnw spring-boot:run`
+  - `cd backend && ./mvnw spring-boot:run -Dspring-boot.run.profiles=local`
   - `cd client && npm i && npm start`
+
 - Backend tests:
   - `cd backend && ./mvnw test`
 - Frontend tests:

@@ -1,34 +1,17 @@
 package com.example.MigrosBackend.config;
 
-import com.example.MigrosBackend.config.security.SecurityConfiguration;
-import com.example.MigrosBackend.entity.admin.AdminEntity;
 import com.example.MigrosBackend.entity.category.CategoryEntity;
-import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.repository.category.CategoryEntityRepository;
-import com.example.MigrosBackend.service.admin.sign.AdminSignupService;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class StartupConfiguration {
-    private final SecurityConfiguration securityConfiguration;
-    private final AdminSignupService adminSignupService;
 
-    public StartupConfiguration(SecurityConfiguration securityConfiguration, AdminSignupService adminSignupService) {
-        this.securityConfiguration = securityConfiguration;
-        this.adminSignupService = adminSignupService;
-    }
     @Bean
-    public CommandLineRunner run(CategoryEntityRepository categoryEntityRepository, AdminEntityRepository adminEntityRepository) {
+    public CommandLineRunner initializeCategories(CategoryEntityRepository categoryEntityRepository) {
         return (args) -> {
-            if(!adminEntityRepository.existsByAdminName("admin")){
-                AdminEntity adminEntity = new AdminEntity();
-                adminEntity.setAdminName("admin");
-                adminEntity.setAdminPassword(securityConfiguration.passwordEncoder().encode("admin"));
-                adminEntityRepository.save(adminEntity);
-            }
-
             String[] categoryNames = {
                     "Yılbaşı",
                     "Meyve, Sebze",

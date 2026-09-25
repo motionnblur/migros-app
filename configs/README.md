@@ -40,3 +40,19 @@ docker compose --env-file configs/postgres.env --env-file configs/spring.env up
 Compose uses these files for variable substitution. `configs/nginx` is mounted
 into the Nginx container and contains the shared proxy, WebSocket, forwarded
 header, timeout, and request-rate-limit settings.
+
+## Profiles and administrator provisioning
+
+Docker Compose explicitly sets `SPRING_PROFILES_ACTIVE=local` for the backend.
+When running the backend directly, activate `local` explicitly (for example
+`./mvnw spring-boot:run -Dspring-boot.run.profiles=local`) to get the
+local-development convenience account `admin` / `admin`.
+
+Local development is recognized only when `local` is the **only** active profile.
+Any other combination (no profile, `prod`, `prod,local`, `local,staging`, ...) is
+treated as non-local: the backend never creates an administrator, and it refuses
+to start before serving traffic if the legacy `admin` / `admin` account still
+exists. Production requires `SPRING_PROFILES_ACTIVE=prod` and a manually
+provisioned administrator row in `admin_entity` using a trusted, externally
+generated BCrypt hash. See the "Administrator provisioning" section of the root
+`README.md` for commands and recovery steps.
