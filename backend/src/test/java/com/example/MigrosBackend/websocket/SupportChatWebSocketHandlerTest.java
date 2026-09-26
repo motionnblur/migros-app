@@ -52,6 +52,7 @@ class SupportChatWebSocketHandlerTest {
         SupportChatWebSocketHandler handler = new SupportChatWebSocketHandler();
         WebSocketSession session = mock(WebSocketSession.class);
         when(session.isOpen()).thenReturn(false);
+        when(session.getId()).thenReturn("session-1");
 
         handler.afterConnectionEstablished(session);
         handler.broadcastSupportUpdate("user@mail.com");
@@ -65,6 +66,7 @@ class SupportChatWebSocketHandlerTest {
         SupportChatWebSocketHandler handler = new SupportChatWebSocketHandler();
         WebSocketSession session = mock(WebSocketSession.class);
         when(session.isOpen()).thenReturn(true);
+        when(session.getId()).thenReturn("session-1");
         doThrow(new RuntimeException("send failed")).when(session).sendMessage(org.mockito.ArgumentMatchers.any(TextMessage.class));
 
         handler.afterConnectionEstablished(session);
@@ -85,6 +87,7 @@ class SupportChatWebSocketHandlerTest {
     void afterConnectionClosed_shouldRemoveSession() throws Exception {
         SupportChatWebSocketHandler handler = new SupportChatWebSocketHandler();
         WebSocketSession session = mock(WebSocketSession.class);
+        when(session.getId()).thenReturn("session-1");
 
         handler.afterConnectionEstablished(session);
         handler.afterConnectionClosed(session, CloseStatus.NORMAL);

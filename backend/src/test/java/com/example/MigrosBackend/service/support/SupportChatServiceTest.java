@@ -149,6 +149,8 @@ class SupportChatServiceTest {
     @Test
     void addManagementMessage_shouldPersistAndBroadcast() {
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(user);
+        when(supportMessageEntityRepository.save(any(SupportMessageEntity.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
         supportChatService.addManagementMessage(USER_MAIL, " hi ");
 
@@ -158,7 +160,7 @@ class SupportChatServiceTest {
         assertEquals(USER_MAIL, saved.getUserMail());
         assertEquals("MANAGEMENT", saved.getSender());
         assertEquals("hi", saved.getMessage());
-        verify(supportChatWebSocketHandler).broadcastSupportUpdate(USER_MAIL);
+        verify(supportChatWebSocketHandler).broadcastSupportMessageCreated(USER_MAIL, "MANAGEMENT", null);
     }
 
     @Test
