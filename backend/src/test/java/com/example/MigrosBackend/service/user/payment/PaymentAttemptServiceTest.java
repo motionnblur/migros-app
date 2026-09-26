@@ -10,6 +10,7 @@ import com.example.MigrosBackend.entity.payment.PaymentAttemptStatus;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.exception.user.CheckoutNotFoundException;
 import com.example.MigrosBackend.exception.user.PaymentStateException;
+import com.example.MigrosBackend.exception.user.StalePaymentLeaseException;
 import com.example.MigrosBackend.repository.user.CheckoutEntityRepository;
 import com.example.MigrosBackend.repository.user.PaymentAttemptEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
@@ -97,6 +98,13 @@ class PaymentAttemptServiceTest {
         if (status.hasDurableCharge()) {
             attempt.setStripeChargeId("ch_123");
         }
+        return attempt;
+    }
+
+    private PaymentAttemptEntity leasedAttempt(PaymentAttemptStatus status, long amountMinor, String leaseOwner) {
+        PaymentAttemptEntity attempt = attempt(status, amountMinor);
+        attempt.setLeaseOwner(leaseOwner);
+        attempt.setLeaseExpiresAt(LocalDateTime.now().plusSeconds(60));
         return attempt;
     }
 
@@ -229,7 +237,7 @@ class PaymentAttemptServiceTest {
 
     @Test
     void recordChargeSuccess_StoresChargeFromProcessing() {
-        PaymentAttemptEntity processing = attempt(PaymentAttemptStatus.PROCESSING, 1000L);
+        PaymentAttemptEntity processing = leasedAttempt(PaymentAttemptStatus.PROCESSING, 1000L, "owner");
         processing.setStripeChargeId(null);
         when(paymentAttemptEntityRepository.findByIdForUpdate(processing.getId()))
                 .thenReturn(Optional.of(processing));
@@ -238,6 +246,42 @@ class PaymentAttemptServiceTest {
 
         assertEquals(PaymentAttemptStatus.CHARGE_SUCCEEDED, processing.getStatus());
         assertEquals("ch_777", processing.getStripeChargeId());
+        // The same fencing token now guards finalization.
+        assertEquals("owner", processing.getLeaseOwner());
+    }
+
+    @Test
+    void recordChargeSuccess_RejectsNullBlankAndIncorrectWorkerTokens() {
+        PaymentAttemptEntity processing = leasedAttempt(PaymentAttemptStatus.PROCESSING, 1000L, "owner");
+        processing.setStripeChargeId(null);
+        when(paymentAttemptEntityRepository.findByIdForUpdate(processing.getId()))
+                .thenReturn(Optional.of(processing));
+
+        assertThrows(StalePaymentLeaseException.class,
+                () -> paymentAttemptService.recordChargeSuccess(processing.getId(), null, "ch_777"));
+        assertThrows(StalePaymentLeaseException.class,
+                () -> paymentAttemptService.recordChargeSuccess(processing.getId(), "   ", "ch_777"));
+        assertThrows(StalePaymentLeaseException.class,
+                () -> paymentAttemptService.recordChargeSuccess(processing.getId(), "other-owner", "ch_777"));
+
+        assertEquals(PaymentAttemptStatus.PROCESSING, processing.getStatus());
+        assertEquals(null, processing.getStripeChargeId());
+        assertEquals("owner", processing.getLeaseOwner());
+    }
+
+    @Test
+    void recordChargeSuccess_ReplacedTokenCannotRecordAfterReclaim() {
+        PaymentAttemptEntity processing = leasedAttempt(PaymentAttemptStatus.PROCESSING, 1000L, "owner-2");
+        processing.setStripeChargeId(null);
+        when(paymentAttemptEntityRepository.findByIdForUpdate(processing.getId()))
+                .thenReturn(Optional.of(processing));
+
+        assertThrows(StalePaymentLeaseException.class,
+                () -> paymentAttemptService.recordChargeSuccess(processing.getId(), "owner-1", "ch_777"));
+
+        assertEquals(PaymentAttemptStatus.PROCESSING, processing.getStatus());
+        assertEquals(null, processing.getStripeChargeId());
+        assertEquals("owner-2", processing.getLeaseOwner());
     }
 
     @Test
@@ -253,34 +297,121 @@ class PaymentAttemptServiceTest {
 
     @Test
     void recordChargeSuccess_ConflictingChargeFailsClosed() {
-        PaymentAttemptEntity succeeded = attempt(PaymentAttemptStatus.CHARGE_SUCCEEDED, 1000L);
+        PaymentAttemptEntity succeeded = leasedAttempt(PaymentAttemptStatus.CHARGE_SUCCEEDED, 1000L, "owner");
         when(paymentAttemptEntityRepository.findByIdForUpdate(succeeded.getId()))
                 .thenReturn(Optional.of(succeeded));
 
         assertThrows(PaymentStateException.class,
-                () -> paymentAttemptService.recordChargeSuccess(succeeded.getId(), null, "ch_OTHER"));
+                () -> paymentAttemptService.recordChargeSuccess(succeeded.getId(), "owner", "ch_OTHER"));
         assertEquals(PaymentAttemptStatus.MANUAL_REVIEW, succeeded.getStatus());
     }
 
     @Test
-    void recordDecline_CannotOverwriteADurableSuccess() {
-        PaymentAttemptEntity succeeded = attempt(PaymentAttemptStatus.CHARGE_SUCCEEDED, 1000L);
+    void recordChargeSuccess_StaleTokenCannotForceManualReview() {
+        PaymentAttemptEntity succeeded = leasedAttempt(PaymentAttemptStatus.CHARGE_SUCCEEDED, 1000L, "owner-2");
         when(paymentAttemptEntityRepository.findByIdForUpdate(succeeded.getId()))
                 .thenReturn(Optional.of(succeeded));
 
-        assertThrows(PaymentStateException.class,
-                () -> paymentAttemptService.recordDecline(succeeded.getId(), "card_declined"));
+        assertThrows(StalePaymentLeaseException.class,
+                () -> paymentAttemptService.recordChargeSuccess(succeeded.getId(), "owner-1", "ch_OTHER"));
         assertEquals(PaymentAttemptStatus.CHARGE_SUCCEEDED, succeeded.getStatus());
+        assertEquals("ch_123", succeeded.getStripeChargeId());
+        assertEquals("owner-2", succeeded.getLeaseOwner());
     }
 
     @Test
-    void markOrderFinalized_RequiresChargeSucceeded() {
-        PaymentAttemptEntity processing = attempt(PaymentAttemptStatus.PROCESSING, 1000L);
+    void recordDecline_RequiresCurrentLeaseAndReleasesNothingWhenStale() {
+        PaymentAttemptEntity processing = leasedAttempt(PaymentAttemptStatus.PROCESSING, 1000L, "owner");
+        when(paymentAttemptEntityRepository.findByIdForUpdate(processing.getId()))
+                .thenReturn(Optional.of(processing));
+        when(paymentAttemptEntityRepository.findById(processing.getId()))
+                .thenReturn(Optional.of(processing));
+
+        assertThrows(StalePaymentLeaseException.class,
+                () -> paymentAttemptService.recordDecline(processing.getId(), "old-owner", "card_declined"));
+        assertThrows(StalePaymentLeaseException.class,
+                () -> paymentAttemptService.recordDecline(processing.getId(), null, "card_declined"));
+
+        assertEquals(PaymentAttemptStatus.PROCESSING, processing.getStatus());
+        assertEquals("owner", processing.getLeaseOwner());
+        verify(checkoutService, never()).failPayment(any());
+    }
+
+    @Test
+    void markOrderFinalized_RequiresCurrentLease() {
+        PaymentAttemptEntity succeeded = leasedAttempt(PaymentAttemptStatus.CHARGE_SUCCEEDED, 1000L, "owner-2");
+        when(paymentAttemptEntityRepository.findByIdForUpdate(succeeded.getId()))
+                .thenReturn(Optional.of(succeeded));
+
+        assertThrows(StalePaymentLeaseException.class,
+                () -> paymentAttemptService.markOrderFinalized(succeeded.getId(), "owner-1"));
+        assertThrows(StalePaymentLeaseException.class,
+                () -> paymentAttemptService.markOrderFinalized(succeeded.getId(), null));
+
+        assertEquals(PaymentAttemptStatus.CHARGE_SUCCEEDED, succeeded.getStatus());
+        assertEquals("owner-2", succeeded.getLeaseOwner());
+    }
+
+    @Test
+    void markOrderFinalized_CurrentOwnerFinalizes() {
+        PaymentAttemptEntity succeeded = leasedAttempt(PaymentAttemptStatus.CHARGE_SUCCEEDED, 1000L, "owner");
+        when(paymentAttemptEntityRepository.findByIdForUpdate(succeeded.getId()))
+                .thenReturn(Optional.of(succeeded));
+
+        paymentAttemptService.markOrderFinalized(succeeded.getId(), "owner");
+
+        assertEquals(PaymentAttemptStatus.ORDER_FINALIZED, succeeded.getStatus());
+    }
+
+    @Test
+    void recordProviderChargeSuccess_VerifiesEconomicsWithoutWorkerToken() {
+        PaymentAttemptEntity processing = leasedAttempt(PaymentAttemptStatus.PROCESSING, 1000L, "owner");
+        processing.setStripeChargeId(null);
+        when(paymentAttemptEntityRepository.findByIdForUpdate(processing.getId()))
+                .thenReturn(Optional.of(processing));
+
+        paymentAttemptService.recordProviderChargeSuccess(
+                processing.getId(), "ch_webhook", 1000L, "TRY", processing.getCheckoutId());
+
+        assertEquals(PaymentAttemptStatus.CHARGE_SUCCEEDED, processing.getStatus());
+        assertEquals("ch_webhook", processing.getStripeChargeId());
+    }
+
+    @Test
+    void recordProviderChargeSuccess_MismatchedEconomicsFailsClosed() {
+        PaymentAttemptEntity processing = leasedAttempt(PaymentAttemptStatus.PROCESSING, 1000L, "owner");
+        processing.setStripeChargeId(null);
         when(paymentAttemptEntityRepository.findByIdForUpdate(processing.getId()))
                 .thenReturn(Optional.of(processing));
 
         assertThrows(PaymentStateException.class,
-                () -> paymentAttemptService.markOrderFinalized(processing.getId(), null));
+                () -> paymentAttemptService.recordProviderChargeSuccess(
+                        processing.getId(), "ch_webhook", 42L, "try", processing.getCheckoutId()));
+        assertEquals(PaymentAttemptStatus.MANUAL_REVIEW, processing.getStatus());
+    }
+
+    @Test
+    void recordDecline_CannotOverwriteADurableSuccess() {
+        PaymentAttemptEntity succeeded = leasedAttempt(PaymentAttemptStatus.CHARGE_SUCCEEDED, 1000L, "owner");
+        when(paymentAttemptEntityRepository.findByIdForUpdate(succeeded.getId()))
+                .thenReturn(Optional.of(succeeded));
+        when(paymentAttemptEntityRepository.findById(succeeded.getId()))
+                .thenReturn(Optional.of(succeeded));
+
+        assertThrows(PaymentStateException.class,
+                () -> paymentAttemptService.recordDecline(succeeded.getId(), "owner", "card_declined"));
+        assertEquals(PaymentAttemptStatus.CHARGE_SUCCEEDED, succeeded.getStatus());
+        verify(checkoutService, never()).failPayment(any());
+    }
+
+    @Test
+    void markOrderFinalized_RequiresChargeSucceeded() {
+        PaymentAttemptEntity processing = leasedAttempt(PaymentAttemptStatus.PROCESSING, 1000L, "owner");
+        when(paymentAttemptEntityRepository.findByIdForUpdate(processing.getId()))
+                .thenReturn(Optional.of(processing));
+
+        assertThrows(PaymentStateException.class,
+                () -> paymentAttemptService.markOrderFinalized(processing.getId(), "owner"));
     }
 
     @Test

@@ -43,7 +43,7 @@ public class PaymentRecoveryService {
         }
         switch (claim.state()) {
             case PROCESSING -> reconcileProcessing(claim);
-            case CHARGE_SUCCEEDED -> paymentFinalizationService.finalizeOrder(
+            case CHARGE_SUCCEEDED -> paymentFinalizationService.finalizeProviderOrder(
                     claim.attemptId(), claim.checkoutId(), claim.chargeId());
             case REFUND_PENDING -> refund(attemptId, claim.chargeId(), "recovery");
             default -> LOG.debug("No recovery needed for attempt {} in state {}",
@@ -89,8 +89,14 @@ public class PaymentRecoveryService {
                 return;
             }
             Charge charge = providerCharge.get();
-            if (!Objects.equals(claim.amountMinor(), charge.getAmount())) {
-                LOG.error("Provider charge {} amount does not match attempt {}; manual review required",
+            // Trusted provider-event path: the gateway lookup above is the
+            // authority, but the attempt transition still re-verifies checkout
+            // linkage plus exact amount and currency and stays forward-only,
+            // so recovery can never overwrite newer durable state.
+            if (!Objects.equals(claim.amountMinor(), charge.getAmount())
+                    || charge.getCurrency() == null
+                    || !charge.getCurrency().equalsIgnoreCase(claim.currency())) {
+                LOG.error("Provider charge {} economics do not match attempt {}; manual review required",
                         charge.getId(), claim.attemptId());
                 paymentAttemptService.markManualReview(claim.attemptId(), "provider_amount_mismatch");
                 return;
@@ -100,8 +106,10 @@ public class PaymentRecoveryService {
                         charge.getId(), claim.attemptId());
                 return;
             }
-            paymentAttemptService.recordChargeSuccess(claim.attemptId(), null, charge.getId());
-            paymentFinalizationService.finalizeOrder(
+            paymentAttemptService.recordProviderChargeSuccess(
+                    claim.attemptId(), charge.getId(), charge.getAmount(),
+                    charge.getCurrency(), claim.checkoutId());
+            paymentFinalizationService.finalizeProviderOrder(
                     claim.attemptId(), claim.checkoutId(), charge.getId());
         } catch (StripeException ex) {
             LOG.warn("Provider lookup failed for attempt {}: {}",

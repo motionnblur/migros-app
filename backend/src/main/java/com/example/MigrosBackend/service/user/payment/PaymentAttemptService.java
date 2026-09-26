@@ -15,6 +15,7 @@ import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.exception.user.CheckoutNotFoundException;
 import com.example.MigrosBackend.exception.user.PaymentAttemptNotFoundException;
 import com.example.MigrosBackend.exception.user.PaymentStateException;
+import com.example.MigrosBackend.exception.user.StalePaymentLeaseException;
 import com.example.MigrosBackend.repository.user.CheckoutEntityRepository;
 import com.example.MigrosBackend.repository.user.PaymentAttemptEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
@@ -23,6 +24,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -32,6 +35,28 @@ import java.util.UUID;
  * database transaction; the Stripe network call is deliberately kept out of
  * these methods so a slow provider can never hold a database transaction or row
  * lock open.
+ *
+ * <p>Lease fencing: every provider call initiated by a request worker receives
+ * an opaque lease token from {@link #claim}. Every worker result
+ * ({@link #recordChargeSuccess}, {@link #recordDecline},
+ * {@link #markOrderFinalized}) must present the same token, which is compared
+ * in constant time against the stored owner while holding the pessimistic row
+ * lock — never as a read-then-write sequence. Fencing is by token ownership,
+ * not wall-clock expiry: a result that began before expiry still commits while
+ * its token is current; once another claim replaces the token, every result
+ * from the older worker is rejected with {@link StalePaymentLeaseException}
+ * without changing attempt, checkout, order, stock, lease, or refund state.
+ *
+ * <p>Stripe webhooks and reconciliation never possess a worker token. They use
+ * the separate provider-event methods
+ * ({@link #recordProviderChargeSuccess}, {@link #recordProviderDecline},
+ * {@link #markProviderFinalized}) which require full provider-economic
+ * verification instead of a lease. Worker methods never accept {@code null} as
+ * a fencing bypass for a state-changing transition.
+ *
+ * <p>Lock ordering is checkout first, then attempt, then product rows in every
+ * path (claim, status, decline, finalization), so concurrent workers cannot
+ * deadlock or strand a processing attempt.
  */
 @Service
 public class PaymentAttemptService {
@@ -92,6 +117,11 @@ public class PaymentAttemptService {
             return describe(attempt, PaymentClaimDecision.FINALIZED, null);
         }
         if (state == PaymentAttemptStatus.CHARGE_SUCCEEDED) {
+            if (hasValidLease(attempt, now)) {
+                // Another worker owns the finalization window; report FINALIZE
+                // without stealing its lease.
+                return describe(attempt, PaymentClaimDecision.FINALIZE, null);
+            }
             String leaseOwner = acquireLease(attempt, now);
             save(attempt);
             return describe(attempt, PaymentClaimDecision.FINALIZE, leaseOwner);
@@ -120,7 +150,20 @@ public class PaymentAttemptService {
         return describe(attempt, decisionFor(attempt.getStatus(), attempt, LocalDateTime.now()), null);
     }
 
-    @Transactional
+    /**
+     * Request-worker transition: records a provider success. Only the worker
+     * holding the current lease token may move the attempt; a stale, null, or
+     * blank token is rejected before any state change. The lease is kept (with
+     * a refreshed expiry) across the success transition so the same token
+     * guards order finalization.
+     *
+     * <p>A genuine charge-id conflict detected by the current owner fails
+     * closed into manual review. The review transition is committed even
+     * though the method still throws to signal failure, hence
+     * {@code noRollbackFor}: every other throw happens before any mutation,
+     * so there is nothing else to roll back.
+     */
+    @Transactional(noRollbackFor = PaymentStateException.class)
     public CheckoutStatusDto recordChargeSuccess(UUID attemptId, String leaseOwner, String chargeId) {
         if (chargeId == null || chargeId.isBlank()) {
             throw new PaymentStateException("A successful charge must have a provider charge id");
@@ -128,22 +171,83 @@ public class PaymentAttemptService {
         PaymentAttemptEntity attempt = paymentAttemptEntityRepository.findByIdForUpdate(attemptId)
                 .orElseThrow(PaymentAttemptNotFoundException::new);
 
+        PaymentAttemptStatus state = attempt.getStatus();
+        if ((state == PaymentAttemptStatus.CHARGE_SUCCEEDED
+                || state == PaymentAttemptStatus.ORDER_FINALIZED)
+                && chargeId.equals(attempt.getStripeChargeId())) {
+            // Idempotent replay of the already-durable success: no attempt,
+            // lease, checkout, stock, or order change.
+            return toStatus(attempt);
+        }
+
+        requireCurrentLease(attempt, leaseOwner);
+
+        if (attempt.getStripeChargeId() != null && !attempt.getStripeChargeId().equals(chargeId)) {
+            reject(attempt, PaymentAttemptStatus.MANUAL_REVIEW,
+                    "Conflicting provider charge ids for the same attempt");
+        }
+
+        if (state != PaymentAttemptStatus.PROCESSING) {
+            throw new PaymentStateException("Cannot record a charge from state " + state);
+        }
+
+        attempt.setStripeChargeId(chargeId);
+        attempt.setProviderStatus("succeeded");
+        transition(attempt, PaymentAttemptStatus.CHARGE_SUCCEEDED);
+        extendLease(attempt, LocalDateTime.now());
+        save(attempt);
+        return toStatus(attempt);
+    }
+
+    /**
+     * Trusted provider-event transition for signature-verified webhooks and
+     * gateway reconciliation. Takes no worker token; instead it requires full
+     * economic linkage (checkout id, exact amount and currency) plus a legal
+     * forward-only transition. Any mismatch fails closed into manual review;
+     * a conflicting provider charge id never overwrites durable state.
+     *
+     * <p>Like the worker success path, the manual-review transition is
+     * committed even though the method throws to signal failure, hence
+     * {@code noRollbackFor}; every other throw happens before any mutation.
+     */
+    @Transactional(noRollbackFor = PaymentStateException.class)
+    public CheckoutStatusDto recordProviderChargeSuccess(UUID attemptId, String chargeId,
+                                                         Long amountMinor, String currency,
+                                                         UUID checkoutId) {
+        if (chargeId == null || chargeId.isBlank()) {
+            throw new PaymentStateException("A successful charge must have a provider charge id");
+        }
+        if (amountMinor == null || currency == null || currency.isBlank() || checkoutId == null) {
+            throw new PaymentStateException("Provider charge evidence is incomplete");
+        }
+        PaymentAttemptEntity attempt = paymentAttemptEntityRepository.findByIdForUpdate(attemptId)
+                .orElseThrow(PaymentAttemptNotFoundException::new);
+
+        if (!checkoutId.equals(attempt.getCheckoutId())) {
+            reject(attempt, PaymentAttemptStatus.MANUAL_REVIEW,
+                    "Provider charge checkout linkage does not match the attempt");
+        }
+        if (!amountMinor.equals(attempt.getAmountMinor())
+                || !currency.equalsIgnoreCase(attempt.getCurrency())) {
+            reject(attempt, PaymentAttemptStatus.MANUAL_REVIEW,
+                    "Provider charge amount or currency does not match the attempt");
+        }
         if (attempt.getStripeChargeId() != null && !attempt.getStripeChargeId().equals(chargeId)) {
             reject(attempt, PaymentAttemptStatus.MANUAL_REVIEW,
                     "Conflicting provider charge ids for the same attempt");
         }
 
         PaymentAttemptStatus state = attempt.getStatus();
-        if (state == PaymentAttemptStatus.CHARGE_SUCCEEDED || state == PaymentAttemptStatus.ORDER_FINALIZED) {
+        if (state == PaymentAttemptStatus.CHARGE_SUCCEEDED
+                || state == PaymentAttemptStatus.ORDER_FINALIZED) {
             if (attempt.getStripeChargeId() == null) {
                 attempt.setStripeChargeId(chargeId);
             }
-            clearLease(attempt);
             save(attempt);
             return toStatus(attempt);
         }
-        if (state != PaymentAttemptStatus.PROCESSING) {
-            throw new PaymentStateException("Cannot record a charge from state " + state);
+        if (state != PaymentAttemptStatus.PROCESSING && state != PaymentAttemptStatus.CREATED) {
+            throw new PaymentStateException("Cannot record a provider charge from state " + state);
         }
 
         attempt.setStripeChargeId(chargeId);
@@ -154,15 +258,19 @@ public class PaymentAttemptService {
         return toStatus(attempt);
     }
 
+    /**
+     * Request-worker transition: marks the order finalized. Only the current
+     * lease holder may complete finalization; a stale token is rejected
+     * without touching attempt, order, or lease state.
+     */
     @Transactional
     public void markOrderFinalized(UUID attemptId, String leaseOwner) {
         PaymentAttemptEntity attempt = paymentAttemptEntityRepository.findByIdForUpdate(attemptId)
                 .orElseThrow(PaymentAttemptNotFoundException::new);
         if (attempt.getStatus() == PaymentAttemptStatus.ORDER_FINALIZED) {
-            clearLease(attempt);
-            save(attempt);
             return;
         }
+        requireCurrentLease(attempt, leaseOwner);
         if (attempt.getStatus() != PaymentAttemptStatus.CHARGE_SUCCEEDED) {
             throw new PaymentStateException(
                     "Cannot finalize an order from state " + attempt.getStatus());
@@ -172,10 +280,73 @@ public class PaymentAttemptService {
         save(attempt);
     }
 
+    /**
+     * Trusted provider-event transition for verified webhooks and recovery:
+     * converges an already-charged attempt to finalized without a worker
+     * token. Forward-only — it can never regress or overwrite newer durable
+     * state — and it fails closed when the charge id disagrees with the
+     * recorded charge.
+     */
     @Transactional
-    public void recordDecline(UUID attemptId, String errorCode) {
+    public void markProviderFinalized(UUID attemptId, String chargeId) {
         PaymentAttemptEntity attempt = paymentAttemptEntityRepository.findByIdForUpdate(attemptId)
                 .orElseThrow(PaymentAttemptNotFoundException::new);
+        if (attempt.getStatus() == PaymentAttemptStatus.ORDER_FINALIZED) {
+            return;
+        }
+        if (attempt.getStatus() != PaymentAttemptStatus.CHARGE_SUCCEEDED) {
+            throw new PaymentStateException(
+                    "Cannot finalize an order from state " + attempt.getStatus());
+        }
+        if (chargeId != null && attempt.getStripeChargeId() != null
+                && !chargeId.equals(attempt.getStripeChargeId())) {
+            throw new PaymentStateException("Provider charge id does not match the recorded charge");
+        }
+        if (attempt.getStripeChargeId() == null && chargeId != null) {
+            attempt.setStripeChargeId(chargeId);
+        }
+        clearLease(attempt);
+        transition(attempt, PaymentAttemptStatus.ORDER_FINALIZED);
+        save(attempt);
+    }
+
+    /**
+     * Request-worker transition: records a provider-confirmed decline. Fencing
+     * is verified before the terminal transition, and the checkout release
+     * commits in the same database transaction. A stale token changes nothing:
+     * no attempt transition, no lease clearing, no checkout cancellation, no
+     * stock release. Locks are acquired checkout-first to match the claim path.
+     */
+    @Transactional
+    public void recordDecline(UUID attemptId, String leaseOwner, String errorCode) {
+        PaymentAttemptEntity attempt = lockAttemptWithCheckoutFirst(attemptId);
+        if (attempt.getStatus() == PaymentAttemptStatus.FAILED_FINAL) {
+            return;
+        }
+        requireCurrentLease(attempt, leaseOwner);
+        if (attempt.getStatus() != PaymentAttemptStatus.PROCESSING
+                && attempt.getStatus() != PaymentAttemptStatus.CREATED) {
+            // A charge may already exist; never overwrite a durable success.
+            throw new PaymentStateException(
+                    "Cannot record a decline from state " + attempt.getStatus());
+        }
+        attempt.setErrorCode(sanitizeCode(errorCode));
+        clearLease(attempt);
+        transition(attempt, PaymentAttemptStatus.FAILED_FINAL);
+        save(attempt);
+        checkoutService.failPayment(attempt.getCheckoutId());
+    }
+
+    /**
+     * Trusted provider-event transition for verified failure events. Takes no
+     * worker token; the attempt must be in a non-charged state and the
+     * checkout release commits in the same transaction. Never overwrites a
+     * durable charge. Locks are acquired checkout-first to match the claim
+     * path.
+     */
+    @Transactional
+    public void recordProviderDecline(UUID attemptId, String errorCode) {
+        PaymentAttemptEntity attempt = lockAttemptWithCheckoutFirst(attemptId);
         if (attempt.getStatus() == PaymentAttemptStatus.FAILED_FINAL) {
             return;
         }
@@ -183,7 +354,7 @@ public class PaymentAttemptService {
                 && attempt.getStatus() != PaymentAttemptStatus.CREATED) {
             // A charge may already exist; never overwrite a durable success.
             throw new PaymentStateException(
-                    "Cannot record a decline from state " + attempt.getStatus());
+                    "Cannot record a provider decline from state " + attempt.getStatus());
         }
         attempt.setErrorCode(sanitizeCode(errorCode));
         clearLease(attempt);
@@ -368,6 +539,56 @@ public class PaymentAttemptService {
         attempt.setLeaseExpiresAt(now.plusSeconds(leaseSeconds));
         attempt.setUpdatedAt(now);
         return owner;
+    }
+
+    /**
+     * Extends the expiry of the currently held lease without rotating the
+     * token, so the worker that just recorded success keeps authority over the
+     * finalization window.
+     */
+    private void extendLease(PaymentAttemptEntity attempt, LocalDateTime now) {
+        attempt.setLeaseExpiresAt(now.plusSeconds(leaseSeconds));
+        attempt.setUpdatedAt(now);
+    }
+
+    /**
+     * Fencing check run inside the row-locked transaction before any worker
+     * state change. Ownership is by token equality only — an expired but
+     * unreplaced token still commits — because replacement (not the wall
+     * clock) is what revokes a worker. Comparison is constant-time so lease
+     * tokens are not subject to timing probing.
+     */
+    private void requireCurrentLease(PaymentAttemptEntity attempt, String leaseOwner) {
+        if (leaseOwner == null || leaseOwner.isBlank()
+                || attempt.getLeaseOwner() == null
+                || !constantTimeEquals(attempt.getLeaseOwner(), leaseOwner)) {
+            throw new StalePaymentLeaseException(
+                    "Stale payment lease: the attempt is owned by another worker");
+        }
+    }
+
+    private boolean constantTimeEquals(String stored, String presented) {
+        return MessageDigest.isEqual(
+                stored.getBytes(StandardCharsets.UTF_8),
+                presented.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Loads the attempt for a decline path with locks acquired checkout-first,
+     * matching the claim path order (checkout, then attempt, then product
+     * rows). The initial non-locking read only determines which checkout row
+     * to lock; all fencing and state decisions happen after both row locks
+     * are held.
+     */
+    private PaymentAttemptEntity lockAttemptWithCheckoutFirst(UUID attemptId) {
+        PaymentAttemptEntity probe = paymentAttemptEntityRepository.findById(attemptId)
+                .orElseThrow(PaymentAttemptNotFoundException::new);
+        UUID checkoutId = probe.getCheckoutId();
+        if (checkoutId != null) {
+            checkoutEntityRepository.findByIdForUpdate(checkoutId);
+        }
+        return paymentAttemptEntityRepository.findByIdForUpdate(attemptId)
+                .orElseThrow(PaymentAttemptNotFoundException::new);
     }
 
     private boolean hasValidLease(PaymentAttemptEntity attempt, LocalDateTime now) {

@@ -147,9 +147,11 @@ class PaymentRecoveryPostgresTest {
         paymentAttemptService.recordRefunded(attempt.getId(), "re_regress");
 
         assertThrows(PaymentStateException.class,
-                () -> paymentAttemptService.recordChargeSuccess(attempt.getId(), null, "ch_regress"));
+                () -> paymentAttemptService.recordProviderChargeSuccess(
+                        attempt.getId(), "ch_regress", attempt.getAmountMinor(),
+                        attempt.getCurrency(), attempt.getCheckoutId()));
         assertThrows(PaymentStateException.class,
-                () -> paymentAttemptService.recordDecline(attempt.getId(), "card_declined"));
+                () -> paymentAttemptService.recordDecline(attempt.getId(), null, "card_declined"));
 
         PaymentAttemptEntity reloaded = paymentAttemptEntityRepository.findById(attempt.getId()).orElseThrow();
         assertEquals(PaymentAttemptStatus.REFUNDED, reloaded.getStatus());

@@ -21,7 +21,7 @@ public enum PaymentAttemptStatus {
     MANUAL_REVIEW;
 
     private static final Map<PaymentAttemptStatus, Set<PaymentAttemptStatus>> ALLOWED = Map.of(
-            CREATED, EnumSet.of(PROCESSING, FAILED_FINAL),
+            CREATED, EnumSet.of(PROCESSING, FAILED_FINAL, MANUAL_REVIEW),
             PROCESSING, EnumSet.of(CHARGE_SUCCEEDED, FAILED_FINAL, MANUAL_REVIEW),
             CHARGE_SUCCEEDED, EnumSet.of(ORDER_FINALIZED, REFUND_PENDING, MANUAL_REVIEW),
             ORDER_FINALIZED, EnumSet.of(REFUND_PENDING, REFUNDED, MANUAL_REVIEW),

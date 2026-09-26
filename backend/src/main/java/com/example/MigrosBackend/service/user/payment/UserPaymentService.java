@@ -6,6 +6,7 @@ import com.example.MigrosBackend.dto.payment.PaymentStatusDto;
 import com.example.MigrosBackend.entity.payment.PaymentAttemptStatus;
 import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.exception.user.PaymentStateException;
+import com.example.MigrosBackend.exception.user.StalePaymentLeaseException;
 import com.stripe.exception.CardException;
 import com.stripe.exception.InvalidRequestException;
 import com.stripe.exception.StripeException;
@@ -85,7 +86,17 @@ public class UserPaymentService {
         } catch (CardException | InvalidRequestException declined) {
             // The provider explicitly rejected the charge: no money moved, so the
             // reservation may be released and this attempt is terminally failed.
-            paymentAttemptService.recordDecline(claim.attemptId(), safeErrorCode(declined));
+            // If this worker was fenced out while the provider call was in
+            // flight, the new lease owner resolves the attempt; stay pending.
+            try {
+                paymentAttemptService.recordDecline(
+                        claim.attemptId(), claim.leaseOwner(), safeErrorCode(declined));
+            } catch (StalePaymentLeaseException fencedOut) {
+                LOG.warn("Decline fenced out for attempt {} checkout {}: another worker owns the lease",
+                        claim.attemptId(), checkoutId);
+                return pendingResponse(claim, userToken, checkoutId,
+                        "Payment is already being processed");
+            }
             return terminalResponse(claim, userToken, checkoutId);
         } catch (StripeException ambiguous) {
             // Connection/API errors are ambiguous: the charge may or may not have
@@ -105,17 +116,40 @@ public class UserPaymentService {
         }
 
         // Persist the provider result before touching the order so a crash after
-        // this point can never re-charge.
-        paymentAttemptService.recordChargeSuccess(claim.attemptId(), claim.leaseOwner(), charge.getId());
+        // this point can never re-charge. If another worker reclaimed the lease
+        // while the provider call was in flight, the recorded outcome belongs
+        // to the new owner (same Stripe idempotency key, same charge); this
+        // worker steps aside and the client polls/reconciles.
+        try {
+            paymentAttemptService.recordChargeSuccess(claim.attemptId(), claim.leaseOwner(), charge.getId());
+        } catch (StalePaymentLeaseException fencedOut) {
+            LOG.warn("Charge success fenced out for attempt {} checkout {}: another worker owns the lease",
+                    claim.attemptId(), checkoutId);
+            PaymentStatusDto status = paymentAttemptService.getStatus(userToken, checkoutId);
+            return new PaymentResponseDto(
+                    false, true, checkoutId.toString(), attemptId(claim), status.checkoutStatus(),
+                    status.state(), status.chargeId(), status.totalAmount(), status.amountMinor(),
+                    status.currency(), "Payment status is uncertain and will be reconciled");
+        }
         return finalizeExistingCharge(claim, userToken, checkoutId, charge.getId());
     }
 
     private PaymentResponseDto finalizeExistingCharge(PaymentClaim claim,
-                                                      String userToken,
-                                                      UUID checkoutId,
-                                                      String chargeId) {
+                                                       String userToken,
+                                                       UUID checkoutId,
+                                                       String chargeId) {
+        if (claim.leaseOwner() == null || claim.leaseOwner().isBlank()) {
+            // Another worker owns the finalization window; converge on its
+            // result instead of stealing the lease.
+            PaymentStatusDto status = paymentAttemptService.getStatus(userToken, checkoutId);
+            return new PaymentResponseDto(
+                    true, true, checkoutId.toString(), attemptId(claim), status.checkoutStatus(),
+                    status.state() == null ? PaymentAttemptStatus.CHARGE_SUCCEEDED.name() : status.state(),
+                    chargeId, status.totalAmount(), status.amountMinor(), status.currency(),
+                    "Payment succeeded and is being finalized");
+        }
         boolean finalized = paymentFinalizationService.finalizeOrder(
-                claim.attemptId(), checkoutId, chargeId);
+                claim.attemptId(), checkoutId, chargeId, claim.leaseOwner());
         if (finalized) {
             return finalizedResponse(claim, userToken, checkoutId);
         }
@@ -134,7 +168,7 @@ public class UserPaymentService {
             return;
         }
         UUID attemptId = UUID.fromString(status.attemptId());
-        paymentFinalizationService.finalizeOrder(attemptId, checkoutId, status.chargeId());
+        paymentFinalizationService.finalizeProviderOrder(attemptId, checkoutId, status.chargeId());
     }
 
     private PaymentResponseDto finalizedResponse(PaymentClaim claim, String userToken, UUID checkoutId) {

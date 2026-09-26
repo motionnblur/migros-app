@@ -6,6 +6,7 @@ import com.example.MigrosBackend.dto.payment.PaymentResponseDto;
 import com.example.MigrosBackend.dto.payment.PaymentStatusDto;
 import com.example.MigrosBackend.entity.payment.PaymentAttemptStatus;
 import com.example.MigrosBackend.exception.shared.GeneralException;
+import com.example.MigrosBackend.exception.user.StalePaymentLeaseException;
 import com.stripe.exception.ApiConnectionException;
 import com.stripe.exception.CardException;
 import com.stripe.exception.StripeException;
@@ -78,7 +79,8 @@ class UserPaymentServiceTest {
         when(charge.getId()).thenReturn("ch_123");
         when(stripePaymentGateway.charge(eq(STRIPE_TOKEN), eq(5099L), eq("try"), eq(idempotencyKey),
                 eq(checkoutId.toString()))).thenReturn(charge);
-        when(paymentFinalizationService.finalizeOrder(attemptId, checkoutId, "ch_123")).thenReturn(true);
+        when(paymentFinalizationService.finalizeOrder(attemptId, checkoutId, "ch_123", "lease-1"))
+                .thenReturn(true);
         when(paymentAttemptService.getStatus(USER_TOKEN, checkoutId))
                 .thenReturn(status("ORDER_FINALIZED", true, false));
 
@@ -112,9 +114,9 @@ class UserPaymentServiceTest {
         assertFalse(response.success());
         assertFalse(response.pending());
         assertEquals("FAILED_FINAL", response.state());
-        verify(paymentAttemptService).recordDecline(attemptId, "card_declined");
+        verify(paymentAttemptService).recordDecline(attemptId, "lease-1", "card_declined");
         verify(paymentAttemptService, never()).recordChargeSuccess(any(), any(), any());
-        verify(paymentFinalizationService, never()).finalizeOrder(any(), any(), any());
+        verify(paymentFinalizationService, never()).finalizeOrder(any(), any(), any(), any());
     }
 
     @Test
@@ -131,7 +133,7 @@ class UserPaymentServiceTest {
         assertFalse(response.success());
         assertTrue(response.pending());
         assertEquals("PROCESSING", response.state());
-        verify(paymentAttemptService, never()).recordDecline(any(), any());
+        verify(paymentAttemptService, never()).recordDecline(any(), any(), any());
     }
 
     @Test
@@ -142,7 +144,8 @@ class UserPaymentServiceTest {
         when(charge.getId()).thenReturn("ch_123");
         when(stripePaymentGateway.charge(anyString(), eq(5099L), eq("try"), eq(idempotencyKey),
                 eq(checkoutId.toString()))).thenReturn(charge);
-        when(paymentFinalizationService.finalizeOrder(attemptId, checkoutId, "ch_123")).thenReturn(false);
+        when(paymentFinalizationService.finalizeOrder(attemptId, checkoutId, "ch_123", "lease-1"))
+                .thenReturn(false);
         when(paymentAttemptService.getStatus(USER_TOKEN, checkoutId))
                 .thenReturn(status("CHARGE_SUCCEEDED", false, true));
 
@@ -151,7 +154,7 @@ class UserPaymentServiceTest {
         assertTrue(response.success());
         assertTrue(response.pending());
         assertEquals("CHARGE_SUCCEEDED", response.state());
-        verify(paymentAttemptService, never()).recordDecline(any(), any());
+        verify(paymentAttemptService, never()).recordDecline(any(), any(), any());
     }
 
     @Test
@@ -189,12 +192,69 @@ class UserPaymentServiceTest {
         when(paymentAttemptService.getStatus(USER_TOKEN, checkoutId))
                 .thenReturn(pending)
                 .thenReturn(finalized);
-        when(paymentFinalizationService.finalizeOrder(attemptId, checkoutId, "ch_123")).thenReturn(true);
+        when(paymentFinalizationService.finalizeProviderOrder(attemptId, checkoutId, "ch_123")).thenReturn(true);
 
         PaymentStatusDto result = userPaymentService.getPaymentStatus(USER_TOKEN, checkoutId);
 
         assertEquals("ORDER_FINALIZED", result.state());
-        verify(paymentFinalizationService).finalizeOrder(attemptId, checkoutId, "ch_123");
+        verify(paymentFinalizationService).finalizeProviderOrder(attemptId, checkoutId, "ch_123");
+    }
+
+    @Test
+    void processCharge_StaleSuccessLeaseStaysPendingWithoutFinalizing() throws StripeException {
+        when(paymentAttemptService.claim(USER_TOKEN, checkoutId, idempotencyKey))
+                .thenReturn(claim(PaymentClaimDecision.PROCEED, PaymentAttemptStatus.PROCESSING));
+        Charge charge = mock(Charge.class);
+        when(charge.getId()).thenReturn("ch_123");
+        when(stripePaymentGateway.charge(anyString(), eq(5099L), eq("try"), eq(idempotencyKey),
+                eq(checkoutId.toString()))).thenReturn(charge);
+        when(paymentAttemptService.recordChargeSuccess(attemptId, "lease-1", "ch_123"))
+                .thenThrow(new StalePaymentLeaseException("stale"));
+        when(paymentAttemptService.getStatus(USER_TOKEN, checkoutId))
+                .thenReturn(status("PROCESSING", false, true));
+
+        PaymentResponseDto response = userPaymentService.processCharge(checkoutId, STRIPE_TOKEN, USER_TOKEN);
+
+        assertFalse(response.success());
+        assertTrue(response.pending());
+        verify(paymentFinalizationService, never()).finalizeOrder(any(), any(), any(), any());
+    }
+
+    @Test
+    void processCharge_StaleDeclineLeaseStaysPendingWithoutTerminalResponse() throws StripeException {
+        when(paymentAttemptService.claim(USER_TOKEN, checkoutId, idempotencyKey))
+                .thenReturn(claim(PaymentClaimDecision.PROCEED, PaymentAttemptStatus.PROCESSING));
+        CardException decline = mock(CardException.class);
+        when(decline.getCode()).thenReturn("card_declined");
+        when(stripePaymentGateway.charge(anyString(), any(Long.class), anyString(), anyString(), anyString()))
+                .thenThrow(decline);
+        org.mockito.Mockito.doThrow(new StalePaymentLeaseException("stale"))
+                .when(paymentAttemptService).recordDecline(eq(attemptId), eq("lease-1"), anyString());
+        when(paymentAttemptService.getStatus(USER_TOKEN, checkoutId))
+                .thenReturn(status("PROCESSING", false, true));
+
+        PaymentResponseDto response = userPaymentService.processCharge(checkoutId, STRIPE_TOKEN, USER_TOKEN);
+
+        assertFalse(response.success());
+        assertTrue(response.pending());
+        verify(paymentFinalizationService, never()).finalizeOrder(any(), any(), any(), any());
+    }
+
+    @Test
+    void processCharge_FinalizeWithoutLeaseStaysPendingWithoutStealing() throws StripeException {
+        PaymentClaim noLease = new PaymentClaim(PaymentClaimDecision.FINALIZE, attemptId, checkoutId,
+                idempotencyKey, 5099L, "try", null, "ch_123", PaymentAttemptStatus.CHARGE_SUCCEEDED);
+        when(paymentAttemptService.claim(USER_TOKEN, checkoutId, idempotencyKey)).thenReturn(noLease);
+        when(paymentAttemptService.getStatus(USER_TOKEN, checkoutId))
+                .thenReturn(status("CHARGE_SUCCEEDED", false, true));
+
+        PaymentResponseDto response = userPaymentService.processCharge(checkoutId, STRIPE_TOKEN, USER_TOKEN);
+
+        assertTrue(response.success());
+        assertTrue(response.pending());
+        assertEquals("CHARGE_SUCCEEDED", response.state());
+        verify(stripePaymentGateway, never()).charge(any(), any(Long.class), any(), any(), any());
+        verify(paymentFinalizationService, never()).finalizeOrder(any(), any(), any(), any());
     }
 
     @Test

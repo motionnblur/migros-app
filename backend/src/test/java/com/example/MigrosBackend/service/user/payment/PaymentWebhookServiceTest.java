@@ -82,7 +82,8 @@ class PaymentWebhookServiceTest {
                 any(), anyString(), any());
         verify(stripeEventStore, times(1)).tryClaim(eq("evt_duplicate"), anyString(), any(), anyLong());
         verify(stripeEventStore, times(1)).markProcessed(eq("evt_duplicate"), any());
-        verify(paymentAttemptService, never()).recordChargeSuccess(any(), any(), anyString());
+        verify(paymentAttemptService, never()).recordProviderChargeSuccess(
+                any(), any(), any(), any(), any());
     }
 
     @Test
@@ -97,8 +98,9 @@ class PaymentWebhookServiceTest {
 
         verify(stripeEventStore).markManualReview("evt_collision", "event_id_collision");
         verify(stripeEventStore, never()).tryClaim(anyString(), anyString(), any(), anyLong());
-        verify(paymentAttemptService, never()).recordChargeSuccess(any(), any(), anyString());
-        verify(paymentFinalizationService, never()).finalizeOrder(any(), any(), anyString());
+        verify(paymentAttemptService, never()).recordProviderChargeSuccess(
+                any(), any(), any(), any(), any());
+        verify(paymentFinalizationService, never()).finalizeProviderOrder(any(), any(), anyString());
     }
 
     @Test
@@ -114,8 +116,9 @@ class PaymentWebhookServiceTest {
         webhookService.handle(event, "{}");
 
         verify(stripeEventStore, never()).markProcessed(anyString(), any());
-        verify(paymentAttemptService, never()).recordChargeSuccess(any(), any(), anyString());
-        verify(paymentFinalizationService, never()).finalizeOrder(any(), any(), anyString());
+        verify(paymentAttemptService, never()).recordProviderChargeSuccess(
+                any(), any(), any(), any(), any());
+        verify(paymentFinalizationService, never()).finalizeProviderOrder(any(), any(), anyString());
     }
 
     @Test
@@ -150,8 +153,9 @@ class PaymentWebhookServiceTest {
 
         webhookService.handle(event, "{}");
 
-        verify(paymentAttemptService).recordChargeSuccess(attemptId, null, "ch_1");
-        verify(paymentFinalizationService).finalizeOrder(attemptId, checkoutId, "ch_1");
+        verify(paymentAttemptService).recordProviderChargeSuccess(
+                attemptId, "ch_1", 1000L, "try", checkoutId);
+        verify(paymentFinalizationService).finalizeProviderOrder(attemptId, checkoutId, "ch_1");
         verify(stripeEventStore).markProcessed(eq("evt_1"), any());
     }
 
@@ -187,6 +191,7 @@ class PaymentWebhookServiceTest {
         webhookService.handle(event, "{}");
 
         verify(paymentAttemptService).markManualReview(attemptId, "provider_amount_mismatch");
-        verify(paymentAttemptService, never()).recordChargeSuccess(any(), any(), anyString());
+        verify(paymentAttemptService, never()).recordProviderChargeSuccess(
+                any(), any(), any(), any(), any());
     }
 }

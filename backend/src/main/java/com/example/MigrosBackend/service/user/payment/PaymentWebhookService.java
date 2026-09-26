@@ -281,12 +281,18 @@ public class PaymentWebhookService {
         PaymentAttemptStatus state = claim.state();
         try {
             if (state == PaymentAttemptStatus.PROCESSING || state == PaymentAttemptStatus.CREATED) {
-                paymentAttemptService.recordChargeSuccess(claim.attemptId(), null, charge.getId());
+                // Trusted provider-event path: no worker token. Economics were
+                // verified in resolveAttempt and are re-verified with checkout
+                // linkage inside the transition itself.
+                paymentAttemptService.recordProviderChargeSuccess(
+                        claim.attemptId(), charge.getId(), charge.getAmount(),
+                        charge.getCurrency(), claim.checkoutId());
             } else if (state != PaymentAttemptStatus.CHARGE_SUCCEEDED
                     && state != PaymentAttemptStatus.ORDER_FINALIZED) {
                 return;
             }
-            paymentFinalizationService.finalizeOrder(claim.attemptId(), claim.checkoutId(), charge.getId());
+            paymentFinalizationService.finalizeProviderOrder(
+                    claim.attemptId(), claim.checkoutId(), charge.getId());
         } catch (PaymentStateException ex) {
             LOG.warn("Webhook charge.succeeded could not be applied to attempt {}: {}",
                     claim.attemptId(), ex.getMessage());
@@ -306,7 +312,9 @@ public class PaymentWebhookService {
             return;
         }
         try {
-            paymentAttemptService.recordDecline(claim.attemptId(), charge.getFailureCode());
+            // Trusted provider-event path: no worker token. Forward-only and
+            // never overwrites a durable charge.
+            paymentAttemptService.recordProviderDecline(claim.attemptId(), charge.getFailureCode());
         } catch (PaymentStateException ex) {
             LOG.warn("Webhook charge.failed could not be applied to attempt {}: {}",
                     claim.attemptId(), ex.getMessage());
