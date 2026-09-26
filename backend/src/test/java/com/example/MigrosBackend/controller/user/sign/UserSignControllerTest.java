@@ -27,6 +27,8 @@ import java.time.Duration;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -84,6 +86,26 @@ class UserSignControllerTest {
         mockMvc.perform(get("/user/signup/confirm")
                         .param("token", "sample-token"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void verifyUserMail_POST_invokesServiceAndReturnsOk() throws Exception {
+        doNothing().when(userSignupService).verifyUserMail(anyString());
+
+        mockMvc.perform(post("/user/verifyUserMail")
+                        .param("userMail", "user@example.com"))
+                .andExpect(status().isOk());
+
+        verify(userSignupService).verifyUserMail("user@example.com");
+    }
+
+    @Test
+    void verifyUserMail_GET_isMethodNotAllowed() throws Exception {
+        mockMvc.perform(get("/user/verifyUserMail")
+                        .param("userMail", "user@example.com"))
+                .andExpect(status().isMethodNotAllowed());
+
+        verifyNoInteractions(userSignupService);
     }
 
     @Test

@@ -81,7 +81,7 @@ public class UserSignController {
         return ResponseEntity.ok(Map.of("userMail", userMail));
     }
 
-    @GetMapping("verifyUserMail")
+    @PostMapping("verifyUserMail")
     private ResponseEntity<Void> verifyUserMail(@RequestParam String userMail) {
         userSignupService.verifyUserMail(userMail);
         return ResponseEntity.ok().build();

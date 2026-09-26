@@ -54,6 +54,26 @@ describe('RestService state-changing requests', () => {
     request.flush('', { status: 200, statusText: 'OK' });
   });
 
+  it('getVerifyUser uses POST with the userMail query parameter', () => {
+    service.getVerifyUser('user@example.com').subscribe();
+
+    const request = httpMock.expectOne(
+      (candidate) =>
+        candidate.url === '/user/verifyUserMail' &&
+        candidate.params.get('userMail') === 'user@example.com',
+    );
+
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toBeNull();
+    request.flush('', { status: 200, statusText: 'OK' });
+
+    httpMock.expectNone(
+      (candidate) =>
+        candidate.url === '/user/verifyUserMail' &&
+        candidate.method === 'GET',
+    );
+  });
+
   it('updateProductCountInUserCart uses POST, not GET', () => {
     service.updateProductCountInUserCart(42, 3).subscribe();
 

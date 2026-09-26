@@ -28,7 +28,7 @@ import { API_BASE_URL } from '../../app/config/backend.config';
 })
 export class RestService {
   getVerifyUser(userMail: string) {
-    return this.http.get(`${API_BASE_URL}/user/verifyUserMail`, {
+    return this.http.post(`${API_BASE_URL}/user/verifyUserMail`, null, {
       params: { userMail },
       responseType: 'json',
     });

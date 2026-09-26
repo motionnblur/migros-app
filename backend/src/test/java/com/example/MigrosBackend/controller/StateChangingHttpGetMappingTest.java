@@ -32,14 +32,22 @@ class StateChangingHttpGetMappingTest {
 
     private static final List<String> STATE_CHANGING_PREFIXES = List.of(
             "add", "update", "delete", "remove", "cancel", "upload",
-            "reset", "ban", "unban", "clear", "charge");
+            "reset", "ban", "unban", "clear", "charge", "verify", "confirm");
 
     /**
      * Explicit exceptions to the rule above. Each entry must be documented with
-     * the reason the GET is safe. Empty today: every state-changing handler is
-     * exposed through a non-GET mapping.
+     * the reason the GET is safe. These are intentionally limited to one-time
+     * bearer-token capability links: the token in the URL is the authority, so a
+     * cross-site GET cannot exploit ambient session credentials. Every other
+     * state-changing handler must use a non-GET mapping.
      */
-    private static final Map<String, String> ALLOWED_GET_EXCEPTIONS = Map.of();
+    private static final Map<String, String> ALLOWED_GET_EXCEPTIONS = Map.of(
+            "com.example.MigrosBackend.controller.user.sign.UserSignController#confirm",
+            "One-time bearer-token link opened from email; the token acts as its own "
+                    + "authority and the request does not rely on ambient session credentials.",
+            "com.example.MigrosBackend.controller.user.sign.UserSignController#confirmUserMail",
+            "One-time bearer-token link opened from email; the token acts as its own "
+                    + "authority and the request does not rely on ambient session credentials.");
 
     @Test
     void stateChangingControllerMethodsAreNotMappedToGetOnly() throws Exception {
