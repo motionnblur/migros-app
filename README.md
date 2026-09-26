@@ -65,35 +65,24 @@ Before you begin, ensure you have the following installed:
 
 ## :airplane: Setup
 
-`configs/postgres.env` and `configs/spring.env` are already included for local development.
+Local `.env` files are ignored by Git. Create them from the tracked templates
+(see `configs/README.md`):
 
-Sample values:
-
-* `configs/postgres.env`
-```env
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=1
-POSTGRES_DB=migros_db
+```powershell
+Copy-Item configs/postgres.env.example configs/postgres.env
+Copy-Item configs/spring.env.example configs/spring.env
 ```
 
-* `configs/spring.env`
-```env
-SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/migros_db
-SPRING_DATASOURCE_USERNAME=postgres
-SPRING_DATASOURCE_PASSWORD=1
-APP_PUBLIC_BASE_URL=http://localhost:5000
-APP_ALLOWED_ORIGINS=http://localhost:4200,http://localhost:5000
-APP_ALLOWED_ORIGIN_PATTERNS=http://localhost:*,http://127.0.0.1:*
-APP_MAIL_PROVIDER=smtp
-MAIL_HOST=smtp.gmail.com
-MAIL_PORT=587
-MAIL_USERNAME=your_smtp_username
-MAIL_PASSWORD=your_smtp_password
-APP_MAIL_FROM=your_smtp_username
-SUPPORT_INTERNAL_KEY=replace-with-a-random-value
-PAYMENT_CURRENCY=try
-STRIPE_API_KEY=replace-with-your-stripe-secret-key
-```
+Then replace every `replace-with-*` placeholder, including the two independent
+JWT signing secrets and `SUPPORT_INTERNAL_KEY`. Never commit the copied files.
+
+There are two network coordinate sets, one per runtime mode:
+
+* **Host processes** (hybrid development): use `localhost`, for example
+  `SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/migros`.
+* **Inside Docker Compose**: use service names (`postgres`, `backend`, `nginx`).
+  The backend's container datasource is derived from the `POSTGRES_*` values, so
+  its JDBC URL uses the `postgres` service host.
 
 > `SUPPORT_INTERNAL_KEY` protects the inbound internal support bridge
 > (`/internal/support/**`) and is **required**: the backend refuses to start
@@ -152,23 +141,29 @@ docker compose --env-file configs/postgres.env up postgres
 ```
 
 2. Start backend (explicitly activate the `local` profile):
-```
+```powershell
 cd backend
-./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=local"
 ```
+The system property is quoted so the Maven Wrapper does not interpret it as a
+lifecycle phase on Windows. The `local` profile optionally imports
+`configs/spring.env` and `configs/postgres.env` (relative to `backend/`), so the
+hybrid backend starts without manually exporting every variable. A real process
+environment variable overrides any value imported from those files.
 Ordinary startup is debugger-free: no JDWP agent is enabled by default.
 
 For explicit local-only debugging (loopback only, never expose remotely):
-```
-.\mvnw.cmd -Plocal-debug spring-boot:run -Dspring-boot.run.profiles=local
+```powershell
+.\mvnw.cmd -Plocal-debug spring-boot:run "-Dspring-boot.run.profiles=local"
 ```
 The debug listener binds only to `127.0.0.1:5005` and must not be exposed through
 port forwarding, Compose, a reverse proxy, a tunnel, or a production deployment.
-If you run `./mvnw spring-boot:run` without `local`, the backend starts with the
-secure default profile: it will **not** create the `admin` / `admin` account, and
-it will refuse to start if a legacy `admin` / `admin` row already exists. The same
-applies when additional profiles are active (`prod,local`, `local,staging`, ...):
-local development is only recognized when `local` is the **only** active profile.
+If you run `.\mvnw.cmd spring-boot:run` without `local`, the backend starts with
+the secure default profile: it will **not** create the `admin` / `admin` account,
+and it will refuse to start if a legacy `admin` / `admin` row already exists. The
+same applies when additional profiles are active (`prod,local`, `local,staging`,
+...): local development is only recognized when `local` is the **only** active
+profile.
 
 3. Start frontend:
 ```
@@ -180,6 +175,11 @@ npm start
 In this mode:
 * Frontend: http://localhost:4200
 * Backend: http://localhost:8080
+
+In the full Docker stack, Nginx routes API traffic to the backend through Compose
+DNS (`backend:8080`) and the client proxy targets `http://nginx:80`, so the same
+edge routing, rate limits, and `/ws/support` upgrade path are exercised on
+http://localhost:8080.
 
 For production deployments, set `SPRING_PROFILES_ACTIVE=prod` and provide the required `SPRING_DATASOURCE_*`, `APP_ALLOWED_ORIGINS`, and `APP_PUBLIC_BASE_URL` variables.
 

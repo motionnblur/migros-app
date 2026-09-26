@@ -3,9 +3,10 @@ services:
   client:
     build: client/
     depends_on:
-      - backend
+      nginx:
+        condition: service_healthy
     environment:
-      - NG_PROXY_TARGET=http://backend:8080
+      - NG_PROXY_TARGET=http://nginx:80
     ports:
       - "5000:4200"
     volumes:
@@ -21,15 +22,22 @@ services:
       - "8080"
     environment:
       - SPRING_PROFILES_ACTIVE=local
-      - SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL}
-      - SPRING_DATASOURCE_USERNAME=${SPRING_DATASOURCE_USERNAME}
-      - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
+      # Container path: derive the datasource from the Postgres service and the
+      # values supplied by configs/postgres.env.
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
       - JWT_USER_SECRET=${JWT_USER_SECRET}
       - JWT_ADMIN_SECRET=${JWT_ADMIN_SECRET}
       - STRIPE_API_KEY=${STRIPE_API_KEY}
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
       - PAYMENT_CURRENCY=${PAYMENT_CURRENCY}
       - SUPPORT_INTERNAL_KEY=${SUPPORT_INTERNAL_KEY}
+      # Optional outbound support-service integration. Forwarded from
+      # configs/spring.env; when unset the integration is disabled rather than
+      # defaulting to localhost inside the container.
+      - SUPPORT_SERVICE_BASE_URL=${SUPPORT_SERVICE_BASE_URL:-}
+      - SUPPORT_SERVICE_INTERNAL_KEY=${SUPPORT_SERVICE_INTERNAL_KEY:-}
       - APP_PUBLIC_BASE_URL=${APP_PUBLIC_BASE_URL}
       - APP_ALLOWED_ORIGINS=${APP_ALLOWED_ORIGINS}
       - APP_ALLOWED_ORIGIN_PATTERNS=${APP_ALLOWED_ORIGIN_PATTERNS}
@@ -39,6 +47,7 @@ services:
       - MAIL_USERNAME=${MAIL_USERNAME}
       - MAIL_PASSWORD=${MAIL_PASSWORD}
       - APP_MAIL_FROM=${APP_MAIL_FROM}
+      - APP_UPLOAD_DIR=${APP_UPLOAD_DIR:-UploadFolder}
     volumes:
       - ./backend:/App
   nginx:
@@ -47,6 +56,12 @@ services:
       - backend
     ports:
       - "8080:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
     volumes:
       - ./configs/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
       - ./configs/nginx/proxy-common.inc:/etc/nginx/conf.d/proxy-common.inc:ro

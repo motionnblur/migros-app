@@ -46,6 +46,8 @@ support-service. Do not reuse the same value for both.
 
 ## Starting the stack
 
+From the repository root:
+
 ```powershell
 docker compose --env-file configs/postgres.env --env-file configs/spring.env up
 ```
@@ -54,14 +56,64 @@ Compose uses these files for variable substitution. `configs/nginx` is mounted
 into the Nginx container and contains the shared proxy, WebSocket, forwarded
 header, timeout, and request-rate-limit settings.
 
+Traffic flows `client -> nginx -> backend -> postgres`. Nginx resolves the
+backend through Compose DNS (`backend:8080`), and the backend datasource is
+derived from the `postgres` service and the `POSTGRES_*` values. The backend
+application port is intentionally not published on the host.
+
+## Hybrid development (Postgres in Compose, apps on the host)
+
+Run Postgres only, then the backend and the Angular dev server on the host:
+
+```powershell
+# 1. From the repository root: start only the database
+docker compose --env-file configs/postgres.env up postgres
+
+# 2. From the repository root: start the backend with the exact-local profile
+cd backend
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=local"
+
+# 3. In another terminal: start the frontend
+cd client
+npm i
+npm start
+```
+
+Unix shells use the same commands with `./mvnw` and single quotes around the
+Maven system property:
+
+```sh
+./mvnw spring-boot:run '-Dspring-boot.run.profiles=local'
+```
+
+The `local` profile optionally imports `configs/spring.env` and
+`configs/postgres.env` through `optional:file:` imports relative to the
+`backend/` working directory. Missing files are ignored, and any real process
+environment variable always overrides a value from those files. The hybrid
+fallback JDBC URL uses `localhost:5432`.
+
+There are two coordinate sets, one per runtime mode:
+
+- **Host processes (hybrid):** use `localhost` (for example
+  `jdbc:postgresql://localhost:5432/migros`, backend on `:8080`, UI on `:4200`).
+- **Inside Compose:** use service names (`postgres`, `backend`, `nginx`).
+
+The outbound support-service integration is optional. Set
+`SUPPORT_SERVICE_BASE_URL` and `SUPPORT_SERVICE_INTERNAL_KEY` in
+`configs/spring.env` to enable it; when `SUPPORT_SERVICE_BASE_URL` is unset the
+integration is disabled instead of calling `localhost:3000` inside a container.
+
+
 ## Profiles and administrator provisioning
 
 Docker Compose explicitly sets `SPRING_PROFILES_ACTIVE=local` for the backend.
 When running the backend directly, activate `local` explicitly (for example
-`./mvnw spring-boot:run -Dspring-boot.run.profiles=local`) to get the
-local-development convenience account `admin` / `admin`. Ordinary startup is
-debugger-free; for opt-in loopback-only debugging use
-`./mvnw -Plocal-debug spring-boot:run -Dspring-boot.run.profiles=local`
+`.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=local"` on PowerShell).
+The quoted system property keeps the Maven Wrapper from interpreting it as a
+lifecycle phase on Windows. To get the local-development convenience account
+`admin` / `admin`, the active profile set must be exactly `{local}`. Ordinary
+startup is debugger-free; for opt-in loopback-only debugging use
+`.\mvnw.cmd -Plocal-debug spring-boot:run "-Dspring-boot.run.profiles=local"`
 (listens only on `127.0.0.1:5005`, never publish it via Compose or forwarding).
 
 Local development is recognized only when `local` is the **only** active profile.

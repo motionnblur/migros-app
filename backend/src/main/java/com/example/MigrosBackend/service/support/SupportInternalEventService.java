@@ -26,17 +26,23 @@ public class SupportInternalEventService {
 
     private final RestTemplate restTemplate;
     private final String internalKey;
+    private final boolean enabled;
 
     public SupportInternalEventService(
             RestTemplateBuilder restTemplateBuilder,
-            @Value("${support.service.base-url:http://localhost:3000}") String supportServiceBaseUrl,
+            @Value("${support.service.base-url:}") String supportServiceBaseUrl,
             @Value("${support.service.internal-key:}") String internalKey
     ) {
-        this.restTemplate = restTemplateBuilder.rootUri(supportServiceBaseUrl).build();
+        this.enabled = supportServiceBaseUrl != null && !supportServiceBaseUrl.isBlank();
+        this.restTemplate = this.enabled ? restTemplateBuilder.rootUri(supportServiceBaseUrl).build() : null;
         this.internalKey = internalKey;
     }
 
     public void publishCustomerMessageCreated(SupportMessageEntity entity) {
+        if (!enabled) {
+            LOGGER.debug("Outbound support-service integration is disabled; skipping customer message event");
+            return;
+        }
         SupportCustomerMessageCreatedEventDto payload = new SupportCustomerMessageCreatedEventDto(
                 UUID.randomUUID().toString(),
                 entity.getUserMail(),
@@ -55,6 +61,10 @@ public class SupportInternalEventService {
     }
 
     public void publishSupportMessageEdited(String userMail, String messageId, String text) {
+        if (!enabled) {
+            LOGGER.debug("Outbound support-service integration is disabled; skipping support message edit event");
+            return;
+        }
         SupportMessageEditedEventDto payload = new SupportMessageEditedEventDto(
                 UUID.randomUUID().toString(),
                 userMail,
@@ -66,6 +76,10 @@ public class SupportInternalEventService {
     }
 
     public void publishSupportMessageDeleted(String userMail, String messageId) {
+        if (!enabled) {
+            LOGGER.debug("Outbound support-service integration is disabled; skipping support message delete event");
+            return;
+        }
         SupportMessageDeletedEventDto payload = new SupportMessageDeletedEventDto(
                 UUID.randomUUID().toString(),
                 userMail,
@@ -76,6 +90,9 @@ public class SupportInternalEventService {
     }
 
     private void postEvent(String path, Object payload) {
+        if (!enabled || restTemplate == null) {
+            return;
+        }
         try {
             restTemplate.postForEntity(path, new HttpEntity<>(payload, buildHeaders()), Void.class);
         } catch (Exception ex) {

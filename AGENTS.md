@@ -89,10 +89,14 @@ Backend packages follow a mostly standard layered layout:
   - `docker compose --env-file configs/postgres.env --env-file configs/spring.env up`
 - Hybrid (recommended):
   - `docker compose --env-file configs/postgres.env up postgres`
-  - `cd backend && ./mvnw spring-boot:run -Dspring-boot.run.profiles=local`
-  - `cd client && npm i && npm start`
+  - `cd backend; .\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=local"`
+  - `cd client; npm i; npm start`
+  - The exact-local profile optionally imports `../configs/spring.env` and
+    `../configs/postgres.env` relative to `backend/`; real environment variables
+    override imported values. Hybrid uses `localhost:5432`; Compose uses service
+    names (`postgres`, `backend`, `nginx`).
 - Local-only debugging (opt-in, loopback-only):
-  - `cd backend && ./mvnw -Plocal-debug spring-boot:run -Dspring-boot.run.profiles=local`
+  - `cd backend; .\mvnw.cmd -Plocal-debug spring-boot:run "-Dspring-boot.run.profiles=local"`
   - Default runs must not enable JDWP. Any debugger must be opt-in via the
     `local-debug` Maven profile and bound to `127.0.0.1:5005` only.
   - Runtime/deployment manifests must not publish debug ports.
