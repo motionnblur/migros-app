@@ -22,7 +22,6 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -108,7 +107,7 @@ public class PaymentWebhookService {
                 eventId, eventType, rawPayload, sha256Hex(payload), now);
         switch (outcome) {
             case CONFLICT -> {
-                stripeEventStore.markManualReview(eventId, "event_id_collision");
+                stripeEventStore.markProviderCollisionReview(eventId, "event_id_collision");
                 LOG.error("Stripe event id collision for {}; held for manual review", eventId);
                 return;
             }
@@ -121,13 +120,15 @@ public class PaymentWebhookService {
             }
         }
 
+        String claimToken = UUID.randomUUID().toString();
         Optional<StoredEvent> claim =
-                stripeEventStore.tryClaim(eventId, UUID.randomUUID().toString(), now, leaseSeconds);
+                stripeEventStore.tryClaim(eventId, claimToken, now, leaseSeconds);
         if (claim.isEmpty()) {
             LOG.info("Stripe event {} is already claimed by another worker", eventId);
             return;
         }
         StoredEvent claimed = claim.get();
+        String leaseOwner = claimed.leaseOwner() != null ? claimed.leaseOwner() : claimToken;
         afterClaim(eventId);
 
         Event effective = event;
@@ -135,7 +136,11 @@ public class PaymentWebhookService {
             try {
                 effective = parseStoredPayload(eventId, claimed.payload());
             } catch (RuntimeException ex) {
-                recordFailure(eventId, claimed.attemptCount(), ex);
+                if (recordFailure(eventId, leaseOwner, claimed.attemptCount(), ex)
+                        == StripeEventStore.InboxTransition.STALE_CLAIM) {
+                    LOG.warn("Stale Stripe worker stepping aside for event {}", eventId);
+                    return;
+                }
                 throw ex;
             }
         }
@@ -143,12 +148,17 @@ public class PaymentWebhookService {
         try {
             process(effective, effective.getType() != null ? effective.getType() : eventType);
             afterEffects(eventId);
-            if (!stripeEventStore.markProcessed(eventId, LocalDateTime.now(clock))) {
-                LOG.warn("Stripe event {} could not be marked processed; "
+            if (stripeEventStore.markProcessed(eventId, leaseOwner, LocalDateTime.now(clock))
+                    == StripeEventStore.InboxTransition.STALE_CLAIM) {
+                LOG.warn("Stale Stripe worker stepping aside for event {}; "
                         + "it was reclaimed or held for review", eventId);
             }
         } catch (RuntimeException ex) {
-            recordFailure(eventId, claimed.attemptCount(), ex);
+            if (recordFailure(eventId, leaseOwner, claimed.attemptCount(), ex)
+                    == StripeEventStore.InboxTransition.STALE_CLAIM) {
+                LOG.warn("Stale Stripe worker stepping aside for event {}", eventId);
+                return;
+            }
             throw ex;
         }
     }
@@ -164,14 +174,16 @@ public class PaymentWebhookService {
             return false;
         }
         LocalDateTime now = LocalDateTime.now(clock);
+        String claimToken = UUID.randomUUID().toString();
         Optional<StoredEvent> claim =
-                stripeEventStore.tryClaim(eventId, UUID.randomUUID().toString(), now, leaseSeconds);
+                stripeEventStore.tryClaim(eventId, claimToken, now, leaseSeconds);
         if (claim.isEmpty()) {
             return false;
         }
         StoredEvent claimed = claim.get();
+        String leaseOwner = claimed.leaseOwner() != null ? claimed.leaseOwner() : claimToken;
         if (claimed.payload() == null || claimed.payload().isBlank()) {
-            stripeEventStore.markManualReview(eventId, "missing_payload");
+            stripeEventStore.markExhaustedReview(eventId, leaseOwner, "missing_payload");
             LOG.error("Stripe event {} has no stored payload; held for manual review", eventId);
             return false;
         }
@@ -179,15 +191,16 @@ public class PaymentWebhookService {
         try {
             event = parseStoredPayload(eventId, claimed.payload());
         } catch (RuntimeException ex) {
-            recordFailure(eventId, claimed.attemptCount(), ex);
+            recordFailure(eventId, leaseOwner, claimed.attemptCount(), ex);
             return false;
         }
         try {
             process(event, event.getType() != null ? event.getType() : claimed.eventType());
             afterEffects(eventId);
-            return stripeEventStore.markProcessed(eventId, LocalDateTime.now(clock));
+            return stripeEventStore.markProcessed(eventId, leaseOwner, LocalDateTime.now(clock))
+                    == StripeEventStore.InboxTransition.APPLIED;
         } catch (RuntimeException ex) {
-            recordFailure(eventId, claimed.attemptCount(), ex);
+            recordFailure(eventId, leaseOwner, claimed.attemptCount(), ex);
             return false;
         }
     }
@@ -225,20 +238,68 @@ public class PaymentWebhookService {
         }
     }
 
-    private void recordFailure(String eventId, int attemptCount, RuntimeException ex) {
+    private StripeEventStore.InboxTransition recordFailure(
+            String eventId, String leaseOwner, int attemptCount, RuntimeException ex) {
         String failureClass = ex.getClass().getSimpleName();
         if (attemptCount >= maxAttempts) {
-            stripeEventStore.markManualReview(eventId, sanitizeCode("exhausted:" + failureClass));
-            LOG.error("Stripe event {} exhausted {} attempts ({}); held for manual review",
-                    eventId, attemptCount, failureClass);
-            return;
+            StripeEventStore.InboxTransition outcome = stripeEventStore.markExhaustedReview(
+                    eventId, leaseOwner, sanitizeCode("exhausted:" + failureClass));
+            if (outcome == StripeEventStore.InboxTransition.APPLIED) {
+                LOG.error("Stripe event {} exhausted {} attempts ({}); held for manual review",
+                        eventId, attemptCount, failureClass);
+            } else {
+                LOG.warn("Stale Stripe worker could not park exhausted event {}", eventId);
+            }
+            return outcome;
         }
         long shift = Math.min(Math.max(attemptCount - 1, 0), 20);
         long backoff = Math.min(backoffBaseSeconds * (1L << shift), backoffMaxSeconds);
         LocalDateTime nextAttempt = LocalDateTime.now(clock).plusSeconds(backoff);
-        stripeEventStore.markFailed(eventId, sanitizeCode("effect_failed:" + failureClass), nextAttempt);
-        LOG.warn("Stripe event {} processing failed ({}); retry {}/{} scheduled",
-                eventId, failureClass, attemptCount, maxAttempts);
+        StripeEventStore.InboxTransition outcome = stripeEventStore.markFailed(
+                eventId, leaseOwner, sanitizeCode("effect_failed:" + failureClass), nextAttempt);
+        if (outcome == StripeEventStore.InboxTransition.APPLIED) {
+            LOG.warn("Stripe event {} processing failed ({}); retry {}/{} scheduled",
+                    eventId, failureClass, attemptCount, maxAttempts);
+        } else {
+            LOG.warn("Stale Stripe worker could not schedule retry for event {}", eventId);
+        }
+        return outcome;
+    }
+
+    /**
+     * Durable disposition of one verified webhook event. The inbox row may
+     * become {@code PROCESSED} only after one of these commits:
+     * <ul>
+     *   <li>{@code APPLIED}: charge/failure/refund effects durably committed.</li>
+     *   <li>{@code IDEMPOTENT}: same-charge replay converged without state change.</li>
+     *   <li>{@code MANUAL_REVIEW}: conflicting provider evidence durably parked
+     *   for an operator with sanitized linkage.</li>
+     *   <li>{@code IGNORED_UNKNOWN}: no attempt maps to the verified charge; nothing to do.</li>
+     *   <li>{@code UNSUPPORTED}: event type carries no payment effects.</li>
+     * </ul>
+     * Transient failures are never represented here: they propagate as
+     * exceptions so the inbox parks for retry ({@code FAILED}) instead of
+     * completing.
+     */
+    enum WebhookOutcome {
+        APPLIED,
+        IDEMPOTENT,
+        MANUAL_REVIEW,
+        IGNORED_UNKNOWN,
+        UNSUPPORTED
+    }
+
+    /** Resolution of a verified charge to a stored attempt. */
+    private sealed interface ChargeResolution permits ChargeResolution.Unknown,
+            ChargeResolution.Reviewed, ChargeResolution.Mapped {
+        record Unknown() implements ChargeResolution {
+        }
+
+        record Reviewed() implements ChargeResolution {
+        }
+
+        record Mapped(PaymentClaim claim) implements ChargeResolution {
+        }
     }
 
     static String sha256Hex(String payload) {
@@ -259,57 +320,150 @@ public class PaymentWebhookService {
         return trimmed.length() <= 64 ? trimmed : trimmed.substring(0, 64);
     }
 
-    private void process(Event event, String eventType) {
+    private WebhookOutcome process(Event event, String eventType) {
         switch (eventType) {
-            case "charge.succeeded" -> handleChargeSucceeded(chargeOf(event));
-            case "charge.failed" -> handleChargeFailed(chargeOf(event));
-            case "charge.refunded" -> handleChargeRefunded(chargeOf(event));
-            case "charge.dispute.created", "charge.dispute.funds_withdrawn", "charge.dispute.closed" ->
-                    handleDispute(event);
-            default -> LOG.debug("Ignoring unhandled Stripe event type {}", eventType);
+            case "charge.succeeded" -> {
+                return handleChargeSucceeded(chargeOf(event));
+            }
+            case "charge.failed" -> {
+                return handleChargeFailed(chargeOf(event));
+            }
+            case "charge.refunded" -> {
+                return handleChargeRefunded(chargeOf(event));
+            }
+            case "charge.dispute.created", "charge.dispute.funds_withdrawn", "charge.dispute.closed" -> {
+                return handleDispute(event);
+            }
+            default -> {
+                LOG.debug("Ignoring unhandled Stripe event type {}", eventType);
+                return WebhookOutcome.UNSUPPORTED;
+            }
         }
     }
 
-    private void handleChargeSucceeded(Charge charge) {
-        if (charge == null) {
-            return;
+    private WebhookOutcome handleChargeSucceeded(Charge charge) {
+        if (charge == null || charge.getId() == null || charge.getId().isBlank()) {
+            LOG.warn("Ignoring charge.succeeded without a provider charge id");
+            return WebhookOutcome.UNSUPPORTED;
         }
-        PaymentClaim claim = resolveAttempt(charge);
-        if (claim == null) {
-            return;
+        ChargeResolution resolution = resolveAttemptStrict(charge);
+        if (resolution instanceof ChargeResolution.Unknown) {
+            return WebhookOutcome.IGNORED_UNKNOWN;
         }
+        if (resolution instanceof ChargeResolution.Reviewed) {
+            return WebhookOutcome.MANUAL_REVIEW;
+        }
+        PaymentClaim claim = ((ChargeResolution.Mapped) resolution).claim();
         PaymentAttemptStatus state = claim.state();
         try {
             if (state == PaymentAttemptStatus.PROCESSING || state == PaymentAttemptStatus.CREATED) {
                 // Trusted provider-event path: no worker token. Economics were
-                // verified in resolveAttempt and are re-verified with checkout
-                // linkage inside the transition itself.
+                // verified in resolveAttemptStrict and are re-verified with
+                // checkout linkage inside the transition itself.
                 paymentAttemptService.recordProviderChargeSuccess(
                         claim.attemptId(), charge.getId(), charge.getAmount(),
                         charge.getCurrency(), claim.checkoutId());
-            } else if (state != PaymentAttemptStatus.CHARGE_SUCCEEDED
-                    && state != PaymentAttemptStatus.ORDER_FINALIZED) {
-                return;
+                // Charge is now durable; finalization converges idempotently.
+                // A false return means finalization is pending for recovery,
+                // not that the charge was lost.
+                paymentFinalizationService.finalizeProviderOrder(
+                        claim.attemptId(), claim.checkoutId(), charge.getId());
+                return WebhookOutcome.APPLIED;
             }
-            paymentFinalizationService.finalizeProviderOrder(
-                    claim.attemptId(), claim.checkoutId(), charge.getId());
+            if (state == PaymentAttemptStatus.CHARGE_SUCCEEDED
+                    || state == PaymentAttemptStatus.ORDER_FINALIZED) {
+                if (!charge.getId().equals(claim.chargeId())) {
+                    paymentAttemptService.preserveReviewEvidence(claim.attemptId(), charge.getId());
+                    paymentAttemptService.markManualReview(
+                            claim.attemptId(), "conflicting_provider_charge");
+                    LOG.error("Conflicting charge for finalized attempt {}; held for manual review",
+                            claim.attemptId());
+                    return WebhookOutcome.MANUAL_REVIEW;
+                }
+                paymentFinalizationService.finalizeProviderOrder(
+                        claim.attemptId(), claim.checkoutId(), charge.getId());
+                return WebhookOutcome.IDEMPOTENT;
+            }
+            if (state == PaymentAttemptStatus.REFUNDED) {
+                // Same charge (a different charge was already failed closed in
+                // resolveAttemptStrict): preserve the refund, idempotent.
+                try {
+                    paymentAttemptService.recordProviderChargeSuccess(
+                            claim.attemptId(), charge.getId(), charge.getAmount(),
+                            charge.getCurrency(), claim.checkoutId());
+                } catch (PaymentStateException ex) {
+                    LOG.warn("Webhook charge.succeeded for refunded attempt {}: {}",
+                            claim.attemptId(), ex.getMessage());
+                    return WebhookOutcome.MANUAL_REVIEW;
+                }
+                return WebhookOutcome.IDEMPOTENT;
+            }
+            if (state == PaymentAttemptStatus.FAILED_FINAL) {
+                // Contradictory success after a recorded no-charge terminal
+                // state: never discard, never auto-fulfill, never touch stock.
+                try {
+                    paymentAttemptService.recordProviderChargeSuccess(
+                            claim.attemptId(), charge.getId(), charge.getAmount(),
+                            charge.getCurrency(), claim.checkoutId());
+                } catch (PaymentStateException expected) {
+                    LOG.error("Late success after failure for attempt {}; held for manual review",
+                            claim.attemptId());
+                    return WebhookOutcome.MANUAL_REVIEW;
+                }
+                LOG.error("Late success after failure for attempt {}; held for manual review",
+                        claim.attemptId());
+                return WebhookOutcome.MANUAL_REVIEW;
+            }
+            if (state == PaymentAttemptStatus.MANUAL_REVIEW) {
+                paymentAttemptService.preserveReviewEvidence(claim.attemptId(), charge.getId());
+                return WebhookOutcome.MANUAL_REVIEW;
+            }
+            // REFUND_PENDING and any other charged state: the service owns the
+            // preserve-vs-review decision; a state rejection already committed
+            // manual review.
+            try {
+                paymentAttemptService.recordProviderChargeSuccess(
+                        claim.attemptId(), charge.getId(), charge.getAmount(),
+                        charge.getCurrency(), claim.checkoutId());
+            } catch (PaymentStateException ex) {
+                LOG.warn("Webhook charge.succeeded could not be applied to attempt {}: {}",
+                        claim.attemptId(), ex.getMessage());
+                return WebhookOutcome.MANUAL_REVIEW;
+            }
+            return WebhookOutcome.IDEMPOTENT;
         } catch (PaymentStateException ex) {
+            // State-machine rejection that did not already commit a review:
+            // fail closed into review so contradictory evidence stays visible.
+            try {
+                paymentAttemptService.preserveReviewEvidence(claim.attemptId(), charge.getId());
+                paymentAttemptService.markManualReview(claim.attemptId(), "provider_state_conflict");
+            } catch (RuntimeException reviewError) {
+                // Transient review failure must stay retryable, never processed.
+                throw reviewError;
+            }
             LOG.warn("Webhook charge.succeeded could not be applied to attempt {}: {}",
                     claim.attemptId(), ex.getMessage());
+            return WebhookOutcome.MANUAL_REVIEW;
         }
     }
 
-    private void handleChargeFailed(Charge charge) {
+    private WebhookOutcome handleChargeFailed(Charge charge) {
         if (charge == null) {
-            return;
+            return WebhookOutcome.UNSUPPORTED;
         }
-        PaymentClaim claim = resolveAttempt(charge);
-        if (claim == null) {
-            return;
+        ChargeResolution resolution = resolveAttemptStrict(charge);
+        if (resolution instanceof ChargeResolution.Unknown) {
+            return WebhookOutcome.IGNORED_UNKNOWN;
         }
+        if (resolution instanceof ChargeResolution.Reviewed) {
+            return WebhookOutcome.MANUAL_REVIEW;
+        }
+        PaymentClaim claim = ((ChargeResolution.Mapped) resolution).claim();
         PaymentAttemptStatus state = claim.state();
         if (state != PaymentAttemptStatus.PROCESSING && state != PaymentAttemptStatus.CREATED) {
-            return;
+            // Late failure must never regress a captured, finalized,
+            // refunded, failed, or review state: idempotent no-op.
+            return WebhookOutcome.IDEMPOTENT;
         }
         try {
             // Trusted provider-event path: no worker token. Forward-only and
@@ -318,16 +472,29 @@ public class PaymentWebhookService {
         } catch (PaymentStateException ex) {
             LOG.warn("Webhook charge.failed could not be applied to attempt {}: {}",
                     claim.attemptId(), ex.getMessage());
+            return WebhookOutcome.IDEMPOTENT;
         }
+        return WebhookOutcome.APPLIED;
     }
 
-    private void handleChargeRefunded(Charge charge) {
+    private WebhookOutcome handleChargeRefunded(Charge charge) {
         if (charge == null) {
-            return;
+            return WebhookOutcome.UNSUPPORTED;
         }
-        PaymentClaim claim = resolveAttempt(charge);
-        if (claim == null || claim.state() == PaymentAttemptStatus.REFUNDED) {
-            return;
+        ChargeResolution resolution = resolveAttemptStrict(charge);
+        if (resolution instanceof ChargeResolution.Unknown) {
+            return WebhookOutcome.IGNORED_UNKNOWN;
+        }
+        if (resolution instanceof ChargeResolution.Reviewed) {
+            return WebhookOutcome.MANUAL_REVIEW;
+        }
+        PaymentClaim claim = ((ChargeResolution.Mapped) resolution).claim();
+        if (claim.state() == PaymentAttemptStatus.REFUNDED) {
+            return WebhookOutcome.IDEMPOTENT;
+        }
+        if (claim.state() == PaymentAttemptStatus.MANUAL_REVIEW) {
+            paymentAttemptService.preserveReviewEvidence(claim.attemptId(), charge.getId());
+            return WebhookOutcome.MANUAL_REVIEW;
         }
         try {
             if (claim.state() == PaymentAttemptStatus.PROCESSING
@@ -335,72 +502,128 @@ public class PaymentWebhookService {
                 // A refund cannot arrive before the charge is recorded; keep the
                 // state forward-only and let an operator reconcile.
                 paymentAttemptService.markManualReview(claim.attemptId(), "refund_before_charge");
-                return;
+                return WebhookOutcome.MANUAL_REVIEW;
             }
             paymentAttemptService.recordRefunded(claim.attemptId(), charge.getId());
         } catch (PaymentStateException ex) {
             LOG.warn("Webhook charge.refunded could not be applied to attempt {}: {}",
                     claim.attemptId(), ex.getMessage());
+            try {
+                paymentAttemptService.preserveReviewEvidence(claim.attemptId(), charge.getId());
+                paymentAttemptService.markManualReview(claim.attemptId(), "refund_state_conflict");
+            } catch (RuntimeException reviewError) {
+                throw reviewError;
+            }
+            return WebhookOutcome.MANUAL_REVIEW;
         }
+        return WebhookOutcome.APPLIED;
     }
 
-    private void handleDispute(Event event) {
+    private WebhookOutcome handleDispute(Event event) {
         StripeObject object = deserialize(event);
         if (!(object instanceof Dispute dispute) || dispute.getCharge() == null) {
-            return;
+            return WebhookOutcome.UNSUPPORTED;
         }
         PaymentClaim claim = paymentAttemptService.findByProviderCharge(dispute.getCharge());
         if (claim == null) {
             LOG.warn("Dispute for unknown charge {} could not be mapped to an attempt",
                     dispute.getCharge());
-            return;
+            return WebhookOutcome.IGNORED_UNKNOWN;
         }
         try {
             paymentAttemptService.markManualReview(claim.attemptId(), "stripe_dispute");
         } catch (PaymentStateException ex) {
             LOG.warn("Webhook dispute could not be applied to attempt {}: {}",
                     claim.attemptId(), ex.getMessage());
+            return WebhookOutcome.MANUAL_REVIEW;
         }
+        return WebhookOutcome.MANUAL_REVIEW;
     }
 
-    private PaymentClaim resolveAttempt(Charge charge) {
-        if (charge.getId() != null) {
-            PaymentClaim byCharge = paymentAttemptService.findByProviderCharge(charge.getId());
-            if (byCharge != null) {
-                return verifyEconomics(byCharge, charge);
-            }
-        }
+    /**
+     * Strict resolution of a verified charge to a stored attempt. Economics
+     * require a non-null exact amount and exact currency equality; checkout
+     * metadata linkage must match the stored attempt; a different charge id
+     * for the same checkout fails closed into manual review without touching
+     * any other attempt.
+     */
+    private ChargeResolution resolveAttemptStrict(Charge charge) {
+        String chargeId = charge.getId();
         String metadataCheckoutId = charge.getMetadata() == null
                 ? null
                 : charge.getMetadata().get(StripePaymentGatewayImpl.CHECKOUT_ID_METADATA_KEY);
-        if (metadataCheckoutId == null) {
-            LOG.warn("Stripe charge {} is not linked to a known attempt or checkout", charge.getId());
-            return null;
+        UUID metadataCheckout = null;
+        if (metadataCheckoutId != null) {
+            try {
+                metadataCheckout = UUID.fromString(metadataCheckoutId);
+            } catch (IllegalArgumentException ex) {
+                LOG.warn("Stripe charge {} carries an unparsable checkout linkage", chargeId);
+                return new ChargeResolution.Unknown();
+            }
         }
-        UUID checkoutId;
-        try {
-            checkoutId = UUID.fromString(metadataCheckoutId);
-        } catch (IllegalArgumentException ex) {
-            return null;
+        PaymentClaim byCharge = null;
+        if (chargeId != null) {
+            byCharge = paymentAttemptService.findByProviderCharge(chargeId);
         }
-        PaymentClaim claim = paymentAttemptService.findByCheckoutId(checkoutId);
+        PaymentClaim byCheckout = null;
+        if (metadataCheckout != null) {
+            byCheckout = paymentAttemptService.findByCheckoutId(metadataCheckout);
+        }
+        if (byCharge != null && byCheckout != null
+                && !byCharge.attemptId().equals(byCheckout.attemptId())) {
+            // The same checkout now claims a different charge, or the charge
+            // belongs to another attempt: fail closed on the checkout attempt
+            // without using the signed event to overwrite the other attempt.
+            failClosedConflict(byCheckout.attemptId(), chargeId, "conflicting_provider_charge");
+            return new ChargeResolution.Reviewed();
+        }
+        PaymentClaim claim = byCharge != null ? byCharge : byCheckout;
         if (claim == null) {
-            return null;
+            LOG.warn("Stripe charge {} is not linked to a known attempt or checkout", chargeId);
+            return new ChargeResolution.Unknown();
         }
-        return verifyEconomics(claim, charge);
-    }
-
-    private PaymentClaim verifyEconomics(PaymentClaim claim, Charge charge) {
-        boolean amountMatches = Objects.equals(claim.amountMinor(), charge.getAmount());
-        boolean currencyMatches = claim.currency() == null || charge.getCurrency() == null
-                || claim.currency().equalsIgnoreCase(charge.getCurrency());
-        if (!amountMatches || !currencyMatches) {
+        if (metadataCheckout != null && !metadataCheckout.equals(claim.checkoutId())) {
+            failClosedConflict(claim.attemptId(), chargeId, "provider_checkout_mismatch");
+            return new ChargeResolution.Reviewed();
+        }
+        if (!economicsMatch(claim, charge)) {
             LOG.error("Stripe event economics do not match attempt {}; moving to manual review",
                     claim.attemptId());
-            paymentAttemptService.markManualReview(claim.attemptId(), "provider_amount_mismatch");
-            return null;
+            failClosedConflict(claim.attemptId(), chargeId, "provider_amount_mismatch");
+            return new ChargeResolution.Reviewed();
         }
-        return claim;
+        return new ChargeResolution.Mapped(claim);
+    }
+
+    private void failClosedConflict(UUID attemptId, String chargeId, String reason) {
+        try {
+            paymentAttemptService.preserveReviewEvidence(attemptId, chargeId);
+        } catch (RuntimeException ex) {
+            // Evidence attach is best-effort; the review transition below must
+            // still commit. A transient failure here propagates as retryable.
+            if (!(ex instanceof PaymentStateException)) {
+                throw ex;
+            }
+        }
+        paymentAttemptService.markManualReview(attemptId, reason);
+    }
+
+    /**
+     * Exact economic equality: a missing/null amount or currency on either
+     * side never counts as a match.
+     */
+    private boolean economicsMatch(PaymentClaim claim, Charge charge) {
+        Long chargeAmount = charge.getAmount();
+        String chargeCurrency = charge.getCurrency();
+        if (chargeAmount == null || chargeCurrency == null || chargeCurrency.isBlank()) {
+            return false;
+        }
+        String claimCurrency = claim.currency();
+        if (claimCurrency == null || claimCurrency.isBlank()) {
+            return false;
+        }
+        return chargeAmount.longValue() == claim.amountMinor()
+                && claimCurrency.equalsIgnoreCase(chargeCurrency);
     }
 
     private Charge chargeOf(Event event) {

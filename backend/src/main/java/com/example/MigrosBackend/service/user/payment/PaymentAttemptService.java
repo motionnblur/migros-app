@@ -206,6 +206,23 @@ public class PaymentAttemptService {
      * forward-only transition. Any mismatch fails closed into manual review;
      * a conflicting provider charge id never overwrites durable state.
      *
+     * <p>Reverse out-of-order policy for a verified success:
+     * <ul>
+     *   <li>{@code PROCESSING}/{@code CREATED} plus matching success: record
+     *   the charge and finalize normally.</li>
+     *   <li>{@code CHARGE_SUCCEEDED}/{@code ORDER_FINALIZED} plus the same
+     *   charge: idempotent replay, history preserved.</li>
+     *   <li>{@code REFUNDED} plus the same charge: preserve the refund state
+     *   and complete as an idempotent historical success.</li>
+     *   <li>{@code FAILED_FINAL} plus provider success: record a sanitized
+     *   conflict and move to {@code MANUAL_REVIEW}; never silently discard,
+     *   never auto-fulfill, never release stock again.</li>
+     *   <li>{@code MANUAL_REVIEW}: preserve the review state and attach
+     *   sanitized provider linkage without erasing the existing reason.</li>
+     *   <li>A different charge id for the same checkout always fails closed
+     *   into manual review without overwriting the canonical charge id.</li>
+     * </ul>
+     *
      * <p>Like the worker success path, the manual-review transition is
      * committed even though the method throws to signal failure, hence
      * {@code noRollbackFor}; every other throw happens before any mutation.
@@ -233,6 +250,7 @@ public class PaymentAttemptService {
                     "Provider charge amount or currency does not match the attempt");
         }
         if (attempt.getStripeChargeId() != null && !attempt.getStripeChargeId().equals(chargeId)) {
+            attachConflictEvidence(attempt, chargeId);
             reject(attempt, PaymentAttemptStatus.MANUAL_REVIEW,
                     "Conflicting provider charge ids for the same attempt");
         }
@@ -242,6 +260,54 @@ public class PaymentAttemptService {
                 || state == PaymentAttemptStatus.ORDER_FINALIZED) {
             if (attempt.getStripeChargeId() == null) {
                 attempt.setStripeChargeId(chargeId);
+            }
+            if (attempt.getProviderStatus() == null) {
+                attempt.setProviderStatus("succeeded");
+            }
+            save(attempt);
+            return toStatus(attempt);
+        }
+        if (state == PaymentAttemptStatus.REFUNDED) {
+            // Historical success for an already-refunded charge: preserve the
+            // refund state (refund id, status) and complete idempotently. A
+            // different charge id was already rejected above, so reaching here
+            // means the same charge or no canonical charge yet.
+            if (attempt.getStripeChargeId() == null) {
+                attempt.setStripeChargeId(chargeId);
+            }
+            if (attempt.getProviderStatus() == null) {
+                attempt.setProviderStatus("succeeded");
+            }
+            save(attempt);
+            return toStatus(attempt);
+        }
+        if (state == PaymentAttemptStatus.MANUAL_REVIEW) {
+            // Preserve the existing review reason; only attach sanitized
+            // provider linkage for reconciliation.
+            attachConflictEvidence(attempt, chargeId);
+            save(attempt);
+            return toStatus(attempt);
+        }
+        if (state == PaymentAttemptStatus.FAILED_FINAL) {
+            // Contradictory provider evidence: money may have moved after the
+            // application released stock and cancelled the checkout. Record a
+            // sanitized conflict and surface for manual review. Never record
+            // as a charge, never fulfill, never release stock again.
+            if (attempt.getStripeChargeId() == null) {
+                attempt.setStripeChargeId(chargeId);
+                attempt.setProviderStatus("succeeded");
+            } else {
+                attachConflictEvidence(attempt, chargeId);
+            }
+            reject(attempt, PaymentAttemptStatus.MANUAL_REVIEW,
+                    "late_success_after_failure");
+        }
+        if (state == PaymentAttemptStatus.REFUND_PENDING) {
+            // A durable charge already exists and a refund is in flight: the
+            // same charge is an idempotent preserve, anything else was already
+            // rejected above as a conflict.
+            if (attempt.getProviderStatus() == null) {
+                attempt.setProviderStatus("succeeded");
             }
             save(attempt);
             return toStatus(attempt);
@@ -261,12 +327,12 @@ public class PaymentAttemptService {
     /**
      * Request-worker transition: marks the order finalized. Only the current
      * lease holder may complete finalization; a stale token is rejected
-     * without touching attempt, order, or lease state.
+     * without touching attempt, order, or lease state. Locks are acquired
+     * checkout-first to match the claim path.
      */
     @Transactional
     public void markOrderFinalized(UUID attemptId, String leaseOwner) {
-        PaymentAttemptEntity attempt = paymentAttemptEntityRepository.findByIdForUpdate(attemptId)
-                .orElseThrow(PaymentAttemptNotFoundException::new);
+        PaymentAttemptEntity attempt = lockAttemptWithCheckoutFirst(attemptId);
         if (attempt.getStatus() == PaymentAttemptStatus.ORDER_FINALIZED) {
             return;
         }
@@ -285,12 +351,12 @@ public class PaymentAttemptService {
      * converges an already-charged attempt to finalized without a worker
      * token. Forward-only — it can never regress or overwrite newer durable
      * state — and it fails closed when the charge id disagrees with the
-     * recorded charge.
+     * recorded charge. Locks are acquired checkout-first to match the claim
+     * path.
      */
     @Transactional
     public void markProviderFinalized(UUID attemptId, String chargeId) {
-        PaymentAttemptEntity attempt = paymentAttemptEntityRepository.findByIdForUpdate(attemptId)
-                .orElseThrow(PaymentAttemptNotFoundException::new);
+        PaymentAttemptEntity attempt = lockAttemptWithCheckoutFirst(attemptId);
         if (attempt.getStatus() == PaymentAttemptStatus.ORDER_FINALIZED) {
             return;
         }
@@ -394,6 +460,29 @@ public class PaymentAttemptService {
         clearLease(attempt);
         transition(attempt, PaymentAttemptStatus.MANUAL_REVIEW);
         save(attempt);
+    }
+
+    /**
+     * Attaches sanitized provider linkage to an attempt already in
+     * {@code MANUAL_REVIEW} without erasing the existing review reason.
+     * When the canonical charge id is still empty the late charge is stored
+     * as the linkage; when it differs the conflict is recorded in
+     * {@code provider_status} (sanitized, length-bounded) so the canonical id
+     * is never overwritten. Never changes status, error code, lease, order,
+     * or stock state.
+     */
+    @Transactional
+    public void preserveReviewEvidence(UUID attemptId, String chargeId) {
+        if (chargeId == null || chargeId.isBlank()) {
+            return;
+        }
+        PaymentAttemptEntity attempt = paymentAttemptEntityRepository.findByIdForUpdate(attemptId)
+                .orElseThrow(PaymentAttemptNotFoundException::new);
+        boolean changed = attachConflictEvidence(attempt, chargeId);
+        if (changed) {
+            attempt.setUpdatedAt(LocalDateTime.now());
+            save(attempt);
+        }
     }
 
     @Transactional
@@ -618,6 +707,37 @@ public class PaymentAttemptService {
         transition(attempt, next);
         save(attempt);
         throw new PaymentStateException(reason);
+    }
+
+    /**
+     * Records sanitized provider linkage without overwriting the canonical
+     * charge id. Returns true when the entity was mutated.
+     */
+    private boolean attachConflictEvidence(PaymentAttemptEntity attempt, String chargeId) {
+        if (chargeId == null || chargeId.isBlank()) {
+            return false;
+        }
+        String stored = attempt.getStripeChargeId();
+        if (stored == null || stored.isBlank()) {
+            attempt.setStripeChargeId(chargeId);
+            if (attempt.getProviderStatus() == null) {
+                attempt.setProviderStatus("succeeded");
+            }
+            return true;
+        }
+        if (stored.equals(chargeId)) {
+            if (attempt.getProviderStatus() == null) {
+                attempt.setProviderStatus("succeeded");
+                return true;
+            }
+            return false;
+        }
+        String conflict = sanitizeCode("conflict:" + chargeId.trim());
+        if (!conflict.equals(attempt.getProviderStatus())) {
+            attempt.setProviderStatus(conflict);
+            return true;
+        }
+        return false;
     }
 
     private void save(PaymentAttemptEntity attempt) {

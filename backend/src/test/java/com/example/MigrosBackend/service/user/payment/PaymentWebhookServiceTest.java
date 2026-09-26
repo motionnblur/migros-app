@@ -4,6 +4,7 @@ import com.example.MigrosBackend.dto.payment.PaymentClaim;
 import com.example.MigrosBackend.dto.payment.PaymentClaimDecision;
 import com.example.MigrosBackend.entity.payment.PaymentAttemptStatus;
 import com.example.MigrosBackend.service.user.payment.StripeEventStore.ReceiveOutcome;
+import com.example.MigrosBackend.service.user.payment.StripeEventStore.InboxTransition;
 import com.example.MigrosBackend.service.user.payment.StripeEventStore.StoredEvent;
 import com.stripe.model.Charge;
 import com.stripe.model.Event;
@@ -45,7 +46,14 @@ class PaymentWebhookServiceTest {
     @BeforeEach
     void stubCompletion() {
         org.mockito.Mockito.lenient()
-                .when(stripeEventStore.markProcessed(anyString(), any())).thenReturn(true);
+                .when(stripeEventStore.markProcessed(anyString(), anyString(), any()))
+                .thenReturn(InboxTransition.APPLIED);
+        org.mockito.Mockito.lenient()
+                .when(stripeEventStore.markFailed(anyString(), anyString(), anyString(), any()))
+                .thenReturn(InboxTransition.APPLIED);
+        org.mockito.Mockito.lenient()
+                .when(stripeEventStore.markExhaustedReview(anyString(), anyString(), anyString()))
+                .thenReturn(InboxTransition.APPLIED);
     }
 
     private PaymentWebhookService service() {
@@ -61,7 +69,7 @@ class PaymentWebhookServiceTest {
     }
 
     private StoredEvent claimed(String eventId, String type) {
-        return new StoredEvent(eventId, type, null, "hash", "PROCESSING", 1);
+        return new StoredEvent(eventId, type, null, "hash", "PROCESSING", 1, "lease-" + eventId);
     }
 
     @Test
@@ -81,7 +89,7 @@ class PaymentWebhookServiceTest {
         verify(stripeEventStore, times(2)).receive(eq("evt_duplicate"), eq("unhandled.event"),
                 any(), anyString(), any());
         verify(stripeEventStore, times(1)).tryClaim(eq("evt_duplicate"), anyString(), any(), anyLong());
-        verify(stripeEventStore, times(1)).markProcessed(eq("evt_duplicate"), any());
+        verify(stripeEventStore, times(1)).markProcessed(eq("evt_duplicate"), anyString(), any());
         verify(paymentAttemptService, never()).recordProviderChargeSuccess(
                 any(), any(), any(), any(), any());
     }
@@ -96,7 +104,7 @@ class PaymentWebhookServiceTest {
 
         webhookService.handle(event, "{\"tampered\":true}");
 
-        verify(stripeEventStore).markManualReview("evt_collision", "event_id_collision");
+        verify(stripeEventStore).markProviderCollisionReview("evt_collision", "event_id_collision");
         verify(stripeEventStore, never()).tryClaim(anyString(), anyString(), any(), anyLong());
         verify(paymentAttemptService, never()).recordProviderChargeSuccess(
                 any(), any(), any(), any(), any());
@@ -115,7 +123,7 @@ class PaymentWebhookServiceTest {
 
         webhookService.handle(event, "{}");
 
-        verify(stripeEventStore, never()).markProcessed(anyString(), any());
+        verify(stripeEventStore, never()).markProcessed(anyString(), anyString(), any());
         verify(paymentAttemptService, never()).recordProviderChargeSuccess(
                 any(), any(), any(), any(), any());
         verify(paymentFinalizationService, never()).finalizeProviderOrder(any(), any(), anyString());
@@ -156,7 +164,81 @@ class PaymentWebhookServiceTest {
         verify(paymentAttemptService).recordProviderChargeSuccess(
                 attemptId, "ch_1", 1000L, "try", checkoutId);
         verify(paymentFinalizationService).finalizeProviderOrder(attemptId, checkoutId, "ch_1");
-        verify(stripeEventStore).markProcessed(eq("evt_1"), any());
+        verify(stripeEventStore).markProcessed(eq("evt_1"), anyString(), any());
+    }
+
+    @Test
+    void completionPresentsTheClaimToken() {
+        PaymentWebhookService webhookService = service();
+        Event event = event("evt_token", "unhandled.event");
+        when(stripeEventStore.receive(eq("evt_token"), eq("unhandled.event"),
+                any(), anyString(), any()))
+                .thenReturn(ReceiveOutcome.RECEIVED_NEW);
+        when(stripeEventStore.tryClaim(eq("evt_token"), anyString(), any(), anyLong()))
+                .thenReturn(Optional.of(claimed("evt_token", "unhandled.event")));
+
+        webhookService.handle(event, "{}");
+
+        verify(stripeEventStore).markProcessed(eq("evt_token"), eq("lease-evt_token"), any());
+    }
+
+    @Test
+    void staleCompletionStepsAsideWithoutAnError() {
+        PaymentWebhookService webhookService = service();
+        Event event = event("evt_stale_done", "unhandled.event");
+        when(stripeEventStore.receive(eq("evt_stale_done"), eq("unhandled.event"),
+                any(), anyString(), any()))
+                .thenReturn(ReceiveOutcome.RECEIVED_NEW);
+        when(stripeEventStore.tryClaim(eq("evt_stale_done"), anyString(), any(), anyLong()))
+                .thenReturn(Optional.of(claimed("evt_stale_done", "unhandled.event")));
+        when(stripeEventStore.markProcessed(eq("evt_stale_done"), anyString(), any()))
+                .thenReturn(InboxTransition.STALE_CLAIM);
+
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> webhookService.handle(event, "{}"));
+
+        verify(stripeEventStore).markProcessed(eq("evt_stale_done"), eq("lease-evt_stale_done"), any());
+    }
+
+    @Test
+    void staleFailureStepsAsideWithoutAnError() {
+        PaymentWebhookService webhookService = service();
+        UUID checkoutId = UUID.randomUUID();
+        UUID attemptId = UUID.randomUUID();
+        Charge charge = new Charge();
+        charge.setId("ch_stale_fail");
+        charge.setAmount(1000L);
+        charge.setCurrency("try");
+        Map<String, String> metadata = new HashMap<>();
+        metadata.put("checkout_id", checkoutId.toString());
+        charge.setMetadata(metadata);
+
+        Event event = event("evt_stale_fail", "charge.succeeded");
+        EventDataObjectDeserializer deserializer = mock(EventDataObjectDeserializer.class);
+        when(event.getDataObjectDeserializer()).thenReturn(deserializer);
+        when(deserializer.getObject()).thenReturn(Optional.of(charge));
+        when(stripeEventStore.receive(eq("evt_stale_fail"), eq("charge.succeeded"),
+                any(), anyString(), any()))
+                .thenReturn(ReceiveOutcome.RECEIVED_NEW);
+        when(stripeEventStore.tryClaim(eq("evt_stale_fail"), anyString(), any(), anyLong()))
+                .thenReturn(Optional.of(claimed("evt_stale_fail", "charge.succeeded")));
+
+        PaymentClaim claim = new PaymentClaim(PaymentClaimDecision.PROCEED, attemptId, checkoutId,
+                "checkout:" + checkoutId + ":charge-v1", 1000L, "try", null, null,
+                PaymentAttemptStatus.PROCESSING);
+        when(paymentAttemptService.findByProviderCharge("ch_stale_fail")).thenReturn(null);
+        when(paymentAttemptService.findByCheckoutId(checkoutId)).thenReturn(claim);
+        org.mockito.Mockito.doThrow(new RuntimeException("boom"))
+                .when(paymentAttemptService).recordProviderChargeSuccess(
+                        any(), any(), any(), any(), any());
+        when(stripeEventStore.markFailed(eq("evt_stale_fail"), anyString(), anyString(), any()))
+                .thenReturn(InboxTransition.STALE_CLAIM);
+
+        // A reclaimed worker must step aside instead of asking Stripe for a
+        // destructive redelivery loop.
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> webhookService.handle(event, "{}"));
+
+        verify(stripeEventStore).markFailed(
+                eq("evt_stale_fail"), eq("lease-evt_stale_fail"), anyString(), any());
     }
 
     @Test

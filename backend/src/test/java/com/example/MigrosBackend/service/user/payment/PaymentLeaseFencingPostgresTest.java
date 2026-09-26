@@ -109,6 +109,8 @@ class PaymentLeaseFencingPostgresTest {
     @Autowired
     private PaymentWebhookService paymentWebhookService;
     @Autowired
+    private PaymentFinalizationService paymentFinalizationService;
+    @Autowired
     private TokenService tokenService;
     @Autowired
     private UserEntityRepository userEntityRepository;
@@ -470,6 +472,180 @@ class PaymentLeaseFencingPostgresTest {
         assertThrows(StalePaymentLeaseException.class,
                 () -> paymentAttemptService.recordChargeSuccess(attemptId, oldLease, "ch_stale"));
         assertEquals(PaymentAttemptStatus.ORDER_FINALIZED, reload(attemptId).getStatus());
+    }
+
+    @Test
+    void staleWorkerFinalizationViaServiceChangesNothing() {
+        Fixture fixture = ambiguousFixture("svc-stale@migros.com");
+        PaymentClaim chargeLease = reclaim(fixture);
+        paymentAttemptService.recordChargeSuccess(
+                fixture.attemptId(), chargeLease.leaseOwner(), "ch_svc_stale");
+        String staleLease = chargeLease.leaseOwner();
+        int stockBefore = stockOf(fixture.productId());
+
+        expireLease(fixture.attemptId());
+        PaymentClaim freshLease = paymentAttemptService.claim(
+                fixture.token(), fixture.checkoutId(),
+                ChargeIdempotencyKeys.forCheckout(fixture.checkoutId()));
+        assertEquals(PaymentClaimDecision.FINALIZE, freshLease.decision());
+
+        boolean finalized = paymentFinalizationService.finalizeOrder(
+                fixture.attemptId(), fixture.checkoutId(), "ch_svc_stale", staleLease);
+
+        assertFalse(finalized, "a stale worker must be fenced out before any side effect");
+        PaymentAttemptEntity attempt = reload(fixture.attemptId());
+        assertEquals(PaymentAttemptStatus.CHARGE_SUCCEEDED, attempt.getStatus());
+        assertEquals("ch_svc_stale", attempt.getStripeChargeId());
+        assertEquals(freshLease.leaseOwner(), attempt.getLeaseOwner(),
+                "a stale worker must not clear or overwrite the current lease");
+        assertEquals("PAYMENT_PROCESSING",
+                checkoutService.getCheckout(fixture.token(), fixture.checkoutId()).status());
+        assertTrue(orderGroupEntityRepository.findAll().isEmpty());
+        assertTrue(orderEntityRepository.findAll().isEmpty());
+        assertEquals(stockBefore, stockOf(fixture.productId()));
+    }
+
+    @Test
+    void nullAndBlankWorkerTokenFinalizationChangesNothing() {
+        Fixture fixture = ambiguousFixture("svc-tokens@migros.com");
+        PaymentClaim chargeLease = reclaim(fixture);
+        paymentAttemptService.recordChargeSuccess(
+                fixture.attemptId(), chargeLease.leaseOwner(), "ch_svc_tokens");
+        String currentLease = storedLease(fixture.attemptId());
+        int stockBefore = stockOf(fixture.productId());
+
+        assertThrows(PaymentStateException.class, () -> paymentFinalizationService.finalizeOrder(
+                fixture.attemptId(), fixture.checkoutId(), "ch_svc_tokens", null));
+        assertThrows(PaymentStateException.class, () -> paymentFinalizationService.finalizeOrder(
+                fixture.attemptId(), fixture.checkoutId(), "ch_svc_tokens", "   "));
+
+        PaymentAttemptEntity attempt = reload(fixture.attemptId());
+        assertEquals(PaymentAttemptStatus.CHARGE_SUCCEEDED, attempt.getStatus());
+        assertEquals(currentLease, attempt.getLeaseOwner());
+        assertEquals("PAYMENT_PROCESSING",
+                checkoutService.getCheckout(fixture.token(), fixture.checkoutId()).status());
+        assertTrue(orderGroupEntityRepository.findAll().isEmpty());
+        assertEquals(stockBefore, stockOf(fixture.productId()));
+    }
+
+    @Test
+    void currentWorkerTokenFinalizesExactlyOnce() {
+        Fixture fixture = ambiguousFixture("svc-current@migros.com");
+        PaymentClaim chargeLease = reclaim(fixture);
+        paymentAttemptService.recordChargeSuccess(
+                fixture.attemptId(), chargeLease.leaseOwner(), "ch_svc_current");
+        expireLease(fixture.attemptId());
+        PaymentClaim finalizeLease = paymentAttemptService.claim(
+                fixture.token(), fixture.checkoutId(),
+                ChargeIdempotencyKeys.forCheckout(fixture.checkoutId()));
+
+        assertTrue(paymentFinalizationService.finalizeOrder(
+                fixture.attemptId(), fixture.checkoutId(), "ch_svc_current",
+                finalizeLease.leaseOwner()));
+        // Idempotent replay converges without a second order.
+        assertTrue(paymentFinalizationService.finalizeOrder(
+                fixture.attemptId(), fixture.checkoutId(), "ch_svc_current",
+                finalizeLease.leaseOwner()));
+
+        assertEquals(PaymentAttemptStatus.ORDER_FINALIZED, reload(fixture.attemptId()).getStatus());
+        assertEquals("CONSUMED",
+                checkoutService.getCheckout(fixture.token(), fixture.checkoutId()).status());
+        assertEquals(1, orderGroupEntityRepository.findAll().size());
+        assertEquals(1, orderEntityRepository.findAll().size());
+    }
+
+    @Test
+    void twoWorkersFinalizingConvergeOnOneOrderWithoutDeadlock() throws Exception {
+        Fixture fixture = ambiguousFixture("svc-race@migros.com");
+        PaymentClaim chargeLease = reclaim(fixture);
+        paymentAttemptService.recordChargeSuccess(
+                fixture.attemptId(), chargeLease.leaseOwner(), "ch_svc_race");
+        String firstLease = chargeLease.leaseOwner();
+        expireLease(fixture.attemptId());
+        PaymentClaim secondLease = paymentAttemptService.claim(
+                fixture.token(), fixture.checkoutId(),
+                ChargeIdempotencyKeys.forCheckout(fixture.checkoutId()));
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        CountDownLatch gate = new CountDownLatch(1);
+        try {
+            Future<Boolean> staleOutcome = pool.submit(() -> {
+                gate.await(30, TimeUnit.SECONDS);
+                return paymentFinalizationService.finalizeOrder(
+                        fixture.attemptId(), fixture.checkoutId(), "ch_svc_race", firstLease);
+            });
+            Future<Boolean> freshOutcome = pool.submit(() -> {
+                gate.await(30, TimeUnit.SECONDS);
+                return paymentFinalizationService.finalizeOrder(
+                        fixture.attemptId(), fixture.checkoutId(), "ch_svc_race",
+                        secondLease.leaseOwner());
+            });
+            gate.countDown();
+            boolean staleResult = staleOutcome.get(30, TimeUnit.SECONDS);
+            boolean freshResult = freshOutcome.get(30, TimeUnit.SECONDS);
+            assertTrue(staleResult != freshResult || (staleResult && freshResult),
+                    "exactly one worker must win, or the loser must converge idempotently");
+            assertFalse(!staleResult && !freshResult, "at least one finalization must succeed");
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertEquals(PaymentAttemptStatus.ORDER_FINALIZED, reload(fixture.attemptId()).getStatus());
+        assertEquals(1, orderGroupEntityRepository.findAll().size());
+        assertEquals(1, orderEntityRepository.findAll().size());
+    }
+
+    @Test
+    void finalizationFailureRollsBackOrderAndAttemptTogether() {
+        Fixture fixture = ambiguousFixture("svc-rollback@migros.com");
+        PaymentClaim chargeLease = reclaim(fixture);
+        paymentAttemptService.recordChargeSuccess(
+                fixture.attemptId(), chargeLease.leaseOwner(), "ch_svc_rollback");
+        // Break the checkout snapshot so order creation fails after the lease
+        // fence has passed: the attempt transition must roll back with it.
+        jdbcTemplate.update("DELETE FROM checkout_item_entity WHERE checkout_id = ?",
+                fixture.checkoutId());
+
+        boolean finalized = paymentFinalizationService.finalizeOrder(
+                fixture.attemptId(), fixture.checkoutId(), "ch_svc_rollback",
+                chargeLease.leaseOwner());
+
+        assertFalse(finalized);
+        assertEquals(PaymentAttemptStatus.CHARGE_SUCCEEDED, reload(fixture.attemptId()).getStatus());
+        assertTrue(orderGroupEntityRepository.findAll().isEmpty());
+        assertTrue(orderEntityRepository.findAll().isEmpty());
+    }
+
+    @Test
+    void providerFinalizationIsIdempotentWithoutWorkerToken() {
+        Fixture fixture = ambiguousFixture("svc-provider@migros.com");
+        PaymentClaim chargeLease = reclaim(fixture);
+        paymentAttemptService.recordChargeSuccess(
+                fixture.attemptId(), chargeLease.leaseOwner(), "ch_svc_provider");
+
+        assertTrue(paymentFinalizationService.finalizeProviderOrder(
+                fixture.attemptId(), fixture.checkoutId(), "ch_svc_provider"));
+        assertTrue(paymentFinalizationService.finalizeProviderOrder(
+                fixture.attemptId(), fixture.checkoutId(), "ch_svc_provider"));
+
+        assertEquals(PaymentAttemptStatus.ORDER_FINALIZED, reload(fixture.attemptId()).getStatus());
+        assertEquals(1, orderGroupEntityRepository.findAll().size());
+        assertEquals(1, orderEntityRepository.findAll().size());
+    }
+
+    @Test
+    void repeatedStatusRecoveryCreatesAtMostOneOrder() {
+        Fixture fixture = ambiguousFixture("svc-status@migros.com");
+        PaymentClaim chargeLease = reclaim(fixture);
+        paymentAttemptService.recordChargeSuccess(
+                fixture.attemptId(), chargeLease.leaseOwner(), "ch_svc_status");
+
+        userPaymentService.getPaymentStatus(fixture.token(), fixture.checkoutId());
+        userPaymentService.getPaymentStatus(fixture.token(), fixture.checkoutId());
+
+        assertEquals(PaymentAttemptStatus.ORDER_FINALIZED, reload(fixture.attemptId()).getStatus());
+        assertEquals(1, orderGroupEntityRepository.findAll().size());
+        assertEquals(1, orderEntityRepository.findAll().size());
     }
 
     private Fixture ambiguousFixture(String mail) {

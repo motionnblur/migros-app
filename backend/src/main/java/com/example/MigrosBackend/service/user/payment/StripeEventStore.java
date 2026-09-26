@@ -43,8 +43,28 @@ public class StripeEventStore {
         CONFLICT
     }
 
+    /**
+     * Typed outcome for every worker-owned inbox transition. The lease owner
+     * acts as a fencing token: only the current claimant may move the row.
+     * A zero-row conditional update is reported as {@code STALE_CLAIM}, never
+     * as success, so an expired worker can never overwrite a newer claim.
+     */
+    public enum InboxTransition {
+        /** The conditional update matched the current lease token. */
+        APPLIED,
+        /** The token was null/blank, wrong, or the row was no longer
+         * claimable by this worker. No inbox field was changed. */
+        STALE_CLAIM
+    }
+
     public record StoredEvent(String eventId, String eventType, String payload,
-                              String payloadHash, String status, int attemptCount) {
+                              String payloadHash, String status, int attemptCount,
+                              String leaseOwner) {
+        /** Convenience for call sites that do not hold a claim token. */
+        public StoredEvent(String eventId, String eventType, String payload,
+                           String payloadHash, String status, int attemptCount) {
+            this(eventId, eventType, payload, payloadHash, status, attemptCount, null);
+        }
     }
 
     private static final RowMapper<StoredEvent> STORED_EVENT_MAPPER = new RowMapper<>() {
@@ -56,7 +76,8 @@ public class StripeEventStore {
                     rs.getString("payload"),
                     rs.getString("payload_hash"),
                     rs.getString("status"),
-                    rs.getInt("attempt_count"));
+                    rs.getInt("attempt_count"),
+                    rs.getString("lease_owner"));
         }
     };
 
@@ -99,14 +120,21 @@ public class StripeEventStore {
     }
 
     /**
-     * Atomically claims a reclaimable event for one worker. Succeeds for
+     * Atomically claims a reclaimable event for one worker. The caller must
+     * generate the {@code leaseOwner} fencing token before calling and retain
+     * it: it is returned as part of the claimed event and must be presented
+     * to every worker-owned transition ({@code markProcessed},
+     * {@code markFailed}, {@code markExhaustedReview}). Succeeds for
      * {@code RECEIVED} rows, {@code PROCESSING} rows whose lease expired, and
      * {@code FAILED} rows whose next attempt is due. Returns the stored event
-     * (with the incremented attempt count) or empty when another worker holds
-     * a valid lease.
+     * (with the incremented attempt count and the new owner) or empty when
+     * another worker holds a valid lease.
      */
     public Optional<StoredEvent> tryClaim(String eventId, String leaseOwner,
                                           LocalDateTime now, long leaseSeconds) {
+        if (leaseOwner == null || leaseOwner.isBlank()) {
+            throw new IllegalArgumentException("claim requires a non-blank lease owner token");
+        }
         Timestamp leaseExpires = Timestamp.valueOf(now.plusSeconds(leaseSeconds));
         Timestamp nowTs = Timestamp.valueOf(now);
         List<StoredEvent> claimed = jdbcTemplate.query(
@@ -119,54 +147,111 @@ public class StripeEventStore {
                         + "AND (lease_expires_at IS NULL OR lease_expires_at <= ?)) "
                         + "OR (status = 'FAILED' "
                         + "AND (next_attempt_at IS NULL OR next_attempt_at <= ?))) "
-                        + "RETURNING event_id, event_type, payload, payload_hash, status, attempt_count",
+                        + "RETURNING event_id, event_type, payload, payload_hash, status, "
+                        + "attempt_count, lease_owner",
                 STORED_EVENT_MAPPER, leaseOwner, leaseExpires, nowTs, eventId, nowTs, nowTs);
         return claimed.stream().findFirst();
     }
 
     public Optional<StoredEvent> findStored(String eventId) {
         List<StoredEvent> rows = jdbcTemplate.query(
-                "SELECT event_id, event_type, payload, payload_hash, status, attempt_count "
-                        + "FROM stripe_event_entity WHERE event_id = ?",
+                "SELECT event_id, event_type, payload, payload_hash, status, attempt_count, "
+                        + "lease_owner FROM stripe_event_entity WHERE event_id = ?",
                 STORED_EVENT_MAPPER, eventId);
         return rows.stream().findFirst();
     }
 
     /**
-     * Marks the event durably complete. Only a {@code PROCESSING} row can
-     * become {@code PROCESSED} so a late completion can never clobber a
-     * manual-review decision.
+     * Marks the event durably complete. Fenced: requires the row to be
+     * {@code PROCESSING} under the caller's lease token. A stale worker
+     * (reclaimed lease, wrong token, or null/blank token) changes nothing —
+     * not status, timestamps, nor the newer lease — and receives
+     * {@code STALE_CLAIM}. A late completion can therefore never clobber a
+     * manual-review decision or a newer claim.
      */
-    public boolean markProcessed(String eventId, LocalDateTime processedAt) {
+    public InboxTransition markProcessed(String eventId, String leaseOwner,
+                                         LocalDateTime processedAt) {
+        if (leaseOwner == null || leaseOwner.isBlank()) {
+            return InboxTransition.STALE_CLAIM;
+        }
         return jdbcTemplate.update(
                 "UPDATE stripe_event_entity SET status = 'PROCESSED', processed_at = ?, "
                         + "lease_owner = NULL, lease_expires_at = NULL "
-                        + "WHERE event_id = ? AND status = 'PROCESSING'",
-                Timestamp.valueOf(processedAt), eventId) == 1;
+                        + "WHERE event_id = ? AND status = 'PROCESSING' "
+                        + "AND lease_owner = ?",
+                Timestamp.valueOf(processedAt), eventId, leaseOwner) == 1
+                ? InboxTransition.APPLIED
+                : InboxTransition.STALE_CLAIM;
     }
 
     /**
-     * Parks the event for a bounded retry. Only a {@code PROCESSING} row can
-     * become {@code FAILED}.
+     * Parks the event for a bounded retry. Fenced: only the current lease
+     * owner moves a {@code PROCESSING} row to {@code FAILED}, and only its
+     * own lease is cleared. Stale callers receive {@code STALE_CLAIM} with no
+     * change to status, retry scheduling, or the newer lease.
      */
-    public boolean markFailed(String eventId, String errorCode, LocalDateTime nextAttemptAt) {
+    public InboxTransition markFailed(String eventId, String leaseOwner,
+                                      String errorCode, LocalDateTime nextAttemptAt) {
+        if (leaseOwner == null || leaseOwner.isBlank()) {
+            return InboxTransition.STALE_CLAIM;
+        }
         return jdbcTemplate.update(
                 "UPDATE stripe_event_entity SET status = 'FAILED', last_error = ?, "
                         + "next_attempt_at = ?, lease_owner = NULL, lease_expires_at = NULL "
-                        + "WHERE event_id = ? AND status = 'PROCESSING'",
-                errorCode, Timestamp.valueOf(nextAttemptAt), eventId) == 1;
+                        + "WHERE event_id = ? AND status = 'PROCESSING' "
+                        + "AND lease_owner = ?",
+                errorCode, Timestamp.valueOf(nextAttemptAt), eventId, leaseOwner) == 1
+                ? InboxTransition.APPLIED
+                : InboxTransition.STALE_CLAIM;
     }
 
     /**
-     * Fails the event closed for operator review. Unconditional so an
-     * event-id collision stays visible even if it races a completion.
+     * Worker-owned exhaustion path: parks a {@code PROCESSING} event the
+     * claimant itself failed for manual review. Fenced on the lease token
+     * like every other worker completion; stale callers change nothing.
      */
-    public void markManualReview(String eventId, String reason) {
+    public InboxTransition markExhaustedReview(String eventId, String leaseOwner, String reason) {
+        if (leaseOwner == null || leaseOwner.isBlank()) {
+            return InboxTransition.STALE_CLAIM;
+        }
+        return jdbcTemplate.update(
+                "UPDATE stripe_event_entity SET status = 'MANUAL_REVIEW', last_error = ?, "
+                        + "lease_owner = NULL, lease_expires_at = NULL, next_attempt_at = NULL "
+                        + "WHERE event_id = ? AND status = 'PROCESSING' "
+                        + "AND lease_owner = ?",
+                reason, eventId, leaseOwner) == 1
+                ? InboxTransition.APPLIED
+                : InboxTransition.STALE_CLAIM;
+    }
+
+    /**
+     * Provider-receipt/administrative transition for event-id collisions
+     * (same id, different type or payload hash). This is not a
+     * processing-worker completion, so it intentionally takes no lease token:
+     * a collision must stay visible for an operator even if it races a live
+     * claim. Worker completions require {@code PROCESSING} status and can
+     * never erase this review state.
+     */
+    public void markProviderCollisionReview(String eventId, String reason) {
         jdbcTemplate.update(
                 "UPDATE stripe_event_entity SET status = 'MANUAL_REVIEW', last_error = ?, "
                         + "lease_owner = NULL, lease_expires_at = NULL, next_attempt_at = NULL "
                         + "WHERE event_id = ?",
                 reason, eventId);
+    }
+
+    /**
+     * Fails the event closed for operator review. Unconditional so an
+     * event-id collision stays visible even if it races a completion.
+     *
+     * @deprecated Prefer {@link #markProviderCollisionReview(String, String)}
+     * for receipt-time collisions and
+     * {@link #markExhaustedReview(String, String, String)} for worker-owned
+     * exhaustion. Retained for compatibility.
+     */
+    @Deprecated
+    public void markManualReview(String eventId, String reason) {
+        markProviderCollisionReview(eventId, reason);
     }
 
     /**

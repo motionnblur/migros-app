@@ -14,6 +14,7 @@ import com.example.MigrosBackend.entity.user.OrderGroupEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.exception.admin.UserNotFoundException;
 import com.example.MigrosBackend.exception.shared.GeneralException;
+import com.example.MigrosBackend.exception.user.CheckoutConflictException;
 import com.example.MigrosBackend.exception.user.CheckoutNotFoundException;
 import com.example.MigrosBackend.exception.user.CheckoutStateException;
 import com.example.MigrosBackend.exception.user.PaymentAmountException;
@@ -372,6 +373,38 @@ class CheckoutServiceTest {
         assertEquals(CheckoutStatus.PAYMENT_PROCESSING, processing.getStatus());
         verify(productEntityRepository, never()).incrementStock(anyLong(), anyInt());
         verify(checkoutItemEntityRepository, never()).findByCheckout_IdOrderByProductIdAsc(any());
+    }
+
+    @Test
+    void cancelCheckout_ProcessingConflictCarriesPendingRecoveryCode() {
+        stubAuthenticatedUser();
+        CheckoutEntity processing = checkout(CheckoutStatus.PAYMENT_PROCESSING, "10.00");
+        when(checkoutEntityRepository.findOwnedByIdForUpdate(processing.getId(), 42L))
+                .thenReturn(Optional.of(processing));
+
+        CheckoutConflictException ex = assertThrows(CheckoutConflictException.class,
+                () -> checkoutService.cancelCheckout(TOKEN, processing.getId()));
+        assertEquals(CheckoutConflictException.RECONCILIATION_PENDING_CODE, ex.getCode());
+        assertTrue(ex.isPending());
+        assertEquals(processing.getId(), ex.getCheckoutId());
+        assertEquals(CheckoutStatus.PAYMENT_PROCESSING, processing.getStatus());
+        verify(productEntityRepository, never()).incrementStock(anyLong(), anyInt());
+    }
+
+    @Test
+    void cancelCheckout_PaidConflictIsTypedNonPending() {
+        stubAuthenticatedUser();
+        CheckoutEntity paid = checkout(CheckoutStatus.PAID, "10.00");
+        when(checkoutEntityRepository.findOwnedByIdForUpdate(paid.getId(), 42L))
+                .thenReturn(Optional.of(paid));
+
+        CheckoutConflictException ex = assertThrows(CheckoutConflictException.class,
+                () -> checkoutService.cancelCheckout(TOKEN, paid.getId()));
+        assertEquals(CheckoutConflictException.NOT_CANCELLABLE_CODE, ex.getCode());
+        assertTrue(!ex.isPending());
+        assertEquals(paid.getId(), ex.getCheckoutId());
+        assertEquals(CheckoutStatus.PAID, paid.getStatus());
+        verify(productEntityRepository, never()).incrementStock(anyLong(), anyInt());
     }
 
     @Test

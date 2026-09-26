@@ -3,6 +3,7 @@ package com.example.MigrosBackend.config;
 import com.example.MigrosBackend.exception.admin.*;
 import com.example.MigrosBackend.exception.shared.*;
 import com.example.MigrosBackend.exception.user.*;
+import com.example.MigrosBackend.dto.payment.CheckoutConflictDto;
 import jakarta.mail.MessagingException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -121,9 +122,26 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
     }
 
+    @ExceptionHandler(CheckoutConflictException.class)
+    public ResponseEntity<CheckoutConflictDto> handleCheckoutConflict(CheckoutConflictException ex) {
+        CheckoutConflictDto body = new CheckoutConflictDto(
+                ex.getCode(),
+                ex.getMessage(),
+                HttpStatus.CONFLICT.value(),
+                ex.isPending(),
+                ex.getCheckoutId() == null ? null : ex.getCheckoutId().toString());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
     @ExceptionHandler(CheckoutStateException.class)
-    public ResponseEntity<String> handleCheckoutState(CheckoutStateException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
+    public ResponseEntity<CheckoutConflictDto> handleCheckoutState(CheckoutStateException ex) {
+        CheckoutConflictDto body = new CheckoutConflictDto(
+                "CHECKOUT_CONFLICT",
+                ex.getMessage(),
+                HttpStatus.CONFLICT.value(),
+                false,
+                null);
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
     }
 
     @ExceptionHandler(PaymentStateException.class)

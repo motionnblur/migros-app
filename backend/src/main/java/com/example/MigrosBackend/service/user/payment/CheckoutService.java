@@ -14,6 +14,7 @@ import com.example.MigrosBackend.entity.user.OrderGroupEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.exception.admin.UserNotFoundException;
 import com.example.MigrosBackend.exception.shared.GeneralException;
+import com.example.MigrosBackend.exception.user.CheckoutConflictException;
 import com.example.MigrosBackend.exception.user.CheckoutNotFoundException;
 import com.example.MigrosBackend.exception.user.CheckoutStateException;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
@@ -190,12 +191,14 @@ public class CheckoutService {
         expireIfNeeded(checkout, now);
 
         if (checkout.getStatus() == CheckoutStatus.PAID || checkout.getStatus() == CheckoutStatus.CONSUMED) {
-            throw new CheckoutStateException("A paid checkout cannot be cancelled");
+            throw CheckoutConflictException.notCancellable(
+                    checkout.getId(), "A paid checkout cannot be cancelled");
         }
         if (checkout.getStatus() == CheckoutStatus.PAYMENT_PROCESSING) {
             // Money may be moving: the reservation must be kept until the
             // provider outcome is durably resolved via the payment status path.
-            throw new CheckoutStateException(
+            throw CheckoutConflictException.reconciliationPending(
+                    checkout.getId(),
                     "Payment is still processing and cannot be cancelled; check payment status");
         }
         if (checkout.getStatus().isUserCancellable()) {

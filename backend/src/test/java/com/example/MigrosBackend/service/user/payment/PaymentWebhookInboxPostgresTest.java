@@ -17,6 +17,8 @@ import com.example.MigrosBackend.repository.user.OrderGroupEntityRepository;
 import com.example.MigrosBackend.repository.user.PaymentAttemptEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
+import com.example.MigrosBackend.service.user.payment.StripeEventStore.InboxTransition;
+import com.example.MigrosBackend.service.user.payment.StripeEventStore.StoredEvent;
 import com.stripe.model.Event;
 import com.stripe.model.StripeObject;
 import com.stripe.net.ApiResource;
@@ -439,6 +441,164 @@ class PaymentWebhookInboxPostgresTest {
     }
 
     @Test
+    void lateSuccessAfterRecordedFailureIsSurfacedForManualReview() {
+        AttemptFixture fixture = prepareProcessingAttemptWithStock("late-success-stock", 5);
+        String failed = chargeFailedPayload("evt_late_fail", "ch_late_1",
+                fixture.amountMinor(), "try", fixture.checkoutId());
+        webhookService.handle(parse(failed), failed);
+        assertEquals(PaymentAttemptStatus.FAILED_FINAL, attemptStatus(fixture.checkoutId()));
+        assertEquals("PROCESSED", rowStatus("evt_late_fail"));
+        int stockAfterFailure = productStock("late-success-stock");
+        assertEquals(0, orderGroupCount());
+
+        String lateSuccess = chargeSucceededPayload("evt_late_success", "ch_late_1",
+                fixture.amountMinor(), "try", fixture.checkoutId());
+        webhookService.handle(parse(lateSuccess), lateSuccess);
+
+        // Contradictory provider evidence must stay visible, never be silently discarded.
+        assertEquals(PaymentAttemptStatus.MANUAL_REVIEW, attemptStatus(fixture.checkoutId()));
+        assertEquals("PROCESSED", rowStatus("evt_late_success"));
+        // The successful provider charge must be traceable for reconciliation.
+        assertEquals("ch_late_1", attemptChargeId(fixture.checkoutId()));
+        // No automatic fulfillment and no second stock mutation.
+        assertEquals(0, orderGroupCount());
+        assertEquals(0, orderCount());
+        assertEquals(stockAfterFailure, productStock("late-success-stock"));
+    }
+
+    @Test
+    void lateSuccessWithDifferentChargeIdFailsClosedIntoManualReview() {
+        AttemptFixture fixture = prepareProcessingAttempt();
+        String failed = chargeFailedPayload("evt_diff_fail", "ch_diff_fail",
+                fixture.amountMinor(), "try", fixture.checkoutId());
+        webhookService.handle(parse(failed), failed);
+        assertEquals(PaymentAttemptStatus.FAILED_FINAL, attemptStatus(fixture.checkoutId()));
+
+        String lateSuccess = chargeSucceededPayload("evt_diff_success", "ch_diff_other",
+                fixture.amountMinor(), "try", fixture.checkoutId());
+        webhookService.handle(parse(lateSuccess), lateSuccess);
+
+        assertEquals(PaymentAttemptStatus.MANUAL_REVIEW, attemptStatus(fixture.checkoutId()));
+        assertEquals("PROCESSED", rowStatus("evt_diff_success"));
+        assertEquals(0, orderGroupCount());
+        assertEquals(0, orderCount());
+    }
+
+    @Test
+    void conflictingChargeForFinalizedAttemptFailsClosedWithoutSecondOrder() {
+        AttemptFixture fixture = prepareProcessingAttempt();
+        String succeeded = chargeSucceededPayload("evt_conf_base", "ch_conf_a",
+                fixture.amountMinor(), "try", fixture.checkoutId());
+        webhookService.handle(parse(succeeded), succeeded);
+        assertEquals(PaymentAttemptStatus.ORDER_FINALIZED, attemptStatus(fixture.checkoutId()));
+        assertEquals(1, orderGroupCount());
+
+        String conflicting = chargeSucceededPayload("evt_conf_other", "ch_conf_b",
+                fixture.amountMinor(), "try", fixture.checkoutId());
+        webhookService.handle(parse(conflicting), conflicting);
+
+        assertEquals(PaymentAttemptStatus.MANUAL_REVIEW, attemptStatus(fixture.checkoutId()));
+        assertEquals("PROCESSED", rowStatus("evt_conf_other"));
+        // Canonical charge id is never overwritten by the conflicting event.
+        assertEquals("ch_conf_a", attemptChargeId(fixture.checkoutId()));
+        // No second order from the conflicting success.
+        assertEquals(1, orderGroupCount());
+        assertEquals(1, orderCount());
+    }
+
+    @Test
+    void duplicateSuccessForSameChargeIsIdempotent() {
+        AttemptFixture fixture = prepareProcessingAttempt();
+        String first = chargeSucceededPayload("evt_dup_first", "ch_dup",
+                fixture.amountMinor(), "try", fixture.checkoutId());
+        webhookService.handle(parse(first), first);
+        assertEquals(PaymentAttemptStatus.ORDER_FINALIZED, attemptStatus(fixture.checkoutId()));
+
+        String replay = chargeSucceededPayload("evt_dup_replay", "ch_dup",
+                fixture.amountMinor(), "try", fixture.checkoutId());
+        webhookService.handle(parse(replay), replay);
+
+        assertEquals(PaymentAttemptStatus.ORDER_FINALIZED, attemptStatus(fixture.checkoutId()));
+        assertEquals("PROCESSED", rowStatus("evt_dup_replay"));
+        assertEquals(1, orderGroupCount());
+        assertEquals(1, orderCount());
+    }
+
+    @Test
+    void refundedHistoricalSuccessRemainsRefundedAndIdempotent() {
+        AttemptFixture fixture = prepareProcessingAttempt();
+        String succeeded = chargeSucceededPayload("evt_hist_base", "ch_hist",
+                fixture.amountMinor(), "try", fixture.checkoutId());
+        webhookService.handle(parse(succeeded), succeeded);
+        String refunded = chargeRefundedPayload("evt_hist_refund", "ch_hist",
+                fixture.amountMinor(), "try", fixture.checkoutId());
+        webhookService.handle(parse(refunded), refunded);
+        assertEquals(PaymentAttemptStatus.REFUNDED, attemptStatus(fixture.checkoutId()));
+
+        String lateSuccess = chargeSucceededPayload("evt_hist_late", "ch_hist",
+                fixture.amountMinor(), "try", fixture.checkoutId());
+        webhookService.handle(parse(lateSuccess), lateSuccess);
+
+        assertEquals(PaymentAttemptStatus.REFUNDED, attemptStatus(fixture.checkoutId()));
+        assertEquals("PROCESSED", rowStatus("evt_hist_late"));
+        assertEquals(1, orderGroupCount());
+    }
+
+    @Test
+    void successWithMissingAmountOrCurrencyFailsClosedIntoManualReview() {
+        AttemptFixture first = prepareProcessingAttempt();
+        String missingAmount = "{\"id\":\"evt_no_amount\",\"object\":\"event\",\"api_version\":\""
+                + STRIPE_API_VERSION + "\",\"type\":\"charge.succeeded\","
+                + "\"data\":{\"object\":{\"id\":\"ch_no_amount\",\"object\":\"charge\","
+                + "\"currency\":\"try\",\"paid\":true,"
+                + "\"metadata\":{\"checkout_id\":\"" + first.checkoutId() + "\"}}}}";
+        webhookService.handle(parse(missingAmount), missingAmount);
+        assertEquals(PaymentAttemptStatus.MANUAL_REVIEW, attemptStatus(first.checkoutId()));
+        assertEquals("PROCESSED", rowStatus("evt_no_amount"));
+
+        AttemptFixture second = prepareProcessingAttempt();
+        String missingCurrency = "{\"id\":\"evt_no_currency\",\"object\":\"event\",\"api_version\":\""
+                + STRIPE_API_VERSION + "\",\"type\":\"charge.succeeded\","
+                + "\"data\":{\"object\":{\"id\":\"ch_no_currency\",\"object\":\"charge\","
+                + "\"amount\":" + second.amountMinor() + ",\"paid\":true,"
+                + "\"metadata\":{\"checkout_id\":\"" + second.checkoutId() + "\"}}}}";
+        webhookService.handle(parse(missingCurrency), missingCurrency);
+        assertEquals(PaymentAttemptStatus.MANUAL_REVIEW, attemptStatus(second.checkoutId()));
+        assertEquals("PROCESSED", rowStatus("evt_no_currency"));
+        assertEquals(0, orderGroupCount());
+    }
+
+    @Test
+    void transientFailureDuringLateSuccessStaysRetryable() {
+        AttemptFixture fixture = prepareProcessingAttempt();
+        String failed = chargeFailedPayload("evt_trans_fail", "ch_trans",
+                fixture.amountMinor(), "try", fixture.checkoutId());
+        webhookService.handle(parse(failed), failed);
+        assertEquals(PaymentAttemptStatus.FAILED_FINAL, attemptStatus(fixture.checkoutId()));
+
+        String lateSuccess = chargeSucceededPayload("evt_trans_success", "ch_trans",
+                fixture.amountMinor(), "try", fixture.checkoutId());
+        doThrow(new RuntimeException("transient db"))
+                .when(webhookService).afterEffects(anyString());
+        try {
+            webhookService.handle(parse(lateSuccess), lateSuccess);
+            assertTrue(false, "transient failure must propagate for retry");
+        } catch (RuntimeException expected) {
+            assertEquals("transient db", expected.getMessage());
+        }
+        // Retryable, never silently completed.
+        assertEquals("FAILED", rowStatus("evt_trans_success"));
+        assertEquals(PaymentAttemptStatus.MANUAL_REVIEW, attemptStatus(fixture.checkoutId()));
+
+        expireNextAttempt("evt_trans_success");
+        reset(webhookService);
+        webhookService.handle(parse(lateSuccess), lateSuccess);
+        assertEquals("PROCESSED", rowStatus("evt_trans_success"));
+        assertEquals(PaymentAttemptStatus.MANUAL_REVIEW, attemptStatus(fixture.checkoutId()));
+        assertEquals(0, orderGroupCount());
+    }
+
+    @Test
     void unhandledEventTypesCompleteWithoutEffects() {
         String payload = "{\"id\":\"evt_ping\",\"object\":\"event\",\"api_version\":\""
                 + STRIPE_API_VERSION + "\",\"type\":\"ping\",\"data\":{\"object\":{}}}";
@@ -450,8 +610,7 @@ class PaymentWebhookInboxPostgresTest {
     }
 
     @Test
-    void retentionRemovesOnlySufficientlyOldProcessedEvents() {
-        AttemptFixture oldFixture = prepareProcessingAttempt();
+    void retentionRemovesOnlySufficientlyOldProcessedEvents() {        AttemptFixture oldFixture = prepareProcessingAttempt();
         String oldPayload = chargeSucceededPayload("evt_ret_old", "ch_ret_old",
                 oldFixture.amountMinor(), "try", oldFixture.checkoutId());
         webhookService.handle(parse(oldPayload), oldPayload);
@@ -507,6 +666,193 @@ class PaymentWebhookInboxPostgresTest {
         } finally {
             logger.detachAppender(appender);
         }
+    }
+
+    // ------------------------------------------------- lease-fencing contract
+
+    @Test
+    void currentOwnerCanMarkProcessed() {
+        String payload = chargeSucceededPayload("evt_fence_done", "ch_fence_done",
+                1000L, "try", UUID.randomUUID());
+        stripeEventStore.receive("evt_fence_done", "charge.succeeded", payload,
+                PaymentWebhookService.sha256Hex(payload), LocalDateTime.now());
+        StoredEvent claimed = stripeEventStore.tryClaim(
+                "evt_fence_done", "worker-a", LocalDateTime.now(), 3600).orElseThrow();
+
+        assertEquals(InboxTransition.APPLIED,
+                stripeEventStore.markProcessed("evt_fence_done", claimed.leaseOwner(), LocalDateTime.now()));
+
+        assertEquals("PROCESSED", rowStatus("evt_fence_done"));
+    }
+
+    @Test
+    void currentOwnerCanScheduleRetryAndClearOnlyItsOwnLease() {
+        String payload = chargeSucceededPayload("evt_fence_retry", "ch_fence_retry",
+                1000L, "try", UUID.randomUUID());
+        stripeEventStore.receive("evt_fence_retry", "charge.succeeded", payload,
+                PaymentWebhookService.sha256Hex(payload), LocalDateTime.now());
+        StoredEvent claimed = stripeEventStore.tryClaim(
+                "evt_fence_retry", "worker-a", LocalDateTime.now(), 3600).orElseThrow();
+
+        assertEquals(InboxTransition.APPLIED, stripeEventStore.markFailed(
+                "evt_fence_retry", claimed.leaseOwner(), "effect_failed:boom",
+                LocalDateTime.now().plusSeconds(60)));
+
+        assertEquals("FAILED", rowStatus("evt_fence_retry"));
+        assertEquals("effect_failed:boom", lastError("evt_fence_retry"));
+    }
+
+    @Test
+    void currentOwnerCanParkAnExhaustedEventForReview() {
+        String payload = chargeSucceededPayload("evt_fence_exhaust", "ch_fence_exhaust",
+                1000L, "try", UUID.randomUUID());
+        stripeEventStore.receive("evt_fence_exhaust", "charge.succeeded", payload,
+                PaymentWebhookService.sha256Hex(payload), LocalDateTime.now());
+        StoredEvent claimed = stripeEventStore.tryClaim(
+                "evt_fence_exhaust", "worker-a", LocalDateTime.now(), 3600).orElseThrow();
+
+        assertEquals(InboxTransition.APPLIED, stripeEventStore.markExhaustedReview(
+                "evt_fence_exhaust", claimed.leaseOwner(), "exhausted:boom"));
+
+        assertEquals("MANUAL_REVIEW", rowStatus("evt_fence_exhaust"));
+        assertEquals("exhausted:boom", lastError("evt_fence_exhaust"));
+    }
+
+    @Test
+    void reclaimedLeaseFencesTheOlderWorker() {
+        String payload = chargeSucceededPayload("evt_fence_reclaim", "ch_fence_reclaim",
+                1000L, "try", UUID.randomUUID());
+        stripeEventStore.receive("evt_fence_reclaim", "charge.succeeded", payload,
+                PaymentWebhookService.sha256Hex(payload), LocalDateTime.now());
+        StoredEvent first = stripeEventStore.tryClaim(
+                "evt_fence_reclaim", "worker-a", LocalDateTime.now(), 3600).orElseThrow();
+        expireLease("evt_fence_reclaim");
+        StoredEvent second = stripeEventStore.tryClaim(
+                "evt_fence_reclaim", "worker-b", LocalDateTime.now(), 3600).orElseThrow();
+
+        // The older worker is fenced on every worker-owned transition and
+        // must not disturb the newer claim.
+        assertEquals(InboxTransition.STALE_CLAIM, stripeEventStore.markProcessed(
+                "evt_fence_reclaim", first.leaseOwner(), LocalDateTime.now()));
+        assertEquals(InboxTransition.STALE_CLAIM, stripeEventStore.markFailed(
+                "evt_fence_reclaim", first.leaseOwner(), "effect_failed:late",
+                LocalDateTime.now().plusSeconds(60)));
+        assertEquals(InboxTransition.STALE_CLAIM, stripeEventStore.markExhaustedReview(
+                "evt_fence_reclaim", first.leaseOwner(), "exhausted:late"));
+
+        assertEquals("PROCESSING", rowStatus("evt_fence_reclaim"));
+        assertEquals("worker-b", leaseOwner("evt_fence_reclaim"));
+        assertEquals(null, processedAt("evt_fence_reclaim"));
+
+        // The live worker still completes normally after the stale attempts.
+        assertEquals(InboxTransition.APPLIED, stripeEventStore.markProcessed(
+                "evt_fence_reclaim", second.leaseOwner(), LocalDateTime.now()));
+        assertEquals("PROCESSED", rowStatus("evt_fence_reclaim"));
+    }
+
+    @Test
+    void nullBlankAndWrongTokensAreRejectedWithoutChangingTheRow() {
+        String payload = chargeSucceededPayload("evt_fence_tokens", "ch_fence_tokens",
+                1000L, "try", UUID.randomUUID());
+        stripeEventStore.receive("evt_fence_tokens", "charge.succeeded", payload,
+                PaymentWebhookService.sha256Hex(payload), LocalDateTime.now());
+        stripeEventStore.tryClaim(
+                "evt_fence_tokens", "worker-a", LocalDateTime.now(), 3600).orElseThrow();
+
+        for (String token : new String[]{null, "", "   ", "worker-impostor"}) {
+            assertEquals(InboxTransition.STALE_CLAIM, stripeEventStore.markProcessed(
+                    "evt_fence_tokens", token, LocalDateTime.now()), "token=" + token);
+            assertEquals(InboxTransition.STALE_CLAIM, stripeEventStore.markFailed(
+                    "evt_fence_tokens", token, "effect_failed:x",
+                    LocalDateTime.now().plusSeconds(60)), "token=" + token);
+            assertEquals(InboxTransition.STALE_CLAIM, stripeEventStore.markExhaustedReview(
+                    "evt_fence_tokens", token, "exhausted:x"), "token=" + token);
+        }
+
+        assertEquals("PROCESSING", rowStatus("evt_fence_tokens"));
+        assertEquals("worker-a", leaseOwner("evt_fence_tokens"));
+    }
+
+    @Test
+    void collisionReviewCannotBeErasedByALateWorker() {
+        AttemptFixture first = prepareProcessingAttempt();
+        String original = chargeSucceededPayload("evt_fence_collision", "ch_fence_col_a",
+                first.amountMinor(), "try", first.checkoutId());
+        webhookService.handle(parse(original), original);
+        assertEquals("PROCESSED", rowStatus("evt_fence_collision"));
+
+        AttemptFixture second = prepareProcessingAttempt();
+        String tampered = chargeSucceededPayload("evt_fence_collision", "ch_fence_col_b",
+                second.amountMinor(), "try", second.checkoutId());
+        webhookService.handle(parse(tampered), tampered);
+        assertEquals("MANUAL_REVIEW", rowStatus("evt_fence_collision"));
+
+        // A late worker holding any token must not erase the review.
+        assertEquals(InboxTransition.STALE_CLAIM, stripeEventStore.markProcessed(
+                "evt_fence_collision", "late-worker", LocalDateTime.now()));
+        assertEquals(InboxTransition.STALE_CLAIM, stripeEventStore.markFailed(
+                "evt_fence_collision", "late-worker", "effect_failed:late",
+                LocalDateTime.now().plusSeconds(60)));
+        assertEquals(InboxTransition.STALE_CLAIM, stripeEventStore.markExhaustedReview(
+                "evt_fence_collision", "late-worker", "exhausted:late"));
+
+        assertEquals("MANUAL_REVIEW", rowStatus("evt_fence_collision"));
+        assertEquals("event_id_collision", lastError("evt_fence_collision"));
+    }
+
+    @Test
+    void deterministicTwoWorkerRaceLeavesOneActiveOwner() throws Exception {
+        String payload = chargeSucceededPayload("evt_fence_race", "ch_fence_race",
+                1000L, "try", UUID.randomUUID());
+        stripeEventStore.receive("evt_fence_race", "charge.succeeded", payload,
+                PaymentWebhookService.sha256Hex(payload), LocalDateTime.now());
+
+        // Worker A wins the first claim; worker B waits for the reclaim
+        // signal instead of sleeping, so the fencing order is deterministic.
+        StoredEvent workerA = stripeEventStore.tryClaim(
+                "evt_fence_race", "worker-a", LocalDateTime.now(), 3600).orElseThrow();
+        expireLease("evt_fence_race");
+
+        CountDownLatch reclaimed = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        Future<InboxTransition> staleAttempt = pool.submit(() -> {
+            assertTrue(reclaimed.await(30, TimeUnit.SECONDS));
+            return stripeEventStore.markProcessed(
+                    "evt_fence_race", workerA.leaseOwner(), LocalDateTime.now());
+        });
+        Future<StoredEvent> reclaim = pool.submit(() -> stripeEventStore.tryClaim(
+                "evt_fence_race", "worker-b", LocalDateTime.now(), 3600).orElseThrow());
+        StoredEvent workerB;
+        try {
+            workerB = reclaim.get(30, TimeUnit.SECONDS);
+            reclaimed.countDown();
+            assertEquals(InboxTransition.STALE_CLAIM, staleAttempt.get(30, TimeUnit.SECONDS));
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertEquals("worker-b", leaseOwner("evt_fence_race"));
+        assertEquals(InboxTransition.APPLIED, stripeEventStore.markProcessed(
+                "evt_fence_race", workerB.leaseOwner(), LocalDateTime.now()));
+        assertEquals("PROCESSED", rowStatus("evt_fence_race"));
+    }
+
+    @Test
+    void recoveryReclaimsAnExpiredClaimAndFinishes() {
+        AttemptFixture fixture = prepareProcessingAttempt();
+        String payload = chargeSucceededPayload("evt_fence_recover", "ch_fence_recover",
+                fixture.amountMinor(), "try", fixture.checkoutId());
+        stripeEventStore.receive("evt_fence_recover", "charge.succeeded", payload,
+                PaymentWebhookService.sha256Hex(payload), LocalDateTime.now());
+        stripeEventStore.tryClaim(
+                "evt_fence_recover", "crashed-worker", LocalDateTime.now(), 3600).orElseThrow();
+        expireLease("evt_fence_recover");
+
+        recoveryJob.recoverDueWebhooks();
+
+        assertEquals("PROCESSED", rowStatus("evt_fence_recover"));
+        assertEquals(PaymentAttemptStatus.ORDER_FINALIZED, attemptStatus(fixture.checkoutId()));
+        assertEquals(1, orderGroupCount());
     }
 
     // ------------------------------------------------------------------ helpers
@@ -589,6 +935,38 @@ class PaymentWebhookInboxPostgresTest {
                 .orElseThrow().getStatus();
     }
 
+    private String attemptChargeId(UUID checkoutId) {
+        return paymentAttemptEntityRepository.findByCheckoutId(checkoutId)
+                .orElseThrow().getStripeChargeId();
+    }
+
+    private AttemptFixture prepareProcessingAttemptWithStock(String productName, int stock) {
+        ProductEntity product = createProductWithName(productName, "10.00", stock);
+        UserEntity user = createUser("buyer-" + UUID.randomUUID() + "@migros.com", product.getId());
+        String token = tokenService.generateUserToken(user.getUserMail());
+        UUID checkoutId = UUID.fromString(checkoutService.prepareCheckout(token).checkoutId());
+        checkoutService.beginPayment(token, checkoutId);
+        CheckoutEntity checkout = checkoutEntityRepository.findById(checkoutId).orElseThrow();
+        PaymentAttemptEntity attempt = new PaymentAttemptEntity();
+        attempt.setId(UUID.randomUUID());
+        attempt.setCheckout(checkout);
+        attempt.setIdempotencyKey("checkout:" + checkoutId + ":charge-v1");
+        attempt.setAmountMinor(checkout.getAmountMinor());
+        attempt.setCurrency(checkout.getCurrency());
+        attempt.setStatus(PaymentAttemptStatus.PROCESSING);
+        attempt.setCreatedAt(LocalDateTime.now());
+        attempt.setUpdatedAt(LocalDateTime.now());
+        paymentAttemptEntityRepository.saveAndFlush(attempt);
+        return new AttemptFixture(checkoutId, checkout.getAmountMinor());
+    }
+
+    private int productStock(String productName) {
+        Integer stock = jdbcTemplate.queryForObject(
+                "SELECT product_count FROM product_entity WHERE product_name = ?",
+                Integer.class, productName);
+        return stock == null ? -1 : stock;
+    }
+
     private String rowStatus(String eventId) {
         return jdbcTemplate.queryForObject(
                 "SELECT status FROM stripe_event_entity WHERE event_id = ?", String.class, eventId);
@@ -603,6 +981,11 @@ class PaymentWebhookInboxPostgresTest {
     private String lastError(String eventId) {
         return jdbcTemplate.queryForObject(
                 "SELECT last_error FROM stripe_event_entity WHERE event_id = ?", String.class, eventId);
+    }
+
+    private String leaseOwner(String eventId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT lease_owner FROM stripe_event_entity WHERE event_id = ?", String.class, eventId);
     }
 
     private LocalDateTime nextAttemptAt(String eventId) {
@@ -659,8 +1042,12 @@ class PaymentWebhookInboxPostgresTest {
     }
 
     private ProductEntity createProduct(String price, int stock) {
+        return createProductWithName("Product", price, stock);
+    }
+
+    private ProductEntity createProductWithName(String name, String price, int stock) {
         ProductEntity product = new ProductEntity();
-        product.setProductName("Product");
+        product.setProductName(name);
         product.setSubcategoryName("general");
         product.setProductCount(stock);
         product.setProductPrice(new BigDecimal(price));

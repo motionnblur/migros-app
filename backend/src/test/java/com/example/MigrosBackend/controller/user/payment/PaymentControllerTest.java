@@ -9,6 +9,7 @@ import com.example.MigrosBackend.dto.payment.PaymentStatusDto;
 import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.exception.shared.TokenNotFoundException;
 import com.example.MigrosBackend.exception.user.CheckoutNotFoundException;
+import com.example.MigrosBackend.exception.user.CheckoutConflictException;
 import com.example.MigrosBackend.exception.user.CheckoutStateException;
 import com.example.MigrosBackend.helper.AuthTokenResolver;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
@@ -37,6 +38,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -174,11 +176,17 @@ class PaymentControllerTest {
     void cancel_ReturnsConflictForPaidCheckout() throws Exception {
         when(authTokenResolver.requireToken("sample-token")).thenReturn("sample-token");
         when(checkoutService.cancelCheckout("sample-token", checkoutId))
-                .thenThrow(new CheckoutStateException("A paid checkout cannot be cancelled"));
+                .thenThrow(CheckoutConflictException.notCancellable(
+                        checkoutId, "A paid checkout cannot be cancelled"));
 
         mockMvc.perform(post("/payment/checkouts/{checkoutId}/cancel", checkoutId)
                         .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "sample-token")))
-                .andExpect(status().isConflict());
+                .andExpect(status().isConflict())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("CHECKOUT_NOT_CANCELLABLE"))
+                .andExpect(jsonPath("$.pending").value(false))
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.checkoutId").value(checkoutId.toString()));
     }
 
     @Test
@@ -198,12 +206,41 @@ class PaymentControllerTest {
     void cancel_ReturnsConflictForProcessingCheckout() throws Exception {
         when(authTokenResolver.requireToken("sample-token")).thenReturn("sample-token");
         when(checkoutService.cancelCheckout("sample-token", checkoutId))
-                .thenThrow(new CheckoutStateException(
+                .thenThrow(CheckoutConflictException.reconciliationPending(
+                        checkoutId,
                         "Payment is still processing and cannot be cancelled; check payment status"));
+
+        String body = mockMvc.perform(post("/payment/checkouts/{checkoutId}/cancel", checkoutId)
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "sample-token")))
+                .andExpect(status().isConflict())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("PAYMENT_RECONCILIATION_PENDING"))
+                .andExpect(jsonPath("$.pending").value(true))
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.checkoutId").value(checkoutId.toString()))
+                .andExpect(jsonPath("$.message").exists())
+                .andReturn().getResponse().getContentAsString();
+
+        String lowered = body.toLowerCase();
+        if (lowered.contains("stripe") || lowered.contains("ch_") || lowered.contains("lease")
+                || lowered.contains("charge")) {
+            throw new AssertionError("conflict response must not leak provider details: " + body);
+        }
+    }
+
+    @Test
+    void cancel_MapsGenericCheckoutConflictToTypedContract() throws Exception {
+        when(authTokenResolver.requireToken("sample-token")).thenReturn("sample-token");
+        when(checkoutService.cancelCheckout("sample-token", checkoutId))
+                .thenThrow(new CheckoutStateException("Checkout is not payable"));
 
         mockMvc.perform(post("/payment/checkouts/{checkoutId}/cancel", checkoutId)
                         .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "sample-token")))
-                .andExpect(status().isConflict());
+                .andExpect(status().isConflict())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("CHECKOUT_CONFLICT"))
+                .andExpect(jsonPath("$.pending").value(false))
+                .andExpect(jsonPath("$.status").value(409));
     }
 
     @Test

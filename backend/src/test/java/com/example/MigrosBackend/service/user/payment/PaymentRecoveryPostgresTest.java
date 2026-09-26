@@ -146,15 +146,18 @@ class PaymentRecoveryPostgresTest {
         PaymentAttemptEntity attempt = persistFinalizedAttempt("ch_regress");
         paymentAttemptService.recordRefunded(attempt.getId(), "re_regress");
 
-        assertThrows(PaymentStateException.class,
-                () -> paymentAttemptService.recordProviderChargeSuccess(
-                        attempt.getId(), "ch_regress", attempt.getAmountMinor(),
-                        attempt.getCurrency(), attempt.getCheckoutId()));
+        // Historical success for the same charge is an idempotent preserve of
+        // the refund state: no throw, no regression, no new fulfillment.
+        paymentAttemptService.recordProviderChargeSuccess(
+                attempt.getId(), "ch_regress", attempt.getAmountMinor(),
+                attempt.getCurrency(), attempt.getCheckoutId());
         assertThrows(PaymentStateException.class,
                 () -> paymentAttemptService.recordDecline(attempt.getId(), null, "card_declined"));
 
         PaymentAttemptEntity reloaded = paymentAttemptEntityRepository.findById(attempt.getId()).orElseThrow();
         assertEquals(PaymentAttemptStatus.REFUNDED, reloaded.getStatus());
+        assertEquals("ch_regress", reloaded.getStripeChargeId());
+        assertEquals("re_regress", reloaded.getRefundId());
     }
 
     private PaymentAttemptEntity persistFinalizedAttempt(String chargeId) {

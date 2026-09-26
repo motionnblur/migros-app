@@ -340,6 +340,8 @@ class PaymentAttemptServiceTest {
     @Test
     void markOrderFinalized_RequiresCurrentLease() {
         PaymentAttemptEntity succeeded = leasedAttempt(PaymentAttemptStatus.CHARGE_SUCCEEDED, 1000L, "owner-2");
+        when(paymentAttemptEntityRepository.findById(succeeded.getId()))
+                .thenReturn(Optional.of(succeeded));
         when(paymentAttemptEntityRepository.findByIdForUpdate(succeeded.getId()))
                 .thenReturn(Optional.of(succeeded));
 
@@ -355,6 +357,8 @@ class PaymentAttemptServiceTest {
     @Test
     void markOrderFinalized_CurrentOwnerFinalizes() {
         PaymentAttemptEntity succeeded = leasedAttempt(PaymentAttemptStatus.CHARGE_SUCCEEDED, 1000L, "owner");
+        when(paymentAttemptEntityRepository.findById(succeeded.getId()))
+                .thenReturn(Optional.of(succeeded));
         when(paymentAttemptEntityRepository.findByIdForUpdate(succeeded.getId()))
                 .thenReturn(Optional.of(succeeded));
 
@@ -407,6 +411,8 @@ class PaymentAttemptServiceTest {
     @Test
     void markOrderFinalized_RequiresChargeSucceeded() {
         PaymentAttemptEntity processing = leasedAttempt(PaymentAttemptStatus.PROCESSING, 1000L, "owner");
+        when(paymentAttemptEntityRepository.findById(processing.getId()))
+                .thenReturn(Optional.of(processing));
         when(paymentAttemptEntityRepository.findByIdForUpdate(processing.getId()))
                 .thenReturn(Optional.of(processing));
 

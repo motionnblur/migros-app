@@ -13,6 +13,8 @@ import { IPaymentStatus } from '../../../../interfaces/IPaymentStatus';
 export class PaymentComponent implements OnInit {
   private static readonly MAX_STATUS_POLLS = 5;
   private static readonly STATUS_POLL_INTERVAL_MS = 2000;
+  static readonly RECONCILIATION_PENDING_CODE =
+    'PAYMENT_RECONCILIATION_PENDING';
 
   stripe: any;
   elements: any;
@@ -204,15 +206,42 @@ export class PaymentComponent implements OnInit {
           this.checkout = null;
           this.closePaymentComponentEvent.emit();
         },
-        error: () => {
-          // Fail closed on the UI as well: the reservation stays server-side
-          // for status recovery even if the modal closes.
-          this.checkout = null;
-          this.closePaymentComponentEvent.emit();
-        },
+        error: (error) => this.handleCancelConflict(checkoutId, error),
       });
       return;
     }
+    this.closePaymentComponentEvent.emit();
+  }
+
+  isReconciliationPendingConflict(error: any): boolean {
+    const body = error?.error;
+    return (
+      error?.status === 409 &&
+      body !== null &&
+      typeof body === 'object' &&
+      body.code === PaymentComponent.RECONCILIATION_PENDING_CODE &&
+      body.pending === true
+    );
+  }
+
+  private handleCancelConflict(checkoutId: string, error: any): void {
+    if (this.isReconciliationPendingConflict(error)) {
+      // Reconciliation is pending: keep the SAME checkout and recover through
+      // the existing status endpoint. Never prepare a replacement checkout.
+      if (this.checkout) {
+        this.checkout.status = 'PAYMENT_PROCESSING';
+      }
+      this.pendingMessage =
+        'Payment is still being processed. Please wait and check your orders before retrying.';
+      this.pollPaymentStatus(checkoutId, PaymentComponent.MAX_STATUS_POLLS);
+      return;
+    }
+    // Fail closed on the UI as well: the reservation stays server-side
+    // for status recovery even if the modal closes. Never surface provider
+    // internals; advise checking order/payment status.
+    this.errorMessage =
+      'Could not verify the cancellation. Please check your orders and payment status before retrying.';
+    this.checkout = null;
     this.closePaymentComponentEvent.emit();
   }
 }
