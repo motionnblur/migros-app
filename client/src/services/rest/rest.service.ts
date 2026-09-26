@@ -188,7 +188,7 @@ export class RestService {
   }
   updateOrderStatus(orderId: number, status: string) {
     return this.http
-      .get(`${API_BASE_URL}/admin/panel/updateOrderStatus`, {
+      .post(`${API_BASE_URL}/admin/panel/updateOrderStatus`, null, {
         params: { orderId, status },
         responseType: 'text',
         observe: 'response',
@@ -305,7 +305,7 @@ export class RestService {
   }
   addProductToUserCart(productId: number) {
     return this.http
-      .get(`${API_BASE_URL}/user/supply/addProductToUserCart`, {
+      .post(`${API_BASE_URL}/user/supply/addProductToUserCart`, null, {
         params: { productId },
         responseType: 'text',
         observe: 'response',
@@ -323,7 +323,7 @@ export class RestService {
   }
   updateProductCountInUserCart(productId: number, count: number) {
     return this.http
-      .get(`${API_BASE_URL}/user/supply/updateProductCountInUserCart`, {
+      .post(`${API_BASE_URL}/user/supply/updateProductCountInUserCart`, null, {
         params: { productId, count },
         responseType: 'text',
         observe: 'response',

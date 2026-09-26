@@ -24,7 +24,7 @@ public class AdminSupplyController {
         this.userSupplyService = userSupplyService;
     }
 
-    @GetMapping("addCategory")
+    @PostMapping("addCategory")
     private ResponseEntity<Void> addCategory(@RequestParam String categoryName) {
         adminSupplyService.addCategory(categoryName);
         return ResponseEntity.ok().build();

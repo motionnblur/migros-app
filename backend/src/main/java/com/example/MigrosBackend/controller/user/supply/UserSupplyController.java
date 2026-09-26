@@ -17,6 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -82,7 +83,7 @@ public class UserSupplyController {
         return ResponseEntity.ok(userSupplyService.getSubCategories(categoryId));
     }
 
-    @GetMapping("addProductToUserCart")
+    @PostMapping("addProductToUserCart")
     public ResponseEntity<Void> addProductToUserCart(@RequestParam Long productId,
                                                      @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
         userSupplyService.addProductToInventory(productId, authTokenResolver.requireToken(token));
@@ -112,7 +113,7 @@ public class UserSupplyController {
         return ResponseEntity.ok().build();
     }
 
-    @GetMapping("updateProductCountInUserCart")
+    @PostMapping("updateProductCountInUserCart")
     public ResponseEntity<Void> updateProductCountInUserCart(@RequestParam Long productId,
                                                              @RequestParam int count,
                                                              @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {

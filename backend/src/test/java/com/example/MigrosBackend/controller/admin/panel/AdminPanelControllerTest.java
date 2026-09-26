@@ -225,10 +225,18 @@ class AdminPanelControllerTest {
 
     @Test
     void updateOrderStatus_shouldReturnOk() throws Exception {
-        mockMvc.perform(get("/admin/panel/updateOrderStatus")
+        mockMvc.perform(post("/admin/panel/updateOrderStatus")
                         .param("orderId", "1")
                         .param("status", "SHIPPED"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void updateOrderStatus_shouldReturnMethodNotAllowed_whenRequestedWithGet() throws Exception {
+        mockMvc.perform(get("/admin/panel/updateOrderStatus")
+                        .param("orderId", "1")
+                        .param("status", "SHIPPED"))
+                .andExpect(status().isMethodNotAllowed());
     }
 
     @Test

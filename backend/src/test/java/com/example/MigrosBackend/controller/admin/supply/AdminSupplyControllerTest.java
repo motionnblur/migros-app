@@ -20,6 +20,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(AdminSupplyController.class)
@@ -45,12 +46,19 @@ class AdminSupplyControllerTest {
 
     @Test
     void addCategory_shouldReturnOk_whenCategoryAdded() throws Exception {
-        mockMvc.perform(get("/admin/supply/addCategory")
+        mockMvc.perform(post("/admin/supply/addCategory")
                         .param("categoryName", "Electronics"))
                 .andExpect(status().isOk());
 
         Mockito.verify(adminSupplyService)
                 .addCategory("Electronics");
+    }
+
+    @Test
+    void addCategory_shouldReturnMethodNotAllowed_whenRequestedWithGet() throws Exception {
+        mockMvc.perform(get("/admin/supply/addCategory")
+                        .param("categoryName", "Electronics"))
+                .andExpect(status().isMethodNotAllowed());
     }
 
     @Test
@@ -90,7 +98,7 @@ class AdminSupplyControllerTest {
 
     @Test
     void addCategory_shouldReturnBadRequest_whenParamMissing() throws Exception {
-        mockMvc.perform(get("/admin/supply/addCategory"))
+        mockMvc.perform(post("/admin/supply/addCategory"))
                 .andExpect(status().isBadRequest());
     }
 }

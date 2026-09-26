@@ -1,6 +1,7 @@
 import { environment } from '../../environments/environment';
 
 const API_PREFIXES = ['/user', '/admin', '/payment'];
+const STATE_CHANGING_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
 
 export const API_BASE_URL = normalizeBaseUrl(environment.apiBaseUrl);
 export const WS_BASE_URL = resolveWsBaseUrl(environment.wsBaseUrl);
@@ -15,7 +16,7 @@ export function wsUrl(path: string): string {
   return `${WS_BASE_URL}${normalizedPath}`;
 }
 
-export function shouldAttachCredentials(url: string): boolean {
+export function isApiUrl(url: string): boolean {
   if (!url) {
     return false;
   }
@@ -28,6 +29,14 @@ export function shouldAttachCredentials(url: string): boolean {
   }
 
   return API_PREFIXES.some((prefix) => url === prefix || url.startsWith(`${prefix}/`));
+}
+
+export function shouldAttachCredentials(url: string): boolean {
+  return isApiUrl(url);
+}
+
+export function shouldAttachCsrfHeader(url: string, method: string): boolean {
+  return isApiUrl(url) && STATE_CHANGING_METHODS.includes((method ?? '').toUpperCase());
 }
 
 function normalizePath(path: string): string {

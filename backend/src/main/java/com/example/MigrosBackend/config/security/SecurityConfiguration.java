@@ -11,6 +11,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -23,16 +24,22 @@ import java.util.stream.Collectors;
 @EnableWebSecurity
 public class SecurityConfiguration {
     private final List<String> allowedOriginPatterns;
+    private final boolean csrfCookieSecure;
+    private final String csrfCookieSameSite;
 
     public SecurityConfiguration(
             @Value("${app.allowed-origins:}") String allowedOriginsValue,
-            @Value("${app.allowed-origin-patterns:}") String allowedOriginPatternsValue
+            @Value("${app.allowed-origin-patterns:}") String allowedOriginPatternsValue,
+            @Value("${auth.cookie.secure:false}") boolean csrfCookieSecure,
+            @Value("${auth.cookie.same-site:Lax}") String csrfCookieSameSite
     ) {
         List<String> parsedPatterns = parseCsvList(allowedOriginPatternsValue);
         if (parsedPatterns.isEmpty()) {
             parsedPatterns = parseCsvList(allowedOriginsValue);
         }
         this.allowedOriginPatterns = parsedPatterns;
+        this.csrfCookieSecure = csrfCookieSecure;
+        this.csrfCookieSameSite = csrfCookieSameSite;
     }
 
     @Bean
@@ -40,12 +47,39 @@ public class SecurityConfiguration {
         return new BCryptPasswordEncoder();
     }
 
+    /**
+     * Cookie-backed CSRF tokens for the cross-origin SPA. The cookie is not
+     * HttpOnly so the token can also be read by same-origin tooling, but the
+     * Angular client never reads it: it obtains the token from {@code GET /csrf}
+     * because a host-only cookie is unreadable across origins. Secure and
+     * SameSite follow the session-cookie configuration so the CSRF cookie stays
+     * usable when the frontend and API are genuinely cross-site.
+     */
+    @Bean
+    public CookieCsrfTokenRepository csrfTokenRepository() {
+        CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        repository.setCookiePath("/");
+        repository.setCookieCustomizer(cookie -> cookie
+                .path("/")
+                .secure(csrfCookieSecure)
+                .sameSite(csrfCookieSameSite));
+        return repository;
+    }
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtRequestFilter jwtRequestFilter) throws Exception {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(csrf -> csrf.disable())
+                .csrf(csrf -> csrf
+                        .csrfTokenRepository(csrfTokenRepository())
+                        // The Stripe webhook authenticates by verified raw-body
+                        // signature and the internal bridge by x-internal-key;
+                        // neither is a browser cookie flow and both are blocked
+                        // at Nginx. Every other state-changing endpoint keeps
+                        // CSRF enforcement.
+                        .ignoringRequestMatchers("/payment/webhook", "/internal/**"))
                 .authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers("/csrf").permitAll()
                         .requestMatchers("/admin/login", "/admin/logout").permitAll()
                         .requestMatchers("/user/login", "/user/logout").permitAll()
                         .requestMatchers("/user/session").hasRole("USER")

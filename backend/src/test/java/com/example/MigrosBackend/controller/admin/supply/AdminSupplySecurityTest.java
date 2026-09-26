@@ -20,7 +20,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(AdminSupplyController.class)
@@ -48,7 +49,7 @@ class AdminSupplySecurityTest {
         String userToken = "user.jwt.token";
         when(tokenService.validateAndExtractAdmin(userToken)).thenThrow(new InvalidTokenException());
 
-        mockMvc.perform(get("/admin/supply/addCategory")
+        mockMvc.perform(post("/admin/supply/addCategory").with(csrf())
                         .param("categoryName", "Electronics")
                         .cookie(new Cookie(AuthCookies.ADMIN_SESSION_COOKIE_NAME, userToken)))
                 .andExpect(status().isForbidden());
@@ -63,7 +64,7 @@ class AdminSupplySecurityTest {
         when(tokenService.validateAndExtractAdmin(adminToken)).thenReturn("ghost@example.com");
         when(adminEntityRepository.findByAdminName("ghost@example.com")).thenReturn(null);
 
-        mockMvc.perform(get("/admin/supply/addCategory")
+        mockMvc.perform(post("/admin/supply/addCategory").with(csrf())
                         .param("categoryName", "Electronics")
                         .cookie(new Cookie(AuthCookies.ADMIN_SESSION_COOKIE_NAME, adminToken)))
                 .andExpect(status().isForbidden());
@@ -77,7 +78,7 @@ class AdminSupplySecurityTest {
         when(tokenService.validateAndExtractAdmin(adminToken)).thenReturn("manager@example.com");
         when(adminEntityRepository.findByAdminName("manager@example.com")).thenReturn(new AdminEntity());
 
-        mockMvc.perform(get("/admin/supply/addCategory")
+        mockMvc.perform(post("/admin/supply/addCategory").with(csrf())
                         .param("categoryName", "Electronics")
                         .cookie(new Cookie(AuthCookies.ADMIN_SESSION_COOKIE_NAME, adminToken)))
                 .andExpect(status().isOk());
@@ -87,7 +88,7 @@ class AdminSupplySecurityTest {
 
     @Test
     void bearerHeader_CannotAuthenticateAdminPath() throws Exception {
-        mockMvc.perform(get("/admin/supply/addCategory")
+        mockMvc.perform(post("/admin/supply/addCategory").with(csrf())
                         .param("categoryName", "Electronics")
                         .header("Authorization", "Bearer some.jwt.token"))
                 .andExpect(status().isForbidden());
@@ -98,7 +99,7 @@ class AdminSupplySecurityTest {
 
     @Test
     void userCookie_CannotAuthenticateAdminPath() throws Exception {
-        mockMvc.perform(get("/admin/supply/addCategory")
+        mockMvc.perform(post("/admin/supply/addCategory").with(csrf())
                         .param("categoryName", "Electronics")
                         .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "user.cookie.token")))
                 .andExpect(status().isForbidden());

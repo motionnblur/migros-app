@@ -33,6 +33,7 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -158,6 +159,7 @@ class SecurityAccessRulesTest {
         when(authCookieService.createUserSessionCookie("token")).thenReturn(cookie);
 
         mockMvc.perform(post("/user/login")
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isOk());
@@ -165,20 +167,20 @@ class SecurityAccessRulesTest {
 
     @Test
     void noCredentials_AreForbiddenOnCheckoutPrepare() throws Exception {
-        mockMvc.perform(post("/payment/checkouts"))
+        mockMvc.perform(post("/payment/checkouts").with(csrf()))
                 .andExpect(status().isForbidden());
     }
 
     @Test
     @WithMockUser(roles = "ADMIN")
     void adminAuthority_IsForbiddenOnCheckoutPrepare() throws Exception {
-        mockMvc.perform(post("/payment/checkouts"))
+        mockMvc.perform(post("/payment/checkouts").with(csrf()))
                 .andExpect(status().isForbidden());
     }
 
     @Test
     void noCredentials_AreForbiddenOnCheckoutCharge() throws Exception {
-        mockMvc.perform(post("/payment/checkouts/{checkoutId}/charge", UUID.randomUUID()))
+        mockMvc.perform(post("/payment/checkouts/{checkoutId}/charge", UUID.randomUUID()).with(csrf()))
                 .andExpect(status().isForbidden());
     }
 
@@ -190,7 +192,7 @@ class SecurityAccessRulesTest {
 
     @Test
     void noCredentials_AreForbiddenOnCheckoutCancel() throws Exception {
-        mockMvc.perform(post("/payment/checkouts/{checkoutId}/cancel", UUID.randomUUID()))
+        mockMvc.perform(post("/payment/checkouts/{checkoutId}/cancel", UUID.randomUUID()).with(csrf()))
                 .andExpect(status().isForbidden());
     }
 
@@ -201,7 +203,7 @@ class SecurityAccessRulesTest {
         when(checkoutService.prepareCheckout("token")).thenReturn(new CheckoutResponseDto(
                 "checkout-id", "PREPARED", new BigDecimal("10.00"), 1000L, "try", null, null));
 
-        mockMvc.perform(post("/payment/checkouts"))
+        mockMvc.perform(post("/payment/checkouts").with(csrf()))
                 .andExpect(status().isOk());
     }
 }

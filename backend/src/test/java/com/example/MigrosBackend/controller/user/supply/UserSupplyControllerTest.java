@@ -106,7 +106,7 @@ class UserSupplyControllerTest {
         when(authTokenResolver.requireToken(SESSION_TOKEN)).thenReturn(SESSION_TOKEN);
         doNothing().when(userSupplyService).addProductToInventory(1L, SESSION_TOKEN);
 
-        mockMvc.perform(get("/user/supply/addProductToUserCart")
+        mockMvc.perform(post("/user/supply/addProductToUserCart")
                         .param("productId", "1")
                         .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, SESSION_TOKEN)))
                 .andExpect(status().isOk());
@@ -115,10 +115,20 @@ class UserSupplyControllerTest {
     }
 
     @Test
+    void addProductToUserCart_shouldReturnMethodNotAllowed_whenRequestedWithGet() throws Exception {
+        mockMvc.perform(get("/user/supply/addProductToUserCart")
+                        .param("productId", "1")
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, SESSION_TOKEN)))
+                .andExpect(status().isMethodNotAllowed());
+
+        verify(userSupplyService, never()).addProductToInventory(anyLong(), anyString());
+    }
+
+    @Test
     void addProductToUserCart_shouldReturnNotFound_whenCookieMissing() throws Exception {
         when(authTokenResolver.requireToken(null)).thenThrow(new TokenNotFoundException());
 
-        mockMvc.perform(get("/user/supply/addProductToUserCart")
+        mockMvc.perform(post("/user/supply/addProductToUserCart")
                         .param("productId", "1"))
                 .andExpect(status().isNotFound());
     }
@@ -359,7 +369,7 @@ class UserSupplyControllerTest {
         when(authTokenResolver.requireToken(SESSION_TOKEN)).thenReturn(SESSION_TOKEN);
         doNothing().when(userSupplyService).updateProductCountInInventory(productId, count, SESSION_TOKEN);
 
-        mockMvc.perform(get("/user/supply/updateProductCountInUserCart")
+        mockMvc.perform(post("/user/supply/updateProductCountInUserCart")
                         .param("productId", productId.toString())
                         .param("count", String.valueOf(count))
                         .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, SESSION_TOKEN))
@@ -367,6 +377,17 @@ class UserSupplyControllerTest {
                 .andExpect(status().isOk());
 
         verify(userSupplyService, times(1)).updateProductCountInInventory(productId, count, SESSION_TOKEN);
+    }
+
+    @Test
+    void updateProductCountInUserCart_ShouldReturnMethodNotAllowed_whenRequestedWithGet() throws Exception {
+        mockMvc.perform(get("/user/supply/updateProductCountInUserCart")
+                        .param("productId", "101")
+                        .param("count", "5")
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, SESSION_TOKEN)))
+                .andExpect(status().isMethodNotAllowed());
+
+        verify(userSupplyService, never()).updateProductCountInInventory(anyLong(), anyInt(), anyString());
     }
 
     @Test

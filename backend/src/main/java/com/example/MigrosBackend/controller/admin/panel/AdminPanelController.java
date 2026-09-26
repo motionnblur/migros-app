@@ -106,7 +106,7 @@ public class AdminPanelController {
         return ResponseEntity.ok(userOrderService.getUserProfileData(orderId));
     }
 
-    @GetMapping("updateOrderStatus")
+    @PostMapping("updateOrderStatus")
     public ResponseEntity<Void> updateOrderStatus(@RequestParam Long orderId, @RequestParam String status) {
         userOrderService.updateOrderStatus(orderId, status);
         return ResponseEntity.ok().build();
