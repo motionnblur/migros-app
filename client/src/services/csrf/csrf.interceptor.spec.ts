@@ -1,5 +1,10 @@
 import { TestBed } from '@angular/core/testing';
-import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
+import {
+  HttpClient,
+  HttpErrorResponse,
+  provideHttpClient,
+  withInterceptors,
+} from '@angular/common/http';
 import {
   HttpTestingController,
   provideHttpClientTesting,
@@ -118,7 +123,10 @@ describe('csrfInterceptor', () => {
 
     const firstAttempt = httpMock.expectOne('/user/login');
     expect(firstAttempt.request.headers.get('X-XSRF-TOKEN')).toBe('expired-token');
-    firstAttempt.flush('', { status: 403, statusText: 'Forbidden' });
+    firstAttempt.flush(
+      { code: 'CSRF_INVALID' },
+      { status: 403, statusText: 'Forbidden' },
+    );
 
     httpMock
       .expectOne('/csrf')
@@ -147,7 +155,10 @@ describe('csrfInterceptor', () => {
 
     httpMock
       .expectOne('/user/login')
-      .flush('', { status: 403, statusText: 'Forbidden' });
+      .flush(
+        { code: 'CSRF_INVALID' },
+        { status: 403, statusText: 'Forbidden' },
+      );
 
     httpMock
       .expectOne('/csrf')
@@ -155,10 +166,58 @@ describe('csrfInterceptor', () => {
 
     httpMock
       .expectOne('/user/login')
-      .flush('', { status: 403, statusText: 'Forbidden' });
+      .flush(
+        { code: 'CSRF_INVALID' },
+        { status: 403, statusText: 'Forbidden' },
+      );
 
     httpMock.expectNone('/csrf');
     httpMock.expectNone('/user/login');
     expect((error as { status?: number })?.status).toBe(403);
+  });
+
+  it('does not refresh or replay an ordinary 403', () => {
+    let error: HttpErrorResponse | null = null;
+    client.post('/user/login', {}).subscribe({
+      error: (err) => {
+        error = err;
+      },
+    });
+
+    httpMock
+      .expectOne('/csrf')
+      .flush({ token: 'token-123', headerName: 'X-XSRF-TOKEN' });
+
+    httpMock
+      .expectOne('/user/login')
+      .flush(
+        { message: 'Not allowed' },
+        { status: 403, statusText: 'Forbidden' },
+      );
+
+    expect((error as HttpErrorResponse | null)?.status).toBe(403);
+    httpMock.expectNone('/csrf');
+    httpMock.expectNone('/user/login');
+  });
+
+  it('does not replay a 403 with malformed error content', () => {
+    let error: HttpErrorResponse | null = null;
+    client.post('/user/login', {}).subscribe({
+      error: (err) => {
+        error = err;
+      },
+    });
+
+    httpMock
+      .expectOne('/csrf')
+      .flush({ token: 'token-123', headerName: 'X-XSRF-TOKEN' });
+
+    httpMock
+      .expectOne('/user/login')
+      .flush('not-json', { status: 403, statusText: 'Forbidden' });
+
+    expect((error as HttpErrorResponse | null)?.status).toBe(403);
+    httpMock.expectNone('/csrf');
+    httpMock.expectNone('/user/login');
   });
 });

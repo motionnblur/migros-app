@@ -1,6 +1,7 @@
 package com.example.MigrosBackend.config.security;
 
 import com.example.MigrosBackend.filter.JwtRequestFilter;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -10,6 +11,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.web.cors.CorsConfiguration;
@@ -66,10 +68,23 @@ public class SecurityConfiguration {
         return repository;
     }
 
+    /**
+     * Reports CSRF-filter failures as a stable JSON code so the SPA can tell
+     * them apart from ordinary authorization denials. Spring Security installs
+     * this handler on both the CSRF filter and the exception translation filter,
+     * so every non-CSRF denial keeps the standard behavior.
+     */
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtRequestFilter jwtRequestFilter) throws Exception {
+    public AccessDeniedHandler csrfAccessDeniedHandler(ObjectMapper objectMapper) {
+        return new CsrfAccessDeniedHandler(objectMapper);
+    }
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtRequestFilter jwtRequestFilter,
+            AccessDeniedHandler csrfAccessDeniedHandler) throws Exception {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .exceptionHandling(exception -> exception.accessDeniedHandler(csrfAccessDeniedHandler))
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokenRepository())
                         // The Stripe webhook authenticates by verified raw-body

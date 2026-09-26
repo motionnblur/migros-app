@@ -27,6 +27,7 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockServletContext;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.DefaultCsrfToken;
 import org.springframework.test.context.TestPropertySource;
@@ -170,6 +171,40 @@ class SecurityCsrfTest {
                         .cookie(new Cookie(CSRF_COOKIE_NAME, csrfCookieValue(csrfResult)))
                         .header(CSRF_HEADER_NAME, "not-the-token"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void missingTokenReturnsStableCsrfErrorCode() throws Exception {
+        when(tokenService.validateAndExtractUser(USER_TOKEN)).thenReturn("user@example.com");
+
+        mockMvc.perform(post("/user/profile/csrf-probe/mutate")
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, USER_TOKEN)))
+                .andExpect(status().isForbidden())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("CSRF_INVALID"));
+    }
+
+    @Test
+    void mismatchedTokenReturnsStableCsrfErrorCode() throws Exception {
+        when(tokenService.validateAndExtractUser(USER_TOKEN)).thenReturn("user@example.com");
+
+        MvcResult csrfResult = obtainCsrfToken();
+
+        mockMvc.perform(post("/user/profile/csrf-probe/mutate")
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, USER_TOKEN))
+                        .cookie(new Cookie(CSRF_COOKIE_NAME, csrfCookieValue(csrfResult)))
+                        .header(CSRF_HEADER_NAME, "not-the-token"))
+                .andExpect(status().isForbidden())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("CSRF_INVALID"));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void ordinaryForbiddenResponseIsNotLabeledAsCsrfFailure() throws Exception {
+        mockMvc.perform(get("/admin/panel/csrf-probe/read"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").doesNotExist());
     }
 
     @Test

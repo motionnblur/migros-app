@@ -1,4 +1,5 @@
 import {
+  HttpErrorResponse,
   HttpEvent,
   HttpInterceptorFn,
   HttpRequest,
@@ -12,6 +13,19 @@ import {
   CsrfTokenService,
   CsrfTokenUnavailableError,
 } from './csrf-token.service';
+
+/**
+ * Identifies the stable error the API returns when Spring's CSRF filter
+ * rejects a request. Only this code triggers a token refresh and replay;
+ * ordinary authorization or domain `403` responses are returned unchanged.
+ */
+export function isCsrfFailure(error: unknown): error is HttpErrorResponse {
+  if (!(error instanceof HttpErrorResponse) || error.status !== 403) {
+    return false;
+  }
+  const body = error.error as { code?: unknown } | null | undefined;
+  return !!body && body.code === 'CSRF_INVALID';
+}
 
 /**
  * Attaches the in-memory CSRF token to state-changing API requests, and
@@ -45,7 +59,7 @@ function sendWithToken(
 
       return next(req.clone({ setHeaders: { [headerName]: token } })).pipe(
         catchError((error) => {
-          if (allowRefresh && error?.status === 403) {
+          if (allowRefresh && isCsrfFailure(error)) {
             return csrfTokenService.refreshToken().pipe(
               catchError((refreshError) =>
                 throwError(() => new CsrfTokenUnavailableError(refreshError)),
