@@ -163,4 +163,49 @@ describe('PaymentComponent', () => {
     expect(component.pendingMessage).toContain('processed');
     expect(component.isProcessing).toBeTrue();
   });
+
+  it('cancels a prepared checkout when the modal is closed before payment', () => {
+    restService.cancelCheckout.and.returnValue(of({ ...checkout }));
+    const closed = spyOn(component.closePaymentComponentEvent, 'emit');
+    component.checkout = { ...checkout, status: 'PREPARED' };
+    component.isProcessing = false;
+
+    component.closePaymentComponent();
+
+    expect(restService.cancelCheckout).toHaveBeenCalledWith('checkout-1');
+    expect(closed).toHaveBeenCalled();
+  });
+
+  it('never cancels a processing checkout when the modal is closed', () => {
+    restService.cancelCheckout.calls.reset();
+    const closed = spyOn(component.closePaymentComponentEvent, 'emit');
+    component.checkout = { ...checkout, status: 'PAYMENT_PROCESSING' };
+    component.isProcessing = true;
+
+    component.closePaymentComponent();
+
+    expect(restService.cancelCheckout).not.toHaveBeenCalled();
+    expect(closed).not.toHaveBeenCalled();
+    expect(component.pendingMessage).toContain('still being verified');
+  });
+
+  it('never cancels when the local status already moved to processing', () => {
+    restService.cancelCheckout.calls.reset();
+    component.checkout = { ...checkout, status: 'PAYMENT_PROCESSING' };
+    component.isProcessing = false;
+
+    component.closePaymentComponent();
+
+    expect(restService.cancelCheckout).not.toHaveBeenCalled();
+  });
+
+  it('does not start a replacement checkout while payment is processing', () => {
+    restService.prepareCheckout.calls.reset();
+    component.checkout = { ...checkout, status: 'PAYMENT_PROCESSING' };
+    component.isProcessing = true;
+
+    component.prepareCheckout();
+
+    expect(restService.prepareCheckout).not.toHaveBeenCalled();
+  });
 });

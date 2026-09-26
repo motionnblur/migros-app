@@ -54,6 +54,12 @@ export class PaymentComponent implements OnInit {
     if (this.isPreparing || this.isProcessing) {
       return;
     }
+    // Never start a replacement checkout while the previous one may have money
+    // in flight. The server also rejects this with a conflict, but the client
+    // must not even attempt it.
+    if (this.checkout?.status === 'PAYMENT_PROCESSING') {
+      return;
+    }
     this.isPreparing = true;
     this.restService.prepareCheckout().subscribe({
       next: (checkout: ICheckoutResponse) => {
@@ -95,6 +101,12 @@ export class PaymentComponent implements OnInit {
 
   processPayment(token: any) {
     const checkoutId = this.checkout!.checkoutId;
+    // Mark the local snapshot as processing so a modal close can never treat
+    // it as a plain prepared checkout. The server moves it to
+    // PAYMENT_PROCESSING during the claim before the provider call.
+    if (this.checkout) {
+      this.checkout.status = 'PAYMENT_PROCESSING';
+    }
 
     this.restService.chargeCheckout(checkoutId, token.id).subscribe({
       next: (response) => {
@@ -177,6 +189,30 @@ export class PaymentComponent implements OnInit {
   }
 
   public closePaymentComponent() {
+    // A processing checkout may have a charge in flight: never cancel it.
+    // Keep polling the same checkout or tell the user verification is pending.
+    // Only an untouched PREPARED checkout may be cancelled to return stock.
+    if (this.isProcessing || this.checkout?.status === 'PAYMENT_PROCESSING') {
+      this.pendingMessage =
+        'Payment is still being verified. Please wait and check your orders before retrying.';
+      return;
+    }
+    const checkoutId = this.checkout?.checkoutId;
+    if (checkoutId && this.checkout?.status === 'PREPARED') {
+      this.restService.cancelCheckout(checkoutId).subscribe({
+        next: () => {
+          this.checkout = null;
+          this.closePaymentComponentEvent.emit();
+        },
+        error: () => {
+          // Fail closed on the UI as well: the reservation stays server-side
+          // for status recovery even if the modal closes.
+          this.checkout = null;
+          this.closePaymentComponentEvent.emit();
+        },
+      });
+      return;
+    }
     this.closePaymentComponentEvent.emit();
   }
 }

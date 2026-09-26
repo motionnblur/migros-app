@@ -6,6 +6,8 @@ import com.example.MigrosBackend.dto.payment.CheckoutStatusDto;
 import com.example.MigrosBackend.entity.checkout.CheckoutEntity;
 import com.example.MigrosBackend.entity.checkout.CheckoutItemEntity;
 import com.example.MigrosBackend.entity.checkout.CheckoutStatus;
+import com.example.MigrosBackend.entity.payment.PaymentAttemptEntity;
+import com.example.MigrosBackend.entity.payment.PaymentAttemptStatus;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.user.OrderEntity;
 import com.example.MigrosBackend.entity.user.OrderGroupEntity;
@@ -19,6 +21,7 @@ import com.example.MigrosBackend.repository.user.CheckoutEntityRepository;
 import com.example.MigrosBackend.repository.user.CheckoutItemEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderGroupEntityRepository;
+import com.example.MigrosBackend.repository.user.PaymentAttemptEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
 import org.springframework.beans.factory.annotation.Value;
@@ -53,6 +56,7 @@ public class CheckoutService {
     private final CheckoutItemEntityRepository checkoutItemEntityRepository;
     private final OrderGroupEntityRepository orderGroupEntityRepository;
     private final OrderEntityRepository orderEntityRepository;
+    private final PaymentAttemptEntityRepository paymentAttemptEntityRepository;
     private final PaymentAmountConverter paymentAmountConverter;
     private final int checkoutTtlMinutes;
 
@@ -63,6 +67,7 @@ public class CheckoutService {
                            CheckoutItemEntityRepository checkoutItemEntityRepository,
                            OrderGroupEntityRepository orderGroupEntityRepository,
                            OrderEntityRepository orderEntityRepository,
+                           PaymentAttemptEntityRepository paymentAttemptEntityRepository,
                            PaymentAmountConverter paymentAmountConverter,
                            @Value("${payment.checkout.ttl-minutes:15}") int checkoutTtlMinutes) {
         this.tokenService = tokenService;
@@ -72,6 +77,7 @@ public class CheckoutService {
         this.checkoutItemEntityRepository = checkoutItemEntityRepository;
         this.orderGroupEntityRepository = orderGroupEntityRepository;
         this.orderEntityRepository = orderEntityRepository;
+        this.paymentAttemptEntityRepository = paymentAttemptEntityRepository;
         this.paymentAmountConverter = paymentAmountConverter;
         this.checkoutTtlMinutes = checkoutTtlMinutes;
     }
@@ -186,7 +192,13 @@ public class CheckoutService {
         if (checkout.getStatus() == CheckoutStatus.PAID || checkout.getStatus() == CheckoutStatus.CONSUMED) {
             throw new CheckoutStateException("A paid checkout cannot be cancelled");
         }
-        if (checkout.getStatus().isLive()) {
+        if (checkout.getStatus() == CheckoutStatus.PAYMENT_PROCESSING) {
+            // Money may be moving: the reservation must be kept until the
+            // provider outcome is durably resolved via the payment status path.
+            throw new CheckoutStateException(
+                    "Payment is still processing and cannot be cancelled; check payment status");
+        }
+        if (checkout.getStatus().isUserCancellable()) {
             releaseReservation(checkout);
             checkout.setStatus(CheckoutStatus.CANCELLED);
             checkout.setUpdatedAt(now);
@@ -253,10 +265,28 @@ public class CheckoutService {
         return toStatus(checkout);
     }
 
+    /**
+     * Internal payment-workflow transition only. Releases the reservation for a
+     * processing checkout when, and only when, the linked payment attempt proves
+     * that no charge occurred (terminal {@code FAILED_FINAL} with no stored
+     * charge id). Ambiguous outcomes, stale leases, and missing attempts fail
+     * closed and keep the reservation for reconciliation.
+     */
     @Transactional
     public void failPayment(UUID checkoutId) {
         CheckoutEntity checkout = checkoutEntityRepository.findByIdForUpdate(checkoutId).orElse(null);
         if (checkout == null || checkout.getStatus() != CheckoutStatus.PAYMENT_PROCESSING) {
+            return;
+        }
+        // Non-locking read on purpose: the decline caller already holds the
+        // attempt row lock in the same transaction, and this guard must fail
+        // closed without introducing a new checkout->attempt lock ordering.
+        PaymentAttemptEntity attempt = paymentAttemptEntityRepository.findByCheckoutId(checkoutId)
+                .orElse(null);
+        if (attempt == null || attempt.getStatus() != PaymentAttemptStatus.FAILED_FINAL) {
+            return;
+        }
+        if (attempt.getStripeChargeId() != null || attempt.getStatus().hasDurableCharge()) {
             return;
         }
         releaseReservation(checkout);

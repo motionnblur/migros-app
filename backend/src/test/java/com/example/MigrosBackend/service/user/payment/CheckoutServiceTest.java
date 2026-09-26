@@ -6,6 +6,8 @@ import com.example.MigrosBackend.dto.payment.CheckoutStatusDto;
 import com.example.MigrosBackend.entity.checkout.CheckoutEntity;
 import com.example.MigrosBackend.entity.checkout.CheckoutItemEntity;
 import com.example.MigrosBackend.entity.checkout.CheckoutStatus;
+import com.example.MigrosBackend.entity.payment.PaymentAttemptEntity;
+import com.example.MigrosBackend.entity.payment.PaymentAttemptStatus;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.user.OrderEntity;
 import com.example.MigrosBackend.entity.user.OrderGroupEntity;
@@ -68,6 +70,8 @@ class CheckoutServiceTest {
     private OrderGroupEntityRepository orderGroupEntityRepository;
     @Mock
     private OrderEntityRepository orderEntityRepository;
+    @Mock
+    private com.example.MigrosBackend.repository.user.PaymentAttemptEntityRepository paymentAttemptEntityRepository;
 
     private final PaymentAmountConverter converter = new PaymentAmountConverter("try");
 
@@ -84,6 +88,7 @@ class CheckoutServiceTest {
                 checkoutItemEntityRepository,
                 orderGroupEntityRepository,
                 orderEntityRepository,
+                paymentAttemptEntityRepository,
                 converter,
                 15);
 
@@ -341,6 +346,124 @@ class CheckoutServiceTest {
         when(checkoutEntityRepository.findOwnedByIdForUpdate(paid.getId(), 42L)).thenReturn(Optional.of(paid));
 
         assertThrows(CheckoutStateException.class, () -> checkoutService.cancelCheckout(TOKEN, paid.getId()));
+        verify(productEntityRepository, never()).incrementStock(anyLong(), anyInt());
+    }
+
+    @Test
+    void cancelCheckout_RefusesConsumedCheckout() {
+        stubAuthenticatedUser();
+        CheckoutEntity consumed = checkout(CheckoutStatus.CONSUMED, "10.00");
+        when(checkoutEntityRepository.findOwnedByIdForUpdate(consumed.getId(), 42L)).thenReturn(Optional.of(consumed));
+
+        assertThrows(CheckoutStateException.class, () -> checkoutService.cancelCheckout(TOKEN, consumed.getId()));
+        verify(productEntityRepository, never()).incrementStock(anyLong(), anyInt());
+    }
+
+    @Test
+    void cancelCheckout_RejectsProcessingCheckoutWithoutReleasingStock() {
+        stubAuthenticatedUser();
+        CheckoutEntity processing = checkout(CheckoutStatus.PAYMENT_PROCESSING, "10.00");
+        when(checkoutEntityRepository.findOwnedByIdForUpdate(processing.getId(), 42L))
+                .thenReturn(Optional.of(processing));
+
+        CheckoutStateException ex = assertThrows(CheckoutStateException.class,
+                () -> checkoutService.cancelCheckout(TOKEN, processing.getId()));
+        assertTrue(ex.getMessage().toLowerCase().contains("processing"));
+        assertEquals(CheckoutStatus.PAYMENT_PROCESSING, processing.getStatus());
+        verify(productEntityRepository, never()).incrementStock(anyLong(), anyInt());
+        verify(checkoutItemEntityRepository, never()).findByCheckout_IdOrderByProductIdAsc(any());
+    }
+
+    @Test
+    void cancelCheckout_IsIdempotentForExpiredCheckout() {
+        stubAuthenticatedUser();
+        CheckoutEntity expired = checkout(CheckoutStatus.EXPIRED, "10.00");
+        when(checkoutEntityRepository.findOwnedByIdForUpdate(expired.getId(), 42L)).thenReturn(Optional.of(expired));
+
+        CheckoutStatusDto status = checkoutService.cancelCheckout(TOKEN, expired.getId());
+
+        assertEquals("EXPIRED", status.status());
+        verify(productEntityRepository, never()).incrementStock(anyLong(), anyInt());
+    }
+
+    @Test
+    void checkoutStatus_OnlyPreparedIsUserCancellable() {
+        assertTrue(CheckoutStatus.PREPARED.isUserCancellable());
+        assertTrue(!CheckoutStatus.PAYMENT_PROCESSING.isUserCancellable());
+        assertTrue(!CheckoutStatus.PAID.isUserCancellable());
+        assertTrue(!CheckoutStatus.CONSUMED.isUserCancellable());
+        assertTrue(!CheckoutStatus.CANCELLED.isUserCancellable());
+        assertTrue(!CheckoutStatus.EXPIRED.isUserCancellable());
+        // PAYMENT_PROCESSING must stay live so the one-live-checkout rule still blocks replacements.
+        assertTrue(CheckoutStatus.PAYMENT_PROCESSING.isLive());
+    }
+
+    private PaymentAttemptEntity paymentAttempt(UUID checkoutId, PaymentAttemptStatus status, String chargeId) {
+        PaymentAttemptEntity attempt = new PaymentAttemptEntity();
+        attempt.setId(UUID.randomUUID());
+        CheckoutEntity ref = new CheckoutEntity();
+        ref.setId(checkoutId);
+        attempt.setCheckout(ref);
+        attempt.setIdempotencyKey("checkout:" + checkoutId + ":charge-v1");
+        attempt.setAmountMinor(1000L);
+        attempt.setCurrency("try");
+        attempt.setStatus(status);
+        attempt.setStripeChargeId(chargeId);
+        attempt.setCreatedAt(LocalDateTime.now());
+        attempt.setUpdatedAt(LocalDateTime.now());
+        return attempt;
+    }
+
+    @Test
+    void failPayment_ReleasesStockOnlyForProvenFailedFinalAttempt() {
+        CheckoutEntity processing = checkout(CheckoutStatus.PAYMENT_PROCESSING, "10.00");
+        when(checkoutEntityRepository.findByIdForUpdate(processing.getId())).thenReturn(Optional.of(processing));
+        when(paymentAttemptEntityRepository.findByCheckoutId(processing.getId()))
+                .thenReturn(Optional.of(paymentAttempt(processing.getId(), PaymentAttemptStatus.FAILED_FINAL, null)));
+        when(checkoutItemEntityRepository.findByCheckout_IdOrderByProductIdAsc(processing.getId()))
+                .thenReturn(List.of(item(processing, 101L, 2, "5.00", "10.00")));
+
+        checkoutService.failPayment(processing.getId());
+
+        assertEquals(CheckoutStatus.CANCELLED, processing.getStatus());
+        verify(productEntityRepository, times(1)).incrementStock(101L, 2);
+    }
+
+    @Test
+    void failPayment_KeepsReservationWhenAttemptStillProcessing() {
+        CheckoutEntity processing = checkout(CheckoutStatus.PAYMENT_PROCESSING, "10.00");
+        when(checkoutEntityRepository.findByIdForUpdate(processing.getId())).thenReturn(Optional.of(processing));
+        when(paymentAttemptEntityRepository.findByCheckoutId(processing.getId()))
+                .thenReturn(Optional.of(paymentAttempt(processing.getId(), PaymentAttemptStatus.PROCESSING, null)));
+
+        checkoutService.failPayment(processing.getId());
+
+        assertEquals(CheckoutStatus.PAYMENT_PROCESSING, processing.getStatus());
+        verify(productEntityRepository, never()).incrementStock(anyLong(), anyInt());
+    }
+
+    @Test
+    void failPayment_KeepsReservationWhenNoAttemptProvesNoCharge() {
+        CheckoutEntity processing = checkout(CheckoutStatus.PAYMENT_PROCESSING, "10.00");
+        when(checkoutEntityRepository.findByIdForUpdate(processing.getId())).thenReturn(Optional.of(processing));
+        when(paymentAttemptEntityRepository.findByCheckoutId(processing.getId())).thenReturn(Optional.empty());
+
+        checkoutService.failPayment(processing.getId());
+
+        assertEquals(CheckoutStatus.PAYMENT_PROCESSING, processing.getStatus());
+        verify(productEntityRepository, never()).incrementStock(anyLong(), anyInt());
+    }
+
+    @Test
+    void failPayment_KeepsReservationWhenChargeIdPresent() {
+        CheckoutEntity processing = checkout(CheckoutStatus.PAYMENT_PROCESSING, "10.00");
+        when(checkoutEntityRepository.findByIdForUpdate(processing.getId())).thenReturn(Optional.of(processing));
+        when(paymentAttemptEntityRepository.findByCheckoutId(processing.getId()))
+                .thenReturn(Optional.of(paymentAttempt(processing.getId(), PaymentAttemptStatus.FAILED_FINAL, "ch_1")));
+
+        checkoutService.failPayment(processing.getId());
+
+        assertEquals(CheckoutStatus.PAYMENT_PROCESSING, processing.getStatus());
         verify(productEntityRepository, never()).incrementStock(anyLong(), anyInt());
     }
 

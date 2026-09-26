@@ -26,6 +26,15 @@ public enum CheckoutStatus {
         return this == PREPARED || this == PAYMENT_PROCESSING;
     }
 
+    /**
+     * Only a PREPARED checkout may be cancelled by the user. A
+     * PAYMENT_PROCESSING checkout may have money in flight and must keep its
+     * reservation until the provider outcome is durably resolved.
+     */
+    public boolean isUserCancellable() {
+        return this == PREPARED;
+    }
+
     public boolean isTerminal() {
         return this == CONSUMED || this == CANCELLED || this == EXPIRED;
     }

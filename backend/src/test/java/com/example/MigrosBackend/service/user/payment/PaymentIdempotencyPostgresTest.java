@@ -1,12 +1,14 @@
 package com.example.MigrosBackend.service.user.payment;
 
 import com.example.MigrosBackend.dto.payment.CheckoutResponseDto;
+import com.example.MigrosBackend.dto.payment.CheckoutStatusDto;
 import com.example.MigrosBackend.dto.payment.PaymentResponseDto;
 import com.example.MigrosBackend.entity.payment.PaymentAttemptEntity;
 import com.example.MigrosBackend.entity.payment.PaymentAttemptStatus;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.user.OrderGroupEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
+import com.example.MigrosBackend.exception.user.CheckoutStateException;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderGroupEntityRepository;
@@ -386,6 +388,143 @@ class PaymentIdempotencyPostgresTest {
         List<OrderGroupEntity> groups = orderGroupEntityRepository.findAll();
         assertEquals(1, groups.size());
         assertEquals(1, orderEntityRepository.findAll().size());
+    }
+
+    @Test
+    void concurrentCancelDuringInFlightChargeCannotPreventOrderFinalization() throws Exception {
+        ProductEntity product = createProduct("10.00", 5);
+        UserEntity user = createUser("buyer@migros.com", product.getId());
+        String token = token(user);
+        UUID checkoutId = UUID.fromString(checkoutService.prepareCheckout(token).checkoutId());
+        assertEquals(4, productEntityRepository.findById(product.getId()).orElseThrow().getProductCount());
+
+        CountDownLatch enteredProvider = new CountDownLatch(1);
+        CountDownLatch releaseProvider = new CountDownLatch(1);
+        when(stripePaymentGateway.charge(anyString(), anyLong(), anyString(), anyString(), anyString()))
+                .thenAnswer(invocation -> {
+                    enteredProvider.countDown();
+                    assertTrue(releaseProvider.await(30, TimeUnit.SECONDS));
+                    return paidCharge("ch_race_cancel", invocation.getArgument(1),
+                            invocation.getArgument(2), invocation.getArgument(4));
+                });
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<PaymentResponseDto> chargeFuture = pool.submit(
+                    () -> userPaymentService.processCharge(checkoutId, "tok_visa", token));
+            assertTrue(enteredProvider.await(30, TimeUnit.SECONDS));
+
+            // The checkout is now PAYMENT_PROCESSING with a charge in flight.
+            // A concurrent user cancellation must be rejected without touching stock.
+            Future<?> cancelFuture = pool.submit(() -> {
+                try {
+                    checkoutService.cancelCheckout(token, checkoutId);
+                    throw new AssertionError("cancel of a processing checkout must be rejected");
+                } catch (CheckoutStateException expected) {
+                    // Expected: reconciliation stays pending, reservation is kept.
+                }
+                return null;
+            });
+            cancelFuture.get(30, TimeUnit.SECONDS);
+
+            releaseProvider.countDown();
+            PaymentResponseDto chargeResponse = chargeFuture.get(30, TimeUnit.SECONDS);
+            assertTrue(chargeResponse.success());
+        } finally {
+            releaseProvider.countDown();
+            pool.shutdownNow();
+        }
+
+        verify(stripePaymentGateway, times(1))
+                .charge(anyString(), anyLong(), anyString(), anyString(), anyString());
+        assertEquals(1, orderGroupEntityRepository.findAll().size(),
+                "exactly one order group must be finalized");
+        assertEquals(1, orderEntityRepository.findAll().size());
+        assertEquals(4, productEntityRepository.findById(product.getId()).orElseThrow().getProductCount(),
+                "stock must stay reserved; the concurrent cancel must not restore it");
+        CheckoutStatusDto status = checkoutService.getCheckout(token, checkoutId);
+        assertEquals("CONSUMED", status.status());
+    }
+
+    @Test
+    void cancellingProcessingCheckoutDirectlyIsRejectedAndKeepsReservation() {
+        ProductEntity product = createProduct("10.00", 5);
+        UserEntity user = createUser("buyer@migros.com", product.getId());
+        String token = token(user);
+        UUID checkoutId = UUID.fromString(checkoutService.prepareCheckout(token).checkoutId());
+        checkoutService.beginPayment(token, checkoutId);
+
+        assertThrows(CheckoutStateException.class,
+                () -> checkoutService.cancelCheckout(token, checkoutId));
+        assertEquals(4, productEntityRepository.findById(product.getId()).orElseThrow().getProductCount());
+        assertEquals("PAYMENT_PROCESSING",
+                checkoutService.getCheckout(token, checkoutId).status());
+    }
+
+    @Test
+    void providerDeclineReleasesStockOnceAndCancelsProcessingCheckout() throws Exception {
+        ProductEntity product = createProduct("10.00", 5);
+        UserEntity user = createUser("buyer@migros.com", product.getId());
+        String token = token(user);
+        UUID checkoutId = UUID.fromString(checkoutService.prepareCheckout(token).checkoutId());
+
+        CardException decline = org.mockito.Mockito.mock(CardException.class);
+        when(decline.getCode()).thenReturn("card_declined");
+        when(stripePaymentGateway.charge(anyString(), anyLong(), anyString(), anyString(), anyString()))
+                .thenThrow(decline);
+
+        PaymentResponseDto response = userPaymentService.processCharge(checkoutId, "tok_visa", token);
+
+        assertFalse(response.success());
+        assertFalse(response.pending());
+        assertEquals("FAILED_FINAL", response.state());
+        assertEquals(5, productEntityRepository.findById(product.getId()).orElseThrow().getProductCount(),
+                "a provider-confirmed decline must release the reservation exactly once");
+        assertEquals("CANCELLED", checkoutService.getCheckout(token, checkoutId).status());
+    }
+
+    @Test
+    void ambiguousProviderFailureKeepsReservationAndProcessingState() throws Exception {
+        ProductEntity product = createProduct("10.00", 5);
+        UserEntity user = createUser("buyer@migros.com", product.getId());
+        String token = token(user);
+        UUID checkoutId = UUID.fromString(checkoutService.prepareCheckout(token).checkoutId());
+
+        when(stripePaymentGateway.charge(anyString(), anyLong(), anyString(), anyString(), anyString()))
+                .thenThrow(new ApiConnectionException("timeout"));
+
+        PaymentResponseDto response = userPaymentService.processCharge(checkoutId, "tok_visa", token);
+
+        assertFalse(response.success());
+        assertTrue(response.pending());
+        assertEquals(4, productEntityRepository.findById(product.getId()).orElseThrow().getProductCount(),
+                "an ambiguous outcome is not proof of no-charge and must keep the reservation");
+        assertEquals("PAYMENT_PROCESSING",
+                checkoutService.getCheckout(token, checkoutId).status());
+    }
+
+    @Test
+    void staleLeaseAloneCannotReleaseStock() throws Exception {
+        ProductEntity product = createProduct("10.00", 5);
+        UserEntity user = createUser("buyer@migros.com", product.getId());
+        String token = token(user);
+        UUID checkoutId = UUID.fromString(checkoutService.prepareCheckout(token).checkoutId());
+
+        // Create a PROCESSING attempt with an ambiguous provider outcome.
+        when(stripePaymentGateway.charge(anyString(), anyLong(), anyString(), anyString(), anyString()))
+                .thenThrow(new ApiConnectionException("timeout"));
+        PaymentResponseDto ambiguous = userPaymentService.processCharge(checkoutId, "tok_visa", token);
+        assertTrue(ambiguous.pending());
+        UUID attemptId = paymentAttemptEntityRepository.findByCheckoutId(checkoutId).orElseThrow().getId();
+
+        jdbcTemplate.update("UPDATE payment_attempt_entity SET lease_expires_at = now() - interval '1 minute' "
+                + "WHERE attempt_id = ?", attemptId);
+
+        // No reconciliation trigger runs here: the checkout must stay processing
+        // with its reservation intact until authoritative provider evidence arrives.
+        assertEquals("PAYMENT_PROCESSING",
+                checkoutService.getCheckout(token, checkoutId).status());
+        assertEquals(4, productEntityRepository.findById(product.getId()).orElseThrow().getProductCount());
     }
 
     private PaymentResponseDto attemptWithAmbiguousProviderFailure(UUID checkoutId, String token)

@@ -195,6 +195,39 @@ class PaymentControllerTest {
     }
 
     @Test
+    void cancel_ReturnsConflictForProcessingCheckout() throws Exception {
+        when(authTokenResolver.requireToken("sample-token")).thenReturn("sample-token");
+        when(checkoutService.cancelCheckout("sample-token", checkoutId))
+                .thenThrow(new CheckoutStateException(
+                        "Payment is still processing and cannot be cancelled; check payment status"));
+
+        mockMvc.perform(post("/payment/checkouts/{checkoutId}/cancel", checkoutId)
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "sample-token")))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void cancel_ReturnsNotFoundWhenCookieMissing() throws Exception {
+        when(authTokenResolver.requireToken(null)).thenThrow(new TokenNotFoundException());
+
+        mockMvc.perform(post("/payment/checkouts/{checkoutId}/cancel", checkoutId))
+                .andExpect(status().isNotFound());
+
+        verify(checkoutService, never()).cancelCheckout(any(), any());
+    }
+
+    @Test
+    void cancel_OtherOwnerOrMissingIsNotFound() throws Exception {
+        when(authTokenResolver.requireToken("sample-token")).thenReturn("sample-token");
+        when(checkoutService.cancelCheckout("sample-token", checkoutId))
+                .thenThrow(new com.example.MigrosBackend.exception.user.CheckoutNotFoundException());
+
+        mockMvc.perform(post("/payment/checkouts/{checkoutId}/cancel", checkoutId)
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "sample-token")))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void prepareCheckout_DoesNotTrustBodyTotals() throws Exception {
         when(authTokenResolver.requireToken("sample-token")).thenReturn("sample-token");
         when(checkoutService.prepareCheckout("sample-token")).thenReturn(prepared());
