@@ -196,7 +196,7 @@ class PaymentAttemptMigrationPostgresTest {
     void migrationIsIdempotentAndRecordsVersionFour() throws SQLException {
         createBaseSchema();
         MigrateResult first = migrate();
-        assertEquals(4, first.migrationsExecuted, "V1, V2, V3 and V4 must run on a first migrate");
+        assertEquals(5, first.migrationsExecuted, "V1, V2, V3, V4 and V5 must run on a first migrate");
 
         MigrateResult second = migrate();
         assertEquals(0, second.migrationsExecuted);
@@ -211,18 +211,26 @@ class PaymentAttemptMigrationPostgresTest {
     }
 
     @Test
-    void migrationSkipsPaymentTablesWhenBaseSchemaIsMissing() throws SQLException {
-        // No base tables: V3/V4 are guarded and must not fail or create orphan tables.
+    void migrationBuildsCompletePaymentSchemaFromEmptyDatabase() throws SQLException {
+        // V5 owns completion: even with no base schema at all, Flyway alone must
+        // build the base tables plus fully constrained payment tables (no
+        // Hibernate runtime DDL required).
         MigrateResult result = migrate();
-        assertEquals(4, result.migrationsExecuted);
+        assertEquals(5, result.migrationsExecuted);
 
-        try (Connection connection = openConnection();
-             Statement statement = connection.createStatement();
-             ResultSet rs = statement.executeQuery(
-                     "SELECT COUNT(*) FROM information_schema.tables "
-                             + "WHERE table_schema = 'public' AND table_name = 'payment_attempt_entity'")) {
-            assertTrue(rs.next());
-            assertEquals(0, rs.getInt(1));
+        try (Connection connection = openConnection()) {
+            assertColumn(connection, "checkout_entity", "total_amount", "numeric", 19, 2);
+            assertColumn(connection, "payment_attempt_entity", "amount_minor", "bigint", null, null);
+            assertConstraint(connection, "checkout_entity", "chk_checkout_total_positive");
+            assertConstraint(connection, "checkout_entity", "chk_checkout_currency");
+            assertConstraint(connection, "checkout_entity", "uq_checkout_order_group");
+            assertConstraint(connection, "payment_attempt_entity", "uq_payment_attempt_checkout");
+            assertConstraint(connection, "payment_attempt_entity", "uq_payment_attempt_idempotency");
+            assertConstraint(connection, "payment_attempt_entity", "chk_payment_attempt_amount_positive");
+            assertConstraint(connection, "stripe_event_entity", "chk_stripe_event_status");
+            assertIndex(connection, "uq_checkout_live_per_user");
+            assertIndex(connection, "idx_checkout_user_status");
+            assertIndex(connection, "idx_stripe_event_recovery");
         }
     }
 
