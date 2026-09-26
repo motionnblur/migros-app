@@ -204,7 +204,10 @@ public class CheckoutService {
         expireIfNeeded(checkout, now);
 
         if (checkout.getStatus() == CheckoutStatus.PAYMENT_PROCESSING) {
-            throw new CheckoutStateException("Checkout is already being processed");
+            // Idempotent resume: a durable payment attempt owns the retry/lease
+            // semantics, so a repeated claim of the same checkout is allowed and
+            // returns the same stored amount and currency.
+            return new CheckoutPaymentStart(checkout.getId(), checkout.getAmountMinor(), checkout.getCurrency());
         }
         if (checkout.getStatus() != CheckoutStatus.PREPARED) {
             throw new CheckoutStateException("Checkout is not payable");
@@ -263,7 +266,7 @@ public class CheckoutService {
 
     @Transactional(readOnly = true)
     public List<UUID> findExpiredCheckoutIds() {
-        return checkoutEntityRepository.findExpiredIds(CheckoutStatus.liveStatuses(), LocalDateTime.now());
+        return checkoutEntityRepository.findExpiredIds(CheckoutStatus.expirableStatuses(), LocalDateTime.now());
     }
 
     @Transactional
@@ -334,7 +337,10 @@ public class CheckoutService {
     }
 
     private boolean expireIfNeeded(CheckoutEntity checkout, LocalDateTime now) {
-        if (checkout.getStatus().isLive() && !checkout.getExpiresAt().isAfter(now)) {
+        // Only a PREPARED checkout may be expired and have its reservation
+        // released. A PAYMENT_PROCESSING checkout may have a charge in flight,
+        // so it is resolved by the payment-attempt recovery path instead.
+        if (checkout.getStatus() == CheckoutStatus.PREPARED && !checkout.getExpiresAt().isAfter(now)) {
             releaseReservation(checkout);
             checkout.setStatus(CheckoutStatus.EXPIRED);
             checkout.setUpdatedAt(now);

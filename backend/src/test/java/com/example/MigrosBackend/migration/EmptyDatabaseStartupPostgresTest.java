@@ -67,11 +67,20 @@ class EmptyDatabaseStartupPostgresTest {
                 assertTrue(rs.getBoolean("success"));
             }
 
+            try (ResultSet rs = statement.executeQuery(
+                    "SELECT success FROM flyway_schema_history WHERE version = '3'")) {
+                assertTrue(rs.next(), "Flyway must record the payment-attempt migration on an empty database");
+                assertTrue(rs.getBoolean("success"));
+            }
+
             assertTableExists(statement, "checkout_entity");
             assertTableExists(statement, "checkout_item_entity");
+            assertTableExists(statement, "payment_attempt_entity");
+            assertTableExists(statement, "stripe_event_entity");
             assertNumeric19Scale2(statement, "checkout_entity", "total_amount");
             assertNumeric19Scale2(statement, "checkout_item_entity", "unit_price");
             assertIndexExists(statement, "uq_checkout_live_per_user");
+            assertIndexExists(statement, "idx_payment_attempt_status_updated");
         }
     }
 

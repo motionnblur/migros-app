@@ -14,6 +14,14 @@ public enum CheckoutStatus {
         return List.of(PREPARED, PAYMENT_PROCESSING);
     }
 
+    /**
+     * A checkout that is safe to expire and release: a processing checkout may
+     * have a charge in flight and must not have its reservation released.
+     */
+    public static List<CheckoutStatus> expirableStatuses() {
+        return List.of(PREPARED);
+    }
+
     public boolean isLive() {
         return this == PREPARED || this == PAYMENT_PROCESSING;
     }

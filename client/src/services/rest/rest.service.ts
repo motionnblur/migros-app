@@ -19,6 +19,7 @@ import { IProductPreview } from '../../interfaces/IProductPreview';
 import { ICheckoutResponse } from '../../interfaces/ICheckoutResponse';
 import { ICheckoutStatus } from '../../interfaces/ICheckoutStatus';
 import { IPaymentResponse } from '../../interfaces/IPaymentResponse';
+import { IPaymentStatus } from '../../interfaces/IPaymentStatus';
 import { ISupportCustomerSummary } from '../../interfaces/support/ISupportCustomerSummary';
 import { API_BASE_URL } from '../../app/config/backend.config';
 
@@ -339,6 +340,14 @@ export class RestService {
     return this.http
       .get<ICheckoutStatus>(`${API_BASE_URL}/payment/checkouts/${checkoutId}`)
       .pipe(map((response) => response as ICheckoutStatus));
+  }
+
+  getPaymentStatus(checkoutId: string) {
+    return this.http
+      .get<IPaymentStatus>(
+        `${API_BASE_URL}/payment/checkouts/${checkoutId}/status`,
+      )
+      .pipe(map((response) => response as IPaymentStatus));
   }
 
   chargeCheckout(checkoutId: string, token: string) {

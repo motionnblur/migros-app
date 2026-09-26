@@ -5,6 +5,7 @@ import com.example.MigrosBackend.config.security.AuthCookies;
 import com.example.MigrosBackend.dto.payment.CheckoutResponseDto;
 import com.example.MigrosBackend.dto.payment.CheckoutStatusDto;
 import com.example.MigrosBackend.dto.payment.PaymentResponseDto;
+import com.example.MigrosBackend.dto.payment.PaymentStatusDto;
 import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.exception.shared.TokenNotFoundException;
 import com.example.MigrosBackend.exception.user.CheckoutNotFoundException;
@@ -128,8 +129,9 @@ class PaymentControllerTest {
     void charge_UsesPathCheckoutIdAndTokenOnly() throws Exception {
         when(authTokenResolver.requireToken("sample-token")).thenReturn("sample-token");
         when(userPaymentService.processCharge(eq(checkoutId), eq("tok_visa"), eq("sample-token")))
-                .thenReturn(new PaymentResponseDto(true, false, checkoutId.toString(), "CONSUMED",
-                        "ch_1", new BigDecimal("21.00"), 2100L, "try", null));
+                .thenReturn(new PaymentResponseDto(true, false, checkoutId.toString(),
+                        UUID.randomUUID().toString(), "CONSUMED", "ORDER_FINALIZED", "ch_1",
+                        new BigDecimal("21.00"), 2100L, "try", null));
 
         mockMvc.perform(post("/payment/checkouts/{checkoutId}/charge", checkoutId)
                         .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "sample-token"))
@@ -138,6 +140,21 @@ class PaymentControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.chargeId").value("ch_1"));
+    }
+
+    @Test
+    void paymentStatus_ReturnsRecoverableState() throws Exception {
+        when(authTokenResolver.requireToken("sample-token")).thenReturn("sample-token");
+        when(userPaymentService.getPaymentStatus("sample-token", checkoutId)).thenReturn(
+                new PaymentStatusDto(checkoutId.toString(), UUID.randomUUID().toString(), "PAYMENT_PROCESSING",
+                        "CHARGE_SUCCEEDED", "ch_1", new BigDecimal("21.00"), 2100L, "try", null,
+                        false, true, false));
+
+        mockMvc.perform(get("/payment/checkouts/{checkoutId}/status", checkoutId)
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "sample-token")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pending").value(true))
+                .andExpect(jsonPath("$.state").value("CHARGE_SUCCEEDED"));
     }
 
     @Test

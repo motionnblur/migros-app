@@ -106,6 +106,20 @@ Backend packages follow a mostly standard layered layout:
 - Global overflow response is JSON `429`.
 - WebSocket upgrade is enabled for `/ws/support`.
 
+## Stripe Payment Durability
+- One immutable checkout can produce at most one economic charge and one order.
+- `PaymentAttemptService` owns the durable state machine; every provider call
+  uses the stable server-derived key `checkout:<uuid>:charge-v1`.
+- The Stripe network call never runs inside a database transaction; a bounded
+  lease plus verified webhooks plus `PaymentReconciliationJob` resolve crashes
+  and ambiguous network outcomes.
+- `POST /payment/webhook` verifies the raw-body `Stripe-Signature` against
+  `STRIPE_WEBHOOK_SECRET`. The secret is required outside exact-local profile.
+- Local webhook testing: run `stripe listen --forward-to
+  http://localhost:8080/payment/webhook`, put the printed `whsec_...` value in
+  `STRIPE_WEBHOOK_SECRET` (or `configs/spring.env`) and restart the backend.
+  Unsigned or invalidly signed payloads are always rejected.
+
 ## Change Guidelines For Agents
 - Keep backend layering intact:
   - Controller for IO/HTTP concerns.

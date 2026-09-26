@@ -52,6 +52,7 @@ public class SecurityConfiguration {
                         .requestMatchers("/admin/session").hasRole("ADMIN")
                         .requestMatchers("/admin/panel/**").hasRole("ADMIN")
                         .requestMatchers("/admin/supply/**").hasRole("ADMIN")
+                        .requestMatchers("/payment/webhook").permitAll()
                         .requestMatchers("/payment/**").hasRole("USER")
                         .requestMatchers("/user/supply/addProductToUserCart").hasRole("USER")
                         .requestMatchers("/user/supply/removeProductFromUserCart").hasRole("USER")

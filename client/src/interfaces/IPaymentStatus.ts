@@ -1,13 +1,14 @@
-export interface IPaymentResponse {
-  success: boolean;
-  pending: boolean;
+export interface IPaymentStatus {
   checkoutId: string;
   attemptId?: string | null;
-  status: string;
+  checkoutStatus: string;
   state?: string | null;
   chargeId?: string | null;
   totalAmount?: number | null;
   amountMinor?: number | null;
   currency?: string | null;
-  error?: string | null;
+  orderGroupId?: number | null;
+  finalized: boolean;
+  pending: boolean;
+  refunded: boolean;
 }

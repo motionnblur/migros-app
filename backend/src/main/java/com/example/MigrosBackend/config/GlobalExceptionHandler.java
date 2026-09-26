@@ -125,4 +125,19 @@ public class GlobalExceptionHandler {
     public ResponseEntity<String> handleCheckoutState(CheckoutStateException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
     }
+
+    @ExceptionHandler(PaymentStateException.class)
+    public ResponseEntity<String> handlePaymentState(PaymentStateException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
+    }
+
+    @ExceptionHandler(PaymentAttemptNotFoundException.class)
+    public ResponseEntity<String> handlePaymentAttemptNotFound(PaymentAttemptNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
+    }
+
+    @ExceptionHandler(WebhookSignatureException.class)
+    public ResponseEntity<String> handleWebhookSignature(WebhookSignatureException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
+    }
 }

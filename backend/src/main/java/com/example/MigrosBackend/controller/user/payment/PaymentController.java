@@ -5,6 +5,7 @@ import com.example.MigrosBackend.dto.payment.ChargeRequestDto;
 import com.example.MigrosBackend.dto.payment.CheckoutResponseDto;
 import com.example.MigrosBackend.dto.payment.CheckoutStatusDto;
 import com.example.MigrosBackend.dto.payment.PaymentResponseDto;
+import com.example.MigrosBackend.dto.payment.PaymentStatusDto;
 import com.example.MigrosBackend.helper.AuthTokenResolver;
 import com.example.MigrosBackend.service.user.payment.CheckoutService;
 import com.example.MigrosBackend.service.user.payment.UserPaymentService;
@@ -47,6 +48,14 @@ public class PaymentController {
             @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
         String userToken = authTokenResolver.requireToken(token);
         return ResponseEntity.ok(checkoutService.getCheckout(userToken, checkoutId));
+    }
+
+    @GetMapping("/checkouts/{checkoutId}/status")
+    public ResponseEntity<PaymentStatusDto> getPaymentStatus(
+            @PathVariable UUID checkoutId,
+            @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
+        String userToken = authTokenResolver.requireToken(token);
+        return ResponseEntity.ok(userPaymentService.getPaymentStatus(userToken, checkoutId));
     }
 
     @PostMapping("/checkouts/{checkoutId}/charge")

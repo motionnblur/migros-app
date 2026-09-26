@@ -4,6 +4,7 @@ import { of, throwError } from 'rxjs';
 import { PaymentComponent } from './payment.component';
 import { RestService } from '../../../../services/rest/rest.service';
 import { ICheckoutResponse } from '../../../../interfaces/ICheckoutResponse';
+import { IPaymentStatus } from '../../../../interfaces/IPaymentStatus';
 
 describe('PaymentComponent', () => {
   let component: PaymentComponent;
@@ -18,11 +19,22 @@ describe('PaymentComponent', () => {
     currency: 'try',
   };
 
+  const finalizedStatus: IPaymentStatus = {
+    checkoutId: 'checkout-1',
+    checkoutStatus: 'CONSUMED',
+    state: 'ORDER_FINALIZED',
+    chargeId: 'ch_1',
+    finalized: true,
+    pending: false,
+    refunded: false,
+  };
+
   beforeEach(async () => {
     restService = jasmine.createSpyObj('RestService', [
       'prepareCheckout',
       'chargeCheckout',
       'getCheckoutStatus',
+      'getPaymentStatus',
       'cancelCheckout',
     ]);
 
@@ -40,12 +52,11 @@ describe('PaymentComponent', () => {
         pending: false,
         checkoutId: checkout.checkoutId,
         status: 'CONSUMED',
+        state: 'ORDER_FINALIZED',
         chargeId: 'ch_1',
       }),
     );
-    restService.getCheckoutStatus.and.returnValue(
-      of({ ...checkout, status: 'CONSUMED' }),
-    );
+    restService.getPaymentStatus.and.returnValue(of(finalizedStatus));
 
     fixture = TestBed.createComponent(PaymentComponent);
     component = fixture.componentInstance;
@@ -120,17 +131,36 @@ describe('PaymentComponent', () => {
 
     await component.handlePayment();
 
-    expect(restService.getCheckoutStatus).toHaveBeenCalledWith('checkout-1');
+    expect(restService.getPaymentStatus).toHaveBeenCalledWith('checkout-1');
     expect(restService.prepareCheckout).toHaveBeenCalledTimes(1);
   });
 
-  it('does not treat a still-paid checkout as a failure', () => {
-    restService.getCheckoutStatus.and.returnValue(
-      of({ ...checkout, status: 'PAID' }),
+  it('polls the same checkout when the server reports a pending attempt', () => {
+    restService.getPaymentStatus.and.returnValue(
+      of({ ...finalizedStatus, finalized: false, pending: true, state: 'PROCESSING' }),
     );
 
-    component.recoverCheckoutStatus('checkout-1');
+    component.pollPaymentStatus('checkout-1', 0);
 
-    expect(component.errorMessage).toContain('finalized');
+    expect(restService.getPaymentStatus).toHaveBeenCalledWith('checkout-1');
+    expect(component.pendingMessage.length).toBeGreaterThanOrEqual(0);
+    expect(component.errorMessage).toContain('still being processed');
+  });
+
+  it('does not treat a gracefully pending checkout as a hard failure', () => {
+    restService.getPaymentStatus.and.returnValue(
+      of({
+        ...finalizedStatus,
+        finalized: false,
+        pending: true,
+        state: 'CHARGE_SUCCEEDED',
+      }),
+    );
+
+    component.isProcessing = true;
+    component.pollPaymentStatus('checkout-1', 3);
+
+    expect(component.pendingMessage).toContain('processed');
+    expect(component.isProcessing).toBeTrue();
   });
 });

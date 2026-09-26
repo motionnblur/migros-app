@@ -13,6 +13,10 @@
     <p class="error-message">{{ errorMessage }}</p>
   }
 
+  @if (pendingMessage) {
+    <p class="pending-message">{{ pendingMessage }}</p>
+  }
+
   <div class="payment-form">
     <div id="card-element" class="card-element">
       <!-- A Stripe Element will be inserted here. -->

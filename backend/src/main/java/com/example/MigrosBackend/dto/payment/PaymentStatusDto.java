@@ -2,17 +2,18 @@ package com.example.MigrosBackend.dto.payment;
 
 import java.math.BigDecimal;
 
-public record PaymentResponseDto(
-        boolean success,
-        boolean pending,
+public record PaymentStatusDto(
         String checkoutId,
         String attemptId,
-        String status,
+        String checkoutStatus,
         String state,
         String chargeId,
         BigDecimal totalAmount,
         Long amountMinor,
         String currency,
-        String error
+        Long orderGroupId,
+        boolean finalized,
+        boolean pending,
+        boolean refunded
 ) {
 }

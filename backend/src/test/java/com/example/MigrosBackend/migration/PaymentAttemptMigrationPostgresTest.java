@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Testcontainers
-class CheckoutMigrationPostgresTest {
+class PaymentAttemptMigrationPostgresTest {
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES =
@@ -36,7 +36,7 @@ class CheckoutMigrationPostgresTest {
     }
 
     @Test
-    void migrationCreatesCheckoutSchemaWithTypesConstraintsAndIndexes() throws SQLException {
+    void migrationCreatesPaymentAttemptSchemaWithTypesConstraintsAndIndexes() throws SQLException {
         createBaseSchema();
         try (Connection connection = openConnection(); Statement statement = connection.createStatement()) {
             statement.execute("INSERT INTO user_entity (user_mail) VALUES ('keeper@migros.com')");
@@ -45,26 +45,22 @@ class CheckoutMigrationPostgresTest {
         migrate();
 
         try (Connection connection = openConnection()) {
-            assertColumn(connection, "checkout_entity", "total_amount", "numeric", 19, 2);
-            assertColumn(connection, "checkout_entity", "amount_minor", "bigint", null, null);
-            assertColumn(connection, "checkout_entity", "currency", "character varying", null, null);
-            assertColumn(connection, "checkout_item_entity", "unit_price", "numeric", 19, 2);
-            assertColumn(connection, "checkout_item_entity", "line_total", "numeric", 19, 2);
+            assertColumn(connection, "payment_attempt_entity", "amount_minor", "bigint", null, null);
+            assertColumn(connection, "payment_attempt_entity", "currency", "character varying", null, null);
+            assertColumn(connection, "payment_attempt_entity", "refund_id", "character varying", null, null);
+            assertColumn(connection, "payment_attempt_entity", "lease_expires_at",
+                    "timestamp without time zone", null, null);
+            assertColumn(connection, "stripe_event_entity", "received_at",
+                    "timestamp without time zone", null, null);
 
-            assertConstraint(connection, "checkout_entity", "chk_checkout_status");
-            assertConstraint(connection, "checkout_entity", "chk_checkout_currency");
-            assertConstraint(connection, "checkout_entity", "chk_checkout_total_positive");
-            assertConstraint(connection, "checkout_entity", "uq_checkout_order_group");
-            assertConstraint(connection, "checkout_item_entity", "chk_checkout_item_quantity_positive");
-            assertConstraint(connection, "checkout_item_entity", "uq_checkout_item_product");
+            assertConstraint(connection, "payment_attempt_entity", "uq_payment_attempt_checkout");
+            assertConstraint(connection, "payment_attempt_entity", "uq_payment_attempt_idempotency");
+            assertConstraint(connection, "payment_attempt_entity", "uq_payment_attempt_charge");
+            assertConstraint(connection, "payment_attempt_entity", "chk_payment_attempt_amount_positive");
+            assertConstraint(connection, "payment_attempt_entity", "chk_payment_attempt_status");
 
-            assertForeignKey(connection, "checkout_entity", "user_entity");
-            assertForeignKey(connection, "checkout_item_entity", "checkout_entity");
-            assertForeignKey(connection, "checkout_item_entity", "product_entity");
-
-            assertIndex(connection, "uq_checkout_live_per_user");
-            assertIndex(connection, "idx_checkout_user_status");
-            assertIndex(connection, "idx_checkout_item_checkout");
+            assertForeignKey(connection, "payment_attempt_entity", "checkout_entity");
+            assertIndex(connection, "idx_payment_attempt_status_updated");
         }
 
         try (Connection connection = openConnection();
@@ -76,68 +72,50 @@ class CheckoutMigrationPostgresTest {
     }
 
     @Test
-    void oneLiveCheckoutPerUserIsEnforcedByPartialUniqueIndex() throws SQLException {
-        createBaseSchema();
-        migrate();
-
-        UUID firstId = UUID.randomUUID();
-        UUID secondId = UUID.randomUUID();
-        UUID terminalId = UUID.randomUUID();
-
-        try (Connection connection = openConnection(); Statement statement = connection.createStatement()) {
-            statement.execute("INSERT INTO user_entity (user_entity_id, user_mail) VALUES (1, 'a@migros.com')");
-            statement.execute(checkoutInsert(firstId, 1, "PREPARED"));
-        }
-
-        SQLException duplicateLive = assertThrows(SQLException.class, () -> {
-            try (Connection connection = openConnection(); Statement statement = connection.createStatement()) {
-                statement.execute(checkoutInsert(secondId, 1, "PAYMENT_PROCESSING"));
-            }
-        });
-        assertTrue(duplicateLive.getMessage().toLowerCase().contains("unique"),
-                "expected a unique violation, got: " + duplicateLive.getMessage());
-
-        try (Connection connection = openConnection(); Statement statement = connection.createStatement()) {
-            statement.execute(checkoutInsert(terminalId, 1, "CANCELLED"));
-        }
-    }
-
-    @Test
-    void moneyAndQuantityChecksAreEnforcedAtTheDatabase() throws SQLException {
+    void oneAttemptPerCheckoutAndOneIdempotencyKeyAreEnforced() throws SQLException {
         createBaseSchema();
         migrate();
 
         try (Connection connection = openConnection(); Statement statement = connection.createStatement()) {
             statement.execute("INSERT INTO user_entity (user_entity_id, user_mail) VALUES (1, 'a@migros.com')");
-            statement.execute("INSERT INTO product_entity (product_entity_id, product_name) VALUES (1, 'Apple')");
-            statement.execute(checkoutInsert(UUID.randomUUID(), 1, "PREPARED"));
+            statement.execute(checkoutInsert(UUID.randomUUID(), 1));
         }
 
-        UUID checkoutId;
-        try (Connection connection = openConnection();
-             Statement statement = connection.createStatement();
-             ResultSet rs = statement.executeQuery("SELECT checkout_id FROM checkout_entity LIMIT 1")) {
-            assertTrue(rs.next());
-            checkoutId = rs.getObject(1, UUID.class);
-        }
+        UUID checkoutId = firstCheckoutId();
+        execute(attemptInsert(UUID.randomUUID(), checkoutId, "checkout:" + checkoutId + ":charge-v1"));
 
-        assertThrows(SQLException.class, () -> execute("INSERT INTO checkout_item_entity "
-                + "(checkout_id, product_entity_id, product_name, quantity, unit_price, line_total) VALUES "
-                + "('" + checkoutId + "', 1, 'Apple', 0, 1.00, 0.00)"));
-        assertThrows(SQLException.class, () -> execute("INSERT INTO checkout_item_entity "
-                + "(checkout_id, product_entity_id, product_name, quantity, unit_price, line_total) VALUES "
-                + "('" + checkoutId + "', 1, 'Apple', -1, 1.00, 1.00)"));
-        assertThrows(SQLException.class, () -> execute("INSERT INTO checkout_entity "
-                + "(checkout_id, user_entity_id, status, total_amount, amount_minor, currency, created_at, "
-                + "expires_at, updated_at, version) VALUES "
-                + "('" + UUID.randomUUID() + "', 1, 'CANCELLED', 1.00, 100, 'usd', now(), now() + interval '1 hour', now(), 0)"));
+        UUID otherCheckout = insertSecondCheckout();
+        SQLException duplicateCheckout = assertThrows(SQLException.class,
+                () -> execute(attemptInsert(UUID.randomUUID(), checkoutId, "checkout:unique:charge-v1")));
+        assertTrue(duplicateCheckout.getMessage().toLowerCase().contains("unique"));
+
+        SQLException duplicateKey = assertThrows(SQLException.class,
+                () -> execute(attemptInsert(UUID.randomUUID(), otherCheckout,
+                        "checkout:" + checkoutId + ":charge-v1")));
+        assertTrue(duplicateKey.getMessage().toLowerCase().contains("unique"));
     }
 
     @Test
-    void migrationIsIdempotentAndRecordsVersionTwo() throws SQLException {
+    void invalidAmountAndStatusAreRejectedByTheDatabase() throws SQLException {
+        createBaseSchema();
+        migrate();
+        try (Connection connection = openConnection(); Statement statement = connection.createStatement()) {
+            statement.execute("INSERT INTO user_entity (user_entity_id, user_mail) VALUES (1, 'a@migros.com')");
+            statement.execute(checkoutInsert(UUID.randomUUID(), 1));
+        }
+        UUID checkoutId = firstCheckoutId();
+
+        assertThrows(SQLException.class,
+                () -> execute(attemptInsert(UUID.randomUUID(), checkoutId, "key-a", 0L, "PROCESSING")));
+        assertThrows(SQLException.class,
+                () -> execute(attemptInsert(UUID.randomUUID(), checkoutId, "key-b", 1000L, "NOT_A_STATE")));
+    }
+
+    @Test
+    void migrationIsIdempotentAndRecordsVersionThree() throws SQLException {
         createBaseSchema();
         MigrateResult first = migrate();
-        assertEquals(3, first.migrationsExecuted);
+        assertEquals(3, first.migrationsExecuted, "V1, V2 and V3 must run on a first migrate");
 
         MigrateResult second = migrate();
         assertEquals(0, second.migrationsExecuted);
@@ -145,23 +123,69 @@ class CheckoutMigrationPostgresTest {
         try (Connection connection = openConnection();
              Statement statement = connection.createStatement();
              ResultSet rs = statement.executeQuery(
-                     "SELECT success FROM flyway_schema_history WHERE version = '2'")) {
+                     "SELECT success FROM flyway_schema_history WHERE version = '3'")) {
             assertTrue(rs.next());
             assertTrue(rs.getBoolean("success"));
         }
+    }
+
+    @Test
+    void migrationSkipsPaymentTablesWhenBaseSchemaIsMissing() throws SQLException {
+        // No base tables: V3 is guarded and must not fail or create orphan tables.
+        MigrateResult result = migrate();
+        assertEquals(3, result.migrationsExecuted);
+
+        try (Connection connection = openConnection();
+             Statement statement = connection.createStatement();
+             ResultSet rs = statement.executeQuery(
+                     "SELECT COUNT(*) FROM information_schema.tables "
+                             + "WHERE table_schema = 'public' AND table_name = 'payment_attempt_entity'")) {
+            assertTrue(rs.next());
+            assertEquals(0, rs.getInt(1));
+        }
+    }
+
+    private UUID firstCheckoutId() throws SQLException {
+        try (Connection connection = openConnection();
+             Statement statement = connection.createStatement();
+             ResultSet rs = statement.executeQuery("SELECT checkout_id FROM checkout_entity LIMIT 1")) {
+            assertTrue(rs.next());
+            return rs.getObject(1, UUID.class);
+        }
+    }
+
+    private UUID insertSecondCheckout() throws SQLException {
+        UUID id = UUID.randomUUID();
+        execute("INSERT INTO checkout_entity (checkout_id, user_entity_id, status, total_amount, amount_minor, "
+                + "currency, created_at, expires_at, updated_at, version) VALUES "
+                + "('" + id + "', 1, 'CANCELLED', 10.00, 1000, 'try', now(), "
+                + "now() + interval '1 hour', now(), 0)");
+        return id;
+    }
+
+    private String checkoutInsert(UUID id, long userId) {
+        return "INSERT INTO checkout_entity (checkout_id, user_entity_id, status, total_amount, amount_minor, "
+                + "currency, created_at, expires_at, updated_at, version) VALUES "
+                + "('" + id + "', " + userId + ", 'PREPARED', 10.00, 1000, 'try', now(), "
+                + "now() + interval '1 hour', now(), 0)";
+    }
+
+    private String attemptInsert(UUID attemptId, UUID checkoutId, String idempotencyKey) {
+        return attemptInsert(attemptId, checkoutId, idempotencyKey, 1000L, "PROCESSING");
+    }
+
+    private String attemptInsert(UUID attemptId, UUID checkoutId, String idempotencyKey,
+                                 long amountMinor, String status) {
+        return "INSERT INTO payment_attempt_entity (attempt_id, checkout_id, idempotency_key, amount_minor, "
+                + "currency, status, created_at, updated_at, version) VALUES "
+                + "('" + attemptId + "', '" + checkoutId + "', '" + idempotencyKey + "', "
+                + amountMinor + ", 'try', '" + status + "', now(), now(), 0)";
     }
 
     private void execute(String sql) throws SQLException {
         try (Connection connection = openConnection(); Statement statement = connection.createStatement()) {
             statement.execute(sql);
         }
-    }
-
-    private String checkoutInsert(UUID id, long userId, String status) {
-        return "INSERT INTO checkout_entity (checkout_id, user_entity_id, status, total_amount, amount_minor, "
-                + "currency, created_at, expires_at, updated_at, version) VALUES "
-                + "('" + id + "', " + userId + ", '" + status + "', 10.00, 1000, 'try', now(), "
-                + "now() + interval '1 hour', now(), 0)";
     }
 
     private void createBaseSchema() throws SQLException {

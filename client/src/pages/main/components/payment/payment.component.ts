@@ -3,6 +3,7 @@ import { loadStripe } from '@stripe/stripe-js';
 import { data } from '../../../../memory/global-data';
 import { RestService } from '../../../../services/rest/rest.service';
 import { ICheckoutResponse } from '../../../../interfaces/ICheckoutResponse';
+import { IPaymentStatus } from '../../../../interfaces/IPaymentStatus';
 
 @Component({
   selector: 'app-payment',
@@ -10,12 +11,16 @@ import { ICheckoutResponse } from '../../../../interfaces/ICheckoutResponse';
   styleUrls: ['./payment.component.css'],
 })
 export class PaymentComponent implements OnInit {
+  private static readonly MAX_STATUS_POLLS = 5;
+  private static readonly STATUS_POLL_INTERVAL_MS = 2000;
+
   stripe: any;
   elements: any;
   card: any;
   isProcessing: boolean = false;
   isPreparing: boolean = false;
   errorMessage: string = '';
+  pendingMessage: string = '';
   checkout: ICheckoutResponse | null = null;
   displayTotal: string = '';
   displayCurrency: string = 'TRY';
@@ -46,6 +51,9 @@ export class PaymentComponent implements OnInit {
   // The server computes the immutable checkout snapshot. The client only
   // displays the returned total and never supplies prices, totals or currency.
   prepareCheckout() {
+    if (this.isPreparing || this.isProcessing) {
+      return;
+    }
     this.isPreparing = true;
     this.restService.prepareCheckout().subscribe({
       next: (checkout: ICheckoutResponse) => {
@@ -64,11 +72,14 @@ export class PaymentComponent implements OnInit {
   }
 
   async handlePayment() {
+    // UI double-submit protection. The server-side payment-attempt lease and
+    // idempotency key remain the authoritative control.
     if (this.isProcessing || !this.checkout) {
       return;
     }
 
     this.errorMessage = '';
+    this.pendingMessage = '';
     this.isProcessing = true;
 
     const { token, error } = await this.stripe.createToken(this.card);
@@ -90,7 +101,8 @@ export class PaymentComponent implements OnInit {
         if (response.success && !response.pending) {
           this.completePayment();
         } else if (response.pending) {
-          this.recoverCheckoutStatus(checkoutId);
+          // The charge may already have succeeded; never start a new checkout.
+          this.pollPaymentStatus(checkoutId, PaymentComponent.MAX_STATUS_POLLS);
         } else {
           this.isProcessing = false;
           this.errorMessage = 'Payment failed. Please try again.';
@@ -98,36 +110,66 @@ export class PaymentComponent implements OnInit {
       },
       // A network timeout is an unknown result: recover the existing checkout
       // instead of starting a new one.
-      error: () => this.recoverCheckoutStatus(checkoutId),
+      error: () =>
+        this.pollPaymentStatus(checkoutId, PaymentComponent.MAX_STATUS_POLLS),
     });
   }
 
-  recoverCheckoutStatus(checkoutId: string) {
-    this.restService.getCheckoutStatus(checkoutId).subscribe({
-      next: (status) => {
-        this.isProcessing = false;
-        if (status.status === 'CONSUMED') {
-          this.completePayment();
-        } else if (status.status === 'PAID') {
-          this.errorMessage =
-            'Payment received and is being finalized. Please check your orders.';
-        } else if (status.status === 'CANCELLED' || status.status === 'EXPIRED') {
-          this.errorMessage = 'Payment failed. Please try again.';
-        } else {
-          this.errorMessage =
-            'Payment status is unknown. Please check your orders before retrying.';
-        }
-      },
+  /**
+   * Polls the authenticated status endpoint for the SAME checkout. The server
+   * retries order finalization on status access and returns the durable attempt
+   * state, so an ambiguous network outcome can never cause a second charge.
+   */
+  pollPaymentStatus(checkoutId: string, remainingPolls: number) {
+    this.restService.getPaymentStatus(checkoutId).subscribe({
+      next: (status) => this.applyPaymentStatus(status, checkoutId, remainingPolls),
       error: () => {
         this.isProcessing = false;
         this.errorMessage =
-          'Could not verify the payment status. Please check your orders.';
+          'Could not verify the payment status. Please check your orders before retrying.';
       },
     });
+  }
+
+  private applyPaymentStatus(
+    status: IPaymentStatus,
+    checkoutId: string,
+    remainingPolls: number,
+  ) {
+    if (status.finalized) {
+      this.completePayment();
+      return;
+    }
+
+    if (status.pending && remainingPolls > 0) {
+      this.pendingMessage =
+        'Payment is being processed. Please wait, do not submit again.';
+      setTimeout(
+        () => this.pollPaymentStatus(checkoutId, remainingPolls - 1),
+        PaymentComponent.STATUS_POLL_INTERVAL_MS,
+      );
+      return;
+    }
+
+    this.isProcessing = false;
+    this.pendingMessage = '';
+
+    if (status.pending) {
+      this.errorMessage =
+        'Payment is still being processed. Please check your orders before retrying.';
+    } else if (status.refunded) {
+      this.errorMessage = 'This payment was refunded.';
+    } else if (status.state === 'FAILED_FINAL') {
+      this.errorMessage = 'Payment failed. Please try again.';
+    } else {
+      this.errorMessage =
+        'Payment status is unknown. Please check your orders before retrying.';
+    }
   }
 
   private completePayment() {
     this.isProcessing = false;
+    this.pendingMessage = '';
     data.totalCartPrice = 0;
     this.paymentSuccess.emit();
     this.closePaymentComponentEvent.emit();
