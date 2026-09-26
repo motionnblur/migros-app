@@ -38,6 +38,17 @@ Backend packages follow a mostly standard layered layout:
 - Security config
   - `SecurityConfiguration` defines open/authenticated/admin-only routes.
   - CORS and WebSocket allowed origins are driven by `app.allowed-origins` and `app.allowed-origin-patterns`.
+  - Only `/actuator/health` and its subpaths are public; `/actuator/**` is
+    explicitly denied before the catch-all `permitAll`. Actuator exposes only
+    `health` over HTTP with details/components never public; the readiness group
+    includes the database and liveness does not.
+- Public URLs
+  - `PublicUrlProperties` binds `app.frontend-base-url` / `app.backend-base-url`
+    (`APP_FRONTEND_BASE_URL` / `APP_BACKEND_BASE_URL`), validates absolute
+    http(s) origins with a host and no path/query/fragment/credentials, and
+    normalizes one trailing slash in one place.
+  - Signup confirmation links use the backend origin; password-reset links use
+    the frontend origin. There is no hard-coded `localhost`.
 - Support subsystem
   - User REST endpoints in `controller/user/support`.
   - Internal support bridge in `controller/internal/InternalSupportController` using `x-internal-key`.
@@ -73,14 +84,17 @@ Backend packages follow a mostly standard layered layout:
     - `nonLocalDefaultAdministratorGuard` (a `SmartInitializingSingleton`, so it runs after repositories are initialized but before the web server lifecycle starts) fails startup with `IllegalStateException` if the policy is non-local and an `admin` account still matches the default password.
   - `config/StartupConfiguration` seeds categories in every profile.
 - `application-local.properties` configures local DB defaults and permissive cookie settings.
-- `application-prod.properties` expects explicit datasource/origin values and secure cookie defaults. Production requires `SPRING_PROFILES_ACTIVE=prod`.
+- `application-prod.properties` expects explicit datasource/origin values and secure cookie defaults. Production requires `SPRING_PROFILES_ACTIVE=prod`; adding `local` makes the runtime non-local.
 - Production administrators are provisioned manually in `admin_entity` with an externally generated BCrypt hash; there is no admin-registration or bootstrap endpoint.
+- `configs/production.env.example` is the committed production contract; `ProductionConfigurationContractTest` keeps it complete and secret-free.
+- `SPRING_PROFILES_ACTIVE=prod` exposes `GET /actuator/health` (plus `/liveness` and `/readiness`); readiness includes the database and liveness does not.
 - Important env vars include:
   - `SPRING_PROFILES_ACTIVE`
   - `SPRING_DATASOURCE_*`
   - `APP_ALLOWED_ORIGINS`, `APP_ALLOWED_ORIGIN_PATTERNS`
+  - `APP_FRONTEND_BASE_URL`, `APP_BACKEND_BASE_URL`
   - `JWT_USER_SECRET`, `JWT_ADMIN_SECRET`
-  - `STRIPE_API_KEY`
+  - `STRIPE_API_KEY`, `STRIPE_WEBHOOK_SECRET`
   - `SUPPORT_SERVICE_BASE_URL`, `SUPPORT_SERVICE_INTERNAL_KEY`, `SUPPORT_INTERNAL_KEY`
   - `APP_UPLOAD_DIR`
 

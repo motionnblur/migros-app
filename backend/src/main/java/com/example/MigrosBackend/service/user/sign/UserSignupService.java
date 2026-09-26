@@ -10,6 +10,7 @@ import com.example.MigrosBackend.exception.user.MailSendingFailedException;
 import com.example.MigrosBackend.exception.user.UserAlreadyExistsException;
 import com.example.MigrosBackend.exception.user.UserMailNotFoundException;
 import com.example.MigrosBackend.exception.user.WeakPasswordException;
+import com.example.MigrosBackend.config.PublicUrlProperties;
 import com.example.MigrosBackend.helper.PasswordValidator;
 import com.example.MigrosBackend.repository.user.PendingSignupEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
@@ -23,8 +24,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.util.UriUtils;
 import org.thymeleaf.context.Context;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -43,7 +46,7 @@ public class UserSignupService {
     private final MailService mailService;
     private final TokenService tokenService;
     private final PasswordValidator passwordValidator;
-    private final String publicBaseUrl;
+    private final PublicUrlProperties publicUrlProperties;
     private final long confirmationTokenTtlMinutes;
     private final ConcurrentHashMap<String, PendingSignupEntity> fallbackPendingSignups = new ConcurrentHashMap<>();
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
@@ -55,7 +58,7 @@ public class UserSignupService {
             EncryptService encryptService,
             MailService mailService, TokenService tokenService,
             PasswordValidator passwordValidator,
-            @Value("${app.public-base-url}") String publicBaseUrl,
+            PublicUrlProperties publicUrlProperties,
             @Value("${app.signup.confirmation.ttl-minutes:15}") long confirmationTokenTtlMinutes) {
         this.userEntityRepository = userEntityRepository;
         this.pendingSignupEntityRepository = pendingSignupEntityRepository;
@@ -63,7 +66,7 @@ public class UserSignupService {
         this.mailService = mailService;
         this.tokenService = tokenService;
         this.passwordValidator = passwordValidator;
-        this.publicBaseUrl = normalizeBaseUrl(publicBaseUrl);
+        this.publicUrlProperties = publicUrlProperties;
         this.confirmationTokenTtlMinutes = confirmationTokenTtlMinutes;
     }
 
@@ -82,7 +85,8 @@ public class UserSignupService {
         userEntityToCreate.setUserPassword(encryptService.getEncryptedPassword(userSignDto.getUserPassword()));
 
         String key = UUID.randomUUID().toString().replace("-", "");
-        String confirmationLink = publicBaseUrl + "/user/signup/confirm?token=" + key;
+        String confirmationLink = publicUrlProperties.normalizedBackendBaseUrl()
+                + "/user/signup/confirm?token=" + UriUtils.encodeQueryParam(key, StandardCharsets.UTF_8);
         PendingSignupEntity pendingSignup = new PendingSignupEntity(
                 key,
                 userEntityToCreate.getUserMail(),
@@ -145,19 +149,6 @@ public class UserSignupService {
             deletePendingSignup(token);
             throw new TokenNotFoundException();
         }
-    }
-
-    private String normalizeBaseUrl(String value) {
-        String normalized = value == null ? "" : value.trim();
-        if (normalized.isEmpty()) {
-            throw new IllegalStateException("app.public-base-url must be configured");
-        }
-
-        while (normalized.endsWith("/")) {
-            normalized = normalized.substring(0, normalized.length() - 1);
-        }
-
-        return normalized;
     }
 
     private void storePendingSignup(PendingSignupEntity pendingSignup) {
@@ -255,7 +246,8 @@ public class UserSignupService {
         }
 
         String key = UUID.randomUUID().toString().replace("-", "");
-        String confirmationLink = "http://localhost:4200/reset-password/" + key;
+        String confirmationLink = publicUrlProperties.normalizedFrontendBaseUrl()
+                + "/reset-password/" + UriUtils.encodePathSegment(key, StandardCharsets.UTF_8);
 
         PendingSignupEntity pendingSignup = new PendingSignupEntity();
         pendingSignup.setToken(key);

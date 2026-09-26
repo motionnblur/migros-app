@@ -1,5 +1,6 @@
 package com.example.MigrosBackend.service.user.sign;
 
+import com.example.MigrosBackend.config.PublicUrlProperties;
 import com.example.MigrosBackend.dto.user.sign.UserSignDto;
 import com.example.MigrosBackend.entity.user.PendingSignupEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
@@ -18,19 +19,29 @@ import jakarta.mail.MessagingException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.autoconfigure.context.ConfigurationPropertiesAutoConfiguration;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.thymeleaf.context.Context;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class UserSignupServiceTest {
+
+    private static final String BACKEND_BASE_URL = "https://api.shop.example";
+    private static final String FRONTEND_BASE_URL = "https://shop.example";
+    private static final String SIGNUP_EMAIL = "test@example.com";
     @Mock
     private UserEntityRepository userEntityRepository;
     @Mock
@@ -51,18 +62,38 @@ class UserSignupServiceTest {
     @BeforeEach
     void setUp() {
         signupDto = new UserSignDto();
-        signupDto.setUserMail("test@example.com");
+        signupDto.setUserMail(SIGNUP_EMAIL);
         signupDto.setUserPassword("StrongPass123!");
-        userSignupService = new UserSignupService(
+        userSignupService = serviceWith(BACKEND_BASE_URL, FRONTEND_BASE_URL);
+    }
+
+    private UserSignupService serviceWith(String backendBaseUrl, String frontendBaseUrl) {
+        PublicUrlProperties publicUrlProperties = new PublicUrlProperties();
+        publicUrlProperties.setBackendBaseUrl(backendBaseUrl);
+        publicUrlProperties.setFrontendBaseUrl(frontendBaseUrl);
+        return new UserSignupService(
                 userEntityRepository,
                 pendingSignupEntityRepository,
                 encryptService,
                 mailService,
                 tokenService,
                 passwordValidator,
-                "http://localhost:4200",
+                publicUrlProperties,
                 15
         );
+    }
+
+    private String lastConfirmationLink() throws MessagingException {
+        ArgumentCaptor<Context> contextCaptor = ArgumentCaptor.forClass(Context.class);
+        verify(mailService, atLeastOnce())
+                .sendMimeMessage(anyString(), anyString(), anyString(), contextCaptor.capture());
+        return (String) contextCaptor.getValue().getVariable("confirmationLink");
+    }
+
+    private String savedPendingToken() {
+        ArgumentCaptor<PendingSignupEntity> pendingCaptor = ArgumentCaptor.forClass(PendingSignupEntity.class);
+        verify(pendingSignupEntityRepository, atLeastOnce()).save(pendingCaptor.capture());
+        return pendingCaptor.getValue().getToken();
     }
 
     @Test
@@ -194,5 +225,138 @@ class UserSignupServiceTest {
         assertThrows(TokenNotFoundException.class, () -> {
             userSignupService.confirm("wrong-token");
         });
+    }
+
+    @Test
+    void signupConfirmationLinkUsesBackendPublicBaseUrl() throws Exception {
+        when(userEntityRepository.existsByUserMail(signupDto.getUserMail())).thenReturn(false);
+        when(passwordValidator.isPasswordStrongEnough(signupDto.getUserPassword())).thenReturn(true);
+        when(encryptService.getEncryptedPassword(anyString())).thenReturn("hashed_password");
+
+        userSignupService.signup(signupDto);
+
+        String token = savedPendingToken();
+        String confirmationLink = lastConfirmationLink();
+
+        assertEquals(BACKEND_BASE_URL + "/user/signup/confirm?token=" + token, confirmationLink);
+        assertFalse(confirmationLink.contains(FRONTEND_BASE_URL));
+        assertFalse(confirmationLink.contains("localhost"));
+    }
+
+    @Test
+    void passwordResetLinkUsesFrontendPublicBaseUrl() throws Exception {
+        UserEntity existingUser = new UserEntity();
+        existingUser.setUserMail(SIGNUP_EMAIL);
+        existingUser.setUserPassword("hashed_password");
+        when(userEntityRepository.findByUserMail(SIGNUP_EMAIL)).thenReturn(existingUser);
+
+        userSignupService.verifyUserMail(SIGNUP_EMAIL);
+
+        String token = savedPendingToken();
+        String resetLink = lastConfirmationLink();
+
+        assertEquals(FRONTEND_BASE_URL + "/reset-password/" + token, resetLink);
+        assertFalse(resetLink.contains(BACKEND_BASE_URL));
+        assertFalse(resetLink.contains("localhost"));
+    }
+
+    @Test
+    void linkGenerationNormalizesOneTrailingSlash() throws Exception {
+        UserSignupService service = serviceWith(BACKEND_BASE_URL + "/", FRONTEND_BASE_URL + "/");
+
+        when(userEntityRepository.existsByUserMail(signupDto.getUserMail())).thenReturn(false);
+        when(passwordValidator.isPasswordStrongEnough(signupDto.getUserPassword())).thenReturn(true);
+        when(encryptService.getEncryptedPassword(anyString())).thenReturn("hashed_password");
+        UserEntity existingUser = new UserEntity();
+        existingUser.setUserMail(SIGNUP_EMAIL);
+        existingUser.setUserPassword("hashed_password");
+        when(userEntityRepository.findByUserMail(SIGNUP_EMAIL)).thenReturn(existingUser);
+
+        service.signup(signupDto);
+        String signupToken = savedPendingToken();
+        String signupLink = lastConfirmationLink();
+
+        service.verifyUserMail(SIGNUP_EMAIL);
+        String resetToken = savedPendingToken();
+        String resetLink = lastConfirmationLink();
+
+        assertEquals(BACKEND_BASE_URL + "/user/signup/confirm?token=" + signupToken, signupLink);
+        assertEquals(FRONTEND_BASE_URL + "/reset-password/" + resetToken, resetLink);
+        assertFalse(signupLink.substring("https://".length()).contains("//"), signupLink);
+        assertFalse(resetLink.substring("https://".length()).contains("//"), resetLink);
+    }
+
+    @Test
+    void publicBaseUrlsRejectBlankMalformedOrNonHttpValues() {
+        List<String> invalidValues = List.of(
+                "",
+                "   ",
+                "shop.example",
+                "api.shop.example",
+                "ftp://shop.example",
+                "//shop.example",
+                "https://user:pass@shop.example",
+                "https://shop.example/path",
+                "https://shop.example/path/",
+                "https://shop.example?query=1",
+                "https://shop.example#fragment",
+                "https://:8080"
+        );
+
+        for (String invalid : invalidValues) {
+            PublicUrlProperties badBackend = new PublicUrlProperties();
+            badBackend.setBackendBaseUrl(invalid);
+            badBackend.setFrontendBaseUrl(FRONTEND_BASE_URL);
+            IllegalStateException backendFailure = assertThrows(
+                    IllegalStateException.class, badBackend::validate, "expected backend rejection for: " + invalid);
+            assertTrue(backendFailure.getMessage().contains("app.backend-base-url"),
+                    "failure must name app.backend-base-url but was: " + backendFailure.getMessage());
+
+            PublicUrlProperties badFrontend = new PublicUrlProperties();
+            badFrontend.setFrontendBaseUrl(invalid);
+            badFrontend.setBackendBaseUrl(BACKEND_BASE_URL);
+            IllegalStateException frontendFailure = assertThrows(
+                    IllegalStateException.class, badFrontend::validate, "expected frontend rejection for: " + invalid);
+            assertTrue(frontendFailure.getMessage().contains("app.frontend-base-url"),
+                    "failure must name app.frontend-base-url but was: " + frontendFailure.getMessage());
+        }
+
+        PublicUrlProperties valid = new PublicUrlProperties();
+        valid.setBackendBaseUrl(BACKEND_BASE_URL);
+        valid.setFrontendBaseUrl(FRONTEND_BASE_URL);
+        assertDoesNotThrow(valid::validate);
+    }
+
+    @Test
+    void productionProfileRequiresBothPublicOrigins() {
+        ApplicationContextRunner runner = new ApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(ConfigurationPropertiesAutoConfiguration.class))
+                .withUserConfiguration(PublicUrlProperties.class);
+
+        runner.withInitializer(context -> context.getEnvironment().setActiveProfiles("prod"))
+                .withPropertyValues("app.backend-base-url=" + BACKEND_BASE_URL)
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(deepestMessage(context.getStartupFailure()))
+                            .contains("app.frontend-base-url")
+                            .doesNotContain("secret");
+                });
+
+        runner.withInitializer(context -> context.getEnvironment().setActiveProfiles("prod"))
+                .withPropertyValues("app.frontend-base-url=" + FRONTEND_BASE_URL)
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(deepestMessage(context.getStartupFailure()))
+                            .contains("app.backend-base-url")
+                            .doesNotContain("secret");
+                });
+    }
+
+    private static String deepestMessage(Throwable failure) {
+        Throwable current = failure;
+        while (current.getCause() != null) {
+            current = current.getCause();
+        }
+        return current.getMessage() == null ? "" : current.getMessage();
     }
 }

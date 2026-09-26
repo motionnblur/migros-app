@@ -65,6 +65,11 @@ public class SecurityConfiguration {
                         .requestMatchers("/user/supply/getProductData").hasRole("USER")
                         .requestMatchers("/user/profile/**").hasRole("USER")
                         .requestMatchers("/user/support/**").hasRole("USER")
+                        // Health probes are public for the hosting platform. Every
+                        // other Actuator endpoint is denied outright rather than
+                        // inheriting the catch-all permitAll below.
+                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        .requestMatchers("/actuator/**").denyAll()
                         .anyRequest().permitAll()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

@@ -181,12 +181,87 @@ DNS (`backend:8080`) and the client proxy targets `http://nginx:80`, so the same
 edge routing, rate limits, and `/ws/support` upgrade path are exercised on
 http://localhost:8080.
 
-For production deployments, set `SPRING_PROFILES_ACTIVE=prod` and provide the required `SPRING_DATASOURCE_*`, `APP_ALLOWED_ORIGINS`, and `APP_PUBLIC_BASE_URL` variables.
-
 For mail provider:
 * Local profile defaults to SMTP (`APP_MAIL_PROVIDER=smtp`)
 * Prod profile defaults to Resend (`APP_MAIL_PROVIDER=resend`)
 * You can override with `APP_MAIL_PROVIDER=auto` to use Resend when `RESEND_API_KEY` is present, otherwise SMTP
+
+## Production deployment
+
+The committed contract for a hosted, split-origin deployment is
+`configs/production.env.example`. Copy it into the hosting provider's
+environment/secret store, replace every `replace-with-*` placeholder, and never
+commit the populated copy. The template is enforced by
+`ProductionConfigurationContractTest`, which also checks that
+`SPRING_PROFILES_ACTIVE` is exactly `prod` and that the public origins use HTTPS.
+
+### Frontend
+
+* Build with `npm ci` followed by the production Angular build
+  (`npm run build`); deploy the generated browser bundle from the actual
+  `dist/` output against a static host/CDN.
+* The repository `client/Dockerfile` runs `ng serve`, which is a development
+  server. It is **not** a production frontend server; replace it with a
+  reviewed static-server image if you choose to serve the frontend from a
+  container.
+
+### Backend
+
+* Package the Spring Boot JAR (`.\mvnw.cmd clean package`) or build the backend
+  Docker image and run it with `SPRING_PROFILES_ACTIVE=prod`.
+* Production must never enable the Maven `local-debug`/JDWP profile or publish
+  port `5005`.
+* The backend owns the signup confirmation endpoint, so `APP_BACKEND_BASE_URL`
+  must be the publicly reachable backend origin. The Angular app owns the
+  password-reset route, so `APP_FRONTEND_BASE_URL` must be the frontend origin.
+* Add the frontend origin to `APP_ALLOWED_ORIGINS` (and, if needed, matching
+  `APP_ALLOWED_ORIGIN_PATTERNS`). Both public origins and every allowed origin
+  must be HTTPS.
+
+### Health probes
+
+* The hosting platform should gate traffic on `GET /actuator/health/readiness`
+  (returns `UP` only when the database is reachable) and use
+  `GET /actuator/health/liveness` for process-restart decisions.
+* Only the health endpoint is exposed over HTTP. Health details and components
+  are never public, and every other `/actuator/**` endpoint is denied at the
+  security layer.
+
+### Cookies
+
+* Production cookies stay `Secure` and `HttpOnly` with the intended `SameSite`
+  policy (`AUTH_COOKIE_SECURE=true`, `AUTH_COOKIE_SAMESITE=None` by default for
+  the split-origin setup). The user session cookie is scoped to `/` and the
+  admin session cookie to `/admin`; both origins must use HTTPS.
+
+### Persistent uploads
+
+* Product images are stored on the filesystem at `APP_UPLOAD_DIR`. Mount a
+  persistent disk/volume at that path on the hosting platform, or complete a
+  separate object-storage migration **before** relying on uploaded images. An
+  ephemeral filesystem loses every upload on redeploy/restart.
+
+### Stripe
+
+* Configure the production webhook endpoint and its signing secret
+  (`STRIPE_WEBHOOK_SECRET`). Never reuse a Stripe CLI `whsec_...` value outside
+  local webhook testing, and never commit a webhook secret.
+
+### Support
+
+* Configure the inbound shared key (`SUPPORT_INTERNAL_KEY`, protects
+  `/internal/support/**`) and the outbound pair (`SUPPORT_SERVICE_BASE_URL`,
+  `SUPPORT_SERVICE_INTERNAL_KEY`) consistently with the external support
+  service. The two keys must be different values.
+
+### Verification gate
+
+The production deployment gate (platform logs, probes, CORS, cookie flags,
+signup/reset emails, Stripe webhook signature rejection, `/ws/support` upgrade,
+upload persistence across restart, and no exposed debug/Actuator/default-admin
+surface) is manual and external. It is not covered by the unit test suite; run
+it against the deployed revision and record sanitized evidence before
+considering a release production-ready.
 
 Nginx now applies per-IP throttling before requests reach Spring Boot (including stricter limits for login, payment, and support send endpoints) and returns HTTP 429 when limits are exceeded.
 

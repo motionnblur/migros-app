@@ -124,3 +124,40 @@ exists. Production requires `SPRING_PROFILES_ACTIVE=prod` and a manually
 provisioned administrator row in `admin_entity` using a trusted, externally
 generated BCrypt hash. See the "Administrator provisioning" section of the root
 `README.md` for commands and recovery steps.
+
+## Production environment
+
+`configs/production.env.example` is the committed production contract. It is a
+**template only**: copy it into the hosting provider's environment or secret
+store, replace every `replace-with-*` value, and never commit the populated
+copy. It is intentionally non-runnable until real secrets are supplied.
+
+Keep `SPRING_PROFILES_ACTIVE=prod` for hosted deployments. Adding `local`
+(for example `prod,local`) makes the runtime non-local, so the local
+`admin` / `admin` convenience account is never created and a legacy default
+administrator blocks startup. Do not add it to a production environment.
+
+The template documents, at minimum:
+
+- Datasource credentials (`SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`,
+  `SPRING_DATASOURCE_PASSWORD`).
+- Independent JWT signing secrets (`JWT_USER_SECRET`, `JWT_ADMIN_SECRET`).
+- Stripe (`STRIPE_API_KEY`, `STRIPE_WEBHOOK_SECRET`) and the payment currency.
+- Support integration (`SUPPORT_INTERNAL_KEY`, `SUPPORT_SERVICE_BASE_URL`,
+  `SUPPORT_SERVICE_INTERNAL_KEY`).
+- Public origins (`APP_FRONTEND_BASE_URL`, `APP_BACKEND_BASE_URL`) and allowed
+  CORS/WebSocket origins (`APP_ALLOWED_ORIGINS`, `APP_ALLOWED_ORIGIN_PATTERNS`),
+  all HTTPS.
+- Cookie security (`AUTH_COOKIE_SECURE`, `AUTH_COOKIE_SAMESITE`).
+- Mail/Resend settings used by signup confirmation and password reset.
+- A persistent upload directory (`APP_UPLOAD_DIR`).
+
+`ProductionConfigurationContractTest` keeps the template complete and
+secret-free: it verifies the template documents every property referenced by
+`application-prod.properties`, contains no real-looking secret or private
+endpoint, and does not introduce insecure production fallbacks.
+
+A separately named production verifier is intentionally **not** added here so
+that local Compose assumptions (see `verify-compose-env.ps1`) and hosted
+production assumptions stay separate. The production readiness gate is manual
+and external; see the "Production deployment" section of the root `README.md`.
