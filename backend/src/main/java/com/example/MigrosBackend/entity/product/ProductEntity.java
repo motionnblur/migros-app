@@ -7,6 +7,7 @@ import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Entity
@@ -30,11 +31,11 @@ public class ProductEntity {
     @Column(nullable = false)
     private int productCount;
 
-    @Column(nullable = false)
-    private float productPrice;
+    @Column(nullable = false, precision = 19, scale = 2)
+    private BigDecimal productPrice;
 
-    @Column(nullable = false)
-    private float productDiscount;
+    @Column(nullable = false, precision = 19, scale = 2)
+    private BigDecimal productDiscount;
 
     @Column(nullable = false)
     private String productDescription;

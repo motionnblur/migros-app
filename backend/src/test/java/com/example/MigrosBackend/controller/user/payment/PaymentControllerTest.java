@@ -2,6 +2,7 @@ package com.example.MigrosBackend.controller.user.payment;
 
 import com.example.MigrosBackend.config.security.AuthCookies;
 import com.example.MigrosBackend.exception.shared.TokenNotFoundException;
+import com.example.MigrosBackend.exception.user.PaymentAmountException;
 import com.example.MigrosBackend.helper.AuthTokenResolver;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
@@ -84,15 +85,16 @@ class PaymentControllerTest {
     }
 
     @Test
-    void createCharge_shouldReturnEmptyBody_whenServiceReturnsNull() throws Exception {
+    void createCharge_shouldReturnBadRequest_whenServiceRejectsAmount() throws Exception {
         when(authTokenResolver.requireToken("sample-token")).thenReturn("sample-token");
-        when(userPaymentService.processCharge(eq(payload), eq("sample-token"))).thenReturn(null);
+        when(userPaymentService.processCharge(eq(payload), eq("sample-token")))
+                .thenThrow(new PaymentAmountException("Payment amount must be positive"));
 
         mockMvc.perform(post("/payment/create-charge")
                         .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "sample-token"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(payload)))
-                .andExpect(status().isOk())
-                .andExpect(content().string(""));
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Payment amount must be positive"));
     }
 }

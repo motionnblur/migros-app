@@ -110,4 +110,9 @@ public class GlobalExceptionHandler {
     public ResponseEntity<String> handleFileNotFound(FileNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
     }
+
+    @ExceptionHandler(PaymentAmountException.class)
+    public ResponseEntity<String> handlePaymentAmountException(PaymentAmountException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
+    }
 }

@@ -3,11 +3,13 @@ package com.example.MigrosBackend.dto.user.product;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
+
 @Getter
 @Setter
 public class ProductPreviewDto {
     private Long productId;
     private String productName;
-    private float productPrice;
+    private BigDecimal productPrice;
     private int productCount;
 }

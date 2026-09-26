@@ -39,6 +39,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -102,11 +104,7 @@ public class UserSupplyService {
             ProductPreviewDto itemDto = new ProductPreviewDto();
             itemDto.setProductId(itemEntity.getId());
             itemDto.setProductName(itemEntity.getProductName());
-            if (itemEntity.getProductDiscount() != 0) {
-                itemDto.setProductPrice(itemEntity.getProductPrice() - (itemEntity.getProductPrice() * itemEntity.getProductDiscount() / 100));
-            } else {
-                itemDto.setProductPrice(itemEntity.getProductPrice());
-            }
+            itemDto.setProductPrice(getEffectivePrice(itemEntity));
             itemDto.setProductCount(itemEntity.getProductCount());
             return itemDto;
         }).collect(Collectors.toList());
@@ -170,11 +168,7 @@ public class UserSupplyService {
             ProductPreviewDto itemDto = new ProductPreviewDto();
             itemDto.setProductId(itemEntity.getId());
             itemDto.setProductName(itemEntity.getProductName());
-            if (itemEntity.getProductDiscount() != 0) {
-                itemDto.setProductPrice(itemEntity.getProductPrice() - (itemEntity.getProductPrice() * itemEntity.getProductDiscount() / 100));
-            } else {
-                itemDto.setProductPrice(itemEntity.getProductPrice());
-            }
+            itemDto.setProductPrice(getEffectivePrice(itemEntity));
             itemDto.setProductCount(itemEntity.getProductCount());
             return itemDto;
         }).collect(Collectors.toList());
@@ -503,13 +497,15 @@ public class UserSupplyService {
 
 
 
-    private float getEffectivePrice(ProductEntity product) {
-        float discount = product.getProductDiscount();
-        float price = product.getProductPrice();
-        if (discount <= 0) {
-            return price;
+    private BigDecimal getEffectivePrice(ProductEntity product) {
+        BigDecimal discount = product.getProductDiscount() == null ? BigDecimal.ZERO : product.getProductDiscount();
+        BigDecimal price = product.getProductPrice() == null ? BigDecimal.ZERO : product.getProductPrice();
+        BigDecimal normalizedPrice = price.setScale(2, RoundingMode.HALF_UP);
+        if (discount.signum() <= 0) {
+            return normalizedPrice;
         }
-        return price - (price * discount / 100);
+        BigDecimal factor = BigDecimal.ONE.subtract(discount.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP));
+        return normalizedPrice.multiply(factor).setScale(2, RoundingMode.HALF_UP);
     }
     private void restockProduct(Long productId, int amount) {
         if (amount <= 0) {

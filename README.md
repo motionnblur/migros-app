@@ -91,6 +91,8 @@ MAIL_USERNAME=your_smtp_username
 MAIL_PASSWORD=your_smtp_password
 APP_MAIL_FROM=your_smtp_username
 SUPPORT_INTERNAL_KEY=replace-with-a-random-value
+PAYMENT_CURRENCY=try
+STRIPE_API_KEY=replace-with-your-stripe-secret-key
 ```
 
 > `SUPPORT_INTERNAL_KEY` protects the inbound internal support bridge
@@ -100,6 +102,26 @@ SUPPORT_INTERNAL_KEY=replace-with-a-random-value
 > `openssl rand -base64 32`, in `configs/spring.env`. The internal bridge is not
 > reachable through Nginx (the edge proxy returns `404` for `/internal/`), so the
 > support-service must call the backend directly over the internal network.
+
+### Payment currency and money representation
+
+Product and order prices are stored as major-unit amounts (`50.25` means ₺50.25)
+using fixed-scale `BigDecimal` / `NUMERIC(19, 2)` columns. The backend is the
+single source of truth for the charge amount: it converts the cart total to the
+integer minor units Stripe requires (`5000` for ₺50.00) and rejects zero,
+negative, non-finite, over-precise, or overflowing totals before any Stripe call.
+
+`PAYMENT_CURRENCY` selects the ISO 4217 currency sent to Stripe and defaults to
+`try`. Only `TRY` is accepted until currency-specific minor-unit handling exists;
+the value is trimmed and lower-cased, and anything other than `try` fails
+application startup before any payment is attempted. Change it only together with
+every customer-facing currency label; the UI is informational and never sends an
+amount or currency. The 8-digit Stripe limit for TRY is enforced before the
+gateway is called, and invalid payment amounts return HTTP `400`.
+
+Legacy `REAL` money columns are converted to `NUMERIC(19, 2)` by Flyway on
+startup. Migrations live in `backend/src/main/resources/db/migration` and are
+applied to both an existing populated schema and a fresh empty database.
 
 * Local development credentials (only created when the active profile set is exactly `local`): admin / admin
 

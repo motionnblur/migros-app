@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @RestController
@@ -61,9 +62,9 @@ public class AdminPanelController {
     private ResponseEntity<String> uploadProduct(@RequestParam("adminId") Long adminId,
                                                  @RequestParam("productName") String productName,
                                                  @RequestParam("subCategoryName") String subCategoryName,
-                                                 @RequestParam("productPrice") float productPrice,
+                                                 @RequestParam("productPrice") BigDecimal productPrice,
                                                  @RequestParam("productCount") int productCount,
-                                                 @RequestParam("productDiscount") float productDiscount,
+                                                 @RequestParam("productDiscount") BigDecimal productDiscount,
                                                  @RequestParam("productDescription") String productDescription,
                                                  @RequestParam("selectedImage") MultipartFile selectedImage,
                                                  @RequestParam("categoryValue") int categoryValue) {
@@ -79,9 +80,9 @@ public class AdminPanelController {
                                                  @RequestParam("productId") Long productId,
                                                  @RequestParam("productName") String productName,
                                                  @RequestParam("subCategoryName") String subCategoryName,
-                                                 @RequestParam("productPrice") float productPrice,
+                                                 @RequestParam("productPrice") BigDecimal productPrice,
                                                  @RequestParam("productCount") int productCount,
-                                                 @RequestParam("productDiscount") float productDiscount,
+                                                 @RequestParam("productDiscount") BigDecimal productDiscount,
                                                  @RequestParam("productDescription") String productDescription,
                                                  @RequestParam(value = "selectedImage", required = false) MultipartFile selectedImage,
                                                  @RequestParam("categoryValue") int categoryValue) {

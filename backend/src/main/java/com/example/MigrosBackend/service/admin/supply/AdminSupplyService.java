@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -82,8 +83,8 @@ public class AdminSupplyService {
     }
 
     public void uploadProduct(Long adminId, String productName,
-                              String subCategoryName, float productPrice,
-                              int productCount, float productDiscount,
+                              String subCategoryName, BigDecimal productPrice,
+                              int productCount, BigDecimal productDiscount,
                               String productDescription, int categoryValue,
                               MultipartFile selectedImage) {
         String normalizedProductName = normalizeRequiredText("Product name", productName);
@@ -128,8 +129,8 @@ public class AdminSupplyService {
     }
 
     public void updateProduct(Long adminId, Long productId, String productName,
-                              String subCategoryName, float productPrice,
-                              int productCount, float productDiscount,
+                              String subCategoryName, BigDecimal productPrice,
+                              int productCount, BigDecimal productDiscount,
                               String productDescription, int categoryValue,
                               MultipartFile selectedImage) {
         String normalizedProductName = normalizeRequiredText("Product name", productName);
@@ -276,17 +277,25 @@ public class AdminSupplyService {
         }
     }
 
-    private void validateProductNumbers(float productPrice, int productCount, float productDiscount) {
-        if (productPrice < 0) {
+    private void validateProductNumbers(BigDecimal productPrice, int productCount, BigDecimal productDiscount) {
+        if (productPrice == null || productPrice.signum() < 0) {
             throw new GeneralException("Product price cannot be negative");
+        }
+
+        if (productPrice.stripTrailingZeros().scale() > 2) {
+            throw new GeneralException("Product price must not exceed two decimal places");
         }
 
         if (productCount < 0) {
             throw new GeneralException("Product count cannot be negative");
         }
 
-        if (productDiscount < 0 || productDiscount > 100) {
+        if (productDiscount == null || productDiscount.signum() < 0 || productDiscount.compareTo(BigDecimal.valueOf(100)) > 0) {
             throw new GeneralException("Product discount must be between 0 and 100");
+        }
+
+        if (productDiscount.stripTrailingZeros().scale() > 2) {
+            throw new GeneralException("Product discount must not exceed two decimal places");
         }
     }
 

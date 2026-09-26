@@ -36,6 +36,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -117,16 +118,57 @@ class AdminSupplyServiceTest {
         when(categoryEntityRepository.findByCategoryId(10)).thenReturn(category);
         when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(admin));
 
-        adminSupplyService.uploadProduct(1L, "Water", "Still", 5.0f, 100, 0.1f, "Fresh water", 10, file);
+        adminSupplyService.uploadProduct(1L, "Water", "Still", new BigDecimal("5.0"), 100, new BigDecimal("0.1"), "Fresh water", 10, file);
 
         verify(productEntityRepository).save(any(ProductEntity.class));
         verify(productImageEntityRepository).save(any(ProductImageEntity.class));
     }
 
     @Test
+    void uploadProduct_AcceptsPriceWithTrailingZeroPadding() throws IOException {
+        MockMultipartFile file = new MockMultipartFile(
+                "selectedImage", "test.png", "image/png", "some-image-data".getBytes());
+        Path mockPath = Paths.get("UploadFolder/image_123.png");
+
+        when(fileService.writeFileToDisk(any(), anyString())).thenReturn(mockPath);
+        when(categoryEntityRepository.findByCategoryId(10)).thenReturn(category);
+        when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(admin));
+
+        adminSupplyService.uploadProduct(1L, "Water", "Still", new BigDecimal("10.000"), 100, new BigDecimal("0.10"), "Fresh water", 10, file);
+
+        verify(productEntityRepository).save(any(ProductEntity.class));
+    }
+
+    @Test
+    void uploadProduct_ThrowsException_WhenProductPriceHasMoreThanTwoMeaningfulDecimals() {
+        MockMultipartFile file = new MockMultipartFile(
+                "selectedImage", "test.png", "image/png", "data".getBytes());
+
+        GeneralException ex = assertThrows(GeneralException.class, () ->
+                adminSupplyService.uploadProduct(1L, "Water", "Still", new BigDecimal("10.001"), 100, new BigDecimal("0.10"), "Fresh", 10, file)
+        );
+
+        assertEquals("Product price must not exceed two decimal places", ex.getMessage());
+        verify(productEntityRepository, never()).save(any());
+    }
+
+    @Test
+    void updateProduct_ThrowsException_WhenProductPriceHasMoreThanTwoMeaningfulDecimals() {
+        MockMultipartFile file = new MockMultipartFile(
+                "selectedImage", "test.png", "image/png", "data".getBytes());
+
+        GeneralException ex = assertThrows(GeneralException.class, () ->
+                adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10.001"), 5, BigDecimal.ZERO, "Desc", 1, file)
+        );
+
+        assertEquals("Product price must not exceed two decimal places", ex.getMessage());
+        verify(productEntityRepository, never()).save(any());
+    }
+
+    @Test
     void uploadProduct_ThrowsException_WhenImageMissing() {
         GeneralException ex = assertThrows(GeneralException.class, () ->
-                adminSupplyService.uploadProduct(1L, "Water", "Still", 5.0f, 100, 0.1f, "Fresh", 10, null)
+                adminSupplyService.uploadProduct(1L, "Water", "Still", new BigDecimal("5.0"), 100, new BigDecimal("0.1"), "Fresh", 10, null)
         );
 
         assertEquals("Product image is required", ex.getMessage());
@@ -138,7 +180,7 @@ class AdminSupplyServiceTest {
                 "selectedImage", "test.png", "image/png", "data".getBytes());
 
         GeneralException ex = assertThrows(GeneralException.class, () ->
-                adminSupplyService.uploadProduct(1L, "   ", "Still", 5.0f, 100, 0.1f, "Fresh", 10, file)
+                adminSupplyService.uploadProduct(1L, "   ", "Still", new BigDecimal("5.0"), 100, new BigDecimal("0.1"), "Fresh", 10, file)
         );
 
         assertEquals("Product name is required", ex.getMessage());
@@ -150,7 +192,7 @@ class AdminSupplyServiceTest {
                 "selectedImage", "test.jpg", "image/jpeg", "data".getBytes());
 
         GeneralException ex = assertThrows(GeneralException.class, () ->
-                adminSupplyService.uploadProduct(1L, "Water", "Still", 5.0f, 100, 0.1f, "Fresh", 10, file)
+                adminSupplyService.uploadProduct(1L, "Water", "Still", new BigDecimal("5.0"), 100, new BigDecimal("0.1"), "Fresh", 10, file)
         );
         assertEquals("Only PNG files are allowed", ex.getMessage());
     }
@@ -163,7 +205,7 @@ class AdminSupplyServiceTest {
         when(fileService.writeFileToDisk(any(), anyString())).thenThrow(new IOException());
 
         assertThrows(FileUploadFailedException.class, () ->
-                adminSupplyService.uploadProduct(1L, "Water", "Still", 5.0f, 100, 0.1f, "Fresh", 10, file)
+                adminSupplyService.uploadProduct(1L, "Water", "Still", new BigDecimal("5.0"), 100, new BigDecimal("0.1"), "Fresh", 10, file)
         );
     }
 
@@ -197,7 +239,7 @@ class AdminSupplyServiceTest {
         when(productImageEntityRepository.findByProductEntityId(productId)).thenReturn(List.of(existingImage));
 
         adminSupplyService.updateProduct(adminId, productId, "Updated Name", "SubCat",
-                10.0f, 50, 0.2f, "New Desc", categoryId, file);
+                new BigDecimal("10.0"), 50, new BigDecimal("0.2"), "New Desc", categoryId, file);
 
         verify(productEntityRepository).save(existingProduct);
         assertEquals("Updated Name", existingProduct.getProductName());
@@ -215,7 +257,7 @@ class AdminSupplyServiceTest {
         product.setId(100L);
         when(productEntityRepository.findById(100L)).thenReturn(Optional.of(product));
 
-        adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", 10f, 5, 0f, "Desc", 1, null);
+        adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10"), 5, BigDecimal.ZERO, "Desc", 1, null);
 
         verify(fileService, never()).writeFileToDisk(any(), anyString());
         verify(productImageEntityRepository, never()).findByProductEntityId(anyLong());
@@ -229,7 +271,7 @@ class AdminSupplyServiceTest {
         when(adminEntityRepository.findById(anyLong())).thenReturn(Optional.empty());
 
         assertThrows(AdminNotFoundException.class, () ->
-                adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", 10f, 5, 0f, "Desc", 1, file)
+                adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10"), 5, BigDecimal.ZERO, "Desc", 1, file)
         );
     }
 
@@ -242,7 +284,7 @@ class AdminSupplyServiceTest {
         when(productEntityRepository.findById(100L)).thenReturn(Optional.empty());
 
         assertThrows(ProductNotFoundException.class, () ->
-                adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", 10f, 5, 0f, "Desc", 1, file)
+                adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10"), 5, BigDecimal.ZERO, "Desc", 1, file)
         );
     }
 
@@ -256,7 +298,7 @@ class AdminSupplyServiceTest {
         when(fileService.writeFileToDisk(any(), anyString())).thenThrow(new IOException());
 
         assertThrows(FileUploadFailedException.class, () ->
-                adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", 10f, 5, 0f, "Desc", 1, file)
+                adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10"), 5, BigDecimal.ZERO, "Desc", 1, file)
         );
     }
 
@@ -307,9 +349,9 @@ class AdminSupplyServiceTest {
         product.setId(7L);
         product.setProductName("Milk");
         product.setSubcategoryName("Dairy");
-        product.setProductPrice(12.5f);
+        product.setProductPrice(new BigDecimal("12.5"));
         product.setProductCount(20);
-        product.setProductDiscount(0.1f);
+        product.setProductDiscount(new BigDecimal("0.1"));
         product.setProductDescription("Fresh milk");
         product.setCategoryEntity(categoryEntity);
 
@@ -319,9 +361,9 @@ class AdminSupplyServiceTest {
 
         assertEquals("Milk", result.getProductName());
         assertEquals("Dairy", result.getSubCategoryName());
-        assertEquals(12.5f, result.getProductPrice());
+        assertEquals(0, new BigDecimal("12.5").compareTo(result.getProductPrice()));
         assertEquals(20, result.getProductCount());
-        assertEquals(0.1f, result.getProductDiscount());
+        assertEquals(0, new BigDecimal("0.1").compareTo(result.getProductDiscount()));
         assertEquals("Fresh milk", result.getProductDescription());
         assertEquals(9, result.getProductCategoryId());
     }

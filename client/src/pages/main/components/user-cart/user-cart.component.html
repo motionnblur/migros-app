@@ -29,7 +29,7 @@
           <div class="fw-bold text-dark text-truncate" style="max-width: 200px;" [title]="item.productName">
             {{ item.productName }}
           </div>
-          <div class="text-orange fw-bold fs-5">{{ item.productPrice }} TL</div>
+          <div class="text-orange fw-bold fs-5">{{ item.productPrice | number:'1.2-2' }} TL</div>
           <div class="small" [ngClass]="item.availableStock > 0 ? 'text-success' : 'text-danger'">
             Stok: {{ item.availableStock }}
           </div>
@@ -63,7 +63,7 @@
   <div class="card-footer bg-light p-3 border-top">
     <div class="d-flex justify-content-between align-items-center mb-3">
       <span class="text-muted fw-medium">Toplam Tutar:</span>
-      <span class="fs-3 fw-bold text-orange">{{ totalPrice }} TL</span>
+      <span class="fs-3 fw-bold text-orange">{{ totalPrice | number:'1.2-2' }} TL</span>
     </div>
 
     <button

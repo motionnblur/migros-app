@@ -26,6 +26,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 
@@ -168,7 +169,7 @@ class UserSupplyControllerTest {
         ProductPreviewDto dto = new ProductPreviewDto();
         dto.setProductId(1L);
         dto.setProductName("Apple");
-        dto.setProductPrice(2.5f);
+        dto.setProductPrice(new BigDecimal("2.5"));
 
         when(userSupplyService.getProductsFromSubcategory(subName, page, range))
                 .thenReturn(List.of(dto));
@@ -269,13 +270,13 @@ class UserSupplyControllerTest {
         UserCartItemDto item1 = new UserCartItemDto();
         item1.setProductId(101L);
         item1.setProductName("Milk");
-        item1.setProductPrice(1.5f);
+        item1.setProductPrice(new BigDecimal("1.5"));
         item1.setProductCount(2);
 
         UserCartItemDto item2 = new UserCartItemDto();
         item2.setProductId(102L);
         item2.setProductName("Bread");
-        item2.setProductPrice(2.0f);
+        item2.setProductPrice(new BigDecimal("2.0"));
         item2.setProductCount(1);
 
         List<UserCartItemDto> cartItems = List.of(item1, item2);
@@ -305,9 +306,9 @@ class UserSupplyControllerTest {
         ProductDto2 mockProduct = new ProductDto2();
         mockProduct.setProductName("Organic Honey");
         mockProduct.setSubCategoryName("Sweeteners");
-        mockProduct.setProductPrice(15.50f);
+        mockProduct.setProductPrice(new BigDecimal("15.50"));
         mockProduct.setProductCount(100);
-        mockProduct.setProductDiscount(10.0f);
+        mockProduct.setProductDiscount(new BigDecimal("10.0"));
         mockProduct.setProductDescription("Pure natural honey.");
         mockProduct.setProductCategoryId(5);
 

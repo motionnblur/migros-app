@@ -31,6 +31,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -96,8 +97,8 @@ class UserSupplyServiceTest {
         ProductEntity product = new ProductEntity();
         product.setId(10L);
         product.setProductName("Milk");
-        product.setProductPrice(100f);
-        product.setProductDiscount(10f);
+        product.setProductPrice(new BigDecimal("100"));
+        product.setProductDiscount(new BigDecimal("10"));
         product.setProductCount(4);
 
         when(categoryEntityRepository.existsById(1L)).thenReturn(true);
@@ -108,7 +109,7 @@ class UserSupplyServiceTest {
 
         assertEquals(1, results.size());
         assertEquals(4, results.get(0).getProductCount());
-        assertEquals(90f, results.get(0).getProductPrice());
+        assertEquals(0, new BigDecimal("90").compareTo(results.get(0).getProductPrice()));
     }
 
     @Test
@@ -148,14 +149,14 @@ class UserSupplyServiceTest {
         ProductEntity inStock = new ProductEntity();
         inStock.setId(1L);
         inStock.setProductName("Apple");
-        inStock.setProductPrice(12f);
-        inStock.setProductDiscount(50f);
+        inStock.setProductPrice(new BigDecimal("12"));
+        inStock.setProductDiscount(new BigDecimal("50"));
         inStock.setProductCount(2);
 
         ProductEntity soldOut = new ProductEntity();
         soldOut.setId(2L);
         soldOut.setProductName("Orange");
-        soldOut.setProductPrice(7f);
+        soldOut.setProductPrice(new BigDecimal("7"));
         soldOut.setProductCount(0);
 
         when(productEntityRepository.findAllById(any())).thenReturn(List.of(inStock, soldOut));
@@ -165,7 +166,7 @@ class UserSupplyServiceTest {
         assertEquals(1, result.size());
         assertEquals(1L, result.get(0).getProductId());
         assertEquals(2, result.get(0).getProductCount());
-        assertEquals(6f, result.get(0).getProductPrice());
+        assertEquals(0, new BigDecimal("6").compareTo(result.get(0).getProductPrice()));
         assertEquals(2, result.get(0).getAvailableStock());
         verify(userEntityRepository, times(1)).save(user);
     }
@@ -322,8 +323,8 @@ class UserSupplyServiceTest {
         groupedOrder.setId(201L);
         groupedOrder.setItemId(5001L);
         groupedOrder.setCount(2);
-        groupedOrder.setPrice(12.5f);
-        groupedOrder.setTotalPrice(25f);
+        groupedOrder.setPrice(new BigDecimal("12.5"));
+        groupedOrder.setTotalPrice(new BigDecimal("25"));
 
         OrderGroupEntity group = new OrderGroupEntity();
         group.setId(900L);
@@ -334,8 +335,8 @@ class UserSupplyServiceTest {
         legacyOrder.setId(202L);
         legacyOrder.setItemId(5002L);
         legacyOrder.setCount(1);
-        legacyOrder.setPrice(5f);
-        legacyOrder.setTotalPrice(5f);
+        legacyOrder.setPrice(new BigDecimal("5"));
+        legacyOrder.setTotalPrice(new BigDecimal("5"));
         legacyOrder.setStatus("Pending");
 
         ProductEntity existingProduct = new ProductEntity();
@@ -383,8 +384,8 @@ class UserSupplyServiceTest {
         groupOrder.setId(3001L);
         groupOrder.setItemId(7001L);
         groupOrder.setCount(1);
-        groupOrder.setPrice(8f);
-        groupOrder.setTotalPrice(8f);
+        groupOrder.setPrice(new BigDecimal("8"));
+        groupOrder.setTotalPrice(new BigDecimal("8"));
 
         OrderGroupEntity orderGroup = new OrderGroupEntity();
         orderGroup.setId(10L);
@@ -396,8 +397,8 @@ class UserSupplyServiceTest {
         legacyOrder.setId(20L);
         legacyOrder.setItemId(7002L);
         legacyOrder.setCount(3);
-        legacyOrder.setPrice(2f);
-        legacyOrder.setTotalPrice(6f);
+        legacyOrder.setPrice(new BigDecimal("2"));
+        legacyOrder.setTotalPrice(new BigDecimal("6"));
         legacyOrder.setStatus("Pending");
 
         ProductEntity product = new ProductEntity();

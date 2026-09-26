@@ -18,6 +18,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -74,20 +75,20 @@ class UserOrderServiceTest {
 
         ProductEntity p1 = new ProductEntity();
         p1.setId(101L);
-        p1.setProductPrice(10.0f);
-        p1.setProductDiscount(20.0f);
+        p1.setProductPrice(new BigDecimal("10.0"));
+        p1.setProductDiscount(new BigDecimal("20.0"));
         p1.setProductCount(5);
 
         ProductEntity p2 = new ProductEntity();
         p2.setId(102L);
-        p2.setProductPrice(5.0f);
+        p2.setProductPrice(new BigDecimal("5.0"));
         p2.setProductCount(2);
 
         when(productEntityRepository.findAllById(any())).thenReturn(List.of(p1, p2));
 
-        float total = userOrderService.getOrderPrice(TOKEN);
+        BigDecimal total = userOrderService.getOrderPrice(TOKEN);
 
-        assertEquals(21.0f, total);
+        assertEquals(0, new BigDecimal("21.0").compareTo(total));
     }
 
     @Test
@@ -96,12 +97,12 @@ class UserOrderServiceTest {
 
         ProductEntity p1 = new ProductEntity();
         p1.setId(101L);
-        p1.setProductPrice(10.0f);
+        p1.setProductPrice(new BigDecimal("10.0"));
         p1.setProductCount(1);
 
         ProductEntity p2 = new ProductEntity();
         p2.setId(102L);
-        p2.setProductPrice(5.0f);
+        p2.setProductPrice(new BigDecimal("5.0"));
         p2.setProductCount(2);
 
         when(productEntityRepository.findAllById(any())).thenReturn(List.of(p1, p2));
@@ -116,14 +117,14 @@ class UserOrderServiceTest {
         ProductEntity p1 = new ProductEntity();
         p1.setId(101L);
         p1.setProductName("Apple");
-        p1.setProductPrice(10.0f);
-        p1.setProductDiscount(20.0f);
+        p1.setProductPrice(new BigDecimal("10.0"));
+        p1.setProductDiscount(new BigDecimal("20.0"));
         p1.setProductCount(2);
 
         ProductEntity p2 = new ProductEntity();
         p2.setId(102L);
         p2.setProductName("Milk");
-        p2.setProductPrice(5.0f);
+        p2.setProductPrice(new BigDecimal("5.0"));
         p2.setProductCount(5);
 
         when(productEntityRepository.findAllById(any())).thenReturn(List.of(p1, p2));
@@ -147,8 +148,8 @@ class UserOrderServiceTest {
                 .filter(item -> item.getItemId().equals(101L))
                 .findFirst()
                 .orElseThrow();
-        assertEquals(8.0f, appleOrder.getPrice());
-        assertEquals(16.0f, appleOrder.getTotalPrice());
+        assertEquals(0, new BigDecimal("8.0").compareTo(appleOrder.getPrice()));
+        assertEquals(0, new BigDecimal("16.0").compareTo(appleOrder.getTotalPrice()));
 
         verify(productEntityRepository, times(1)).saveAll(any());
         verify(userEntityRepository, times(1)).save(user);
@@ -161,7 +162,7 @@ class UserOrderServiceTest {
         ProductEntity p1 = new ProductEntity();
         p1.setId(101L);
         p1.setProductName("Apple");
-        p1.setProductPrice(10.0f);
+        p1.setProductPrice(new BigDecimal("10.0"));
         p1.setProductCount(3);
 
         when(productEntityRepository.findAllById(any())).thenReturn(List.of(p1));

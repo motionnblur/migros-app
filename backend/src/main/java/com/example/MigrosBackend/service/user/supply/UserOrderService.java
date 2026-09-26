@@ -18,6 +18,8 @@ import com.example.MigrosBackend.service.global.TokenService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -95,10 +97,10 @@ public class UserOrderService {
             order.setOrderGroup(orderGroup);
             order.setUserId(user.getId());
             order.setItemId(productId);
-            float effectivePrice = getEffectivePrice(product);
+            BigDecimal effectivePrice = getEffectivePrice(product);
             order.setPrice(effectivePrice);
             order.setCount(count);
-            order.setTotalPrice(effectivePrice * count);
+            order.setTotalPrice(effectivePrice.multiply(BigDecimal.valueOf(count)));
             order.setStatus(orderGroup.getStatus());
             orderEntityRepository.save(order);
 
@@ -112,14 +114,13 @@ public class UserOrderService {
         userEntityRepository.save(user);
     }
 
-    public float getOrderPrice(String userToken) {
+    public BigDecimal getOrderPrice(String userToken) {
         UserEntity user = getValidatedUser(userToken);
 
         List<Long> productsInCart = user.getProductsIdsInCart();
         if (productsInCart == null || productsInCart.isEmpty()) {
-            return 0;
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         }
-
         Map<Long, Integer> productCounts = productsInCart.stream()
                 .collect(Collectors.groupingBy(Function.identity(), Collectors.summingInt(e -> 1)));
 
@@ -127,7 +128,7 @@ public class UserOrderService {
                 .stream()
                 .collect(Collectors.toMap(ProductEntity::getId, Function.identity()));
 
-        float total = 0;
+        BigDecimal total = BigDecimal.ZERO;
         for (Map.Entry<Long, Integer> entry : productCounts.entrySet()) {
             ProductEntity product = productMap.get(entry.getKey());
             if (product == null) {
@@ -136,9 +137,9 @@ public class UserOrderService {
             if (product.getProductCount() < entry.getValue()) {
                 throw new GeneralException("Insufficient stock for product: " + product.getProductName());
             }
-            total += getEffectivePrice(product) * entry.getValue();
+            total = total.add(getEffectivePrice(product).multiply(BigDecimal.valueOf(entry.getValue())));
         }
-        return total;
+        return total.setScale(2, RoundingMode.HALF_UP);
     }
 
     public OrderPageDto getAllOrders(int page, int productRange) {
@@ -147,10 +148,10 @@ public class UserOrderService {
         List<OrderGroupEntity> groups = orderGroupEntityRepository.findAll();
         for (OrderGroupEntity group : groups) {
             List<OrderEntity> items = orderEntityRepository.findByOrderGroup_Id(group.getId());
-            float totalPrice = 0;
+            BigDecimal totalPrice = BigDecimal.ZERO;
             for (OrderEntity item : items) {
                 if (item.getTotalPrice() != null) {
-                    totalPrice += item.getTotalPrice();
+                    totalPrice = totalPrice.add(item.getTotalPrice());
                 }
             }
 
@@ -167,7 +168,7 @@ public class UserOrderService {
             OrderDto dto = new OrderDto();
             dto.setOrderId(legacy.getId());
             dto.setOrderGroupId(legacy.getId());
-            dto.setTotalPrice(legacy.getTotalPrice() != null ? legacy.getTotalPrice() : 0);
+            dto.setTotalPrice(legacy.getTotalPrice() != null ? legacy.getTotalPrice() : BigDecimal.ZERO);
             dto.setStatus(legacy.getStatus());
             orderDtos.add(dto);
         }
@@ -259,13 +260,22 @@ public class UserOrderService {
     }
 
 
-    private float getEffectivePrice(ProductEntity product) {
-        float discount = product.getProductDiscount();
-        float price = product.getProductPrice();
-        if (discount <= 0) {
+    private BigDecimal getEffectivePrice(ProductEntity product) {
+        BigDecimal discount = normalizeDiscount(product.getProductDiscount());
+        BigDecimal price = normalizeAmount(product.getProductPrice());
+        if (discount.signum() <= 0) {
             return price;
         }
-        return price - (price * discount / 100);
+        BigDecimal factor = BigDecimal.ONE.subtract(discount.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP));
+        return price.multiply(factor).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal normalizeAmount(BigDecimal amount) {
+        return amount == null ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP) : amount.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal normalizeDiscount(BigDecimal discount) {
+        return discount == null ? BigDecimal.ZERO : discount;
     }
 
     private void restockOrderItems(List<OrderEntity> orderItems) {

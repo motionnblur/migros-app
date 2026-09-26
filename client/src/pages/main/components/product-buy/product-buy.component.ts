@@ -32,6 +32,10 @@ export class ProductBuyComponent extends ProductBuyBase {
     return +(price - (price * discount) / 100).toFixed(2);
   }
 
+  public formatPrice(value: number | null | undefined): string {
+    return (value ?? 0).toFixed(2);
+  }
+
   public get isOutOfStock(): boolean {
     return (this.productData?.productCount ?? 0) <= 0;
   }

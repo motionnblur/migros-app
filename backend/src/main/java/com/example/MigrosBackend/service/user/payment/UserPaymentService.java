@@ -3,40 +3,37 @@ package com.example.MigrosBackend.service.user.payment;
 import com.example.MigrosBackend.service.user.supply.UserOrderService;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Charge;
-import com.stripe.param.ChargeCreateParams;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
 
 @Service
 public class UserPaymentService {
     private final UserOrderService userOrderService;
+    private final PaymentAmountConverter paymentAmountConverter;
+    private final StripePaymentGateway stripePaymentGateway;
 
-    public UserPaymentService(UserOrderService userOrderService) {
+    public UserPaymentService(UserOrderService userOrderService,
+                              PaymentAmountConverter paymentAmountConverter,
+                              StripePaymentGateway stripePaymentGateway) {
         this.userOrderService = userOrderService;
+        this.paymentAmountConverter = paymentAmountConverter;
+        this.stripePaymentGateway = stripePaymentGateway;
     }
 
     public Map<String, Object> processCharge(Map<String, Object> payload, String userToken) {
         String token = (String) payload.get("token");
 
-        float amount = userOrderService.getOrderPrice(userToken);
-
-        if (amount <= 0) {
-            return null;
-        }
+        BigDecimal amount = userOrderService.getOrderPrice(userToken);
+        StripeAmount stripeAmount = paymentAmountConverter.toStripeAmount(amount);
 
         Map<String, Object> response = new HashMap<>();
 
         try {
-            ChargeCreateParams params = ChargeCreateParams.builder()
-                    .setAmount((long) amount)
-                    .setCurrency("usd")
-                    .setDescription("Example charge")
-                    .setSource(token)
-                    .build();
-
-            Charge charge = Charge.create(params);
+            Charge charge = stripePaymentGateway.charge(
+                    token, stripeAmount.amountMinor(), stripeAmount.currency());
 
             response.put("success", true);
             response.put("charge", extractChargeDetails(charge));

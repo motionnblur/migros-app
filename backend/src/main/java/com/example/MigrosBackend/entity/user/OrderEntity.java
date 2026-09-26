@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
+
 @Entity
 @Data
 @Getter
@@ -19,8 +21,13 @@ public class OrderEntity {
     private Long userId;
     private Long itemId;
     private Integer count;
-    private Float price;
-    private Float totalPrice;
+
+    @Column(precision = 19, scale = 2)
+    private BigDecimal price;
+
+    @Column(precision = 19, scale = 2)
+    private BigDecimal totalPrice;
+
     private String status;
 
     @ManyToOne(fetch = FetchType.LAZY)

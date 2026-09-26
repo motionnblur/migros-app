@@ -24,9 +24,9 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
+import java.math.BigDecimal;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyFloat;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doThrow;
@@ -151,7 +151,7 @@ class AdminPanelControllerTest {
     void uploadProduct_shouldReturnBadRequest_whenValidationFails() throws Exception {
         doThrow(new GeneralException("Product name is required"))
                 .when(adminSupplyService)
-                .uploadProduct(anyLong(), any(), any(), anyFloat(), anyInt(), anyFloat(), any(), anyInt(), any());
+                .uploadProduct(anyLong(), any(), any(), any(BigDecimal.class), anyInt(), any(BigDecimal.class), any(), anyInt(), any());
 
         mockMvc.perform(multipart("/admin/panel/uploadProduct")
                         .file(mockFile)
@@ -196,7 +196,7 @@ class AdminPanelControllerTest {
         OrderDto order = new OrderDto();
         order.setOrderId(1L);
         order.setOrderGroupId(1L);
-        order.setTotalPrice(25.0f);
+        order.setTotalPrice(new BigDecimal("25.0"));
         order.setStatus("PENDING");
 
         OrderPageDto pageDto = new OrderPageDto();
