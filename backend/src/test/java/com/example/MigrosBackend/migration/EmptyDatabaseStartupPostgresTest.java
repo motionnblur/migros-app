@@ -73,6 +73,12 @@ class EmptyDatabaseStartupPostgresTest {
                 assertTrue(rs.getBoolean("success"));
             }
 
+            try (ResultSet rs = statement.executeQuery(
+                    "SELECT success FROM flyway_schema_history WHERE version = '4'")) {
+                assertTrue(rs.next(), "Flyway must record the webhook-inbox migration on an empty database");
+                assertTrue(rs.getBoolean("success"));
+            }
+
             assertTableExists(statement, "checkout_entity");
             assertTableExists(statement, "checkout_item_entity");
             assertTableExists(statement, "payment_attempt_entity");

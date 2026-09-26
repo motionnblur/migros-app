@@ -3,25 +3,57 @@ package com.example.MigrosBackend.service.user.payment;
 import com.example.MigrosBackend.dto.payment.PaymentClaim;
 import com.example.MigrosBackend.entity.payment.PaymentAttemptStatus;
 import com.example.MigrosBackend.exception.user.PaymentStateException;
+import com.example.MigrosBackend.service.user.payment.StripeEventStore.ReceiveOutcome;
+import com.example.MigrosBackend.service.user.payment.StripeEventStore.StoredEvent;
 import com.stripe.exception.EventDataObjectDeserializationException;
 import com.stripe.model.Charge;
 import com.stripe.model.Dispute;
 import com.stripe.model.Event;
 import com.stripe.model.StripeObject;
+import com.stripe.net.ApiResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.HexFormat;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
  * Applies signature-verified Stripe webhook events to the durable payment
- * attempt. Events are deduplicated by event id and mapped to stored attempts by
- * provider charge id first, then by the checkout id embedded in the signed
- * charge metadata. Out-of-order or duplicate events can never regress a final
- * state because all transitions go through the central state machine.
+ * attempt through a crash-safe inbox.
+ *
+ * <p>At-least-once processing with exactly-once effects:
+ *
+ * <ul>
+ *   <li>Receipt ({@code RECEIVED}) and processing are separate commits. A
+ *   crash after receipt but before processing leaves the event reclaimable;
+ *   row existence alone never counts as completion, only {@code PROCESSED}
+ *   does.</li>
+ *   <li>Claiming uses an atomic conditional update with a bounded lease, so
+ *   concurrent duplicate deliveries converge on a single worker and an
+ *   expired lease can be reclaimed.</li>
+ *   <li>All effects (charge transitions, order finalization, refunds) are
+ *   idempotent, so a crash after effects commit but before {@code PROCESSED}
+ *   is harmless on retry.</li>
+ *   <li>A redelivery whose type or payload hash differs from the stored row
+ *   fails closed into manual review without applying effects.</li>
+ * </ul>
+ *
+ * <p>Events are mapped to stored attempts by provider charge id first, then by
+ * the checkout id embedded in the signed charge metadata. Out-of-order or
+ * duplicate events can never regress a final state because all transitions go
+ * through the central state machine.
+ *
+ * <p>Only event ids, types, and sanitized error codes are logged. Verified
+ * payloads, signatures, and secrets never enter logs.
  */
 @Service
 public class PaymentWebhookService {
@@ -31,35 +63,200 @@ public class PaymentWebhookService {
     private final StripeEventStore stripeEventStore;
     private final PaymentAttemptService paymentAttemptService;
     private final PaymentFinalizationService paymentFinalizationService;
+    private final Clock clock;
+    private final long leaseSeconds;
+    private final int maxAttempts;
+    private final long backoffBaseSeconds;
+    private final long backoffMaxSeconds;
 
     public PaymentWebhookService(StripeEventStore stripeEventStore,
                                  PaymentAttemptService paymentAttemptService,
-                                 PaymentFinalizationService paymentFinalizationService) {
+                                 PaymentFinalizationService paymentFinalizationService,
+                                 Clock clock,
+                                 @Value("${payment.webhook.inbox-lease-seconds:120}") long leaseSeconds,
+                                 @Value("${payment.webhook.inbox-max-attempts:8}") int maxAttempts,
+                                 @Value("${payment.webhook.inbox-backoff-base-seconds:60}") long backoffBaseSeconds,
+                                 @Value("${payment.webhook.inbox-backoff-max-seconds:3600}") long backoffMaxSeconds) {
         this.stripeEventStore = stripeEventStore;
         this.paymentAttemptService = paymentAttemptService;
         this.paymentFinalizationService = paymentFinalizationService;
+        this.clock = clock;
+        this.leaseSeconds = leaseSeconds;
+        this.maxAttempts = maxAttempts;
+        this.backoffBaseSeconds = backoffBaseSeconds;
+        this.backoffMaxSeconds = backoffMaxSeconds;
     }
 
-    public void handle(Event event) {
+    /**
+     * Handles one verified delivery. The event must already have passed
+     * Stripe signature verification over {@code rawPayload}; this method
+     * inserts it into the inbox and processes it when it wins the claim.
+     * A processing failure parks the event for a bounded retry and rethrows
+     * so Stripe redelivers; redelivery is always safe.
+     */
+    public void handle(Event event, String rawPayload) {
         if (event == null || event.getId() == null || event.getType() == null) {
             LOG.warn("Ignoring Stripe webhook without an id or type");
             return;
         }
         String eventId = event.getId();
         String eventType = event.getType();
+        LocalDateTime now = LocalDateTime.now(clock);
+        String payload = rawPayload == null ? "" : rawPayload;
 
-        if (!stripeEventStore.markIfNew(eventId, eventType, LocalDateTime.now())) {
-            LOG.info("Ignoring duplicate Stripe event {} of type {}", eventId, eventType);
+        ReceiveOutcome outcome = stripeEventStore.receive(
+                eventId, eventType, rawPayload, sha256Hex(payload), now);
+        switch (outcome) {
+            case CONFLICT -> {
+                stripeEventStore.markManualReview(eventId, "event_id_collision");
+                LOG.error("Stripe event id collision for {}; held for manual review", eventId);
+                return;
+            }
+            case ALREADY_PROCESSED -> {
+                LOG.info("Ignoring already-processed Stripe event {} of type {}", eventId, eventType);
+                return;
+            }
+            case RECEIVED_NEW, NEEDS_PROCESSING -> {
+                // Fall through to the atomic claim below.
+            }
+        }
+
+        Optional<StoredEvent> claim =
+                stripeEventStore.tryClaim(eventId, UUID.randomUUID().toString(), now, leaseSeconds);
+        if (claim.isEmpty()) {
+            LOG.info("Stripe event {} is already claimed by another worker", eventId);
             return;
+        }
+        StoredEvent claimed = claim.get();
+        afterClaim(eventId);
+
+        Event effective = event;
+        if (claimed.payload() != null) {
+            try {
+                effective = parseStoredPayload(eventId, claimed.payload());
+            } catch (RuntimeException ex) {
+                recordFailure(eventId, claimed.attemptCount(), ex);
+                throw ex;
+            }
         }
 
         try {
-            process(event, eventType);
-            stripeEventStore.markProcessed(eventId);
+            process(effective, effective.getType() != null ? effective.getType() : eventType);
+            afterEffects(eventId);
+            if (!stripeEventStore.markProcessed(eventId, LocalDateTime.now(clock))) {
+                LOG.warn("Stripe event {} could not be marked processed; "
+                        + "it was reclaimed or held for review", eventId);
+            }
         } catch (RuntimeException ex) {
-            stripeEventStore.remove(eventId);
+            recordFailure(eventId, claimed.attemptCount(), ex);
             throw ex;
         }
+    }
+
+    /**
+     * Replays one stored event for the scheduled recovery job. Returns true
+     * when this worker completed the event; false when another worker holds
+     * the lease or the attempt was parked for retry/review. Never throws for
+     * event-processing failures; they are recorded in the inbox row.
+     */
+    public boolean processStoredEvent(String eventId) {
+        if (eventId == null || eventId.isBlank()) {
+            return false;
+        }
+        LocalDateTime now = LocalDateTime.now(clock);
+        Optional<StoredEvent> claim =
+                stripeEventStore.tryClaim(eventId, UUID.randomUUID().toString(), now, leaseSeconds);
+        if (claim.isEmpty()) {
+            return false;
+        }
+        StoredEvent claimed = claim.get();
+        if (claimed.payload() == null || claimed.payload().isBlank()) {
+            stripeEventStore.markManualReview(eventId, "missing_payload");
+            LOG.error("Stripe event {} has no stored payload; held for manual review", eventId);
+            return false;
+        }
+        Event event;
+        try {
+            event = parseStoredPayload(eventId, claimed.payload());
+        } catch (RuntimeException ex) {
+            recordFailure(eventId, claimed.attemptCount(), ex);
+            return false;
+        }
+        try {
+            process(event, event.getType() != null ? event.getType() : claimed.eventType());
+            afterEffects(eventId);
+            return stripeEventStore.markProcessed(eventId, LocalDateTime.now(clock));
+        } catch (RuntimeException ex) {
+            recordFailure(eventId, claimed.attemptCount(), ex);
+            return false;
+        }
+    }
+
+    /**
+     * Fault-injection hook called after a claim is won and before effects run.
+     * No-op in production; tests stub it to simulate a crash after receipt.
+     */
+    void afterClaim(String eventId) {
+    }
+
+    /**
+     * Fault-injection hook called after effects commit and before the inbox
+     * row is marked processed. No-op in production; tests stub it to simulate
+     * a crash between effects and completion.
+     */
+    void afterEffects(String eventId) {
+    }
+
+    /**
+     * Parses only the payload already verified and stored for the event, so a
+     * worker can never act on content that bypassed signature verification.
+     */
+    private Event parseStoredPayload(String eventId, String payload) {
+        try {
+            Event event = StripeObject.deserializeStripeObject(
+                    payload, Event.class, ApiResource.getGlobalResponseGetter());
+            if (event == null || event.getId() == null || event.getType() == null) {
+                throw new IllegalStateException("stored payload is missing its id or type");
+            }
+            return event;
+        } catch (RuntimeException ex) {
+            throw new IllegalStateException(
+                    "Stored webhook payload for event " + eventId + " cannot be replayed", ex);
+        }
+    }
+
+    private void recordFailure(String eventId, int attemptCount, RuntimeException ex) {
+        String failureClass = ex.getClass().getSimpleName();
+        if (attemptCount >= maxAttempts) {
+            stripeEventStore.markManualReview(eventId, sanitizeCode("exhausted:" + failureClass));
+            LOG.error("Stripe event {} exhausted {} attempts ({}); held for manual review",
+                    eventId, attemptCount, failureClass);
+            return;
+        }
+        long shift = Math.min(Math.max(attemptCount - 1, 0), 20);
+        long backoff = Math.min(backoffBaseSeconds * (1L << shift), backoffMaxSeconds);
+        LocalDateTime nextAttempt = LocalDateTime.now(clock).plusSeconds(backoff);
+        stripeEventStore.markFailed(eventId, sanitizeCode("effect_failed:" + failureClass), nextAttempt);
+        LOG.warn("Stripe event {} processing failed ({}); retry {}/{} scheduled",
+                eventId, failureClass, attemptCount, maxAttempts);
+    }
+
+    static String sha256Hex(String payload) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(payload.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 is required for webhook payload hashing", ex);
+        }
+    }
+
+    private String sanitizeCode(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.length() <= 64 ? trimmed : trimmed.substring(0, 64);
     }
 
     private void process(Event event, String eventType) {

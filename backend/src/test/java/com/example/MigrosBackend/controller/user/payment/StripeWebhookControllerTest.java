@@ -59,7 +59,7 @@ class StripeWebhookControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.received").value(true));
 
-        verify(paymentWebhookService).handle(event);
+        verify(paymentWebhookService).handle(event, "{}");
     }
 
     @Test
@@ -73,7 +73,7 @@ class StripeWebhookControllerTest {
                         .content("{}"))
                 .andExpect(status().isBadRequest());
 
-        verify(paymentWebhookService, never()).handle(any());
+        verify(paymentWebhookService, never()).handle(any(), any());
     }
 
     @Test
@@ -86,6 +86,6 @@ class StripeWebhookControllerTest {
                         .content("{}"))
                 .andExpect(status().isBadRequest());
 
-        verify(paymentWebhookService, never()).handle(any());
+        verify(paymentWebhookService, never()).handle(any(), any());
     }
 }

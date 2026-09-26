@@ -35,8 +35,10 @@ public class StripeWebhookController {
             @RequestHeader(name = "Stripe-Signature", required = false) String signature) {
         // Verifies the raw body against the configured secret; throws
         // WebhookSignatureException (HTTP 400) on a missing or invalid signature.
+        // Verification happens before any inbox row is inserted or acted upon,
+        // so unsigned payloads can never enter the durable inbox.
         Event event = verifier.verify(payload, signature);
-        paymentWebhookService.handle(event);
+        paymentWebhookService.handle(event, payload);
         return ResponseEntity.ok(Map.of("received", true));
     }
 }

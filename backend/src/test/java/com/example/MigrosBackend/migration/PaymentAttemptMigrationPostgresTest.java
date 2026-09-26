@@ -112,10 +112,91 @@ class PaymentAttemptMigrationPostgresTest {
     }
 
     @Test
-    void migrationIsIdempotentAndRecordsVersionThree() throws SQLException {
+    void migrationCreatesInboxLifecycleColumnsConstraintsAndIndexes() throws SQLException {
+        createBaseSchema();
+        migrate();
+
+        try (Connection connection = openConnection()) {
+            assertColumn(connection, "stripe_event_entity", "status",
+                    "character varying", null, null);
+            assertColumn(connection, "stripe_event_entity", "payload_hash",
+                    "character varying", null, null);
+            assertColumn(connection, "stripe_event_entity", "attempt_count",
+                    "integer", null, null);
+            assertColumn(connection, "stripe_event_entity", "last_error",
+                    "character varying", null, null);
+            assertColumn(connection, "stripe_event_entity", "lease_owner",
+                    "character varying", null, null);
+            assertColumn(connection, "stripe_event_entity", "lease_expires_at",
+                    "timestamp without time zone", null, null);
+            assertColumn(connection, "stripe_event_entity", "processing_started_at",
+                    "timestamp without time zone", null, null);
+            assertColumn(connection, "stripe_event_entity", "next_attempt_at",
+                    "timestamp without time zone", null, null);
+
+            assertConstraint(connection, "stripe_event_entity", "chk_stripe_event_status");
+            assertIndex(connection, "idx_stripe_event_recovery");
+            assertIndex(connection, "idx_stripe_event_lease");
+        }
+    }
+
+    @Test
+    void existingV3RowsAreBackfilledIntoInboxStates() throws SQLException {
+        createBaseSchema();
+        migrateTo("3");
+
+        try (Connection connection = openConnection(); Statement statement = connection.createStatement()) {
+            statement.execute("INSERT INTO stripe_event_entity (event_id, event_type, received_at, processed_at) "
+                    + "VALUES ('evt_done', 'charge.succeeded', now() - interval '2 hours', now() - interval '1 hour')");
+            statement.execute("INSERT INTO stripe_event_entity (event_id, event_type, received_at) "
+                    + "VALUES ('evt_pending', 'charge.succeeded', now() - interval '1 hour')");
+        }
+
+        migrate();
+
+        try (Connection connection = openConnection();
+             Statement statement = connection.createStatement();
+             ResultSet rs = statement.executeQuery(
+                     "SELECT event_id, status, attempt_count, payload_hash, next_attempt_at "
+                             + "FROM stripe_event_entity ORDER BY event_id")) {
+            assertTrue(rs.next());
+            assertEquals("evt_done", rs.getString("event_id"));
+            assertEquals("PROCESSED", rs.getString("status"));
+            assertTrue(rs.next());
+            assertEquals("evt_pending", rs.getString("event_id"));
+            assertEquals("RECEIVED", rs.getString("status"));
+            assertEquals(0, rs.getInt("attempt_count"));
+            assertEquals("", rs.getString("payload_hash"));
+            assertTrue(rs.getTimestamp("next_attempt_at") != null,
+                    "unprocessed legacy rows must become immediately due");
+        }
+    }
+
+    @Test
+    void legacyMinimalInsertsKeepWorkingThroughColumnDefaults() throws SQLException {
+        createBaseSchema();
+        migrate();
+
+        execute("INSERT INTO stripe_event_entity (event_id, event_type, received_at) "
+                + "VALUES ('evt_legacy', 'charge.failed', now())");
+
+        try (Connection connection = openConnection();
+             Statement statement = connection.createStatement();
+             ResultSet rs = statement.executeQuery(
+                     "SELECT status, attempt_count, payload_hash FROM stripe_event_entity "
+                             + "WHERE event_id = 'evt_legacy'")) {
+            assertTrue(rs.next());
+            assertEquals("RECEIVED", rs.getString("status"));
+            assertEquals(0, rs.getInt("attempt_count"));
+            assertEquals("", rs.getString("payload_hash"));
+        }
+    }
+
+    @Test
+    void migrationIsIdempotentAndRecordsVersionFour() throws SQLException {
         createBaseSchema();
         MigrateResult first = migrate();
-        assertEquals(3, first.migrationsExecuted, "V1, V2 and V3 must run on a first migrate");
+        assertEquals(4, first.migrationsExecuted, "V1, V2, V3 and V4 must run on a first migrate");
 
         MigrateResult second = migrate();
         assertEquals(0, second.migrationsExecuted);
@@ -123,7 +204,7 @@ class PaymentAttemptMigrationPostgresTest {
         try (Connection connection = openConnection();
              Statement statement = connection.createStatement();
              ResultSet rs = statement.executeQuery(
-                     "SELECT success FROM flyway_schema_history WHERE version = '3'")) {
+                     "SELECT success FROM flyway_schema_history WHERE version = '4'")) {
             assertTrue(rs.next());
             assertTrue(rs.getBoolean("success"));
         }
@@ -131,9 +212,9 @@ class PaymentAttemptMigrationPostgresTest {
 
     @Test
     void migrationSkipsPaymentTablesWhenBaseSchemaIsMissing() throws SQLException {
-        // No base tables: V3 is guarded and must not fail or create orphan tables.
+        // No base tables: V3/V4 are guarded and must not fail or create orphan tables.
         MigrateResult result = migrate();
-        assertEquals(3, result.migrationsExecuted);
+        assertEquals(4, result.migrationsExecuted);
 
         try (Connection connection = openConnection();
              Statement statement = connection.createStatement();
@@ -205,6 +286,17 @@ class PaymentAttemptMigrationPostgresTest {
                 .locations("classpath:db/migration")
                 .baselineOnMigrate(true)
                 .baselineVersion("0")
+                .load()
+                .migrate();
+    }
+
+    private MigrateResult migrateTo(String version) {
+        return Flyway.configure()
+                .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
+                .locations("classpath:db/migration")
+                .baselineOnMigrate(true)
+                .baselineVersion("0")
+                .target(version)
                 .load()
                 .migrate();
     }
