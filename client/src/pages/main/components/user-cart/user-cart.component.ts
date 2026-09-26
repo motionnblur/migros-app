@@ -178,6 +178,15 @@ export class UserCartComponent {
     this.isPaymentPhaseActive = false;
   }
 
+  public handleCheckoutPrepared() {
+    // The server reserved and removed the cart contents when the snapshot was
+    // prepared, so the live cart view must be refreshed from the backend.
+    this.itemsToDelete = [];
+    this.itemCountMap.clear();
+    this.isCartConfirmed = false;
+    this.loadCart();
+  }
+
   public handlePaymentSuccess() {
     this.isPaymentPhaseActive = false;
     this.isCartConfirmed = false;

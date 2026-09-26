@@ -2,6 +2,17 @@
 <div class="payment-container">
   <h3 class="payment-title">Secure Payment</h3>
 
+  @if (checkout) {
+    <div class="payment-total">
+      <span>Total:</span>
+      <strong>{{ displayTotal }} {{ displayCurrency }}</strong>
+    </div>
+  }
+
+  @if (errorMessage) {
+    <p class="error-message">{{ errorMessage }}</p>
+  }
+
   <div class="payment-form">
     <div id="card-element" class="card-element">
       <!-- A Stripe Element will be inserted here. -->
@@ -11,7 +22,16 @@
       <!-- Stripe form errors will be displayed here -->
     </div>
 
-    <button (click)="handlePayment()" class="payment-button">Pay Now</button>
+    <button
+      (click)="handlePayment()"
+      class="payment-button"
+      [disabled]="isProcessing || isPreparing || !checkout">
+      @if (isProcessing) {
+        Processing...
+      } @else {
+        Pay Now
+      }
+    </button>
   </div>
 
   <p class="payment-info">

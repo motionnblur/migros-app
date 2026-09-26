@@ -60,6 +60,36 @@ class EmptyDatabaseStartupPostgresTest {
                 assertTrue(rs.next(), "Flyway must record the money-columns migration on an empty database");
                 assertTrue(rs.getBoolean("success"));
             }
+
+            try (ResultSet rs = statement.executeQuery(
+                    "SELECT success FROM flyway_schema_history WHERE version = '2'")) {
+                assertTrue(rs.next(), "Flyway must record the checkout-snapshot migration on an empty database");
+                assertTrue(rs.getBoolean("success"));
+            }
+
+            assertTableExists(statement, "checkout_entity");
+            assertTableExists(statement, "checkout_item_entity");
+            assertNumeric19Scale2(statement, "checkout_entity", "total_amount");
+            assertNumeric19Scale2(statement, "checkout_item_entity", "unit_price");
+            assertIndexExists(statement, "uq_checkout_live_per_user");
+        }
+    }
+
+    private void assertIndexExists(Statement statement, String indexName) throws SQLException {
+        try (ResultSet rs = statement.executeQuery(
+                "SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'public' "
+                        + "AND indexname = '" + indexName + "'")) {
+            assertTrue(rs.next());
+            assertEquals(1, rs.getInt(1), "index " + indexName + " must exist after startup");
+        }
+    }
+
+    private void assertTableExists(Statement statement, String tableName) throws SQLException {
+        try (ResultSet rs = statement.executeQuery(
+                "SELECT COUNT(*) FROM information_schema.tables "
+                        + "WHERE table_schema = 'public' AND table_name = '" + tableName + "'")) {
+            assertTrue(rs.next());
+            assertEquals(1, rs.getInt(1), "table " + tableName + " must exist after startup");
         }
     }
 

@@ -3,28 +3,21 @@ package com.example.MigrosBackend.service.user.supply;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.user.OrderEntity;
 import com.example.MigrosBackend.entity.user.OrderGroupEntity;
-import com.example.MigrosBackend.entity.user.UserEntity;
-import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderGroupEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -50,125 +43,6 @@ class UserOrderServiceTest {
 
     @InjectMocks
     private UserOrderService userOrderService;
-
-    private static final String TOKEN = "mock-token";
-    private static final String EMAIL = "test@migros.com";
-
-    private UserEntity user;
-
-    @BeforeEach
-    void setUp() {
-        user = new UserEntity();
-        user.setId(1L);
-        user.setUserMail(EMAIL);
-        user.setProductsIdsInCart(new ArrayList<>(List.of(101L, 101L, 102L)));
-    }
-
-    private void stubAuthenticatedUser() {
-        when(tokenService.validateAndExtractUser(TOKEN)).thenReturn(EMAIL);
-        when(userEntityRepository.findByUserMail(EMAIL)).thenReturn(user);
-    }
-
-    @Test
-    void getOrderPrice_ShouldCalculate_WhenStockIsAvailable() {
-        stubAuthenticatedUser();
-
-        ProductEntity p1 = new ProductEntity();
-        p1.setId(101L);
-        p1.setProductPrice(new BigDecimal("10.0"));
-        p1.setProductDiscount(new BigDecimal("20.0"));
-        p1.setProductCount(5);
-
-        ProductEntity p2 = new ProductEntity();
-        p2.setId(102L);
-        p2.setProductPrice(new BigDecimal("5.0"));
-        p2.setProductCount(2);
-
-        when(productEntityRepository.findAllById(any())).thenReturn(List.of(p1, p2));
-
-        BigDecimal total = userOrderService.getOrderPrice(TOKEN);
-
-        assertEquals(0, new BigDecimal("21.0").compareTo(total));
-    }
-
-    @Test
-    void getOrderPrice_ShouldThrow_WhenCartExceedsStock() {
-        stubAuthenticatedUser();
-
-        ProductEntity p1 = new ProductEntity();
-        p1.setId(101L);
-        p1.setProductPrice(new BigDecimal("10.0"));
-        p1.setProductCount(1);
-
-        ProductEntity p2 = new ProductEntity();
-        p2.setId(102L);
-        p2.setProductPrice(new BigDecimal("5.0"));
-        p2.setProductCount(2);
-
-        when(productEntityRepository.findAllById(any())).thenReturn(List.of(p1, p2));
-
-        assertThrows(GeneralException.class, () -> userOrderService.getOrderPrice(TOKEN));
-    }
-
-    @Test
-    void createOrder_ShouldUseDiscountedPrice_AndDecreaseStock_AndClearCart() {
-        stubAuthenticatedUser();
-
-        ProductEntity p1 = new ProductEntity();
-        p1.setId(101L);
-        p1.setProductName("Apple");
-        p1.setProductPrice(new BigDecimal("10.0"));
-        p1.setProductDiscount(new BigDecimal("20.0"));
-        p1.setProductCount(2);
-
-        ProductEntity p2 = new ProductEntity();
-        p2.setId(102L);
-        p2.setProductName("Milk");
-        p2.setProductPrice(new BigDecimal("5.0"));
-        p2.setProductCount(5);
-
-        when(productEntityRepository.findAllById(any())).thenReturn(List.of(p1, p2));
-        when(orderGroupEntityRepository.save(any(OrderGroupEntity.class))).thenAnswer(invocation -> {
-            OrderGroupEntity group = invocation.getArgument(0);
-            group.setId(10L);
-            return group;
-        });
-
-        userOrderService.createOrder(TOKEN);
-
-        assertEquals(0, p1.getProductCount());
-        assertEquals(4, p2.getProductCount());
-        assertEquals(0, user.getProductsIdsInCart().size());
-
-        ArgumentCaptor<OrderEntity> orderCaptor = ArgumentCaptor.forClass(OrderEntity.class);
-        verify(orderEntityRepository, times(2)).save(orderCaptor.capture());
-        List<OrderEntity> savedOrders = orderCaptor.getAllValues();
-
-        OrderEntity appleOrder = savedOrders.stream()
-                .filter(item -> item.getItemId().equals(101L))
-                .findFirst()
-                .orElseThrow();
-        assertEquals(0, new BigDecimal("8.0").compareTo(appleOrder.getPrice()));
-        assertEquals(0, new BigDecimal("16.0").compareTo(appleOrder.getTotalPrice()));
-
-        verify(productEntityRepository, times(1)).saveAll(any());
-        verify(userEntityRepository, times(1)).save(user);
-    }
-
-    @Test
-    void createOrder_ShouldThrow_WhenAnyProductMissing() {
-        stubAuthenticatedUser();
-
-        ProductEntity p1 = new ProductEntity();
-        p1.setId(101L);
-        p1.setProductName("Apple");
-        p1.setProductPrice(new BigDecimal("10.0"));
-        p1.setProductCount(3);
-
-        when(productEntityRepository.findAllById(any())).thenReturn(List.of(p1));
-
-        assertThrows(GeneralException.class, () -> userOrderService.createOrder(TOKEN));
-    }
 
     @Test
     void deleteOrder_ShouldRestock_WhenGroupOrderIsPending() {

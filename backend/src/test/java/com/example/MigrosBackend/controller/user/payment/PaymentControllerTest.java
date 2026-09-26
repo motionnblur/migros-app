@@ -1,35 +1,49 @@
 package com.example.MigrosBackend.controller.user.payment;
 
+import com.example.MigrosBackend.config.GlobalExceptionHandler;
 import com.example.MigrosBackend.config.security.AuthCookies;
+import com.example.MigrosBackend.dto.payment.CheckoutResponseDto;
+import com.example.MigrosBackend.dto.payment.CheckoutStatusDto;
+import com.example.MigrosBackend.dto.payment.PaymentResponseDto;
+import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.exception.shared.TokenNotFoundException;
-import com.example.MigrosBackend.exception.user.PaymentAmountException;
+import com.example.MigrosBackend.exception.user.CheckoutNotFoundException;
+import com.example.MigrosBackend.exception.user.CheckoutStateException;
 import com.example.MigrosBackend.helper.AuthTokenResolver;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
+import com.example.MigrosBackend.service.user.payment.CheckoutService;
 import com.example.MigrosBackend.service.user.payment.UserPaymentService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.UUID;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(PaymentController.class)
 @AutoConfigureMockMvc(addFilters = false)
+@Import(GlobalExceptionHandler.class)
 class PaymentControllerTest {
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -40,6 +54,9 @@ class PaymentControllerTest {
     private UserPaymentService userPaymentService;
 
     @MockBean
+    private CheckoutService checkoutService;
+
+    @MockBean
     private AuthTokenResolver authTokenResolver;
 
     @MockBean
@@ -48,53 +65,131 @@ class PaymentControllerTest {
     @MockBean
     private TokenService tokenService;
 
-    private Map<String, Object> payload;
-    private Map<String, Object> response;
+    private final UUID checkoutId = UUID.randomUUID();
 
-    @BeforeEach
-    void setup() {
-        payload = new HashMap<>();
-        payload.put("token", "tok_visa");
-
-        response = new HashMap<>();
-        response.put("status", "success");
-        response.put("chargeId", "ch_12345");
+    private CheckoutResponseDto prepared() {
+        return new CheckoutResponseDto(checkoutId.toString(), "PREPARED", new BigDecimal("21.00"), 2100L, "try",
+                LocalDateTime.now(), LocalDateTime.now().plusMinutes(15));
     }
 
     @Test
-    void createCharge_shouldReturnOkWithResponse() throws Exception {
+    void prepareCheckout_ReturnsServerCalculatedSnapshot() throws Exception {
         when(authTokenResolver.requireToken("sample-token")).thenReturn("sample-token");
-        when(userPaymentService.processCharge(eq(payload), eq("sample-token"))).thenReturn(response);
+        when(checkoutService.prepareCheckout("sample-token")).thenReturn(prepared());
 
-        mockMvc.perform(post("/payment/create-charge")
-                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "sample-token"))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(payload)))
+        mockMvc.perform(post("/payment/checkouts")
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "sample-token")))
                 .andExpect(status().isOk())
-                .andExpect(content().json(objectMapper.writeValueAsString(response)));
+                .andExpect(jsonPath("$.checkoutId").value(checkoutId.toString()))
+                .andExpect(jsonPath("$.totalAmount").value(21.00))
+                .andExpect(jsonPath("$.amountMinor").value(2100))
+                .andExpect(jsonPath("$.currency").value("try"));
     }
 
     @Test
-    void createCharge_shouldReturnNotFound_whenCookieMissing() throws Exception {
+    void prepareCheckout_ReturnsNotFoundWhenCookieMissing() throws Exception {
         when(authTokenResolver.requireToken(null)).thenThrow(new TokenNotFoundException());
 
-        mockMvc.perform(post("/payment/create-charge")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(payload)))
+        mockMvc.perform(post("/payment/checkouts"))
                 .andExpect(status().isNotFound());
     }
 
     @Test
-    void createCharge_shouldReturnBadRequest_whenServiceRejectsAmount() throws Exception {
+    void getCheckout_ReturnsOwnedStatus() throws Exception {
         when(authTokenResolver.requireToken("sample-token")).thenReturn("sample-token");
-        when(userPaymentService.processCharge(eq(payload), eq("sample-token")))
-                .thenThrow(new PaymentAmountException("Payment amount must be positive"));
+        when(checkoutService.getCheckout("sample-token", checkoutId)).thenReturn(new CheckoutStatusDto(
+                checkoutId.toString(), "CONSUMED", new BigDecimal("21.00"), 2100L, "try",
+                LocalDateTime.now(), LocalDateTime.now(), 900L, "ch_1"));
 
-        mockMvc.perform(post("/payment/create-charge")
+        mockMvc.perform(get("/payment/checkouts/{checkoutId}", checkoutId)
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "sample-token")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CONSUMED"))
+                .andExpect(jsonPath("$.orderGroupId").value(900));
+    }
+
+    @Test
+    void getCheckout_OtherOwnerOrMissingIsNotFound() throws Exception {
+        when(authTokenResolver.requireToken("sample-token")).thenReturn("sample-token");
+        when(checkoutService.getCheckout("sample-token", checkoutId)).thenThrow(new CheckoutNotFoundException());
+
+        mockMvc.perform(get("/payment/checkouts/{checkoutId}", checkoutId)
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "sample-token")))
+                .andExpect(status().isNotFound())
+                .andExpect(content -> {
+                    String body = content.getResponse().getContentAsString();
+                    if (body.contains(checkoutId.toString())) {
+                        throw new AssertionError("ownership failure must not reveal the checkout id");
+                    }
+                });
+    }
+
+    @Test
+    void charge_UsesPathCheckoutIdAndTokenOnly() throws Exception {
+        when(authTokenResolver.requireToken("sample-token")).thenReturn("sample-token");
+        when(userPaymentService.processCharge(eq(checkoutId), eq("tok_visa"), eq("sample-token")))
+                .thenReturn(new PaymentResponseDto(true, false, checkoutId.toString(), "CONSUMED",
+                        "ch_1", new BigDecimal("21.00"), 2100L, "try", null));
+
+        mockMvc.perform(post("/payment/checkouts/{checkoutId}/charge", checkoutId)
                         .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "sample-token"))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(payload)))
-                .andExpect(status().isBadRequest())
-                .andExpect(content().string("Payment amount must be positive"));
+                        .content("{\"token\":\"tok_visa\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.chargeId").value("ch_1"));
+    }
+
+    @Test
+    void charge_WithBlankTokenIsRejected() throws Exception {
+        when(authTokenResolver.requireToken("sample-token")).thenReturn("sample-token");
+        when(userPaymentService.processCharge(eq(checkoutId), eq("  "), eq("sample-token")))
+                .thenThrow(new GeneralException("Payment token is required"));
+
+        mockMvc.perform(post("/payment/checkouts/{checkoutId}/charge", checkoutId)
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "sample-token"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"  \"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void cancel_ReturnsConflictForPaidCheckout() throws Exception {
+        when(authTokenResolver.requireToken("sample-token")).thenReturn("sample-token");
+        when(checkoutService.cancelCheckout("sample-token", checkoutId))
+                .thenThrow(new CheckoutStateException("A paid checkout cannot be cancelled"));
+
+        mockMvc.perform(post("/payment/checkouts/{checkoutId}/cancel", checkoutId)
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "sample-token")))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void cancel_ReleasesUnpaidReservation() throws Exception {
+        when(authTokenResolver.requireToken("sample-token")).thenReturn("sample-token");
+        when(checkoutService.cancelCheckout("sample-token", checkoutId)).thenReturn(new CheckoutStatusDto(
+                checkoutId.toString(), "CANCELLED", new BigDecimal("21.00"), 2100L, "try",
+                LocalDateTime.now(), LocalDateTime.now(), null, null));
+
+        mockMvc.perform(post("/payment/checkouts/{checkoutId}/cancel", checkoutId)
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "sample-token")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
+    }
+
+    @Test
+    void prepareCheckout_DoesNotTrustBodyTotals() throws Exception {
+        when(authTokenResolver.requireToken("sample-token")).thenReturn("sample-token");
+        when(checkoutService.prepareCheckout("sample-token")).thenReturn(prepared());
+
+        mockMvc.perform(post("/payment/checkouts")
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "sample-token"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"totalAmount\":0.01,\"amountMinor\":1,\"currency\":\"usd\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalAmount").value(21.00))
+                .andExpect(jsonPath("$.currency").value("try"));
+
+        verify(checkoutService, never()).cancelCheckout(any(), any());
     }
 }

@@ -1,8 +1,10 @@
 package com.example.MigrosBackend.config.security;
 
 import com.example.MigrosBackend.controller.admin.sign.AdminSignController;
+import com.example.MigrosBackend.controller.user.payment.PaymentController;
 import com.example.MigrosBackend.controller.user.profile.UserProfileController;
 import com.example.MigrosBackend.controller.user.sign.UserSignController;
+import com.example.MigrosBackend.dto.payment.CheckoutResponseDto;
 import com.example.MigrosBackend.dto.user.UserProfileTableDto;
 import com.example.MigrosBackend.entity.admin.AdminEntity;
 import com.example.MigrosBackend.filter.JwtRequestFilter;
@@ -10,6 +12,8 @@ import com.example.MigrosBackend.helper.AuthTokenResolver;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.service.admin.sign.AdminSignupService;
 import com.example.MigrosBackend.service.global.TokenService;
+import com.example.MigrosBackend.service.user.payment.CheckoutService;
+import com.example.MigrosBackend.service.user.payment.UserPaymentService;
 import com.example.MigrosBackend.service.user.profile.UserProfileService;
 import com.example.MigrosBackend.service.user.sign.UserSignupService;
 import jakarta.servlet.http.Cookie;
@@ -24,6 +28,9 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
+import java.util.UUID;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -31,7 +38,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = {UserProfileController.class, AdminSignController.class, UserSignController.class})
+@WebMvcTest(controllers = {UserProfileController.class, AdminSignController.class, UserSignController.class,
+        PaymentController.class})
 @AutoConfigureMockMvc
 @Import({SecurityConfiguration.class, JwtRequestFilter.class})
 class SecurityAccessRulesTest {
@@ -59,6 +67,12 @@ class SecurityAccessRulesTest {
 
     @MockBean
     private AdminEntityRepository adminEntityRepository;
+
+    @MockBean
+    private CheckoutService checkoutService;
+
+    @MockBean
+    private UserPaymentService userPaymentService;
 
     @Test
     void userCookie_GrantsAccessToProfileEndpoint() throws Exception {
@@ -146,6 +160,48 @@ class SecurityAccessRulesTest {
         mockMvc.perform(post("/user/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void noCredentials_AreForbiddenOnCheckoutPrepare() throws Exception {
+        mockMvc.perform(post("/payment/checkouts"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void adminAuthority_IsForbiddenOnCheckoutPrepare() throws Exception {
+        mockMvc.perform(post("/payment/checkouts"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void noCredentials_AreForbiddenOnCheckoutCharge() throws Exception {
+        mockMvc.perform(post("/payment/checkouts/{checkoutId}/charge", UUID.randomUUID()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void noCredentials_AreForbiddenOnCheckoutStatus() throws Exception {
+        mockMvc.perform(get("/payment/checkouts/{checkoutId}", UUID.randomUUID()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void noCredentials_AreForbiddenOnCheckoutCancel() throws Exception {
+        mockMvc.perform(post("/payment/checkouts/{checkoutId}/cancel", UUID.randomUUID()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void userAuthority_CanPrepareCheckout() throws Exception {
+        when(authTokenResolver.requireToken(null)).thenReturn("token");
+        when(checkoutService.prepareCheckout("token")).thenReturn(new CheckoutResponseDto(
+                "checkout-id", "PREPARED", new BigDecimal("10.00"), 1000L, "try", null, null));
+
+        mockMvc.perform(post("/payment/checkouts"))
                 .andExpect(status().isOk());
     }
 }

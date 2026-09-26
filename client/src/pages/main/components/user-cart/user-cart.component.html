@@ -79,5 +79,6 @@
     *ngIf='isPaymentPhaseActive'
     (closePaymentComponentEvent)='closePaymentComponent()'
     (paymentSuccess)='handlePaymentSuccess()'
+    (cartPrepared)='handleCheckoutPrepared()'
   />
 </div>

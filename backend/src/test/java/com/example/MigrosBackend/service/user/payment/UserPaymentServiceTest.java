@@ -1,7 +1,9 @@
 package com.example.MigrosBackend.service.user.payment;
 
-import com.example.MigrosBackend.exception.user.PaymentAmountException;
-import com.example.MigrosBackend.service.user.supply.UserOrderService;
+import com.example.MigrosBackend.dto.payment.CheckoutPaymentStart;
+import com.example.MigrosBackend.dto.payment.CheckoutStatusDto;
+import com.example.MigrosBackend.dto.payment.PaymentResponseDto;
+import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Charge;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,178 +14,125 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
-import java.util.HashMap;
-import java.util.Map;
+import java.time.LocalDateTime;
+import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class UserPaymentServiceTest {
-    @Mock
-    private UserOrderService userOrderService;
 
+    private static final String USER_TOKEN = "user-token";
+    private static final String STRIPE_TOKEN = "tok_visa";
+
+    @Mock
+    private CheckoutService checkoutService;
     @Mock
     private StripePaymentGateway stripePaymentGateway;
 
-    private final PaymentAmountConverter paymentAmountConverter = new PaymentAmountConverter("try");
-
     private UserPaymentService userPaymentService;
+    private UUID checkoutId;
 
     @BeforeEach
     void setUp() {
-        userPaymentService = new UserPaymentService(userOrderService, paymentAmountConverter, stripePaymentGateway);
+        userPaymentService = new UserPaymentService(checkoutService, stripePaymentGateway);
+        checkoutId = UUID.randomUUID();
     }
 
-    private Map<String, Object> payloadWithToken(String token) {
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("token", token);
-        return payload;
-    }
-
-    @Test
-    void processCharge_Success() throws StripeException {
-        String userToken = "user-123";
-        String stripeToken = "tok_visa";
-
-        when(userOrderService.getOrderPrice(userToken)).thenReturn(new BigDecimal("50.00"));
-
-        Charge mockCharge = mock(Charge.class);
-        when(mockCharge.getId()).thenReturn("ch_123");
-        when(mockCharge.getAmount()).thenReturn(5000L);
-        when(mockCharge.getCurrency()).thenReturn("try");
-        when(mockCharge.getStatus()).thenReturn("succeeded");
-        when(stripePaymentGateway.charge(stripeToken, 5000L, "try")).thenReturn(mockCharge);
-
-        Map<String, Object> response = userPaymentService.processCharge(payloadWithToken(stripeToken), userToken);
-
-        assertNotNull(response);
-        assertTrue((Boolean) response.get("success"));
-        verify(stripePaymentGateway).charge(stripeToken, 5000L, "try");
-        verify(userOrderService, times(1)).createOrder(userToken);
+    private CheckoutStatusDto status(String state) {
+        return new CheckoutStatusDto(checkoutId.toString(), state, new BigDecimal("50.99"), 5099L, "try",
+                LocalDateTime.now(), LocalDateTime.now().plusMinutes(10), 700L, "ch_123");
     }
 
     @Test
-    void processCharge_SubmitsMinorUnits_ForFractionalTotal() throws StripeException {
-        String userToken = "user-123";
-        String stripeToken = "tok_visa";
+    void processCharge_ChargesSnapshotAmountAndForwardsCheckoutId() throws StripeException {
+        when(checkoutService.beginPayment(USER_TOKEN, checkoutId))
+                .thenReturn(new CheckoutPaymentStart(checkoutId, 5099L, "try"));
 
-        when(userOrderService.getOrderPrice(userToken)).thenReturn(new BigDecimal("50.99"));
+        Charge charge = org.mockito.Mockito.mock(Charge.class);
+        when(charge.getId()).thenReturn("ch_123");
+        when(stripePaymentGateway.charge(STRIPE_TOKEN, 5099L, "try")).thenReturn(charge);
+        when(checkoutService.completePayment(checkoutId, "ch_123")).thenReturn(status("CONSUMED"));
 
-        Charge mockCharge = mock(Charge.class);
-        when(stripePaymentGateway.charge(eq(stripeToken), anyLong(), anyString())).thenReturn(mockCharge);
+        PaymentResponseDto response = userPaymentService.processCharge(checkoutId, STRIPE_TOKEN, USER_TOKEN);
 
-        userPaymentService.processCharge(payloadWithToken(stripeToken), userToken);
+        assertTrue(response.success());
+        assertFalse(response.pending());
+        assertEquals("CONSUMED", response.status());
+        assertEquals("ch_123", response.chargeId());
+        assertEquals(5099L, response.amountMinor());
 
-        ArgumentCaptor<Long> amountCaptor = ArgumentCaptor.forClass(Long.class);
-        ArgumentCaptor<String> currencyCaptor = ArgumentCaptor.forClass(String.class);
-        verify(stripePaymentGateway).charge(eq(stripeToken), amountCaptor.capture(), currencyCaptor.capture());
-
-        assertEquals(5099L, amountCaptor.getValue());
-        assertEquals("try", currencyCaptor.getValue());
+        ArgumentCaptor<Long> amount = ArgumentCaptor.forClass(Long.class);
+        ArgumentCaptor<String> currency = ArgumentCaptor.forClass(String.class);
+        verify(stripePaymentGateway).charge(eq(STRIPE_TOKEN), amount.capture(), currency.capture());
+        assertEquals(5099L, amount.getValue());
+        assertEquals("try", currency.getValue());
     }
 
     @Test
-    void processCharge_ThrowsPaymentAmountException_WhenAmountIsZero() {
-        String userToken = "user-123";
-        when(userOrderService.getOrderPrice(userToken)).thenReturn(BigDecimal.ZERO);
+    void processCharge_StripeFailure_ReleasesReservationAndReportsFailure() throws StripeException {
+        when(checkoutService.beginPayment(USER_TOKEN, checkoutId))
+                .thenReturn(new CheckoutPaymentStart(checkoutId, 1000L, "try"));
+        when(stripePaymentGateway.charge(anyString(), eq(1000L), eq("try")))
+                .thenThrow(org.mockito.Mockito.mock(StripeException.class));
 
-        assertThrows(PaymentAmountException.class,
-                () -> userPaymentService.processCharge(payloadWithToken("tok_visa"), userToken));
+        PaymentResponseDto response = userPaymentService.processCharge(checkoutId, STRIPE_TOKEN, USER_TOKEN);
 
-        verifyNoInteractions(stripePaymentGateway);
-        verify(userOrderService, never()).createOrder(any());
+        assertFalse(response.success());
+        assertEquals("CANCELLED", response.status());
+        assertTrue(response.error().contains("Stripe error"));
+        verify(checkoutService).failPayment(checkoutId);
+        verify(checkoutService, never()).completePayment(any(), anyString());
     }
 
     @Test
-    void processCharge_ThrowsPaymentAmountException_WhenAmountIsNegative() {
-        String userToken = "user-123";
-        when(userOrderService.getOrderPrice(userToken)).thenReturn(new BigDecimal("-5.00"));
+    void processCharge_FinalizationFailure_KeepsChargeAndReservationRecoverable() throws StripeException {
+        when(checkoutService.beginPayment(USER_TOKEN, checkoutId))
+                .thenReturn(new CheckoutPaymentStart(checkoutId, 1000L, "try"));
+        Charge charge = org.mockito.Mockito.mock(Charge.class);
+        when(charge.getId()).thenReturn("ch_123");
+        when(stripePaymentGateway.charge(STRIPE_TOKEN, 1000L, "try")).thenReturn(charge);
+        when(checkoutService.completePayment(checkoutId, "ch_123"))
+                .thenThrow(new GeneralException("order transaction failed"));
 
-        assertThrows(PaymentAmountException.class,
-                () -> userPaymentService.processCharge(payloadWithToken("tok_visa"), userToken));
+        PaymentResponseDto response = userPaymentService.processCharge(checkoutId, STRIPE_TOKEN, USER_TOKEN);
 
-        verifyNoInteractions(stripePaymentGateway);
-        verify(userOrderService, never()).createOrder(any());
+        assertTrue(response.success());
+        assertTrue(response.pending());
+        assertEquals("ch_123", response.chargeId());
+        verify(checkoutService, never()).failPayment(any());
     }
 
     @Test
-    void processCharge_ThrowsPaymentAmountException_WhenAmountOverflows() {
-        String userToken = "user-123";
-        when(userOrderService.getOrderPrice(userToken)).thenReturn(new BigDecimal("1E20"));
-
-        assertThrows(PaymentAmountException.class,
-                () -> userPaymentService.processCharge(payloadWithToken("tok_visa"), userToken));
-
-        verifyNoInteractions(stripePaymentGateway);
-        verify(userOrderService, never()).createOrder(any());
+    void processCharge_RejectsBlankTokenWithoutCallingStripe() throws StripeException {
+        assertThrows(GeneralException.class,
+                () -> userPaymentService.processCharge(checkoutId, "   ", USER_TOKEN));
+        verify(stripePaymentGateway, never()).charge(anyString(), anyLong(), anyString());
+        verify(checkoutService, never()).beginPayment(any(), any());
     }
 
     @Test
-    void processCharge_ThrowsPaymentAmountException_WhenAmountIsOverPrecise() {
-        String userToken = "user-123";
-        when(userOrderService.getOrderPrice(userToken)).thenReturn(new BigDecimal("10.001"));
+    void processCharge_DoesNotIncludeCardTokenInResponse() throws StripeException {
+        when(checkoutService.beginPayment(USER_TOKEN, checkoutId))
+                .thenReturn(new CheckoutPaymentStart(checkoutId, 1000L, "try"));
+        Charge charge = org.mockito.Mockito.mock(Charge.class);
+        when(charge.getId()).thenReturn("ch_123");
+        when(stripePaymentGateway.charge(STRIPE_TOKEN, 1000L, "try")).thenReturn(charge);
+        when(checkoutService.completePayment(checkoutId, "ch_123")).thenReturn(status("CONSUMED"));
 
-        assertThrows(PaymentAmountException.class,
-                () -> userPaymentService.processCharge(payloadWithToken("tok_visa"), userToken));
+        PaymentResponseDto response = userPaymentService.processCharge(checkoutId, STRIPE_TOKEN, USER_TOKEN);
 
-        verifyNoInteractions(stripePaymentGateway);
-        verify(userOrderService, never()).createOrder(any());
-    }
-
-    @Test
-    void processCharge_ThrowsPaymentAmountException_WhenAmountExceedsStripeTryLimit() {
-        String userToken = "user-123";
-        when(userOrderService.getOrderPrice(userToken)).thenReturn(new BigDecimal("1000000.00"));
-
-        assertThrows(PaymentAmountException.class,
-                () -> userPaymentService.processCharge(payloadWithToken("tok_visa"), userToken));
-
-        verifyNoInteractions(stripePaymentGateway);
-        verify(userOrderService, never()).createOrder(any());
-    }
-
-    @Test
-    void processCharge_ThrowsPaymentAmountException_WhenAmountIsNull() {
-        String userToken = "user-123";
-        when(userOrderService.getOrderPrice(userToken)).thenReturn(null);
-
-        assertThrows(PaymentAmountException.class,
-                () -> userPaymentService.processCharge(payloadWithToken("tok_visa"), userToken));
-
-        verifyNoInteractions(stripePaymentGateway);
-        verify(userOrderService, never()).createOrder(any());
-    }
-
-    @Test
-    void processCharge_ReturnsError_WhenStripeFails() throws StripeException {
-        String userToken = "user-123";
-        when(userOrderService.getOrderPrice(userToken)).thenReturn(new BigDecimal("10.00"));
-        when(stripePaymentGateway.charge(anyString(), anyLong(), anyString()))
-                .thenThrow(mock(StripeException.class));
-
-        Map<String, Object> response = userPaymentService.processCharge(payloadWithToken("tok_visa"), userToken);
-
-        assertFalse((Boolean) response.get("success"));
-        assertTrue(response.get("error").toString().contains("Stripe error"));
-        verify(userOrderService, never()).createOrder(any());
-    }
-
-    @Test
-    void processCharge_ReturnsError_WhenUnexpectedExceptionOccurs() throws StripeException {
-        String userToken = "user-123";
-        when(userOrderService.getOrderPrice(userToken)).thenReturn(new BigDecimal("10.00"));
-        when(stripePaymentGateway.charge(anyString(), anyLong(), anyString()))
-                .thenThrow(new RuntimeException("boom"));
-
-        Map<String, Object> response = userPaymentService.processCharge(payloadWithToken("tok_visa"), userToken);
-
-        assertFalse((Boolean) response.get("success"));
-        assertTrue(response.get("error").toString().contains("Unexpected error"));
-        verify(userOrderService, never()).createOrder(any());
+        assertNull(response.error());
     }
 }

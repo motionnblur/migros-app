@@ -101,7 +101,7 @@ Backend packages follow a mostly standard layered layout:
 - Nginx applies pre-backend rate limits with dedicated limits for:
   - `/admin/login`
   - `/user/login`
-  - `/payment/create-charge`
+  - `/payment/checkouts/*/charge`
   - `/user/support/send`
 - Global overflow response is JSON `429`.
 - WebSocket upgrade is enabled for `/ws/support`.

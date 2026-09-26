@@ -16,6 +16,9 @@ import { IChatMessage } from '../../interfaces/IChatMessage';
 import { IUserOrderDetail } from '../../interfaces/IUserOrderDetail';
 import { IUserOrderGroup } from '../../interfaces/IUserOrderGroup';
 import { IProductPreview } from '../../interfaces/IProductPreview';
+import { ICheckoutResponse } from '../../interfaces/ICheckoutResponse';
+import { ICheckoutStatus } from '../../interfaces/ICheckoutStatus';
+import { IPaymentResponse } from '../../interfaces/IPaymentResponse';
 import { ISupportCustomerSummary } from '../../interfaces/support/ISupportCustomerSummary';
 import { API_BASE_URL } from '../../app/config/backend.config';
 
@@ -326,6 +329,36 @@ export class RestService {
       })
       .pipe(map((response) => response.body));
   }
+  prepareCheckout() {
+    return this.http
+      .post<ICheckoutResponse>(`${API_BASE_URL}/payment/checkouts`, {})
+      .pipe(map((response) => response as ICheckoutResponse));
+  }
+
+  getCheckoutStatus(checkoutId: string) {
+    return this.http
+      .get<ICheckoutStatus>(`${API_BASE_URL}/payment/checkouts/${checkoutId}`)
+      .pipe(map((response) => response as ICheckoutStatus));
+  }
+
+  chargeCheckout(checkoutId: string, token: string) {
+    return this.http
+      .post<IPaymentResponse>(
+        `${API_BASE_URL}/payment/checkouts/${checkoutId}/charge`,
+        { token },
+      )
+      .pipe(map((response) => response as IPaymentResponse));
+  }
+
+  cancelCheckout(checkoutId: string) {
+    return this.http
+      .post<ICheckoutStatus>(
+        `${API_BASE_URL}/payment/checkouts/${checkoutId}/cancel`,
+        {},
+      )
+      .pipe(map((response) => response as ICheckoutStatus));
+  }
+
   getAllOrders(page: number, productRange: number) {
     return this.http
       .get(`${API_BASE_URL}/admin/panel/getAllOrders`, {

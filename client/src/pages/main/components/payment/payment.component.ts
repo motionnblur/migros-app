@@ -1,7 +1,8 @@
 import { Component, EventEmitter, OnInit, Output } from '@angular/core';
 import { loadStripe } from '@stripe/stripe-js';
 import { data } from '../../../../memory/global-data';
-import { apiUrl } from '../../../../app/config/backend.config';
+import { RestService } from '../../../../services/rest/rest.service';
+import { ICheckoutResponse } from '../../../../interfaces/ICheckoutResponse';
 
 @Component({
   selector: 'app-payment',
@@ -12,14 +13,22 @@ export class PaymentComponent implements OnInit {
   stripe: any;
   elements: any;
   card: any;
-  isProcessing: boolean = false; // To track payment process
-  errorMessage: string = ''; // To store and display errors
+  isProcessing: boolean = false;
+  isPreparing: boolean = false;
+  errorMessage: string = '';
+  checkout: ICheckoutResponse | null = null;
+  displayTotal: string = '';
+  displayCurrency: string = 'TRY';
 
   @Output() closePaymentComponentEvent = new EventEmitter<void>();
   @Output() paymentSuccess = new EventEmitter<void>();
+  @Output() cartPrepared = new EventEmitter<void>();
+
+  constructor(private restService: RestService) {}
 
   ngOnInit() {
     this.loadStripe();
+    this.prepareCheckout();
   }
 
   async loadStripe() {
@@ -34,53 +43,95 @@ export class PaymentComponent implements OnInit {
     this.card.mount('#card-element');
   }
 
-  async handlePayment() {
-    // Clear previous errors
-    this.errorMessage = '';
-    this.isProcessing = true; // Indicate payment is in progress
+  // The server computes the immutable checkout snapshot. The client only
+  // displays the returned total and never supplies prices, totals or currency.
+  prepareCheckout() {
+    this.isPreparing = true;
+    this.restService.prepareCheckout().subscribe({
+      next: (checkout: ICheckoutResponse) => {
+        this.checkout = checkout;
+        this.displayTotal = Number(checkout.totalAmount).toFixed(2);
+        this.displayCurrency = (checkout.currency || 'try').toUpperCase();
+        this.isPreparing = false;
+        // The reserved snapshot has been removed from the live cart server-side.
+        this.cartPrepared.emit();
+      },
+      error: () => {
+        this.isPreparing = false;
+        this.errorMessage = 'Could not prepare the checkout. Please try again.';
+      },
+    });
+  }
 
-    // Create token with Stripe
+  async handlePayment() {
+    if (this.isProcessing || !this.checkout) {
+      return;
+    }
+
+    this.errorMessage = '';
+    this.isProcessing = true;
+
     const { token, error } = await this.stripe.createToken(this.card);
 
     if (error) {
-      this.errorMessage = error.message; // Display error message
-      this.isProcessing = false; // Reset processing state
-    } else {
-      this.processPayment(token);
+      this.errorMessage = error.message;
+      this.isProcessing = false;
+      return;
     }
+
+    this.processPayment(token);
   }
 
-  // Call your backend API to create a charge
   processPayment(token: any) {
-    fetch(apiUrl('/payment/create-charge'), {
-      method: 'POST',
-      body: JSON.stringify({
-        token: token.id,
-      }),
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        console.log(data);
-        this.isProcessing = false; // Reset processing state
+    const checkoutId = this.checkout!.checkoutId;
 
-        if (data.success) {
-          data.totalCartPrice = 0;
-          this.paymentSuccess.emit();
-          this.closePaymentComponentEvent.emit();
-          alert('Payment Successful!');
+    this.restService.chargeCheckout(checkoutId, token.id).subscribe({
+      next: (response) => {
+        if (response.success && !response.pending) {
+          this.completePayment();
+        } else if (response.pending) {
+          this.recoverCheckoutStatus(checkoutId);
         } else {
-          alert('Payment Failed! Please try again.');
+          this.isProcessing = false;
+          this.errorMessage = 'Payment failed. Please try again.';
         }
-      })
-      .catch((error) => {
-        this.isProcessing = false; // Reset processing state
+      },
+      // A network timeout is an unknown result: recover the existing checkout
+      // instead of starting a new one.
+      error: () => this.recoverCheckoutStatus(checkoutId),
+    });
+  }
+
+  recoverCheckoutStatus(checkoutId: string) {
+    this.restService.getCheckoutStatus(checkoutId).subscribe({
+      next: (status) => {
+        this.isProcessing = false;
+        if (status.status === 'CONSUMED') {
+          this.completePayment();
+        } else if (status.status === 'PAID') {
+          this.errorMessage =
+            'Payment received and is being finalized. Please check your orders.';
+        } else if (status.status === 'CANCELLED' || status.status === 'EXPIRED') {
+          this.errorMessage = 'Payment failed. Please try again.';
+        } else {
+          this.errorMessage =
+            'Payment status is unknown. Please check your orders before retrying.';
+        }
+      },
+      error: () => {
+        this.isProcessing = false;
         this.errorMessage =
-          'Payment failed due to a network issue. Please try again.';
-      });
+          'Could not verify the payment status. Please check your orders.';
+      },
+    });
+  }
+
+  private completePayment() {
+    this.isProcessing = false;
+    data.totalCartPrice = 0;
+    this.paymentSuccess.emit();
+    this.closePaymentComponentEvent.emit();
+    alert('Payment Successful!');
   }
 
   public closePaymentComponent() {

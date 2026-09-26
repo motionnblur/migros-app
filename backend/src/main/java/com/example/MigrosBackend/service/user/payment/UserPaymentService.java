@@ -1,63 +1,77 @@
 package com.example.MigrosBackend.service.user.payment;
 
-import com.example.MigrosBackend.service.user.supply.UserOrderService;
+import com.example.MigrosBackend.dto.payment.CheckoutPaymentStart;
+import com.example.MigrosBackend.dto.payment.CheckoutStatusDto;
+import com.example.MigrosBackend.dto.payment.PaymentResponseDto;
+import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Charge;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.UUID;
 
 @Service
 public class UserPaymentService {
-    private final UserOrderService userOrderService;
-    private final PaymentAmountConverter paymentAmountConverter;
+    private final CheckoutService checkoutService;
     private final StripePaymentGateway stripePaymentGateway;
 
-    public UserPaymentService(UserOrderService userOrderService,
-                              PaymentAmountConverter paymentAmountConverter,
+    public UserPaymentService(CheckoutService checkoutService,
                               StripePaymentGateway stripePaymentGateway) {
-        this.userOrderService = userOrderService;
-        this.paymentAmountConverter = paymentAmountConverter;
+        this.checkoutService = checkoutService;
         this.stripePaymentGateway = stripePaymentGateway;
     }
 
-    public Map<String, Object> processCharge(Map<String, Object> payload, String userToken) {
-        String token = (String) payload.get("token");
-
-        BigDecimal amount = userOrderService.getOrderPrice(userToken);
-        StripeAmount stripeAmount = paymentAmountConverter.toStripeAmount(amount);
-
-        Map<String, Object> response = new HashMap<>();
-
-        try {
-            Charge charge = stripePaymentGateway.charge(
-                    token, stripeAmount.amountMinor(), stripeAmount.currency());
-
-            response.put("success", true);
-            response.put("charge", extractChargeDetails(charge));
-
-            userOrderService.createOrder(userToken);
-
-        } catch (StripeException e) {
-            response.put("success", false);
-            response.put("error", "Stripe error: " + e.getMessage());
-        } catch (Exception e) {
-            response.put("success", false);
-            response.put("error", "Unexpected error: " + e.getMessage());
+    public PaymentResponseDto processCharge(UUID checkoutId, String paymentToken, String userToken) {
+        if (paymentToken == null || paymentToken.isBlank()) {
+            throw new GeneralException("Payment token is required");
         }
 
-        return response;
-    }
+        //Claims the owned checkout for this attempt and commits the reservation
+        //state before any network call, so no database transaction is held open
+        //while Stripe is contacted.
+        CheckoutPaymentStart start = checkoutService.beginPayment(userToken, checkoutId);
 
-    private Map<String, Object> extractChargeDetails(Charge charge) {
-        Map<String, Object> details = new HashMap<>();
-        details.put("id", charge.getId());
-        details.put("amount", charge.getAmount());
-        details.put("currency", charge.getCurrency());
-        details.put("status", charge.getStatus());
-        details.put("description", charge.getDescription());
-        return details;
+        try {
+            Charge charge = stripePaymentGateway.charge(paymentToken, start.amountMinor(), start.currency());
+            try {
+                CheckoutStatusDto status = checkoutService.completePayment(checkoutId, charge.getId());
+                return new PaymentResponseDto(
+                        true,
+                        false,
+                        status.checkoutId(),
+                        status.status(),
+                        status.chargeId(),
+                        status.totalAmount(),
+                        status.amountMinor(),
+                        status.currency(),
+                        null);
+            } catch (RuntimeException finalizationError) {
+                // Stripe accepted the charge. The reservation must not be
+                // released and the outcome must stay recoverable rather than be
+                // reported as an ordinary decline.
+                return new PaymentResponseDto(
+                        true,
+                        true,
+                        start.checkoutId().toString(),
+                        "PAID",
+                        charge.getId(),
+                        null,
+                        start.amountMinor(),
+                        start.currency(),
+                        "Payment succeeded but order finalization is pending");
+            }
+        } catch (StripeException e) {
+            checkoutService.failPayment(checkoutId);
+            return new PaymentResponseDto(
+                    false,
+                    false,
+                    start.checkoutId().toString(),
+                    "CANCELLED",
+                    null,
+                    null,
+                    start.amountMinor(),
+                    start.currency(),
+                    "Stripe error: " + e.getMessage());
+        }
     }
 }

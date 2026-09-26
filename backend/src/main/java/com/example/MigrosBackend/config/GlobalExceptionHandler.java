@@ -115,4 +115,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<String> handlePaymentAmountException(PaymentAmountException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
     }
+
+    @ExceptionHandler(CheckoutNotFoundException.class)
+    public ResponseEntity<String> handleCheckoutNotFound(CheckoutNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
+    }
+
+    @ExceptionHandler(CheckoutStateException.class)
+    public ResponseEntity<String> handleCheckoutState(CheckoutStateException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
+    }
 }
