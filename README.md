@@ -90,7 +90,16 @@ MAIL_PORT=587
 MAIL_USERNAME=your_smtp_username
 MAIL_PASSWORD=your_smtp_password
 APP_MAIL_FROM=your_smtp_username
+SUPPORT_INTERNAL_KEY=replace-with-a-random-value
 ```
+
+> `SUPPORT_INTERNAL_KEY` protects the inbound internal support bridge
+> (`/internal/support/**`) and is **required**: the backend refuses to start
+> without it. It is separate from the outbound `SUPPORT_SERVICE_INTERNAL_KEY`
+> used to call the support-service. Set it to a random value, for example with
+> `openssl rand -base64 32`, in `configs/spring.env`. The internal bridge is not
+> reachable through Nginx (the edge proxy returns `404` for `/internal/`), so the
+> support-service must call the backend directly over the internal network.
 
 * Local development credentials (only created when the active profile set is exactly `local`): admin / admin
 

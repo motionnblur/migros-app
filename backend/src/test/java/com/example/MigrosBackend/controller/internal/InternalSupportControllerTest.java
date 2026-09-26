@@ -17,6 +17,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.Mockito.doNothing;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -119,6 +120,19 @@ class InternalSupportControllerTest {
                         .header("x-internal-key", "wrong-key")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void customersShouldReturnUnauthorizedWhenKeyMissing() throws Exception {
+        mockMvc.perform(get("/internal/support/customers"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void customersShouldReturnUnauthorizedWhenKeyBlank() throws Exception {
+        mockMvc.perform(get("/internal/support/customers")
+                        .header("x-internal-key", "   "))
                 .andExpect(status().isUnauthorized());
     }
 }

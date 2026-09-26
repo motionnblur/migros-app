@@ -31,6 +31,19 @@ short, or identical. User and admin tokens are signed with different keys and
 carry a signed `session_type` claim, so a compromised user key cannot mint an
 administrator token.
 
+`spring.env` also requires `SUPPORT_INTERNAL_KEY`, the shared key that protects
+the inbound internal support bridge (`/internal/support/**`). The backend refuses
+to start when it is missing, so generate one and add it to your local
+`configs/spring.env`:
+
+```sh
+openssl rand -base64 32
+```
+
+This is the **inbound** key. It is distinct from `SUPPORT_SERVICE_INTERNAL_KEY`,
+which is the **outbound** key the backend uses when calling the separate
+support-service. Do not reuse the same value for both.
+
 ## Starting the stack
 
 ```powershell

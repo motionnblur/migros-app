@@ -18,6 +18,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.List;
 
 @RestController
@@ -31,7 +33,12 @@ public class InternalSupportController {
             @Value("${support.internal.key:}") String supportInternalKey
     ) {
         this.supportChatService = supportChatService;
-        this.supportInternalKey = supportInternalKey;
+        this.supportInternalKey = supportInternalKey == null ? "" : supportInternalKey.trim();
+        if (this.supportInternalKey.isBlank()) {
+            throw new IllegalStateException(
+                    "support.internal.key (SUPPORT_INTERNAL_KEY) must be configured; "
+                    + "refusing to start with an open internal support bridge.");
+        }
     }
 
     @GetMapping("customers")
@@ -175,9 +182,12 @@ public class InternalSupportController {
     }
 
     private boolean isAuthorized(String internalKey) {
-        return supportInternalKey == null
-                || supportInternalKey.isBlank()
-                || supportInternalKey.equals(internalKey);
+        if (internalKey == null || internalKey.isBlank()) {
+            return false;
+        }
+        return MessageDigest.isEqual(
+                supportInternalKey.getBytes(StandardCharsets.UTF_8),
+                internalKey.getBytes(StandardCharsets.UTF_8));
     }
 
     private String safeTrim(String value) {
