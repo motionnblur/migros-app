@@ -648,6 +648,95 @@ class PaymentLeaseFencingPostgresTest {
         assertEquals(1, orderEntityRepository.findAll().size());
     }
 
+    @Test
+    void unsafeThreeArgFinalizeOrderOverloadIsAbsent() throws Exception {
+        for (java.lang.reflect.Method m : PaymentFinalizationService.class.getMethods()) {
+            if (m.getName().equals("finalizeOrder") && m.getParameterCount() == 3) {
+                throw new AssertionError(
+                        "unsafe finalizeOrder(UUID,UUID,String) overload must be removed; "
+                        + "use the 4-arg lease-fenced worker method or finalizeProviderOrder");
+            }
+        }
+        java.lang.reflect.Method worker = PaymentFinalizationService.class.getMethod(
+                "finalizeOrder", UUID.class, UUID.class, String.class, String.class);
+        java.lang.reflect.Method provider = PaymentFinalizationService.class.getMethod(
+                "finalizeProviderOrder", UUID.class, UUID.class, String.class);
+        assertNotNull(worker);
+        assertNotNull(provider);
+    }
+
+    @Test
+    void legitimateFinalizationEntryPointsRemainTransactionalAndFunctional() throws Exception {
+        java.lang.reflect.Method worker = PaymentFinalizationService.class.getMethod(
+                "finalizeOrder", UUID.class, UUID.class, String.class, String.class);
+        java.lang.reflect.Method provider = PaymentFinalizationService.class.getMethod(
+                "finalizeProviderOrder", UUID.class, UUID.class, String.class);
+        assertNotNull(worker.getAnnotation(
+                org.springframework.transaction.annotation.Transactional.class),
+                "4-arg worker finalizeOrder must remain @Transactional");
+        assertNotNull(provider.getAnnotation(
+                org.springframework.transaction.annotation.Transactional.class),
+                "finalizeProviderOrder must remain @Transactional");
+
+        Fixture workerFixture = ambiguousFixture("svc-legit-worker@migros.com");
+        PaymentClaim workerLease = reclaim(workerFixture);
+        paymentAttemptService.recordChargeSuccess(
+                workerFixture.attemptId(), workerLease.leaseOwner(), "ch_svc_legit_worker");
+        assertTrue(paymentFinalizationService.finalizeOrder(
+                workerFixture.attemptId(), workerFixture.checkoutId(),
+                "ch_svc_legit_worker", workerLease.leaseOwner()));
+        assertEquals(PaymentAttemptStatus.ORDER_FINALIZED,
+                reload(workerFixture.attemptId()).getStatus());
+
+        Fixture providerFixture = ambiguousFixture("svc-legit-provider@migros.com");
+        PaymentClaim providerLease = reclaim(providerFixture);
+        paymentAttemptService.recordChargeSuccess(
+                providerFixture.attemptId(), providerLease.leaseOwner(), "ch_svc_legit_provider");
+        assertTrue(paymentFinalizationService.finalizeProviderOrder(
+                providerFixture.attemptId(), providerFixture.checkoutId(), "ch_svc_legit_provider"));
+        assertEquals(PaymentAttemptStatus.ORDER_FINALIZED,
+                reload(providerFixture.attemptId()).getStatus());
+    }
+
+    @Test
+    void alreadyManualReviewAttemptPreservesReasonAndCanonicalChargeOnConflictingSuccess() {
+        Fixture fixture = ambiguousFixture("svc-manual-review@migros.com");
+        PaymentClaim lease = reclaim(fixture);
+        paymentAttemptService.recordChargeSuccess(
+                fixture.attemptId(), lease.leaseOwner(), "ch_mr_canonical");
+        paymentAttemptService.markManualReview(fixture.attemptId(), "original_review_reason");
+
+        PaymentAttemptEntity before = reload(fixture.attemptId());
+        assertEquals(PaymentAttemptStatus.MANUAL_REVIEW, before.getStatus());
+        assertEquals("original_review_reason", before.getErrorCode());
+        assertEquals("ch_mr_canonical", before.getStripeChargeId());
+        String leaseBefore = before.getLeaseOwner();
+        int stockBefore = stockOf(fixture.productId());
+        String checkoutBefore = checkoutService.getCheckout(
+                fixture.token(), fixture.checkoutId()).status();
+
+        paymentAttemptService.recordProviderChargeSuccess(
+                fixture.attemptId(), "ch_mr_conflict", 1000L, "try", fixture.checkoutId());
+
+        PaymentAttemptEntity after = reload(fixture.attemptId());
+        assertEquals(PaymentAttemptStatus.MANUAL_REVIEW, after.getStatus());
+        assertEquals("original_review_reason", after.getErrorCode(),
+                "existing MANUAL_REVIEW reason must never be overwritten");
+        assertEquals("ch_mr_canonical", after.getStripeChargeId(),
+                "canonical Stripe charge id must never be overwritten");
+        assertEquals("conflict:ch_mr_conflict", after.getProviderStatus(),
+                "conflicting charge evidence must be retained in sanitized evidence field");
+        assertEquals(leaseBefore, after.getLeaseOwner(),
+                "lease must remain unchanged for MANUAL_REVIEW");
+        assertEquals(checkoutBefore,
+                checkoutService.getCheckout(fixture.token(), fixture.checkoutId()).status());
+        assertTrue(orderGroupEntityRepository.findAll().isEmpty(),
+                "conflicting success on MANUAL_REVIEW must not create an order");
+        assertTrue(orderEntityRepository.findAll().isEmpty());
+        assertEquals(stockBefore, stockOf(fixture.productId()),
+                "conflicting success on MANUAL_REVIEW must not mutate stock");
+    }
+
     private Fixture ambiguousFixture(String mail) {
         try {
             ProductEntity product = createProduct("10.00", 5);

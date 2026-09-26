@@ -127,16 +127,6 @@ public class PaymentFinalizationService {
     }
 
     /**
-     * Backwards-compatible trusted converge path for internal callers that
-     * act on an already-durable, provider-verified charge. Delegates to
-     * {@link #finalizeProviderOrder}; request workers must use the
-     * lease-fenced {@link #finalizeOrder(UUID, UUID, String, String)} instead.
-     */
-    public boolean finalizeOrder(UUID attemptId, UUID checkoutId, String chargeId) {
-        return finalizeProviderOrder(attemptId, checkoutId, chargeId);
-    }
-
-    /**
      * Worker fence: locks checkout first, then the attempt, and validates the
      * attempt id, expected {@code CHARGE_SUCCEEDED} state (or
      * {@code ORDER_FINALIZED} for idempotent convergence), provider charge id,

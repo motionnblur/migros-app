@@ -240,6 +240,16 @@ public class PaymentAttemptService {
         PaymentAttemptEntity attempt = paymentAttemptEntityRepository.findByIdForUpdate(attemptId)
                 .orElseThrow(PaymentAttemptNotFoundException::new);
 
+        if (attempt.getStatus() == PaymentAttemptStatus.MANUAL_REVIEW) {
+            // Already parked for operator review: preserve the existing review
+            // reason, canonical charge id, status, and lease; only attach
+            // sanitized provider linkage for reconciliation. Must run before
+            // any conflicting-charge branch that calls reject(...), otherwise
+            // the original errorCode would be overwritten.
+            attachConflictEvidence(attempt, chargeId);
+            save(attempt);
+            return toStatus(attempt);
+        }
         if (!checkoutId.equals(attempt.getCheckoutId())) {
             reject(attempt, PaymentAttemptStatus.MANUAL_REVIEW,
                     "Provider charge checkout linkage does not match the attempt");
@@ -278,13 +288,6 @@ public class PaymentAttemptService {
             if (attempt.getProviderStatus() == null) {
                 attempt.setProviderStatus("succeeded");
             }
-            save(attempt);
-            return toStatus(attempt);
-        }
-        if (state == PaymentAttemptStatus.MANUAL_REVIEW) {
-            // Preserve the existing review reason; only attach sanitized
-            // provider linkage for reconciliation.
-            attachConflictEvidence(attempt, chargeId);
             save(attempt);
             return toStatus(attempt);
         }
