@@ -59,7 +59,10 @@ header, timeout, and request-rate-limit settings.
 Docker Compose explicitly sets `SPRING_PROFILES_ACTIVE=local` for the backend.
 When running the backend directly, activate `local` explicitly (for example
 `./mvnw spring-boot:run -Dspring-boot.run.profiles=local`) to get the
-local-development convenience account `admin` / `admin`.
+local-development convenience account `admin` / `admin`. Ordinary startup is
+debugger-free; for opt-in loopback-only debugging use
+`./mvnw -Plocal-debug spring-boot:run -Dspring-boot.run.profiles=local`
+(listens only on `127.0.0.1:5005`, never publish it via Compose or forwarding).
 
 Local development is recognized only when `local` is the **only** active profile.
 Any other combination (no profile, `prod`, `prod,local`, `local,staging`, ...) is

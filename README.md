@@ -156,6 +156,14 @@ docker compose --env-file configs/postgres.env up postgres
 cd backend
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
 ```
+Ordinary startup is debugger-free: no JDWP agent is enabled by default.
+
+For explicit local-only debugging (loopback only, never expose remotely):
+```
+.\mvnw.cmd -Plocal-debug spring-boot:run -Dspring-boot.run.profiles=local
+```
+The debug listener binds only to `127.0.0.1:5005` and must not be exposed through
+port forwarding, Compose, a reverse proxy, a tunnel, or a production deployment.
 If you run `./mvnw spring-boot:run` without `local`, the backend starts with the
 secure default profile: it will **not** create the `admin` / `admin` account, and
 it will refuse to start if a legacy `admin` / `admin` row already exists. The same

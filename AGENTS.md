@@ -91,6 +91,11 @@ Backend packages follow a mostly standard layered layout:
   - `docker compose --env-file configs/postgres.env up postgres`
   - `cd backend && ./mvnw spring-boot:run -Dspring-boot.run.profiles=local`
   - `cd client && npm i && npm start`
+- Local-only debugging (opt-in, loopback-only):
+  - `cd backend && ./mvnw -Plocal-debug spring-boot:run -Dspring-boot.run.profiles=local`
+  - Default runs must not enable JDWP. Any debugger must be opt-in via the
+    `local-debug` Maven profile and bound to `127.0.0.1:5005` only.
+  - Runtime/deployment manifests must not publish debug ports.
 
 - Backend tests:
   - `cd backend && ./mvnw test`
