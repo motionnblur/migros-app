@@ -1,7 +1,7 @@
 import { HttpClient, HttpBackend } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
-import { finalize, tap } from 'rxjs/operators';
+import { finalize, shareReplay, tap } from 'rxjs/operators';
 import { apiUrl } from '../../app/config/backend.config';
 
 export interface CsrfTokenResponse {
@@ -78,7 +78,7 @@ export class CsrfTokenService {
       return this.inFlight;
     }
 
-    this.inFlight = this.http
+    const request$ = this.http
       .get<CsrfTokenResponse>(apiUrl('/csrf'), { withCredentials: true })
       .pipe(
         tap((response) => {
@@ -89,6 +89,14 @@ export class CsrfTokenService {
           this.inFlight = null;
         }),
       );
+
+    // A single cold HTTP request shared by every concurrent subscriber. It is
+    // cached so late subscribers during the same fetch receive the same result,
+    // while cleanup on the upstream completion/error clears the in-flight slot
+    // exactly once so a later fetch can start. Errors are never retained.
+    this.inFlight = request$.pipe(
+      shareReplay({ bufferSize: 1, refCount: false }),
+    );
 
     return this.inFlight;
   }

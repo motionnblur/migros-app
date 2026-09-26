@@ -68,6 +68,70 @@ describe('CsrfTokenService', () => {
     expect(service.getToken()).toBe('token-456');
   });
 
+  it('shares one request between concurrent ensureToken subscribers', () => {
+    const received: string[] = [];
+    service.ensureToken().subscribe((response) => received.push(response.token));
+    service.ensureToken().subscribe((response) => received.push(response.token));
+
+    const requests = httpMock.match('/csrf');
+    expect(requests.length).toBe(1);
+    requests[0].flush({ token: 'token-123', headerName: 'X-XSRF-TOKEN' });
+
+    expect(received).toEqual(['token-123', 'token-123']);
+    httpMock.expectNone('/csrf');
+  });
+
+  it('shares one request between concurrent refreshToken subscribers', () => {
+    service.ensureToken().subscribe();
+    httpMock
+      .expectOne('/csrf')
+      .flush({ token: 'token-123', headerName: 'X-XSRF-TOKEN' });
+
+    const received: string[] = [];
+    service.refreshToken().subscribe((response) => received.push(response.token));
+    service.refreshToken().subscribe((response) => received.push(response.token));
+
+    const requests = httpMock.match('/csrf');
+    expect(requests.length).toBe(1);
+    requests[0].flush({ token: 'token-456', headerName: 'X-XSRF-TOKEN' });
+
+    expect(received).toEqual(['token-456', 'token-456']);
+    expect(service.getToken()).toBe('token-456');
+  });
+
+  it('allows a new request after an in-flight request completes', () => {
+    service.refreshToken().subscribe();
+    httpMock
+      .expectOne('/csrf')
+      .flush({ token: 'token-123', headerName: 'X-XSRF-TOKEN' });
+
+    service.refreshToken().subscribe();
+    const requests = httpMock.match('/csrf');
+    expect(requests.length).toBe(1);
+    requests[0].flush({ token: 'token-456', headerName: 'X-XSRF-TOKEN' });
+
+    expect(service.getToken()).toBe('token-456');
+  });
+
+  it('allows recovery after a shared request errors', () => {
+    let firstError: unknown = null;
+    service.ensureToken().subscribe({
+      error: (error) => {
+        firstError = error;
+      },
+    });
+
+    httpMock.expectOne('/csrf').error(new ProgressEvent('error'));
+    expect(firstError).not.toBeNull();
+
+    service.ensureToken().subscribe();
+    const requests = httpMock.match('/csrf');
+    expect(requests.length).toBe(1);
+    requests[0].flush({ token: 'token-123', headerName: 'X-XSRF-TOKEN' });
+
+    expect(service.getToken()).toBe('token-123');
+  });
+
   it('application initialization fetches /csrf with credentials', async () => {
     const initializer = initializeCsrfToken(service);
 
