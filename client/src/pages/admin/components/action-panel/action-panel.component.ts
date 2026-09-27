@@ -3,6 +3,7 @@ import {CommonModule} from '@angular/common'; // Use CommonModule for *ngFor and
 import {FormsModule} from '@angular/forms';
 import {RestService} from '../../../../services/rest/rest.service';
 import {IUserProfileTable} from '../../../../interfaces/IUserProfileTable';
+import {ToastService} from '../../services/toast.service';
 
 interface Status {
   value: string;
@@ -30,7 +31,10 @@ export class ActionPanelComponent implements OnChanges {
     {value: 'Delivered', viewValue: 'Teslim Edildi'},
   ];
 
-  constructor(private restService: RestService) {
+  constructor(
+    private restService: RestService,
+    private toastService: ToastService
+  ) {
   }
 
   ngOnChanges(changes: SimpleChanges) {
@@ -54,12 +58,14 @@ export class ActionPanelComponent implements OnChanges {
     this.restService.updateOrderStatus(this.orderId, this.selectedStatus).subscribe({
       next: (success: boolean) => {
         if (success) {
-          // You could use a toast here later!
-          alert('Sipariş durumu güncellendi: ' + this.selectedStatus);
+          this.toastService.success('Sipariş durumu güncellendi.');
           this.closeActionPanel();
         }
       },
-      error: (err) => console.error('Update failed', err)
+      error: (err) => {
+        console.error('Update failed', err);
+        this.toastService.error('Sipariş durumu güncellenemedi.');
+      }
     });
   }
 }

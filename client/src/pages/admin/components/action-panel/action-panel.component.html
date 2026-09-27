@@ -1,45 +1,40 @@
 <div id="action-panel-bg" (click)="closeActionPanel()"></div>
 
-<div id="action-panel-main" class="card shadow-lg border-0 animate-fade-in" *ngIf="userData">
-
-  <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-3">
-    <h5 class="mb-0 fw-bold"><i class="bi bi-gear-fill me-2"></i>Sipariş İşlemi</h5>
-    <button type="button" class="btn-close btn-close-white" (click)="closeActionPanel()"></button>
-  </div>
+<div id="action-panel-main" class="card-admin animate-fade-in" *ngIf="userData">
+  <header class="card-admin__header action-panel__header">
+    <h2 class="card-admin__title"><i class="bi bi-gear-fill me-2 text-brand"></i>Sipariş İşlemi</h2>
+    <button type="button" class="btn-close" (click)="closeActionPanel()" aria-label="Kapat"></button>
+  </header>
 
   <div class="card-body p-4">
-    <div class="user-details mb-4 p-3 bg-light rounded border">
-      <h6 class="text-muted small fw-bold text-uppercase mb-3">Müşteri Bilgileri</h6>
+    <div class="action-panel__customer">
+      <h6 class="action-panel__section-label">Müşteri Bilgileri</h6>
       <div class="d-flex align-items-center mb-2">
-        <i class="bi bi-person-circle fs-4 me-2 text-primary"></i>
-        <span class="fw-bold fs-5">{{ userData.userFirstName }} {{ userData.userLastName }}</span>
+        <span class="admin-avatar me-2"><i class="bi bi-person-fill"></i></span>
+        <span class="fw-bold fs-6">{{ userData.userFirstName }} {{ userData.userLastName }}</span>
       </div>
-      <div class="small text-secondary mb-1">
+      <div class="action-panel__detail">
         <i class="bi bi-geo-alt-fill me-1"></i> {{ userData.userAddress }}
       </div>
-      <div class="small text-secondary" *ngIf="userData.userAddress2">
+      <div class="action-panel__detail" *ngIf="userData.userAddress2">
         <i class="bi bi-info-circle me-1"></i> {{ userData.userAddress2 }}
       </div>
     </div>
 
     <div class="mb-4">
-      <label class="form-label fw-bold text-muted small text-uppercase">Sipariş Durumunu Güncelle</label>
-      <select class="form-select form-select-lg border-2" [(ngModel)]="selectedStatus">
+      <label class="form-label fw-bold small text-uppercase">Sipariş Durumunu Güncelle</label>
+      <select class="form-select border-2" [(ngModel)]="selectedStatus">
         <option value="" disabled selected>Durum seçiniz...</option>
-        <option *ngFor="let s of status" [value]="s.value">
-          {{ s.viewValue }}
-        </option>
+        <option *ngFor="let s of status" [value]="s.value">{{ s.viewValue }}</option>
       </select>
     </div>
 
-    <button class="btn btn-orange w-100 py-3 fw-bold shadow-sm"
-            [disabled]="!selectedStatus"
-            (click)="save()">
+    <button class="btn btn-brand w-100 py-3 fw-bold" [disabled]="!selectedStatus" (click)="save()">
       <i class="bi bi-check-circle-fill me-2"></i>Değişiklikleri Kaydet
     </button>
   </div>
 
-  <div class="card-footer bg-white py-3 text-center border-0">
-    <small class="text-muted italic">Sipariş ID: #{{ orderId }}</small>
-  </div>
+  <footer class="card-admin__footer text-center">
+    <small class="text-muted">Sipariş ID: #{{ orderId }}</small>
+  </footer>
 </div>

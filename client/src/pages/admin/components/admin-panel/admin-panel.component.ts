@@ -13,10 +13,19 @@ import { IChatMessage } from '../../../../interfaces/IChatMessage';
 import { SupportRealtimeService } from '../../../../services/support-realtime/support-realtime.service';
 import { ISupportRealtimeEvent } from '../../../../interfaces/support/ISupportRealtimeEvent';
 import { ISupportCustomerSummary } from '../../../../interfaces/support/ISupportCustomerSummary';
-import { Subscription } from 'rxjs';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { Observable, Subscription } from 'rxjs';
+import { ActivatedRoute, Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { MatDialog } from '@angular/material/dialog';
 import { AuthService } from '../../../../services/auth/auth.service';
 import { staticImageUrl } from '../../../../app/config/supabase-assets';
+import { DashboardComponent } from '../dashboard/dashboard.component';
+import {
+  ConfirmDialogComponent,
+  ConfirmDialogData,
+} from '../confirm-dialog/confirm-dialog.component';
+import { ToastService } from '../../services/toast.service';
+
+type AdminSection = 'home' | 'products' | 'orders' | 'support';
 
 @Component({
   selector: 'app-admin-panel',
@@ -29,8 +38,10 @@ import { staticImageUrl } from '../../../../app/config/supabase-assets';
     ProductUpdaterComponent,
     ProductEditComponent,
     OrderPanelComponent,
+    DashboardComponent,
     FormsModule,
     RouterLink,
+    RouterLinkActive,
   ],
   templateUrl: './admin-panel.component.html',
   styleUrl: './admin-panel.component.css',
@@ -45,7 +56,8 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
   hasOrdersOpened = false;
   hasSupportOpened = false;
   isLoggingOut = false;
-  currentSection: 'home' | 'products' | 'orders' | 'support' = 'home';
+  isSidebarOpen = false;
+  currentSection: AdminSection = 'home';
 
   supportUsers: string[] = [];
   bannedUsers: string[] = [];
@@ -76,7 +88,9 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     private supportRealtimeService: SupportRealtimeService,
     private authService: AuthService,
     private route: ActivatedRoute,
-    private router: Router
+    private router: Router,
+    private dialog: MatDialog,
+    private toastService: ToastService
   ) {
     this.productChangedCallback = (data: any) => {
       this.productChangedEventHandler(data);
@@ -84,6 +98,32 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     this.editorOpenedCallback = () => {
       this.editorOpenedEventHandler();
     };
+  }
+
+  get sectionTitle(): string {
+    switch (this.currentSection) {
+      case 'products':
+        return 'Ürünler';
+      case 'orders':
+        return 'Siparişler';
+      case 'support':
+        return 'Canlı Destek';
+      default:
+        return 'Dashboard';
+    }
+  }
+
+  get sectionSubtitle(): string {
+    switch (this.currentSection) {
+      case 'products':
+        return 'Kategori bazlı ürün yönetimi';
+      case 'orders':
+        return 'Sipariş durumlarını yönetin';
+      case 'support':
+        return 'Müşteri sohbetlerini yanıtlayın';
+      default:
+        return 'Mağaza genel bakışı ve son hareketler';
+    }
   }
 
   ngOnInit(): void {
@@ -110,11 +150,7 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     );
 
     this.routeSub = this.route.data.subscribe((data) => {
-      const section = (data['section'] ?? 'home') as
-        | 'home'
-        | 'products'
-        | 'orders'
-        | 'support';
+      const section = (data['section'] ?? 'home') as AdminSection;
       this.setSection(section);
     });
   }
@@ -130,6 +166,14 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
       clearTimeout(this.supportCustomerSearchTimer);
       this.supportCustomerSearchTimer = null;
     }
+  }
+
+  toggleSidebar(): void {
+    this.isSidebarOpen = !this.isSidebarOpen;
+  }
+
+  closeSidebar(): void {
+    this.isSidebarOpen = false;
   }
 
   logoutAdmin() {
@@ -189,7 +233,7 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     this.hasProductEditOpened = false;
   }
 
-  private setSection(section: 'home' | 'products' | 'orders' | 'support') {
+  private setSection(section: AdminSection) {
     this.currentSection = section;
 
     this.hasProductsOpened = section === 'products';
@@ -204,6 +248,18 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     }
 
     this.stopSupportPolling();
+  }
+
+  private confirmAction(data: ConfirmDialogData): Observable<boolean> {
+    return this.dialog
+      .open(ConfirmDialogComponent, {
+        width: '420px',
+        maxWidth: '92vw',
+        autoFocus: false,
+        panelClass: 'admin-confirm-dialog',
+        data,
+      })
+      .afterClosed() as Observable<boolean>;
   }
 
   loadSupportUsers() {
@@ -227,7 +283,7 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
         }
       },
       error: () => {
-        this.supportError = 'Kullanici sohbetleri yuklenemedi.';
+        this.supportError = 'Kullanıcı sohbetleri yüklenemedi.';
       },
     });
   }
@@ -238,7 +294,7 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
         this.bannedUsers = users;
       },
       error: () => {
-        this.supportError = 'Banli kullanicilar yuklenemedi.';
+        this.supportError = 'Banlı kullanıcılar yüklenemedi.';
       },
     });
   }
@@ -272,7 +328,7 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
       },
       error: () => {
         this.isSupportCustomerSearchLoading = false;
-        this.supportError = 'Kullanici aramasi yapilamadi.';
+        this.supportError = 'Kullanıcı araması yapılamadı.';
       },
     });
   }
@@ -313,7 +369,7 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
         },
         error: () => {
           this.isSupportLoading = false;
-          this.supportError = 'Mesajlar yuklenemedi.';
+          this.supportError = 'Mesajlar yüklenemedi.';
         },
       });
   }
@@ -344,7 +400,7 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
 
     const nextMessage = this.supportEditInput.trim();
     if (!nextMessage) {
-      this.supportError = 'Mesaj bos olamaz.';
+      this.supportError = 'Mesaj boş olamaz.';
       return;
     }
 
@@ -356,15 +412,18 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
           this.supportMessageActionInProgressId = null;
           this.editingSupportMessageId = null;
           this.supportEditInput = '';
+          this.toastService.success('Mesaj güncellendi.');
           this.loadSupportMessages();
           this.loadSupportUsers();
         },
         error: (err) => {
           this.supportMessageActionInProgressId = null;
-          this.supportError =
+          const messageText =
             typeof err?.error === 'string' && err.error
               ? err.error
-              : 'Mesaj duzenlenemedi.';
+              : 'Mesaj düzenlenemedi.';
+          this.supportError = messageText;
+          this.toastService.error(messageText);
         },
       });
   }
@@ -374,32 +433,41 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const approved = confirm('Mesaj kalici olarak silinecek. Devam edilsin mi?');
-    if (!approved) {
-      return;
-    }
+    this.confirmAction({
+      title: 'Mesajı sil',
+      message: 'Mesaj kalıcı olarak silinecek. Devam edilsin mi?',
+      confirmText: 'Sil',
+      danger: true,
+    }).subscribe((approved) => {
+      if (!approved) {
+        return;
+      }
 
-    this.supportMessageActionInProgressId = message.id;
-    this.restService
-      .deleteSupportMessageForAdmin(this.selectedSupportUserMail, message.id)
-      .subscribe({
-        next: () => {
-          this.supportMessageActionInProgressId = null;
-          if (this.editingSupportMessageId === message.id) {
-            this.editingSupportMessageId = null;
-            this.supportEditInput = '';
-          }
-          this.loadSupportMessages();
-          this.loadSupportUsers();
-        },
-        error: (err) => {
-          this.supportMessageActionInProgressId = null;
-          this.supportError =
-            typeof err?.error === 'string' && err.error
-              ? err.error
-              : 'Mesaj silinemedi.';
-        },
-      });
+      this.supportMessageActionInProgressId = message.id;
+      this.restService
+        .deleteSupportMessageForAdmin(this.selectedSupportUserMail, message.id)
+        .subscribe({
+          next: () => {
+            this.supportMessageActionInProgressId = null;
+            if (this.editingSupportMessageId === message.id) {
+              this.editingSupportMessageId = null;
+              this.supportEditInput = '';
+            }
+            this.toastService.success('Mesaj silindi.');
+            this.loadSupportMessages();
+            this.loadSupportUsers();
+          },
+          error: (err) => {
+            this.supportMessageActionInProgressId = null;
+            const messageText =
+              typeof err?.error === 'string' && err.error
+                ? err.error
+                : 'Mesaj silinemedi.';
+            this.supportError = messageText;
+            this.toastService.error(messageText);
+          },
+        });
+    });
   }
 
   isSupportMessageActionBusy(message: IChatMessage): boolean {
@@ -413,7 +481,7 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
     }
 
     if (this.isSelectedUserBanned()) {
-      this.supportError = 'Banli kullaniciya mesaj gonderilemez.';
+      this.supportError = 'Banlı kullanıcıya mesaj gönderilemez.';
       return;
     }
 
@@ -429,10 +497,12 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
         },
         error: (err) => {
           this.isSupportSending = false;
-          this.supportError =
+          const messageText =
             typeof err?.error === 'string' && err.error
               ? err.error
-              : 'Yanit gonderilemedi.';
+              : 'Yanıt gönderilemedi.';
+          this.supportError = messageText;
+          this.toastService.error(messageText);
         },
       });
   }
@@ -442,33 +512,38 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const approved = confirm(
-      `Sohbet kapatilacak: ${this.selectedSupportUserMail}`
-    );
-    if (!approved) {
-      return;
-    }
+    this.confirmAction({
+      title: 'Sohbeti kapat',
+      message: `Sohbet kapatılacak: ${this.selectedSupportUserMail}`,
+      confirmText: 'Kapat',
+    }).subscribe((approved) => {
+      if (!approved) {
+        return;
+      }
 
-    this.restService
-      .closeSupportChatForAdmin(this.selectedSupportUserMail)
-      .subscribe({
-        next: () => {
-          const closedUser = this.selectedSupportUserMail;
-          this.supportUsers = this.supportUsers.filter((u) => u !== closedUser);
-          this.selectedSupportUserMail = this.supportUsers.length
-            ? this.supportUsers[0]
-            : '';
-          this.supportMessages = [];
-          this.supportReplyInput = '';
+      this.restService
+        .closeSupportChatForAdmin(this.selectedSupportUserMail)
+        .subscribe({
+          next: () => {
+            const closedUser = this.selectedSupportUserMail;
+            this.supportUsers = this.supportUsers.filter((u) => u !== closedUser);
+            this.selectedSupportUserMail = this.supportUsers.length
+              ? this.supportUsers[0]
+              : '';
+            this.supportMessages = [];
+            this.supportReplyInput = '';
+            this.toastService.success('Sohbet kapatıldı.');
 
-          if (this.selectedSupportUserMail) {
-            this.loadSupportMessages();
-          }
-        },
-        error: () => {
-          this.supportError = 'Sohbet kapatilamadi.';
-        },
-      });
+            if (this.selectedSupportUserMail) {
+              this.loadSupportMessages();
+            }
+          },
+          error: () => {
+            this.supportError = 'Sohbet kapatılamadı.';
+            this.toastService.error('Sohbet kapatılamadı.');
+          },
+        });
+    });
   }
 
   banSupportUser() {
@@ -476,24 +551,30 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const approved = confirm(
-      `Kullanici banlanacak: ${this.selectedSupportUserMail}`
-    );
-    if (!approved) {
-      return;
-    }
+    this.confirmAction({
+      title: 'Kullanıcıyı banla',
+      message: `Kullanıcı banlanacak: ${this.selectedSupportUserMail}`,
+      confirmText: 'Banla',
+      danger: true,
+    }).subscribe((approved) => {
+      if (!approved) {
+        return;
+      }
 
-    this.restService
-      .banSupportUserFromAdmin(this.selectedSupportUserMail)
-      .subscribe({
-        next: () => {
-          this.supportError = 'Kullanici banlandi.';
-          this.loadBannedUsers();
-        },
-        error: () => {
-          this.supportError = 'Kullanici banlanamadi.';
-        },
-      });
+      this.restService
+        .banSupportUserFromAdmin(this.selectedSupportUserMail)
+        .subscribe({
+          next: () => {
+            this.supportError = 'Kullanıcı banlandı.';
+            this.toastService.success('Kullanıcı banlandı.');
+            this.loadBannedUsers();
+          },
+          error: () => {
+            this.supportError = 'Kullanıcı banlanamadı.';
+            this.toastService.error('Kullanıcı banlanamadı.');
+          },
+        });
+    });
   }
 
   isSelectedUserBanned(): boolean {
@@ -513,19 +594,26 @@ export class AdminPanelComponent implements OnInit, OnDestroy {
   }
 
   unbanUserByMail(userMail: string) {
-    const approved = confirm(`Kullanici bani kaldirilacak: ${userMail}`);
-    if (!approved) {
-      return;
-    }
+    this.confirmAction({
+      title: 'Banı kaldır',
+      message: `Kullanıcı banı kaldırılacak: ${userMail}`,
+      confirmText: 'Banı Kaldır',
+    }).subscribe((approved) => {
+      if (!approved) {
+        return;
+      }
 
-    this.restService.unbanSupportUserFromAdmin(userMail).subscribe({
-      next: () => {
-        this.supportError = 'Kullanici bani kaldirildi.';
-        this.loadBannedUsers();
-      },
-      error: () => {
-        this.supportError = 'Kullanici ban kaldirma islemi basarisiz.';
-      },
+      this.restService.unbanSupportUserFromAdmin(userMail).subscribe({
+        next: () => {
+          this.supportError = 'Kullanıcı banı kaldırıldı.';
+          this.toastService.success('Kullanıcı banı kaldırıldı.');
+          this.loadBannedUsers();
+        },
+        error: () => {
+          this.supportError = 'Kullanıcı ban kaldırma işlemi başarısız.';
+          this.toastService.error('Kullanıcı ban kaldırma işlemi başarısız.');
+        },
+      });
     });
   }
 

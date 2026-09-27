@@ -11,6 +11,38 @@ app-admin-panel {
   height: 100%;
 }
 
+.admin-page-main {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.admin-page-main--login {
+  background: radial-gradient(
+      circle at 20% 20%,
+      rgba(255, 127, 0, 0.18),
+      transparent 45%
+    ),
+    linear-gradient(160deg, #1f2430 0%, #171b25 100%);
+}
+
+.admin-page-main--app {
+  background-color: var(--admin-bg);
+}
+
+.login-stage {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.login-stage__box {
+  width: 100%;
+  max-width: 440px;
+}
+
 .animate-fade-in {
   animation: fadeIn 0.3s ease-in-out;
 }

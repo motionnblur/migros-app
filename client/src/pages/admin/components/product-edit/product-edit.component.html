@@ -1,90 +1,137 @@
-<div class="product-edit__buy-view" *ngIf="productData">
-  <div class="product-edit__buy-view__head">
-    <div class="container-left">
-      <div class="product-edit__buy-view__head-left">
-        <img
-          #product_image_ref
-          [src]="productImageUrl || 'assets/placeholder.png'"
-          class="product-edit__buy-view__head-left__image"
-        />
+<div class="product-edit" *ngIf="productData">
+  <header class="product-edit__header">
+    <h2 class="product-edit__title">
+      <i class="bi bi-pencil-square me-2 text-brand"></i>Ürünü Düzenle
+    </h2>
+    <button type="button" class="btn-close" (click)="hasEscapePressed.emit(true)" aria-label="Kapat"></button>
+  </header>
+
+  <div class="product-edit__body admin-scroll">
+    <div class="product-edit__grid">
+      <div class="product-edit__media">
+        <label class="product-edit__media-frame" title="Görseli değiştir">
+          <img [src]="productImageUrl || 'assets/placeholder.png'" alt="Ürün görseli" />
+          <span class="product-edit__media-overlay"><i class="bi bi-camera-fill"></i> Görseli Değiştir</span>
+        </label>
+        <input type="file" accept="image/png, image/jpeg" class="d-none" (change)="onImageSelected($event)" />
+        <p class="product-edit__field-hint">PNG veya JPEG yükleyebilirsiniz.</p>
       </div>
-    </div>
-    <div class="container-right">
-      <div class="product-edit__buy-view__head-right">
-        <div class="product-edit__buy-view__head-right-1 line-bottom">
-          <div class="product-edit__buy-view__head-right-1__title">
-            {{ productData.productName }}
+
+      <div class="product-edit__fields">
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label small fw-bold text-uppercase">Ürün Adı</label>
+            <input type="text" class="form-control" [(ngModel)]="productName" />
           </div>
-          <div class="product-edit__buy-view__head-right-1__price">
-            {{ productData.productPrice }}
-            <span class="product-edit__buy-view__head-right-1__currency"
-              >TL</span
-            >
+
+          <div class="col-md-6">
+            <label class="form-label small fw-bold text-uppercase">Kategori</label>
+            <select class="form-select" [(ngModel)]="categoryValue">
+              <option [ngValue]="null" disabled>Kategori seçin</option>
+              <option *ngFor="let category of categories" [ngValue]="category.value">
+                {{ category.name }}
+              </option>
+            </select>
           </div>
-        </div>
-        <div
-          #product_money_ref
-          class="product-edit__buy-view__head-right-3 line-bottom"
-        >
-          <img
-            class="product-edit__buy-view__head-right-3__image"
-            [src]="staticImageUrl('moneyy.png')"
-          />
-        </div>
-        <div class="product-edit__buy-view__head-right-4 line-bottom">
-          <div class="product-edit__buy-view__head-right-4__title">Adet</div>
-          <div
-            #product_addbutton_ref
-            class="product-edit__buy-view__head-right-4__button"
-          >
-            Sepete Ekle
+          <div class="col-md-6">
+            <label class="form-label small fw-bold text-uppercase">Alt Kategori</label>
+            <input type="text" class="form-control" [(ngModel)]="subCategoryName" />
           </div>
-        </div>
-        <div class="product-edit__buy-view__head-right-5">
-          Ürünün stok, fiyat ve kampanya bilgisi, teslimatı gerçekleştirecek
-          mağazanın stok, fiyat ve kampanya bilgilerine göre belirlenmektedir.
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="product-edit__buy-view__tail">
-    <div class="product-edit__buy-view__tail-head" *ngIf="productDescriptions">
-      <div
-        #tabRef
-        *ngFor="let item of productDescriptions.descriptionList; let i = index"
-        (click)="changeTab(i, tabRef)"
-        [attr.data-tab-ref]="i"
-      >
-        <div>
-          <div contenteditable="true" (blur)="changeTabName($event, i)">
-            {{ item.descriptionTabName }}
+
+          <div class="col-md-4">
+            <label class="form-label small fw-bold text-uppercase">Fiyat (TL)</label>
+            <div class="input-group">
+              <input type="number" class="form-control" step="0.01" min="0" [(ngModel)]="price" />
+              <span class="input-group-text text-muted">TL</span>
+            </div>
           </div>
-          <div (click)="deleteProductTab($event, i)">
-                    <img [src]="staticImageUrl('delete.png')" />
+          <div class="col-md-4">
+            <label class="form-label small fw-bold text-uppercase">Stok</label>
+            <input type="number" class="form-control" min="0" [(ngModel)]="count" />
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-bold text-uppercase">İndirim</label>
+            <div class="input-group">
+              <input type="number" class="form-control" min="0" max="100" [(ngModel)]="discount" />
+              <span class="input-group-text text-muted">%</span>
+            </div>
+          </div>
+
+          <div class="col-12">
+            <label class="form-label small fw-bold text-uppercase">Açıklama</label>
+            <textarea class="form-control" rows="3" [(ngModel)]="description"></textarea>
           </div>
         </div>
 
-        <div [attr.data-line-ref]="i"></div>
-      </div>
-      <div
-        class="product-edit__buy-view__tail-head__plus"
-        (click)="createProductTab()"
-      >
-                    <img [src]="staticImageUrl('plus.png')" />
+        <div *ngIf="validationError" class="alert alert-danger py-2 mt-3 mb-0" role="alert">
+          {{ validationError }}
+        </div>
+        <div *ngIf="saveError" class="alert alert-warning py-2 mt-3 mb-0" role="alert">
+          {{ saveError }}
+        </div>
+
+        <div class="product-edit__actions">
+          <button type="button" class="btn btn-ghost" (click)="hasEscapePressed.emit(true)">Kapat</button>
+          <button type="button" class="btn btn-brand" [disabled]="isSavingProduct" (click)="saveProduct()">
+            <i class="bi bi-check2-circle me-2"></i>
+            {{ isSavingProduct ? 'Kaydediliyor...' : 'Ürünü Kaydet' }}
+          </button>
+        </div>
       </div>
     </div>
-    <div
-      [innerHTML]="currentProductDescriptionBody"
-      class="product-edit__buy-view__tail-body"
-      contenteditable="true"
-      (blur)="changeTabBody($event)"
-    >
-      {{ this.currentProductDescriptionBody }}
-    </div>
-  </div>
-  <div class="product-edit__buy-view__update">
-    <div (click)="updateButtonClick()">Güncelle</div>
+
+    <section class="product-edit__tabs">
+      <div class="product-edit__tabs-header">
+        <h3 class="product-edit__section-title">
+          <i class="bi bi-list-columns-reverse me-2 text-brand"></i>Açıklama Sekmeleri
+        </h3>
+        <button type="button" class="btn btn-sm btn-brand-outline" (click)="addDescriptionTab()">
+          <i class="bi bi-plus-lg me-1"></i> Sekme Ekle
+        </button>
+      </div>
+
+      <div class="product-edit__tab-list admin-scroll">
+        <button
+          type="button"
+          class="product-edit__tab"
+          *ngFor="let tab of descriptionList; let i = index"
+          [class.active]="i === currentSelectedTabIndex"
+          (click)="selectTab(i)"
+        >
+          <i class="bi bi-textarea-t me-1"></i>
+          <span class="product-edit__tab-name">{{ tab.descriptionTabName || 'Sekme' }}</span>
+          <span class="product-edit__tab-remove" (click)="removeDescriptionTab($event, i)">
+            <i class="bi bi-x-lg"></i>
+          </span>
+        </button>
+
+        <span class="product-edit__tabs-empty" *ngIf="descriptionList.length === 0">
+          Henüz sekme yok. "Sekme Ekle" ile başlayın.
+        </span>
+      </div>
+
+      <div class="product-edit__tab-editor" *ngIf="descriptionList.length > 0">
+        <div class="mb-3">
+          <label class="form-label small fw-bold text-uppercase">Sekme Başlığı</label>
+          <input type="text" class="form-control" [(ngModel)]="descriptionList[currentSelectedTabIndex].descriptionTabName" />
+        </div>
+        <div>
+          <label class="form-label small fw-bold text-uppercase">Sekme İçeriği</label>
+          <textarea
+            class="form-control"
+            rows="5"
+            [ngModel]="currentTabContent"
+            (ngModelChange)="onDescriptionBodyInput($event)"
+          ></textarea>
+        </div>
+
+        <div class="product-edit__actions">
+          <button type="button" class="btn btn-brand" [disabled]="isSavingDescriptions" (click)="saveDescriptions()">
+            <i class="bi bi-save me-2"></i>
+            {{ isSavingDescriptions ? 'Kaydediliyor...' : 'Açıklamaları Kaydet' }}
+          </button>
+        </div>
+      </div>
+    </section>
   </div>
 </div>
-
-

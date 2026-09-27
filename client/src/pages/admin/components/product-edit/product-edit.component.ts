@@ -1,71 +1,72 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { ProductBuyBase } from '../../../../base-components/product-buy.base';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { RestService } from '../../../../services/rest/rest.service';
 import { EventService } from '../../../../services/event/event.service';
 import { IDescription } from '../../../../interfaces/IDescription';
-import { IProductDescriptionTab } from '../../../../interfaces/IProductDescriptionTab';
 import { IProductDescription } from '../../../../interfaces/IProductDescription';
-import { staticImageUrl } from '../../../../app/config/supabase-assets';
+import { IProductUpdater } from '../../../../interfaces/IProductUpdater';
+import { categories } from '../../../../memory/global-data';
+import { ToastService } from '../../services/toast.service';
 
 @Component({
   selector: 'app-product-edit',
-  imports: [CommonModule],
+  standalone: true,
+  imports: [CommonModule, FormsModule],
   templateUrl: './product-edit.component.html',
   styleUrl: './product-edit.component.css',
 })
 export class ProductEditComponent extends ProductBuyBase {
-  readonly staticImageUrl = staticImageUrl;
   @Input() selectedImage: File | null = null;
   @Output() hasEscapePressed = new EventEmitter<boolean>();
-  currentSelectedTabIndis: number = 0;
-  productDescriptionTabs: IProductDescriptionTab[] = [];
-  productDescriptionTabsToDelete: number[] = [];
+
+  readonly categories = categories;
+
+  currentSelectedTabIndex = 0;
   localProductDescriptions: IProductDescription | null = null;
+  productDescriptionTabsToDelete: number[] = [];
+
+  productName = '';
+  subCategoryName = '';
+  price = 0;
+  count = 0;
+  discount = 0;
+  description = '';
+  categoryValue: number | null = null;
+
+  isSavingProduct = false;
+  isSavingDescriptions = false;
+  validationError = '';
+  saveError = '';
 
   private boundKeyDownEvent!: (event: KeyboardEvent) => void;
-  isEditing = false;
 
   constructor(
     protected override restService: RestService,
-    protected override eventManager: EventService
+    protected override eventManager: EventService,
+    private toastService: ToastService
   ) {
     super(restService, eventManager);
     this.boundKeyDownEvent = this.keyDownEvent.bind(this);
   }
+
   override ngOnInit() {
     super.ngOnInit();
     document.addEventListener('keydown', this.boundKeyDownEvent);
   }
 
-  override ngAfterViewInit() {
-    super.ngAfterViewInit();
-    setTimeout(() => {
-      this.productImageRef.nativeElement.style.cursor = 'default';
-      this.productAddButtonRef.nativeElement.style.cursor = 'default';
-      this.productMoneyRef.nativeElement.style.cursor = 'default';
-    }, 200);
-  }
-
   override ngOnDestroy() {
+    super.ngOnDestroy();
     document.removeEventListener('keydown', this.boundKeyDownEvent);
   }
 
   protected override onProductDescritptionUpdate(
     data: IProductDescription
   ): void {
-    if (this.localProductDescriptions === null) {
+    if (this.localProductDescriptions === null && data) {
       this.localProductDescriptions = JSON.parse(JSON.stringify(data));
     }
-
-    var tabIndex: number = 0;
-    data.descriptionList.forEach((description: IDescription) => {
-      const tab: IProductDescriptionTab = {
-        tabIndex: tabIndex++,
-        description: description,
-      };
-      this.productDescriptionTabs.push(tab);
-    });
   }
 
   private keyDownEvent(event: KeyboardEvent) {
@@ -74,96 +75,177 @@ export class ProductEditComponent extends ProductBuyBase {
     }
   }
 
-  protected override changeTab(index: number, tabRef: HTMLDivElement): void {
-    super.changeTab(index, tabRef);
-    this.currentSelectedTabIndis = index;
+  get descriptionList(): IDescription[] {
+    return this.productDescriptions?.descriptionList ?? [];
   }
 
-  public changeTabName(event: any, index: number) {
-    this.productDescriptions.descriptionList[index].descriptionTabName =
-      event.target.innerText;
+  get currentTabContent(): string {
+    return this.descriptionList[this.currentSelectedTabIndex]?.descriptionTabContent ?? '';
   }
-  public changeProductDescription(event: any) {
-    this.productData.productDescription = event.target.innerText;
-  }
-  public changeTabBody(event: any) {
-    this.currentProductDescriptionBody = event.target.innerHTML;
 
-    this.productDescriptions.descriptionList[
-      this.currentSelectedTabIndis
-    ].descriptionTabContent = event.target.innerHTML;
+  selectTab(index: number): void {
+    this.currentSelectedTabIndex = index;
   }
-  public createProductTab() {
-    const newTab: IDescription = {
-      descriptionId: 0,
-      descriptionTabName: 'Test tab',
-      descriptionTabContent: 'Test body',
-    };
-    if (this.productDescriptions === undefined) {
-      this.productDescriptions = {
-        productId: 0,
-        descriptionList: [],
-      };
+
+  onDescriptionBodyInput(value: string): void {
+    const tab = this.descriptionList[this.currentSelectedTabIndex];
+    if (!tab) {
+      return;
     }
-    if (this.productDescriptions.descriptionList === null) {
+    tab.descriptionTabContent = value;
+    this.currentProductDescriptionBody = value;
+  }
+
+  addDescriptionTab(): void {
+    if (!this.productDescriptions) {
+      this.productDescriptions = { productId: this.productId, descriptionList: [] };
+    }
+    if (!this.productDescriptions.descriptionList) {
       this.productDescriptions.descriptionList = [];
     }
-    this.productDescriptions.descriptionList.push(newTab);
-    //this.currentProductDescriptionBody = '';
+
+    this.productDescriptions.descriptionList.push({
+      descriptionId: 0,
+      descriptionTabName: 'Yeni Sekme',
+      descriptionTabContent: '',
+    });
+    this.currentSelectedTabIndex =
+      this.productDescriptions.descriptionList.length - 1;
+    this.currentProductDescriptionBody = '';
   }
-  public deleteProductTab(event: any, index: number) {
+
+  removeDescriptionTab(event: Event, index: number): void {
     event.stopPropagation();
 
-    if (this.productDescriptionTabs[index] === undefined) {
-      this.productDescriptions.descriptionList.splice(index, 1);
-      this.currentProductDescriptionBody = '';
+    const tab = this.descriptionList[index];
+    if (!tab) {
       return;
     }
 
-    this.productDescriptionTabsToDelete.push(
-      this.productDescriptionTabs[index].description.descriptionId
-    );
+    if (tab.descriptionId) {
+      this.productDescriptionTabsToDelete.push(tab.descriptionId);
+    }
 
-    this.productDescriptions.descriptionList[index].descriptionTabContent = '';
     this.productDescriptions.descriptionList.splice(index, 1);
 
-    if (this.productDescriptions.descriptionList.length > 0) {
-      this.changeTab(0, this.currentTabRef!);
-    } else {
-      this.currentProductDescriptionBody = '';
-      this.currentTabRef = null;
-      this.currentSelectedTabIndis = 0;
-    }
+    const nextIndex = Math.max(
+      0,
+      Math.min(this.currentSelectedTabIndex, this.descriptionList.length - 1)
+    );
+    this.currentSelectedTabIndex = this.descriptionList.length ? nextIndex : 0;
+    this.currentProductDescriptionBody = this.currentTabContent;
   }
-  public updateButtonClick() {
-    this.productDescriptions.productId = this.productId;
+
+  saveProduct(): void {
+    if (this.isSavingProduct) {
+      return;
+    }
+
+    if (!this.productName.trim() || !this.subCategoryName.trim()) {
+      this.validationError = 'Ürün adı ve alt kategori zorunludur.';
+      return;
+    }
+
+    if (this.categoryValue === null) {
+      this.validationError = 'Kategori seçimi zorunludur.';
+      return;
+    }
+
+    if (this.price < 0 || this.count < 0 || this.discount < 0 || this.discount > 100) {
+      this.validationError = 'Fiyat/miktar/indirim değerleri geçersiz.';
+      return;
+    }
+
+    this.validationError = '';
+    this.saveError = '';
+    this.isSavingProduct = true;
+
+    const productData: IProductUpdater = {
+      adminId: 1,
+      productId: this.productId,
+      productName: this.productName.trim(),
+      subCategoryName: this.subCategoryName.trim(),
+      productPrice: this.price,
+      productCount: this.count,
+      productDiscount: this.discount,
+      productDescription: this.description.trim(),
+      selectedImage: this.selectedImage,
+      categoryValue: this.categoryValue,
+    };
+
+    this.restService.updateProductData(productData).subscribe({
+      next: (status: boolean) => {
+        this.isSavingProduct = false;
+        if (status) {
+          this.eventManager.trigger('productAdded');
+          this.toastService.success('Ürün kaydedildi.');
+        }
+      },
+      error: (error) => {
+        this.isSavingProduct = false;
+        this.saveError =
+          error?.error ?? 'Ürün kaydedilemedi. Lütfen alanları kontrol edin.';
+        this.toastService.error('Ürün kaydedilemedi.');
+      },
+    });
+  }
+
+  saveDescriptions(): void {
+    if (this.isSavingDescriptions || !this.productDescriptions) {
+      return;
+    }
+
+    this.saveError = '';
+    this.isSavingDescriptions = true;
 
     if (this.productDescriptionTabsToDelete.length > 0) {
       this.productDescriptionTabsToDelete.forEach((descriptionId) => {
-        this.restService
-          .deleteProductDescription(descriptionId)
-          .subscribe((status: boolean) => {
-            if (status) {
-              console.log(status);
-            }
-          });
+        this.restService.deleteProductDescription(descriptionId).subscribe();
       });
       this.productDescriptionTabsToDelete = [];
     }
 
+    this.productDescriptions.productId = this.productId;
+
     if (
-      JSON.stringify(this.localProductDescriptions) !==
+      JSON.stringify(this.localProductDescriptions) ===
       JSON.stringify(this.productDescriptions)
     ) {
-      this.restService
-        .addProductDescription(this.productDescriptions)
-        .subscribe((status: boolean) => {
-          if (status) {
-            this.localProductDescriptions = JSON.parse(
-              JSON.stringify(this.productDescriptions)
-            );
-          }
-        });
+      this.isSavingDescriptions = false;
+      return;
+    }
+
+    this.restService.addProductDescription(this.productDescriptions).subscribe({
+      next: (status: boolean) => {
+        this.isSavingDescriptions = false;
+        if (status) {
+          this.localProductDescriptions = JSON.parse(
+            JSON.stringify(this.productDescriptions)
+          );
+          this.toastService.success('Açıklama sekmeleri kaydedildi.');
+        }
+      },
+      error: (error) => {
+        this.isSavingDescriptions = false;
+        this.saveError = error?.error ?? 'Açıklamalar kaydedilemedi.';
+        this.toastService.error('Açıklamalar kaydedilemedi.');
+      },
+    });
+  }
+
+  onImageSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      this.selectedImage = input.files[0];
+      this.releaseImageUrl();
+      this.productImageUrl = URL.createObjectURL(this.selectedImage);
+    }
+  }
+
+  private releaseImageUrl(): void {
+    if (this.productImageUrl) {
+      URL.revokeObjectURL(this.productImageUrl);
+      this.productImageUrl = null;
     }
   }
 }

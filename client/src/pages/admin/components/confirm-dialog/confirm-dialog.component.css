@@ -1,0 +1,58 @@
+.confirm-dialog {
+  padding: 8px 4px 4px;
+}
+
+.confirm-dialog__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.confirm-dialog__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.confirm-dialog__icon--brand {
+  background-color: var(--admin-brand-soft);
+  color: var(--admin-brand-hover);
+}
+
+.confirm-dialog__icon--danger {
+  background-color: var(--admin-danger-soft);
+  color: var(--admin-danger);
+}
+
+.confirm-dialog__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--admin-heading);
+}
+
+.confirm-dialog__message {
+  margin: 0 0 20px;
+  color: var(--admin-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.confirm-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.confirm-dialog__actions .btn {
+  min-width: 96px;
+  padding: 8px 16px;
+  border-radius: var(--admin-radius-sm);
+  font-weight: 600;
+}

@@ -1,0 +1,27 @@
+<div class="confirm-dialog">
+  <div class="confirm-dialog__header">
+    <span
+      class="confirm-dialog__icon"
+      [ngClass]="data.danger ? 'confirm-dialog__icon--danger' : 'confirm-dialog__icon--brand'"
+    >
+      <i class="bi" [ngClass]="data.danger ? 'bi-exclamation-triangle-fill' : 'bi-question-lg'"></i>
+    </span>
+    <h2 class="confirm-dialog__title">{{ data.title }}</h2>
+  </div>
+
+  <p class="confirm-dialog__message">{{ data.message }}</p>
+
+  <div class="confirm-dialog__actions">
+    <button type="button" class="btn btn-ghost confirm-dialog__cancel" (click)="cancel()">
+      {{ data.cancelText || 'Vazgeç' }}
+    </button>
+    <button
+      type="button"
+      class="btn confirm-dialog__confirm"
+      [ngClass]="data.danger ? 'btn-danger' : 'btn-brand'"
+      (click)="confirm()"
+    >
+      {{ data.confirmText || 'Onayla' }}
+    </button>
+  </div>
+</div>

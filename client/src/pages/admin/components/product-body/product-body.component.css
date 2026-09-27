@@ -1,89 +1,104 @@
-.text-orange {
-  color: #ff7f00 !important;
+.product-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
-.btn-orange {
-  background-color: #ff7f00 !important;
-  border-color: #ff7f00 !important;
-  color: white !important;
-}
-
-.btn-orange:hover {
-  background-color: #e67200 !important;
-  transform: translateY(-1px);
+.category-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--admin-border);
+  background: #f9fafb;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--admin-text);
 }
 
 .cursor-pointer {
   cursor: pointer;
 }
 
-/* Table Hover Effect */
-.table-hover tbody tr:hover {
-  background-color: #fff9f2 !important;
+.icon-btn {
+  width: 34px;
+  height: 34px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
 
-/* Using the newer syntax or just targeting the class directly */
+.icon-btn:hover {
+  transform: translateY(-1px);
+}
+
+.icon-btn--edit {
+  background-color: var(--admin-info-soft);
+  color: var(--admin-info);
+}
+
+.icon-btn--edit:hover {
+  background-color: #d5e0fb;
+}
+
+.icon-btn--delete {
+  background-color: var(--admin-danger-soft);
+  color: var(--admin-danger);
+}
+
+.icon-btn--delete:hover {
+  background-color: #f9d7d3;
+}
+
 :host ::ng-deep .mat-mdc-paginator {
-  background: transparent !important;
-  font-family: inherit !important;
+  background: transparent;
+  font-family: inherit;
 }
 
-/* Ensure the container of the paginator also has no background */
 :host ::ng-deep .mat-mdc-paginator-container {
-  background: transparent !important;
+  background: transparent;
+  min-height: 44px;
+  padding: 0;
 }
 
-.card-body {
-  min-height: 400px;
+.card-admin__body {
+  min-height: 380px;
 }
 
-/* Limit height and enable scrolling */
 .dropdown-menu {
-  max-height: 300px; /* Adjust based on how many categories you want to see at once */
+  max-height: 300px;
   overflow-y: auto;
-  min-width: 200px;
+  min-width: 220px;
+  border-radius: var(--admin-radius-sm);
+  border-color: var(--admin-border);
 }
 
-/* Custom Scrollbar for the Dropdown */
-.dropdown-menu::-webkit-scrollbar {
-  width: 6px;
-}
-
-.dropdown-menu::-webkit-scrollbar-track {
-  background: #f1f1f1;
-}
-
-.dropdown-menu::-webkit-scrollbar-thumb {
-  background: #ccc;
-  border-radius: 10px;
-}
-
-.dropdown-menu::-webkit-scrollbar-thumb:hover {
-  background: #ff7f00; /* Matches your brand color */
-}
-
-/* Ensure the dropdown list items don't wrap strangely */
 .dropdown-item {
   white-space: nowrap;
   padding: 8px 16px;
 }
 
-/* Optional: Make the active/hover state match your theme */
 .dropdown-item:hover {
-  background-color: #fff4e6;
-  color: #d96c00;
+  background-color: var(--admin-brand-soft);
+  color: var(--admin-brand-hover);
 }
 
 @media (max-width: 767.98px) {
-  .table {
-    min-width: 520px;
+  .card-admin__header {
+    flex-direction: column;
+    align-items: stretch;
   }
 
-  .card-header .row {
-    row-gap: 10px;
-  }
-
-  .card-header .btn {
+  .card-admin__header .btn-brand {
     width: 100%;
+  }
+
+  .product-toolbar {
+    justify-content: space-between;
   }
 }

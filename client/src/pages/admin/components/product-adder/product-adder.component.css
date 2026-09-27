@@ -1,36 +1,53 @@
-.text-orange {
-  color: #ff7f00 !important;
+.product-adder__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--admin-border);
+  background-color: var(--admin-surface);
 }
 
-.btn-orange {
-  background-color: #ff7f00 !important;
-  border-color: #ff7f00 !important;
-  color: white !important;
-}
-
-.btn-orange:hover {
-  background-color: #e67200 !important;
+.product-adder__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--admin-heading);
 }
 
 /* Custom Image Upload UI */
 .image-upload-wrapper {
   position: relative;
-  width: 120px;
-  height: 120px;
+  width: 132px;
+  height: 132px;
   cursor: pointer;
+  border-radius: var(--admin-radius-sm);
 }
 
 .upload-placeholder {
-  width: 120px;
-  height: 120px;
+  width: 132px;
+  height: 132px;
   background-color: #f8f9fa;
-  border: 2px dashed #dee2e6 !important;
+  border: 2px dashed var(--admin-border-strong);
+  border-radius: var(--admin-radius-sm);
+  color: var(--admin-muted);
   transition: all 0.2s ease;
+  gap: 4px;
 }
 
 .upload-placeholder:hover {
-  background-color: #e9ecef;
-  border-color: #ff7f00 !important;
+  background-color: var(--admin-brand-soft);
+  border-color: var(--admin-brand);
+  color: var(--admin-brand-hover);
+}
+
+.upload-preview {
+  width: 132px;
+  height: 132px;
+  object-fit: contain;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  background: #fff;
 }
 
 .upload-hover-overlay {
@@ -39,7 +56,8 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(255, 127, 0, 0.4);
+  background-color: rgba(255, 127, 0, 0.45);
+  border-radius: var(--admin-radius-sm);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -51,40 +69,25 @@
   opacity: 1;
 }
 
-/* Form Styling */
-.form-control, .form-select {
-  border: 1px solid #ced4da;
-  padding: 0.6rem 0.75rem;
-}
-
-.form-control:focus, .form-select:focus {
-  border-color: #ff7f00;
-  box-shadow: 0 0 0 0.25rem rgba(255, 127, 0, 0.2);
-}
-
 .product-adder-main {
-  max-height: 500px;
-  scrollbar-width: thin;
+  max-height: 60vh;
 }
 
-.product-adder-main::-webkit-scrollbar {
-  width: 6px;
-}
-
-.product-adder-main::-webkit-scrollbar-thumb {
-  background: #dee2e6;
-  border-radius: 10px;
+.product-adder__footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--admin-border);
+  background-color: #f9fafb;
 }
 
 @media (max-width: 767.98px) {
   .product-adder-main {
-    max-height: calc(100vh - 120px);
-    padding-right: 4px;
+    max-height: calc(100vh - 200px);
   }
 
   .image-upload-wrapper,
-  .upload-placeholder {
-    width: 96px;
-    height: 96px;
+  .upload-placeholder,
+  .upload-preview {
+    width: 104px;
+    height: 104px;
   }
 }

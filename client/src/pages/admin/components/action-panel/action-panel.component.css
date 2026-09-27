@@ -5,7 +5,7 @@
   left: 0;
   width: 100vw;
   height: 100vh;
-  background-color: rgba(0, 0, 0, 0.6);
+  background-color: rgba(15, 18, 25, 0.6);
   backdrop-filter: blur(3px);
   z-index: 1060;
 }
@@ -16,37 +16,45 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 450px;
-  max-width: 90vw;
+  width: 460px;
+  max-width: 92vw;
   z-index: 1070;
-  border-radius: 12px;
 }
 
-.btn-orange {
-  background-color: #ff7f00 !important;
-  border-color: #ff7f00 !important;
-  color: white !important;
-  transition: all 0.2s ease;
+.action-panel__header {
+  background-color: #f9fafb;
 }
 
-.btn-orange:hover:not(:disabled) {
-  background-color: #e67200 !important;
-  transform: translateY(-2px);
+.action-panel__customer {
+  padding: 16px;
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-sm);
+  background-color: #f9fafb;
+  margin-bottom: 20px;
 }
 
-.form-select:focus {
-  border-color: #ff7f00;
-  box-shadow: 0 0 0 0.25rem rgba(255, 127, 0, 0.25);
+.action-panel__section-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--admin-muted);
+  margin-bottom: 12px;
+}
+
+.action-panel__detail {
+  font-size: 0.82rem;
+  color: var(--admin-muted);
 }
 
 .animate-fade-in {
-  animation: modalIn 0.3s ease-out;
+  animation: modalIn 0.25s ease-out;
 }
 
 @keyframes modalIn {
   from {
     opacity: 0;
-    transform: translate(-50%, -45%);
+    transform: translate(-50%, -46%);
   }
   to {
     opacity: 1;

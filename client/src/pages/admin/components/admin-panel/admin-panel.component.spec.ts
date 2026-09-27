@@ -1,11 +1,15 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideRouter } from '@angular/router';
 import { ActivatedRoute, Router } from '@angular/router';
 import { of, Subject } from 'rxjs';
 
 import { AdminPanelComponent } from './admin-panel.component';
 import { EventService } from '../../../../services/event/event.service';
 import { RestService } from '../../../../services/rest/rest.service';
-import { SupportRealtimeService } from '../../../../services/support-realtime/support-realtime.service';
+import {
+  SupportRealtimeService,
+} from '../../../../services/support-realtime/support-realtime.service';
 import { AuthService } from '../../../../services/auth/auth.service';
 
 describe('AdminPanelComponent', () => {
@@ -37,6 +41,8 @@ describe('AdminPanelComponent', () => {
       'closeSupportChatForAdmin',
       'banSupportUserFromAdmin',
       'unbanSupportUserFromAdmin',
+      'getAllOrders',
+      'getProductCountsFromCategoryAdmin',
     ]);
 
     restServiceSpy.getSupportUsersForAdmin.and.returnValue(of([]));
@@ -44,6 +50,8 @@ describe('AdminPanelComponent', () => {
     restServiceSpy.getSupportMessagesForAdmin.and.returnValue(of([]));
     restServiceSpy.editSupportMessageForAdmin.and.returnValue(of(true));
     restServiceSpy.deleteSupportMessageForAdmin.and.returnValue(of(true));
+    restServiceSpy.getAllOrders.and.returnValue(of({ items: [], total: 0 }));
+    restServiceSpy.getProductCountsFromCategoryAdmin.and.returnValue(of(0));
 
     const supportSpyBase = jasmine.createSpyObj<SupportRealtimeService>(
       'SupportRealtimeService',
@@ -60,12 +68,22 @@ describe('AdminPanelComponent', () => {
       onComplete?.();
     });
 
-    routerSpy = jasmine.createSpyObj<Router>('Router', ['navigate']);
+    routerSpy = jasmine.createSpyObj<Router>('Router', [
+      'navigate',
+      'createUrlTree',
+      'serializeUrl',
+    ]);
     routerSpy.navigate.and.returnValue(Promise.resolve(true));
+    (routerSpy as unknown as { events: Subject<unknown> }).events = new Subject<unknown>();
+    (routerSpy as unknown as { createUrlTree: () => unknown }).createUrlTree = () =>
+      ({ toString: () => '/' });
+    (routerSpy as unknown as { serializeUrl: () => string }).serializeUrl = () => '/';
 
     await TestBed.configureTestingModule({
       imports: [AdminPanelComponent],
       providers: [
+        provideNoopAnimations(),
+        provideRouter([]),
         { provide: EventService, useValue: eventServiceSpy },
         { provide: RestService, useValue: restServiceSpy },
         { provide: SupportRealtimeService, useValue: supportRealtimeServiceSpy },

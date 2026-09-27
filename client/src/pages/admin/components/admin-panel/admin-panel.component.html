@@ -1,77 +1,101 @@
-<div class="admin-panel-main d-flex flex-column min-vh-100 bg-light">
+<div class="admin-shell">
+  <div class="admin-sidebar-backdrop" *ngIf="isSidebarOpen" (click)="closeSidebar()"></div>
 
-  <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm px-4 py-2 sticky-top">
-    <a class="navbar-brand d-flex align-items-center" routerLink="/admin">
-      <img [src]="staticImageUrl('migroslogo.png')" class="me-2 admin-brand-logo" alt="Admin Logo">
-      <span class="fw-bold small text-uppercase tracking-wider">Yonetim Paneli</span>
+  <aside class="admin-sidebar" [class.admin-sidebar--open]="isSidebarOpen">
+    <a class="admin-sidebar__brand" routerLink="/admin" (click)="closeSidebar()">
+      <img [src]="staticImageUrl('migroslogo.png')" class="admin-sidebar__logo" alt="Migros">
+      <span class="admin-sidebar__brand-text">Yönetim Paneli</span>
     </a>
 
-    <div class="ms-auto d-flex gap-2">
-      <a class="btn btn-sm px-3 rounded-pill transition-all"
-         routerLink="/admin/products"
-         [ngClass]="currentSection === 'products' ? 'btn-orange' : 'btn-outline-light'">
-        <i class="bi bi-box-seam me-1"></i> Urunler
+    <nav class="admin-sidebar__nav">
+      <a
+        class="admin-nav-item"
+        routerLink="/admin"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: true }"
+        (click)="closeSidebar()"
+      >
+        <i class="bi bi-speedometer2"></i><span>Dashboard</span>
       </a>
-      <a class="btn btn-sm px-3 rounded-pill transition-all"
-         routerLink="/admin/orders"
-         [ngClass]="currentSection === 'orders' ? 'btn-orange' : 'btn-outline-light'">
-        <i class="bi bi-receipt me-1"></i> Siparisler
+      <a class="admin-nav-item" routerLink="/admin/products" routerLinkActive="active" (click)="closeSidebar()">
+        <i class="bi bi-box-seam"></i><span>Ürünler</span>
       </a>
-      <a class="btn btn-sm px-3 rounded-pill transition-all"
-         routerLink="/admin/support"
-         [ngClass]="currentSection === 'support' ? 'btn-orange' : 'btn-outline-light'">
-        <i class="bi bi-chat-dots me-1"></i> Canli Destek
+      <a class="admin-nav-item" routerLink="/admin/orders" routerLinkActive="active" (click)="closeSidebar()">
+        <i class="bi bi-receipt"></i><span>Siparişler</span>
       </a>
-      <button class="btn btn-sm px-3 rounded-pill btn-outline-danger"
-              type="button"
-              [disabled]="isLoggingOut"
-              (click)="logoutAdmin()">
-        <i class="bi bi-box-arrow-right me-1"></i>
-        {{ isLoggingOut ? 'Cikis Yapiliyor...' : 'Cikis Yap' }}
+      <a class="admin-nav-item" routerLink="/admin/support" routerLinkActive="active" (click)="closeSidebar()">
+        <i class="bi bi-chat-dots"></i><span>Canlı Destek</span>
+      </a>
+    </nav>
+
+    <div class="admin-sidebar__footer">
+      <button
+        type="button"
+        class="admin-nav-item admin-nav-item--danger"
+        [disabled]="isLoggingOut"
+        (click)="logoutAdmin()"
+      >
+        <i class="bi bi-box-arrow-right"></i>
+        <span>{{ isLoggingOut ? 'Çıkış Yapılıyor...' : 'Çıkış Yap' }}</span>
       </button>
     </div>
-  </nav>
+  </aside>
 
-  <div class="admin-panel-body flex-grow-1 position-relative p-4">
+  <div class="admin-main">
+    <header class="admin-header">
+      <button type="button" class="admin-header__burger" (click)="toggleSidebar()" aria-label="Menüyü aç/kapat">
+        <i class="bi bi-list"></i>
+      </button>
 
-    <div class="admin-overlay-container"
-         *ngIf="hasProductAdderOpened || hasProductUpdaterOpened || hasProductEditOpened">
-
-      <div class="admin-modal-box shadow-lg animate-fade-in">
-        <app-product-adder
-          *ngIf="hasProductAdderOpened"
-          (hasProductAdded)="productAddedEventHandler($event)"
-          (hasEscapePressed)="closeProductAdder()"
-        />
-        <app-product-updater
-          *ngIf="hasProductUpdaterOpened && !hasProductEditOpened"
-          [id]="productId"
-          (hasProductAdded)="productAddedEventHandler($event)"
-          (hasEscapePressed)="closeProductUpdater()"
-        />
-        <app-product-edit
-          *ngIf="hasProductEditOpened"
-          [productId]="productId"
-          (hasEscapePressed)="closeProductEdit()"
-        />
+      <div class="admin-header__titles">
+        <h1 class="page-title">{{ sectionTitle }}</h1>
+        <p class="page-subtitle">{{ sectionSubtitle }}</p>
       </div>
 
-      <app-wall
-        class="admin-backdrop"
-        (hasWallOnClicked)="hasWallOnClickedEventAdder($event)"
-      />
-    </div>
+      <div class="admin-header__account">
+        <span class="admin-avatar"><i class="bi bi-person-fill"></i></span>
+        <span class="admin-header__account-name">Yönetici</span>
+      </div>
+    </header>
 
-    <div class="container-fluid h-100">
-      <app-product-body
-        *ngIf="hasProductsOpened && !hasOrdersOpened && !hasSupportOpened"
-        (hasAddProductButtonClicked)="openProductAdder()"
-      />
-      <app-order-panel *ngIf="hasOrdersOpened && !hasProductsOpened && !hasSupportOpened"/>
+    <main class="admin-content admin-scroll">
+      <div
+        class="admin-overlay-container"
+        *ngIf="hasProductAdderOpened || hasProductUpdaterOpened || hasProductEditOpened"
+      >
+        <div class="admin-modal-box animate-fade-in">
+          <app-product-adder
+            *ngIf="hasProductAdderOpened"
+            (hasProductAdded)="productAddedEventHandler($event)"
+            (hasEscapePressed)="closeProductAdder()"
+          />
+          <app-product-updater
+            *ngIf="hasProductUpdaterOpened && !hasProductEditOpened"
+            [id]="productId"
+            (hasProductAdded)="productAddedEventHandler($event)"
+            (hasEscapePressed)="closeProductUpdater()"
+          />
+          <app-product-edit
+            *ngIf="hasProductEditOpened"
+            [productId]="productId"
+            (hasEscapePressed)="closeProductEdit()"
+          />
+        </div>
+
+        <app-wall class="admin-backdrop" (hasWallOnClicked)="hasWallOnClickedEventAdder($event)" />
+      </div>
+
+      <app-dashboard *ngIf="currentSection === 'home'"></app-dashboard>
+
+      <app-product-body *ngIf="hasProductsOpened" (hasAddProductButtonClicked)="openProductAdder()" />
+
+      <app-order-panel *ngIf="hasOrdersOpened" />
 
       <div *ngIf="hasSupportOpened" class="support-chat-layout">
-        <aside class="support-user-list">
-          <div class="support-list-title">Musteri Secimi</div>
+        <aside class="support-panel support-panel--search">
+          <div class="support-panel__title">
+            <i class="bi bi-search me-2"></i>Müşteri Seçimi
+          </div>
 
           <div class="support-customer-search">
             <input
@@ -82,102 +106,126 @@
               placeholder="Email veya ad ile ara"
             />
 
-            <div class="support-search-results" *ngIf="supportCustomerQuery.trim()">
-              <div class="support-empty" *ngIf="isSupportCustomerSearchLoading">
-                Araniyor...
-              </div>
+            <div class="support-search-results admin-scroll" *ngIf="supportCustomerQuery.trim()">
+              <div class="support-empty" *ngIf="isSupportCustomerSearchLoading">Aranıyor...</div>
 
               <button
                 type="button"
                 class="support-user-item support-search-item"
                 *ngFor="let customer of supportCustomerResults"
-                [ngClass]="{ 'active': customer.userMail === selectedSupportUserMail }"
-                (click)="selectSupportCustomerFromSearch(customer)">
-                <div class="support-search-main">{{ customer.userName || customer.userMail }} {{ customer.userLastName || '' }}</div>
+                [ngClass]="{ active: customer.userMail === selectedSupportUserMail }"
+                (click)="selectSupportCustomerFromSearch(customer)"
+              >
+                <div class="support-search-main">
+                  {{ customer.userName || customer.userMail }} {{ customer.userLastName || '' }}
+                </div>
                 <div class="support-search-sub">{{ customer.userMail }}</div>
                 <div class="support-search-tags">
                   <span class="tag tag-convo" *ngIf="customer.hasConversation">Sohbet Var</span>
-                  <span class="tag tag-banned" *ngIf="customer.isBanned">Banli</span>
+                  <span class="tag tag-banned" *ngIf="customer.isBanned">Banlı</span>
                 </div>
               </button>
 
-              <div class="support-empty" *ngIf="!isSupportCustomerSearchLoading && supportCustomerResults.length === 0">
-                Sonuc bulunamadi.
+              <div
+                class="support-empty"
+                *ngIf="!isSupportCustomerSearchLoading && supportCustomerResults.length === 0"
+              >
+                Sonuç bulunamadı.
               </div>
             </div>
           </div>
 
-          <hr class="my-2" />
+          <div class="support-panel__divider"></div>
 
-          <div class="support-list-title">Bekleyen Sohbetler</div>
-
-          <div class="support-empty" *ngIf="!supportUsers.length">
-            Henuz mesaj yok.
+          <div class="support-panel__title support-panel__title--sub">
+            <i class="bi bi-chat-left-text me-2"></i>Bekleyen Sohbetler
           </div>
+
+          <div class="support-empty" *ngIf="!supportUsers.length">Henüz mesaj yok.</div>
 
           <button
             type="button"
             class="support-user-item"
             *ngFor="let userMail of supportUsers"
-            [ngClass]="{ 'active': userMail === selectedSupportUserMail }"
-            (click)="selectSupportUser(userMail)">
-            {{ userMail }}
+            [ngClass]="{ active: userMail === selectedSupportUserMail }"
+            (click)="selectSupportUser(userMail)"
+          >
+            <span class="support-user-item__avatar"><i class="bi bi-person"></i></span>
+            <span class="support-user-item__mail">{{ userMail }}</span>
           </button>
         </aside>
 
-        <aside class="support-user-list banned-list">
-          <div class="support-list-title">Banli Kullanicilar</div>
-
-          <div class="support-empty" *ngIf="!bannedUsers.length">
-            Banli kullanici yok.
+        <aside class="support-panel support-panel--banned">
+          <div class="support-panel__title support-panel__title--danger">
+            <i class="bi bi-slash-circle me-2"></i>Banlı Kullanıcılar
           </div>
+
+          <div class="support-empty" *ngIf="!bannedUsers.length">Banlı kullanıcı yok.</div>
 
           <div class="banned-item" *ngFor="let userMail of bannedUsers">
             <span class="banned-mail">{{ userMail }}</span>
-            <button
-              type="button"
-              class="btn btn-sm btn-success"
-              (click)="unbanUserByMail(userMail)">
-              Ban Kaldir
+            <button type="button" class="btn btn-sm btn-outline-success" (click)="unbanUserByMail(userMail)">
+              Banı Kaldır
             </button>
           </div>
         </aside>
 
         <section class="support-conversation" *ngIf="selectedSupportUserMail; else noConversationTemplate">
-          <div class="support-conversation-header">
-            <strong>{{ selectedSupportUserMail }}</strong>
+          <div class="support-conversation__header">
+            <div class="support-conversation__identity">
+              <span class="support-user-item__avatar"><i class="bi bi-person"></i></span>
+              <strong>{{ selectedSupportUserMail }}</strong>
+            </div>
             <div class="support-actions">
-              <button type="button" class="btn btn-sm btn-outline-secondary" (click)="closeSupportChat()">Sohbeti Kapat</button>
-              <button *ngIf="!isSelectedUserBanned()" type="button" class="btn btn-sm btn-danger" (click)="banSupportUser()">Kullaniciyi Banla</button>
-              <button *ngIf="isSelectedUserBanned()" type="button" class="btn btn-sm btn-success" (click)="unbanSupportUser()">Ban Kaldir</button>
+              <button type="button" class="btn btn-sm btn-ghost" (click)="closeSupportChat()">Sohbeti Kapat</button>
+              <button
+                *ngIf="!isSelectedUserBanned()"
+                type="button"
+                class="btn btn-sm btn-outline-danger"
+                (click)="banSupportUser()"
+              >
+                Kullanıcıyı Banla
+              </button>
+              <button
+                *ngIf="isSelectedUserBanned()"
+                type="button"
+                class="btn btn-sm btn-outline-success"
+                (click)="unbanSupportUser()"
+              >
+                Banı Kaldır
+              </button>
             </div>
           </div>
 
-          <div class="support-conversation-body">
-            <div class="support-info" *ngIf="isSupportLoading">Yukleniyor...</div>
+          <div class="support-conversation__body admin-scroll">
+            <div class="support-info" *ngIf="isSupportLoading">Yükleniyor...</div>
             <div class="support-info text-danger" *ngIf="supportError">{{ supportError }}</div>
 
-            <div class="support-message"
-                 *ngFor="let message of supportMessages"
-                 [ngClass]="{ 'admin': message.sender === 'MANAGEMENT' }">
-              <div class="support-message-meta-row">
-                <div class="support-message-meta">
-                  {{ message.sender === 'MANAGEMENT' ? 'Yonetim' : 'Kullanici' }}
-                  <span class="support-message-edited" *ngIf="message.editedAt">duzenlendi</span>
+            <div
+              class="support-message"
+              *ngFor="let message of supportMessages"
+              [ngClass]="{ admin: message.sender === 'MANAGEMENT' }"
+            >
+              <div class="support-message__meta-row">
+                <div class="support-message__meta">
+                  {{ message.sender === 'MANAGEMENT' ? 'Yönetim' : 'Kullanıcı' }}
+                  <span class="support-message__edited" *ngIf="message.editedAt">düzenlendi</span>
                 </div>
-                <div class="support-message-actions" *ngIf="editingSupportMessageId !== message.id">
+                <div class="support-message__actions" *ngIf="editingSupportMessageId !== message.id">
                   <button
                     type="button"
                     class="btn btn-sm btn-outline-primary"
                     [disabled]="supportMessageActionInProgressId !== null"
-                    (click)="startEditSupportMessage(message)">
-                    Duzenle
+                    (click)="startEditSupportMessage(message)"
+                  >
+                    Düzenle
                   </button>
                   <button
                     type="button"
                     class="btn btn-sm btn-outline-danger"
                     [disabled]="supportMessageActionInProgressId !== null"
-                    (click)="deleteSupportMessage(message)">
+                    (click)="deleteSupportMessage(message)"
+                  >
                     {{ isSupportMessageActionBusy(message) ? 'Siliniyor...' : 'Sil' }}
                   </button>
                 </div>
@@ -188,62 +236,61 @@
                   class="form-control form-control-sm support-message-editor"
                   rows="3"
                   [(ngModel)]="supportEditInput"
-                  [disabled]="supportMessageActionInProgressId !== null"></textarea>
+                  [disabled]="supportMessageActionInProgressId !== null"
+                ></textarea>
                 <div class="support-editor-actions">
                   <button
                     type="button"
-                    class="btn btn-sm btn-outline-secondary"
+                    class="btn btn-sm btn-ghost"
                     [disabled]="supportMessageActionInProgressId !== null"
-                    (click)="cancelEditSupportMessage()">
-                    Iptal
+                    (click)="cancelEditSupportMessage()"
+                  >
+                    İptal
                   </button>
                   <button
                     type="button"
-                    class="btn btn-sm btn-warning"
+                    class="btn btn-sm btn-brand"
                     [disabled]="supportMessageActionInProgressId !== null || !supportEditInput.trim()"
-                    (click)="saveEditedSupportMessage(message)">
+                    (click)="saveEditedSupportMessage(message)"
+                  >
                     {{ isSupportMessageActionBusy(message) ? 'Kaydediliyor...' : 'Kaydet' }}
                   </button>
                 </div>
               </div>
 
               <ng-template #supportMessageReadOnly>
-                <div class="support-message-content">{{ message.message }}</div>
+                <div class="support-message__content">{{ message.message }}</div>
               </ng-template>
             </div>
           </div>
 
-          <div class="support-conversation-footer">
+          <div class="support-conversation__footer">
             <input
               type="text"
               class="form-control form-control-sm"
               [(ngModel)]="supportReplyInput"
               [disabled]="isSelectedUserBanned()"
-              placeholder="Yanitinizi yazin..."
+              placeholder="Yanıtınızı yazın..."
               (keydown.enter)="sendSupportReply()"
             />
             <button
               type="button"
-              class="btn btn-warning btn-sm"
+              class="btn btn-brand btn-sm support-conversation__send"
               [disabled]="isSupportSending || isSelectedUserBanned()"
-              (click)="sendSupportReply()">
-              <i class="bi bi-send h6"></i>
+              (click)="sendSupportReply()"
+            >
+              <i class="bi bi-send"></i>
             </button>
           </div>
         </section>
 
         <ng-template #noConversationTemplate>
           <section class="support-conversation support-placeholder">
-            Kullanici secerek sohbeti acin.
+            <i class="bi bi-chat-square-dots"></i>
+            <span>Kullanıcı seçerek sohbeti açın.</span>
           </section>
         </ng-template>
       </div>
-
-      <div *ngIf="!hasProductsOpened && !hasOrdersOpened && !hasSupportOpened" class="text-center mt-5 py-5">
-        <i class="bi bi-speedometer2 display-1 text-muted"></i>
-        <h2 class="text-muted mt-3">Admin Paneline Hos Geldiniz</h2>
-        <p class="text-secondary">Yonetmek istediginiz bolumu yukaridan secin.</p>
-      </div>
-    </div>
+    </main>
   </div>
 </div>

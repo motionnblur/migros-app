@@ -5,6 +5,9 @@ import {EventService} from '../../../../services/event/event.service';
 import {IAdminProductPreview} from '../../../../interfaces/IAdminProductPreview';
 import {categories, data} from '../../../../memory/global-data';
 import {MatPaginatorModule, PageEvent} from '@angular/material/paginator';
+import {MatDialog} from '@angular/material/dialog';
+import {ConfirmDialogComponent} from '../confirm-dialog/confirm-dialog.component';
+import {ToastService} from '../../services/toast.service';
 
 @Component({
   selector: 'app-product-body',
@@ -30,7 +33,9 @@ export class ProductBodyComponent implements OnInit, OnDestroy {
 
   constructor(
     private restService: RestService,
-    private eventService: EventService
+    private eventService: EventService,
+    private dialog: MatDialog,
+    private toastService: ToastService
   ) {
   }
 
@@ -80,14 +85,36 @@ export class ProductBodyComponent implements OnInit, OnDestroy {
   }
 
   public deleteProduct(productId: number) {
-    if (confirm('Bu ürünü silmek istediğinize emin misiniz?')) {
-      this.restService.deleteProduct(productId).subscribe({
-        complete: () => {
-          this.productsData = this.productsData.filter(p => p.productId !== productId);
-          this.productPageLength--;
+    this.dialog
+      .open(ConfirmDialogComponent, {
+        width: '420px',
+        maxWidth: '92vw',
+        autoFocus: false,
+        panelClass: 'admin-confirm-dialog',
+        data: {
+          title: 'Ürünü sil',
+          message: 'Bu ürünü silmek istediğinize emin misiniz?',
+          confirmText: 'Sil',
+          danger: true,
+        },
+      })
+      .afterClosed()
+      .subscribe((approved) => {
+        if (!approved) {
+          return;
         }
+
+        this.restService.deleteProduct(productId).subscribe({
+          complete: () => {
+            this.productsData = this.productsData.filter(p => p.productId !== productId);
+            this.productPageLength = Math.max(0, this.productPageLength - 1);
+            this.toastService.success('Ürün silindi.');
+          },
+          error: () => {
+            this.toastService.error('Ürün silinemedi.');
+          }
+        });
       });
-    }
   }
 
   pageEvent($event: PageEvent) {

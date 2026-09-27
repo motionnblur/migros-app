@@ -1,0 +1,77 @@
+<div class="dashboard">
+  <section class="dashboard__stats">
+    <ng-container *ngIf="stats.length > 0; else statsSkeleton">
+      <article
+        class="stat-card stat-card--{{ stat.tone }}"
+        *ngFor="let stat of stats; trackBy: trackByKey"
+      >
+        <span class="stat-card__icon"><i class="bi" [ngClass]="stat.icon"></i></span>
+        <div class="stat-card__content">
+          <span class="stat-card__label">{{ stat.label }}</span>
+          <span class="stat-card__value">{{ stat.value | number }}</span>
+        </div>
+      </article>
+    </ng-container>
+
+    <ng-template #statsSkeleton>
+      <article class="stat-card stat-card--skeleton" *ngFor="let s of [1, 2, 3, 4]">
+        <span class="stat-card__icon placeholder-glow"><span class="placeholder col-12"></span></span>
+        <div class="stat-card__content">
+          <span class="stat-card__label placeholder-glow"><span class="placeholder col-8"></span></span>
+          <span class="stat-card__value placeholder-glow"><span class="placeholder col-6"></span></span>
+        </div>
+      </article>
+    </ng-template>
+  </section>
+
+  <section class="card-admin dashboard__orders">
+    <header class="card-admin__header">
+      <h2 class="card-admin__title">
+        <i class="bi bi-clock-history me-2 text-brand"></i>Son Siparişler
+      </h2>
+      <a class="btn btn-ghost btn-sm" routerLink="/admin/orders">Tümünü Gör</a>
+    </header>
+
+    <div class="card-admin__body">
+      <div class="dashboard__loading" *ngIf="isOrdersLoading">
+        <span class="spinner-border spinner-border-sm me-2"></span> Yükleniyor...
+      </div>
+
+      <div class="empty-state" *ngIf="!isOrdersLoading && ordersError">
+        <i class="bi bi-exclamation-circle"></i>
+        <span>{{ ordersError }}</span>
+      </div>
+
+      <div class="table-responsive" *ngIf="!isOrdersLoading && !ordersError">
+        <table class="table-admin">
+          <thead>
+            <tr>
+              <th>Sipariş</th>
+              <th>Tutar</th>
+              <th>Durum</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let order of recentOrders">
+              <td class="fw-semibold">#{{ order.orderId }}</td>
+              <td>{{ order.totalPrice | number: '1.2-2' }} TL</td>
+              <td>
+                <span class="badge-status" [ngClass]="'badge-status--' + orderStatusVariant(order.status)">
+                  {{ order.status }}
+                </span>
+              </td>
+            </tr>
+            <tr *ngIf="recentOrders.length === 0">
+              <td colspan="3">
+                <div class="empty-state py-4">
+                  <i class="bi bi-inbox"></i>
+                  <span>Henüz sipariş bulunmuyor.</span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>

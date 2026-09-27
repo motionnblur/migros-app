@@ -79,6 +79,10 @@ export abstract class ProductAdderBase {
     }
   }
 
+  public cancel() {
+    this.hasEscapePressed.emit(true);
+  }
+
   public onImageSelected(event: Event) {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files.length > 0) {

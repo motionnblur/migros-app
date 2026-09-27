@@ -1,44 +1,55 @@
-.btn-action {
-  width: 32px;
-  height: 32px;
-  background-color: #e8f5e9;
-  color: #2e7d32;
-  border: none;
+.icon-btn {
+  width: 34px;
+  height: 34px;
+  border: 1px solid transparent;
+  border-radius: 8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
 
-.btn-action:hover {
-  background-color: #c8e6c9;
-  transform: scale(1.1);
+.icon-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
 }
 
-.btn-delete {
-  width: 32px;
-  height: 32px;
-  background-color: #ffebee;
-  color: #c62828;
-  border: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-}
-
-.btn-delete:hover {
-  background-color: #ffcdd2;
-  transform: scale(1.1);
-}
-
-.btn-delete:disabled {
+.icon-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-.table-hover tbody tr:hover {
-  background-color: #f8f9fa;
+.icon-btn--view {
+  background-color: var(--admin-success-soft);
+  color: var(--admin-success);
+}
+
+.icon-btn--view:hover {
+  background-color: #cdebd9;
+}
+
+.icon-btn--delete {
+  background-color: var(--admin-danger-soft);
+  color: var(--admin-danger);
+}
+
+.icon-btn--delete:hover:not(:disabled) {
+  background-color: #f9d7d3;
+}
+
+.card-admin__body {
+  min-height: 380px;
+}
+
+:host ::ng-deep .mat-mdc-paginator {
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.85rem;
+}
+
+:host ::ng-deep .mat-mdc-paginator-container {
+  background: transparent;
+  min-height: 44px;
+  padding: 0;
 }
 
 /* Action Panel Overlay Styling */
@@ -48,26 +59,10 @@
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(15, 18, 25, 0.55);
   backdrop-filter: blur(2px);
   z-index: 1050;
   display: flex;
   justify-content: center;
   align-items: center;
-}
-
-/* Align Material Paginator with Bootstrap font */
-::ng-deep .mat-mdc-paginator {
-  font-family: inherit !important;
-  font-size: 0.85rem !important;
-}
-
-@media (max-width: 767.98px) {
-  .table {
-    min-width: 520px;
-  }
-
-  .card-header h5 {
-    font-size: 1rem;
-  }
 }
