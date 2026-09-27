@@ -34,13 +34,16 @@ export abstract class ProductBuyBase {
       .getProductData(this.productId)
       .subscribe((data: IProductData) => {
         this.productData = data;
+        this.onProductDataUpdate(data);
       });
     this.restService
       .getProductDescription(this.productId)
       .subscribe((data: IProductDescription) => {
         this.productDescriptions = data;
-        this.currentProductDescriptionBody =
-          this.productDescriptions.descriptionList[0].descriptionTabContent;
+        const descriptionList = data?.descriptionList ?? [];
+        this.currentProductDescriptionBody = descriptionList.length
+          ? descriptionList[0].descriptionTabContent
+          : '';
         this.onProductDescritptionUpdate(data);
       });
     this.restService.getProductImage(this.productId).subscribe((data: Blob) => {
@@ -73,6 +76,7 @@ export abstract class ProductBuyBase {
   protected onProductDescritptionUpdate(data: IProductDescription) {
     console.log('onProductDescritptionUpdate');
   }
+  protected onProductDataUpdate(data: IProductData) {}
   protected changeTab(index: number, tabRef: HTMLDivElement) {
     this.currentProductDescriptionBody =
       this.productDescriptions.descriptionList[index].descriptionTabContent;

@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { RestService } from '../../../../services/rest/rest.service';
 import { EventService } from '../../../../services/event/event.service';
 import { IDescription } from '../../../../interfaces/IDescription';
+import { IProductData } from '../../../../interfaces/IProductData';
 import { IProductDescription } from '../../../../interfaces/IProductDescription';
 import { IProductUpdater } from '../../../../interfaces/IProductUpdater';
 import { categories } from '../../../../memory/global-data';
@@ -67,6 +68,16 @@ export class ProductEditComponent extends ProductBuyBase {
     if (this.localProductDescriptions === null && data) {
       this.localProductDescriptions = JSON.parse(JSON.stringify(data));
     }
+  }
+
+  protected override onProductDataUpdate(data: IProductData): void {
+    this.productName = data.productName ?? '';
+    this.subCategoryName = data.subCategoryName ?? '';
+    this.price = data.productPrice ?? 0;
+    this.count = data.productCount ?? 0;
+    this.discount = data.productDiscount ?? 0;
+    this.description = data.productDescription ?? '';
+    this.categoryValue = data.productCategoryId ?? null;
   }
 
   private keyDownEvent(event: KeyboardEvent) {
