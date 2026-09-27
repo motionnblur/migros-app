@@ -23,8 +23,28 @@ export function isCsrfFailure(error: unknown): error is HttpErrorResponse {
   if (!(error instanceof HttpErrorResponse) || error.status !== 403) {
     return false;
   }
-  const body = error.error as { code?: unknown } | null | undefined;
-  return !!body && body.code === 'CSRF_INVALID';
+  return readCsrfCode(error.error) === 'CSRF_INVALID';
+}
+
+/**
+ * Reads the machine-readable error code from a response body. Angular leaves
+ * the body as a string when a request uses `responseType: 'text'`, so string
+ * bodies are parsed defensively; malformed or absent content yields
+ * `undefined`, which never matches the CSRF contract.
+ */
+function readCsrfCode(body: unknown): unknown {
+  if (typeof body === 'string') {
+    try {
+      const parsed = JSON.parse(body) as { code?: unknown } | null;
+      return parsed?.code;
+    } catch {
+      return undefined;
+    }
+  }
+  if (body && typeof body === 'object') {
+    return (body as { code?: unknown }).code;
+  }
+  return undefined;
 }
 
 /**

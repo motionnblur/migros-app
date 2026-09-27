@@ -141,6 +141,39 @@ describe('csrfInterceptor', () => {
     httpMock.expectNone('/user/login');
   });
 
+  it('refreshes and replays once when a CSRF 403 arrives as a text body', () => {
+    let completed = false;
+    client
+      .post('/user/login', {}, { responseType: 'text' })
+      .subscribe({ next: () => (completed = true) });
+
+    httpMock
+      .expectOne('/csrf')
+      .flush({ token: 'expired-token', headerName: 'X-XSRF-TOKEN' });
+
+    const firstAttempt = httpMock.expectOne('/user/login');
+    expect(firstAttempt.request.responseType).toBe('text');
+    expect(firstAttempt.request.headers.get('X-XSRF-TOKEN')).toBe(
+      'expired-token',
+    );
+    firstAttempt.flush('{"code":"CSRF_INVALID"}', {
+      status: 403,
+      statusText: 'Forbidden',
+    });
+
+    httpMock
+      .expectOne('/csrf')
+      .flush({ token: 'fresh-token', headerName: 'X-XSRF-TOKEN' });
+
+    const replay = httpMock.expectOne('/user/login');
+    expect(replay.request.headers.get('X-XSRF-TOKEN')).toBe('fresh-token');
+    replay.flush('{}');
+
+    expect(completed).toBe(true);
+    httpMock.expectNone('/csrf');
+    httpMock.expectNone('/user/login');
+  });
+
   it('never retries a mutation more than once', () => {
     let error: unknown = null;
     client.post('/user/login', {}).subscribe({
