@@ -16,6 +16,7 @@ import {
   SiteHeaderComponent,
 } from './components/site-header/site-header.component';
 import { SupportFabComponent } from './components/support-fab/support-fab.component';
+import { scrollToFragment } from './helpers/scroll-to-fragment';
 
 @Component({
   selector: 'app-main',
@@ -143,10 +144,16 @@ export class MainComponent implements OnInit, OnDestroy {
 
   public handleSearch(term: string): void {
     const trimmedTerm = (term || '').trim();
-    this.router.navigate(['/'], {
-      queryParams: trimmedTerm ? { q: trimmedTerm } : {},
-      fragment: 'categories',
-    });
+    this.router
+      .navigate(['/'], {
+        queryParams: trimmedTerm ? { q: trimmedTerm } : {},
+        fragment: 'categories',
+      })
+      .then((navigated) => {
+        if (navigated === false) {
+          scrollToFragment('categories');
+        }
+      });
   }
 
   public openLoginComponent() {

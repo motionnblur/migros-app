@@ -1,3 +1,12 @@
+/* The host wraps the header, so it must span the whole shell for the sticky
+   header to stay pinned; .site-header alone is constrained to this 1-row box. */
+:host {
+  display: block;
+  position: sticky;
+  top: 0;
+  z-index: 1030;
+}
+
 .site-header {
   background: var(--landing-surface);
   border-bottom: 1px solid var(--landing-border);

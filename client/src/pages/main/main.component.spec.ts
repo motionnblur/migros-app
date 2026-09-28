@@ -91,6 +91,19 @@ describe('MainComponent', () => {
     expect(query('#site-header-search')).toBeTruthy();
   });
 
+  it('keeps the header sticky above the full-height landing shell', () => {
+    const host = query('app-site-header');
+    const header = query('.site-header');
+    const shell = query('.landing-shell');
+
+    expect(getComputedStyle(host).position).toBe('sticky');
+    expect(getComputedStyle(host).top).toBe('0px');
+    expect(getComputedStyle(shell).overflowX).not.toBe('clip');
+    expect(header.getBoundingClientRect().top).toBe(
+      host.getBoundingClientRect().top
+    );
+  });
+
   describe('when logged out', () => {
     beforeEach(() => {
       spyOn(router, 'navigate');
@@ -185,7 +198,7 @@ describe('MainComponent', () => {
 
   describe('category search', () => {
     beforeEach(() => {
-      spyOn(router, 'navigate');
+      spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
     });
 
     it('navigates to the landing query parameter on explicit submit', () => {
@@ -217,6 +230,49 @@ describe('MainComponent', () => {
         queryParams: {},
         fragment: 'categories',
       });
+    });
+
+    it('brings the category section into view when the router skips the same URL', async () => {
+      (router.navigate as jasmine.Spy).and.returnValue(Promise.resolve(false));
+
+      const rafQueue: FrameRequestCallback[] = [];
+      spyOn(window, 'requestAnimationFrame').and.callFake(
+        (callback: FrameRequestCallback) => {
+          rafQueue.push(callback);
+          return rafQueue.length;
+        }
+      );
+      spyOn(window, 'matchMedia').and.returnValue({
+        matches: false,
+      } as MediaQueryList);
+      const scrollSpy = spyOn(Element.prototype, 'scrollIntoView');
+      const focusSpy = spyOn(HTMLElement.prototype, 'focus');
+
+      const section = document.createElement('div');
+      section.id = 'categories';
+      section.tabIndex = -1;
+      document.body.appendChild(section);
+
+      try {
+        query('form').dispatchEvent(
+          new Event('submit', { bubbles: true, cancelable: true })
+        );
+        fixture.detectChanges();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(rafQueue.length).toBe(1);
+        rafQueue.splice(0).forEach((callback) => callback(0));
+
+        expect(scrollSpy).toHaveBeenCalledWith({
+          behavior: 'smooth',
+          block: 'start',
+        });
+        expect(scrollSpy.calls.mostRecent().object).toBe(section);
+        expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true });
+        expect(focusSpy.calls.mostRecent().object).toBe(section);
+      } finally {
+        section.remove();
+      }
     });
 
     it('keeps the header field aligned with the active query parameter', () => {

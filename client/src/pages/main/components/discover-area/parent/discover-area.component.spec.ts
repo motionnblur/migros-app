@@ -233,4 +233,29 @@ describe('DiscoverAreaComponent', () => {
       block: 'start',
     });
   });
+
+  it('re-scrolls to the category section when only the query changes', () => {
+    setReducedMotion(false);
+    const target = categorySection();
+
+    emitFragment('categories');
+    expect(scrollSpy.calls.count()).toBe(1);
+
+    setSearchQuery('meyve');
+    flushAnimationFrames();
+
+    expect(component.searchQuery).toBe('meyve');
+    expect(scrollSpy.calls.count()).toBe(2);
+    expect(scrollSpy.calls.mostRecent().object).toBe(target);
+  });
+
+  it('does not scroll when the route carries a query without a fragment', () => {
+    setReducedMotion(false);
+
+    setSearchQuery('meyve');
+    flushAnimationFrames();
+
+    expect(scrollSpy).not.toHaveBeenCalled();
+    expect(focusSpy).not.toHaveBeenCalled();
+  });
 });
