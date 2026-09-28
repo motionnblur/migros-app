@@ -136,6 +136,16 @@ export function filterCategoriesByQuery(
     return [...catalog];
   }
 
+  const exactMatches = catalog.filter((category) =>
+    [category.name, ...category.keywords].some(
+      (term) => normalizeCategorySearch(term) === normalizedQuery
+    )
+  );
+
+  if (exactMatches.length > 0) {
+    return exactMatches;
+  }
+
   return catalog.filter((category) =>
     normalizeCategorySearch([category.name, ...category.keywords].join(' ')).includes(
       normalizedQuery

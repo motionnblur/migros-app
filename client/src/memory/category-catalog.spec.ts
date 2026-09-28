@@ -1,5 +1,6 @@
 import {
   CATEGORY_CATALOG,
+  CategoryDefinition,
   filterCategoriesByQuery,
   normalizeCategorySearch,
 } from './category-catalog';
@@ -114,7 +115,7 @@ describe('category catalog', () => {
     const multi = filterCategoriesByQuery(CATEGORY_CATALOG, 'su').map(
       (c) => c.value
     );
-    expect(multi).toEqual([3, 6]);
+    expect(multi).toEqual([6]);
     expect(new Set(multi).size).toBe(multi.length);
 
     const single = filterCategoriesByQuery(CATEGORY_CATALOG, 'bakim').map(
@@ -122,6 +123,52 @@ describe('category catalog', () => {
     );
     expect(single).toEqual([12]);
     expect(new Set(single).size).toBe(single.length);
+  });
+
+  it('gives exact normalized name and keyword matches precedence', () => {
+    const values = (query: string): number[] =>
+      filterCategoriesByQuery(CATEGORY_CATALOG, query).map((c) => c.value);
+
+    expect(values('su')).toEqual([6]);
+    expect(values('süt')).toEqual([3]);
+    expect(values('sut')).toEqual([3]);
+    expect(values('ekmek')).toEqual([9]);
+    expect(values('şampuan')).toEqual([12]);
+    expect(values('sampuan')).toEqual([12]);
+    expect(values('meyv')).toEqual([2]);
+  });
+
+  it('returns every exact owner once in catalog order for a shared exact term', () => {
+    const localCatalog: CategoryDefinition[] = [
+      {
+        value: 31,
+        name: 'Birinci Yerel',
+        image: '/discover-items/petshop.png',
+        keywords: ['ortak'],
+      },
+      {
+        value: 32,
+        name: 'Ortak İkinci',
+        image: '/discover-items/bebek.png',
+        keywords: ['başka'],
+      },
+      {
+        value: 33,
+        name: 'Üçüncü Yerel',
+        image: '/discover-items/cicek.png',
+        keywords: ['ortak', 'diger'],
+      },
+    ];
+
+    const shared = filterCategoriesByQuery(localCatalog, 'ortak').map(
+      (c) => c.value
+    );
+    expect(shared).toEqual([31, 33]);
+    expect(new Set(shared).size).toBe(shared.length);
+
+    expect(
+      filterCategoriesByQuery(localCatalog, 'ortak ikinci').map((c) => c.value)
+    ).toEqual([32]);
   });
 
   it('returns no category for a query without matches', () => {
