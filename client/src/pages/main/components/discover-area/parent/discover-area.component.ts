@@ -69,6 +69,7 @@ export class DiscoverComponent implements OnInit, OnDestroy {
         behavior: prefersReducedMotion ? 'auto' : 'smooth',
         block: 'start',
       });
+      target.focus({ preventScroll: true });
     });
   }
 }

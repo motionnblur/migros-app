@@ -145,6 +145,7 @@ export class MainComponent implements OnInit, OnDestroy {
     const trimmedTerm = (term || '').trim();
     this.router.navigate(['/'], {
       queryParams: trimmedTerm ? { q: trimmedTerm } : {},
+      fragment: 'categories',
     });
   }
 

@@ -203,6 +203,7 @@ describe('MainComponent', () => {
 
       expect(router.navigate).toHaveBeenCalledWith(['/'], {
         queryParams: { q: 'çiçek' },
+        fragment: 'categories',
       });
     });
 
@@ -214,6 +215,7 @@ describe('MainComponent', () => {
 
       expect(router.navigate).toHaveBeenCalledWith(['/'], {
         queryParams: {},
+        fragment: 'categories',
       });
     });
 

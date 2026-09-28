@@ -16,9 +16,24 @@ describe('DiscoverAreaComponent', () => {
   let fixture: ComponentFixture<DiscoverComponent>;
   let router: Router;
   let queryParamMap$: BehaviorSubject<ParamMap>;
+  let fragment$: BehaviorSubject<string | null>;
+  let rafQueue: FrameRequestCallback[];
+  let scrollSpy: jasmine.Spy;
+  let focusSpy: jasmine.Spy;
 
   beforeEach(async () => {
     queryParamMap$ = new BehaviorSubject<ParamMap>(convertToParamMap({}));
+    fragment$ = new BehaviorSubject<string | null>(null);
+    rafQueue = [];
+
+    spyOn(window, 'requestAnimationFrame').and.callFake(
+      (callback: FrameRequestCallback) => {
+        rafQueue.push(callback);
+        return rafQueue.length;
+      }
+    );
+    scrollSpy = spyOn(Element.prototype, 'scrollIntoView');
+    focusSpy = spyOn(HTMLElement.prototype, 'focus');
 
     await TestBed.configureTestingModule({
       imports: [DiscoverComponent],
@@ -28,7 +43,7 @@ describe('DiscoverAreaComponent', () => {
           provide: ActivatedRoute,
           useValue: {
             queryParamMap: queryParamMap$.asObservable(),
-            fragment: new BehaviorSubject<string | null>(null).asObservable(),
+            fragment: fragment$.asObservable(),
           },
         },
       ],
@@ -45,6 +60,29 @@ describe('DiscoverAreaComponent', () => {
       convertToParamMap(query.trim() ? { q: query.trim() } : {})
     );
     fixture.detectChanges();
+  }
+
+  function flushAnimationFrames(): void {
+    const pending = rafQueue;
+    rafQueue = [];
+    pending.forEach((callback) => callback(0));
+  }
+
+  function emitFragment(fragment: string | null): void {
+    fragment$.next(fragment);
+    flushAnimationFrames();
+  }
+
+  function setReducedMotion(prefersReduced: boolean): void {
+    spyOn(window, 'matchMedia').and.returnValue({
+      matches: prefersReduced,
+    } as MediaQueryList);
+  }
+
+  function categorySection(): HTMLElement {
+    return fixture.nativeElement.querySelector(
+      '#categories'
+    ) as HTMLElement;
   }
 
   function categoryLinks(): HTMLAnchorElement[] {
@@ -143,5 +181,56 @@ describe('DiscoverAreaComponent', () => {
     );
     expect(clearButtons.length).toBe(1);
     expect(clearButtons[0].textContent).toContain('Aramayı temizle');
+  });
+
+  it('smoothly scrolls to the category section for a route fragment', () => {
+    setReducedMotion(false);
+    const target = categorySection();
+
+    emitFragment('categories');
+
+    expect(scrollSpy).toHaveBeenCalledWith({
+      behavior: 'smooth',
+      block: 'start',
+    });
+    expect(scrollSpy.calls.mostRecent().object).toBe(target);
+  });
+
+  it('selects an instant scroll when the user prefers reduced motion', () => {
+    setReducedMotion(true);
+
+    emitFragment('categories');
+
+    expect(scrollSpy).toHaveBeenCalledWith({
+      behavior: 'auto',
+      block: 'start',
+    });
+  });
+
+  it('focuses the category section with preventScroll after scrolling', () => {
+    setReducedMotion(false);
+    const target = categorySection();
+
+    emitFragment('categories');
+
+    expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true });
+    expect(focusSpy.calls.mostRecent().object).toBe(target);
+  });
+
+  it('filters the catalog even when the route also carries the fragment', () => {
+    setReducedMotion(false);
+
+    queryParamMap$.next(convertToParamMap({ q: 'meyve' }));
+    emitFragment('categories');
+    fixture.detectChanges();
+
+    expect(component.searchQuery).toBe('meyve');
+    const links = categoryLinks();
+    expect(links.length).toBe(1);
+    expect(links[0].getAttribute('href')).toBe('/category/2');
+    expect(scrollSpy).toHaveBeenCalledWith({
+      behavior: 'smooth',
+      block: 'start',
+    });
   });
 });
