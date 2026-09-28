@@ -136,7 +136,7 @@ describe('MainComponent', () => {
       const openMenuAndClick = (label: string): void => {
         click('.site-header__account-toggle');
         const item = Array.from(
-          element.querySelectorAll('[role="menuitem"]')
+          element.querySelectorAll('#site-header-account-panel button')
         ).find((entry) => entry.textContent?.includes(label)) as HTMLButtonElement;
 
         expect(item).toBeTruthy();

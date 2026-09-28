@@ -127,73 +127,179 @@ describe('SiteHeaderComponent', () => {
     expect(input.value).toBe('dondurma');
   });
 
-  describe('account menu', () => {
+  describe('account disclosure', () => {
     beforeEach(() => {
       establishSession('ayse@example.com');
     });
 
-    it('renders the signed-in account control with an unexpanded menu', () => {
-      const toggle = query<HTMLButtonElement>('.site-header__account-toggle');
+    function toggleButton(): HTMLButtonElement {
+      return query<HTMLButtonElement>('.site-header__account-toggle');
+    }
+
+    function openToggle(): HTMLButtonElement {
+      const toggle = toggleButton();
+      toggle.click();
+      fixture.detectChanges();
+      return toggle;
+    }
+
+    function panel(): HTMLElement | null {
+      return query<HTMLElement>('#site-header-account-panel');
+    }
+
+    function panelButtons(): HTMLButtonElement[] {
+      return Array.from(
+        element.querySelectorAll<HTMLButtonElement>(
+          '#site-header-account-panel button'
+        )
+      );
+    }
+
+    function pressEscape(): boolean {
+      const event = new KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+        cancelable: true,
+      });
+      const notPrevented = document.dispatchEvent(event);
+      fixture.detectChanges();
+      return notPrevented;
+    }
+
+    it('renders the signed-in account control with a collapsed disclosure', () => {
+      const toggle = toggleButton();
       expect(toggle).toBeTruthy();
       expect(toggle.getAttribute('aria-expanded')).toBe('false');
-      expect(toggle.getAttribute('aria-haspopup')).toBe('menu');
-      expect(query('.site-header__dropdown')).toBeNull();
+      expect(toggle.getAttribute('aria-controls')).toBe(
+        'site-header-account-panel'
+      );
+      expect(toggle.hasAttribute('aria-haspopup')).toBe(false);
+      expect(panel()).toBeNull();
     });
 
-    it('toggles the expanded state and exposes the account destinations', () => {
-      const toggle = query<HTMLButtonElement>('.site-header__account-toggle');
+    it('associates the toggle with the revealed panel and removes menu roles', () => {
+      const toggle = openToggle();
+
+      const revealed = panel();
+      expect(revealed).toBeTruthy();
+      expect(revealed?.tagName).toBe('UL');
+      const controls = toggle.getAttribute('aria-controls');
+      expect(controls).toBe('site-header-account-panel');
+      expect(revealed?.id).toBe(controls ?? '');
+      expect(revealed?.hasAttribute('role')).toBe(false);
+
+      const forbiddenRoles = Array.from(element.querySelectorAll('[role]'))
+        .map((node) => node.getAttribute('role'))
+        .filter(
+          (role) => role === 'menu' || role === 'menuitem' || role === 'none'
+        );
+      expect(forbiddenRoles).toEqual([]);
+    });
+
+    it('keeps the account actions as native buttons in document order', () => {
+      openToggle();
+      const buttons = panelButtons();
+
+      expect(
+        buttons.map((button) =>
+          button.textContent?.replace(/\s+/g, ' ').trim()
+        )
+      ).toEqual(['Sepetim', 'Profilim', 'Siparişlerim', 'Çıkış Yap']);
+
+      buttons.forEach((button) => {
+        expect(button instanceof HTMLButtonElement).toBe(true);
+        expect(button.disabled).toBe(false);
+        expect(button.getAttribute('tabindex')).toBeNull();
+        expect(button.closest('li')).toBeTruthy();
+        button.focus();
+        expect(document.activeElement).toBe(button);
+      });
+    });
+
+    it('emits the exact account actions from the panel buttons', () => {
       const emitted: string[] = [];
       component.action.subscribe((action) => emitted.push(action));
 
-      toggle.click();
-      fixture.detectChanges();
+      const expectations = [
+        { label: 'Sepetim', action: 'cart' },
+        { label: 'Profilim', action: 'profile' },
+        { label: 'Siparişlerim', action: 'orderHistory' },
+        { label: 'Çıkış Yap', action: 'logout' },
+      ];
 
-      expect(toggle.getAttribute('aria-expanded')).toBe('true');
+      expectations.forEach((entry, index) => {
+        openToggle();
 
-      const menuItems = Array.from(
-        element.querySelectorAll('[role="menuitem"]')
-      ).map((item) => item.textContent?.replace(/\s+/g, ' ').trim());
-      expect(menuItems).toEqual([
-        'Sepetim',
-        'Profilim',
-        'Siparişlerim',
-        'Çıkış Yap',
-      ]);
+        const item = panelButtons().find((button) =>
+          button.textContent?.includes(entry.label)
+        ) as HTMLButtonElement;
+        expect(item).toBeTruthy();
 
-      const cartItem = Array.from(
-        element.querySelectorAll('[role="menuitem"]')
-      ).find((item) => item.textContent?.includes('Sepetim')) as HTMLButtonElement;
-      cartItem.click();
-      fixture.detectChanges();
+        item.click();
+        fixture.detectChanges();
 
-      expect(emitted).toEqual(['cart']);
-      expect(
-        query('.site-header__account-toggle').getAttribute('aria-expanded')
-      ).toBe('false');
+        expect(emitted).toEqual(
+          expectations.slice(0, index + 1).map((e) => e.action)
+        );
+        expect(panel()).toBeNull();
+        expect(toggleButton().getAttribute('aria-expanded')).toBe('false');
+      });
     });
 
-    it('closes the menu on escape and on outside clicks', () => {
-      const toggle = query<HTMLButtonElement>('.site-header__account-toggle');
-
-      toggle.click();
-      fixture.detectChanges();
+    it('closes the disclosure on escape, prevents the default and restores focus', () => {
+      const toggle = openToggle();
       expect(toggle.getAttribute('aria-expanded')).toBe('true');
 
-      document.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })
-      );
-      fixture.detectChanges();
-      expect(
-        query('.site-header__account-toggle').getAttribute('aria-expanded')
-      ).toBe('false');
+      toggle.focus();
+      expect(document.activeElement).toBe(toggle);
 
-      query<HTMLButtonElement>('.site-header__account-toggle').click();
-      fixture.detectChanges();
+      const panelItem = panelButtons()[0];
+      panelItem.focus();
+      expect(document.activeElement).toBe(panelItem);
+
+      const notPrevented = pressEscape();
+
+      expect(notPrevented).toBe(false);
+      expect(toggle.getAttribute('aria-expanded')).toBe('false');
+      expect(panel()).toBeNull();
+      expect(document.activeElement).toBe(toggle);
+    });
+
+    it('ignores escape while the disclosure is already closed', () => {
+      const toggle = toggleButton();
+      const actionButton = query<HTMLButtonElement>(
+        'button[aria-label="Sipariş Takibi"]'
+      );
+      actionButton.focus();
+      expect(document.activeElement).toBe(actionButton);
+
+      const notPrevented = pressEscape();
+
+      expect(notPrevented).toBe(true);
+      expect(toggle.getAttribute('aria-expanded')).toBe('false');
+      expect(panel()).toBeNull();
+      expect(document.activeElement).toBe(actionButton);
+      expect(document.activeElement).not.toBe(toggle);
+    });
+
+    it('closes the disclosure on outside clicks without emitting an action', () => {
+      const emitted: string[] = [];
+      component.action.subscribe((action) => emitted.push(action));
+
+      const toggle = openToggle();
+      const actionButton = query<HTMLButtonElement>(
+        'button[aria-label="Sipariş Takibi"]'
+      );
+      actionButton.focus();
+      expect(document.activeElement).toBe(actionButton);
+
       document.dispatchEvent(new Event('click', { bubbles: true }));
       fixture.detectChanges();
-      expect(
-        query('.site-header__account-toggle').getAttribute('aria-expanded')
-      ).toBe('false');
+
+      expect(toggle.getAttribute('aria-expanded')).toBe('false');
+      expect(panel()).toBeNull();
+      expect(emitted).toEqual([]);
+      expect(document.activeElement).toBe(actionButton);
     });
 
     it('shows the signed-in label and a logout action', () => {
@@ -204,11 +310,10 @@ describe('SiteHeaderComponent', () => {
       const emitted: string[] = [];
       component.action.subscribe((action) => emitted.push(action));
 
-      query<HTMLButtonElement>('.site-header__account-toggle').click();
-      fixture.detectChanges();
-      const logoutItem = Array.from(
-        element.querySelectorAll('[role="menuitem"]')
-      ).find((item) => item.textContent?.includes('Çıkış Yap')) as HTMLButtonElement;
+      openToggle();
+      const logoutItem = panelButtons().find((button) =>
+        button.textContent?.includes('Çıkış Yap')
+      ) as HTMLButtonElement;
       logoutItem.click();
 
       expect(emitted).toEqual(['logout']);

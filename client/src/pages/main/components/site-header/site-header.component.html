@@ -77,10 +77,11 @@
       } @else {
         <div class="site-header__account">
           <button
+            #accountToggle
             type="button"
             class="site-header__action site-header__account-toggle"
             [attr.aria-expanded]="isAccountMenuOpen"
-            aria-haspopup="menu"
+            aria-controls="site-header-account-panel"
             (click)="toggleAccountMenu($event)"
           >
             <i class="bi bi-person-circle" aria-hidden="true"></i>
@@ -89,32 +90,35 @@
           </button>
 
           @if (isAccountMenuOpen) {
-            <ul class="site-header__dropdown" role="menu" (click)="$event.stopPropagation()">
-              <li role="none">
-                <button type="button" role="menuitem" (click)="selectAction('cart')">
+            <ul
+              id="site-header-account-panel"
+              class="site-header__dropdown"
+              (click)="$event.stopPropagation()"
+            >
+              <li>
+                <button type="button" (click)="selectAction('cart')">
                   <i class="bi bi-cart3" aria-hidden="true"></i>
                   Sepetim
                 </button>
               </li>
-              <li role="none">
-                <button type="button" role="menuitem" (click)="selectAction('profile')">
+              <li>
+                <button type="button" (click)="selectAction('profile')">
                   <i class="bi bi-person" aria-hidden="true"></i>
                   Profilim
                 </button>
               </li>
-              <li role="none">
-                <button type="button" role="menuitem" (click)="selectAction('orderHistory')">
+              <li>
+                <button type="button" (click)="selectAction('orderHistory')">
                   <i class="bi bi-receipt" aria-hidden="true"></i>
                   Siparişlerim
                 </button>
               </li>
-              <li role="none">
+              <li>
                 <hr class="site-header__divider" />
               </li>
-              <li role="none">
+              <li>
                 <button
                   type="button"
-                  role="menuitem"
                   class="site-header__logout"
                   (click)="selectAction('logout')"
                 >

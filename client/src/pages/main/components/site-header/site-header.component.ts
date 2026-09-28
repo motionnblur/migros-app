@@ -1,5 +1,6 @@
 import {
   Component,
+  ElementRef,
   EventEmitter,
   HostListener,
   Input,
@@ -8,6 +9,7 @@ import {
   OnInit,
   Output,
   SimpleChanges,
+  ViewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -42,6 +44,9 @@ export class SiteHeaderComponent implements OnInit, OnChanges, OnDestroy {
   isLoggedIn = false;
   accountLabel = 'Üye Ol veya Giriş Yap';
   isAccountMenuOpen = false;
+
+  @ViewChild('accountToggle', { static: false })
+  private accountToggle: ElementRef<HTMLButtonElement> | null = null;
 
   private authSub: Subscription | null = null;
 
@@ -88,9 +93,15 @@ export class SiteHeaderComponent implements OnInit, OnChanges, OnDestroy {
     this.isAccountMenuOpen = false;
   }
 
-  @HostListener('document:keydown.escape')
-  public closeAccountMenuOnEscape(): void {
+  @HostListener('document:keydown.escape', ['$event'])
+  public closeAccountMenuOnEscape(event: KeyboardEvent): void {
+    if (!this.isAccountMenuOpen) {
+      return;
+    }
+
+    event.preventDefault();
     this.isAccountMenuOpen = false;
+    this.accountToggle?.nativeElement.focus();
   }
 
   private syncAccountState(): void {
