@@ -97,6 +97,35 @@ class AdminSupplyControllerTest {
     }
 
     @Test
+    void getAllProductCounts_shouldReturnCount() throws Exception {
+        when(userSupplyService.getAllProductCounts()).thenReturn(15);
+
+        mockMvc.perform(get("/admin/supply/getAllProductCounts"))
+                .andExpect(status().isOk())
+                .andExpect(content().string("15"));
+
+        Mockito.verify(userSupplyService).getAllProductCounts();
+    }
+
+    @Test
+    void getAllProducts_shouldReturnProductList() throws Exception {
+        ProductPreviewDto product = new ProductPreviewDto();
+        product.setProductName("Laptop");
+
+        List<ProductPreviewDto> products = List.of(product);
+
+        when(userSupplyService.getAllProducts(anyInt(), anyInt())).thenReturn(products);
+
+        mockMvc.perform(get("/admin/supply/getAllProducts")
+                        .param("page", "0")
+                        .param("productRange", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].productName").value("Laptop"));
+
+        Mockito.verify(userSupplyService).getAllProducts(0, 10);
+    }
+
+    @Test
     void addCategory_shouldReturnBadRequest_whenParamMissing() throws Exception {
         mockMvc.perform(post("/admin/supply/addCategory"))
                 .andExpect(status().isBadRequest());

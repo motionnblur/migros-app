@@ -34,4 +34,8 @@ public interface ProductEntityRepository extends JpaRepository<ProductEntity, Lo
     int countByCategoryEntityIdAndProductCountGreaterThan(Long categoryId, int productCount);
 
     int countBySubcategoryNameAndProductCountGreaterThan(String subcategoryName, int productCount);
+
+    Page<ProductEntity> findByProductCountGreaterThan(int productCount, Pageable pageable);
+
+    int countByProductCountGreaterThan(int productCount);
 }

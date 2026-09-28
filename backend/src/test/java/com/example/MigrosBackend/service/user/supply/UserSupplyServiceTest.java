@@ -212,6 +212,34 @@ class UserSupplyServiceTest {
     }
 
     @Test
+    void getAllProducts_ShouldReturnOnlyInStockProductsAcrossCategories() {
+        ProductEntity product = new ProductEntity();
+        product.setId(10L);
+        product.setProductName("Milk");
+        product.setProductPrice(new BigDecimal("100"));
+        product.setProductDiscount(new BigDecimal("10"));
+        product.setProductCount(4);
+
+        when(productEntityRepository.findByProductCountGreaterThan(0, PageRequest.of(0, 10)))
+                .thenReturn(new PageImpl<>(List.of(product)));
+
+        List<ProductPreviewDto> results = userSupplyService.getAllProducts(0, 10);
+
+        assertEquals(1, results.size());
+        assertEquals(4, results.get(0).getProductCount());
+        assertEquals(0, new BigDecimal("90").compareTo(results.get(0).getProductPrice()));
+    }
+
+    @Test
+    void getAllProductCounts_ShouldUseInStockCount() {
+        when(productEntityRepository.countByProductCountGreaterThan(0)).thenReturn(7);
+
+        int result = userSupplyService.getAllProductCounts();
+
+        assertEquals(7, result);
+    }
+
+    @Test
     void cancelOrder_ShouldRestockAndDeleteGroup_WhenPending() {
         stubAuthenticatedUser();
         OrderEntity orderA = new OrderEntity();

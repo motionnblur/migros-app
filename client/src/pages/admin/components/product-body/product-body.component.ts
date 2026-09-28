@@ -3,7 +3,7 @@ import {RestService} from '../../../../services/rest/rest.service';
 import {CommonModule} from '@angular/common';
 import {EventService} from '../../../../services/event/event.service';
 import {IAdminProductPreview} from '../../../../interfaces/IAdminProductPreview';
-import {categories, data} from '../../../../memory/global-data';
+import {categories as productCategories} from '../../../../memory/global-data';
 import {MatPaginatorModule, PageEvent} from '@angular/material/paginator';
 import {MatDialog} from '@angular/material/dialog';
 import {ConfirmDialogComponent} from '../confirm-dialog/confirm-dialog.component';
@@ -21,12 +21,16 @@ export class ProductBodyComponent implements OnInit, OnDestroy {
   @Output() hasAddProductButtonClicked = new EventEmitter();
 
   productsData: IAdminProductPreview[] = [];
-  categories = categories;
+  readonly allCategory = { value: 0, name: 'Hepsi' };
+  categories = [this.allCategory, ...productCategories];
   selectedCategoryName: string = 'Lütfen bir kategori seçin';
   productPageLength: number = 0;
   currentPageSize: number = 5;
   currentPageNumber: number = 0;
   isDropdownOpen = false;
+
+  private selectedCategoryId = 1;
+  private showAll = false;
 
   // Callback reference for the event service
   private productAddedCallback = () => this.loadProducts();
@@ -49,33 +53,50 @@ export class ProductBodyComponent implements OnInit, OnDestroy {
   }
 
   private loadProducts() {
-    const id = data.currentSelectedCategoryId || 1; // Default to 1 if not set
-    this.fetchPageData(id, 0, this.currentPageSize);
-    this.fetchProductCount(id);
+    this.fetchPageData(0, this.currentPageSize);
+    this.fetchProductCount();
   }
 
-  private fetchPageData(categoryId: number, page: number, size: number) {
-    this.restService.getProductPageDataAdmin(categoryId, page, size).subscribe({
+  private fetchPageData(page: number, size: number) {
+    const request = this.showAll
+      ? this.restService.getAllProductsAdmin(page, size)
+      : this.restService.getProductPageDataAdmin(this.selectedCategoryId, page, size);
+    request.subscribe({
       next: (res: any) => {
         this.productsData = res;
-        const category = this.categories.find(c => c.value === categoryId);
-        this.selectedCategoryName = category ? category.name : 'Bilinmeyen Kategori';
+        this.selectedCategoryName = this.resolveSelectedCategoryName();
       },
       error: (err) => console.error('Error loading products', err)
     });
   }
 
-  private fetchProductCount(categoryId: number) {
-    this.restService.getProductCountsFromCategoryAdmin(categoryId).subscribe({
+  private fetchProductCount() {
+    const request = this.showAll
+      ? this.restService.getAllProductCountsAdmin()
+      : this.restService.getProductCountsFromCategoryAdmin(this.selectedCategoryId);
+    request.subscribe({
       next: (count: any) => this.productPageLength = count
     });
   }
 
-  public onCategorySelected(index: number) {
-    data.currentSelectedCategoryId = index;
+  private resolveSelectedCategoryName(): string {
+    if (this.showAll) {
+      return this.allCategory.name;
+    }
+    const category = this.categories.find(c => c.value === this.selectedCategoryId);
+    return category ? category.name : 'Bilinmeyen Kategori';
+  }
+
+  public onCategorySelected(value: number) {
+    if (value === this.allCategory.value) {
+      this.showAll = true;
+    } else {
+      this.showAll = false;
+      this.selectedCategoryId = value;
+    }
     this.currentPageNumber = 0;
-    this.fetchPageData(index, 0, this.currentPageSize);
-    this.fetchProductCount(index);
+    this.fetchPageData(0, this.currentPageSize);
+    this.fetchProductCount();
   }
 
   public onBodyClick(productId: number) {
@@ -120,7 +141,7 @@ export class ProductBodyComponent implements OnInit, OnDestroy {
   pageEvent($event: PageEvent) {
     this.currentPageSize = $event.pageSize;
     this.currentPageNumber = $event.pageIndex;
-    this.fetchPageData(data.currentSelectedCategoryId, $event.pageIndex, $event.pageSize);
+    this.fetchPageData($event.pageIndex, $event.pageSize);
   }
 
   public openProductAdder() {

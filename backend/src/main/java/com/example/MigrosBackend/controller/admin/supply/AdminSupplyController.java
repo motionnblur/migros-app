@@ -39,4 +39,14 @@ public class AdminSupplyController {
     public ResponseEntity<List<ProductPreviewDto>> getProductsFromCategory(@RequestParam Long categoryId, @RequestParam int page, @RequestParam int productRange) {
         return ResponseEntity.ok(userSupplyService.getProductsFromCategory(categoryId, page, productRange));
     }
+
+    @GetMapping("getAllProductCounts")
+    public int getAllProductCounts() {
+        return userSupplyService.getAllProductCounts();
+    }
+
+    @GetMapping("getAllProducts")
+    public ResponseEntity<List<ProductPreviewDto>> getAllProducts(@RequestParam int page, @RequestParam int productRange) {
+        return ResponseEntity.ok(userSupplyService.getAllProducts(page, productRange));
+    }
 }

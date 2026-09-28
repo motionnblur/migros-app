@@ -75,6 +75,17 @@ export class RestService {
       },
     );
   }
+  getAllProductsAdmin(page: number, productRange: number) {
+    return this.http.get(`${API_BASE_URL}/admin/supply/getAllProducts`, {
+      params: { page, productRange },
+      responseType: 'json',
+    });
+  }
+  getAllProductCountsAdmin() {
+    return this.http.get(`${API_BASE_URL}/admin/supply/getAllProductCounts`, {
+      responseType: 'json',
+    });
+  }
   getProductCountsFromSubCategory(subcategoryName: string) {
     return this.http.get(
       `${API_BASE_URL}/user/supply/getProductCountsFromSubCategory`,

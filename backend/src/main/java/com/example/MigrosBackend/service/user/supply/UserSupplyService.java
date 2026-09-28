@@ -100,14 +100,17 @@ public class UserSupplyService {
             throw new CategoryHasNoProductException(categoryId.toString());
         }
 
-        return entities.stream().map(itemEntity -> {
-            ProductPreviewDto itemDto = new ProductPreviewDto();
-            itemDto.setProductId(itemEntity.getId());
-            itemDto.setProductName(itemEntity.getProductName());
-            itemDto.setProductPrice(getEffectivePrice(itemEntity));
-            itemDto.setProductCount(itemEntity.getProductCount());
-            return itemDto;
-        }).collect(Collectors.toList());
+        return entities.stream().map(this::toProductPreviewDto).collect(Collectors.toList());
+    }
+
+    public List<ProductPreviewDto> getAllProducts(int page, int itemRange) {
+        Pageable pageable = PageRequest.of(page, itemRange);
+        Page<ProductEntity> entities = productEntityRepository.findByProductCountGreaterThan(0, pageable);
+        return entities.stream().map(this::toProductPreviewDto).collect(Collectors.toList());
+    }
+
+    public int getAllProductCounts() {
+        return productEntityRepository.countByProductCountGreaterThan(0);
     }
 
     public List<String> getProductImageNames(Long itemId) {
@@ -164,14 +167,7 @@ public class UserSupplyService {
     public List<ProductPreviewDto> getProductsFromSubcategory(String subcategoryName, int page, int productRange) {
         Pageable pageable = PageRequest.of(page, productRange);
         Page<ProductEntity> entities = productEntityRepository.findBySubcategoryNameAndProductCountGreaterThan(subcategoryName, 0, pageable);
-        return entities.stream().map(itemEntity -> {
-            ProductPreviewDto itemDto = new ProductPreviewDto();
-            itemDto.setProductId(itemEntity.getId());
-            itemDto.setProductName(itemEntity.getProductName());
-            itemDto.setProductPrice(getEffectivePrice(itemEntity));
-            itemDto.setProductCount(itemEntity.getProductCount());
-            return itemDto;
-        }).collect(Collectors.toList());
+        return entities.stream().map(this::toProductPreviewDto).collect(Collectors.toList());
     }
 
     public int getProductCountsFromSubcategory(String subcategoryName) {
@@ -507,6 +503,16 @@ public class UserSupplyService {
         BigDecimal factor = BigDecimal.ONE.subtract(discount.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP));
         return normalizedPrice.multiply(factor).setScale(2, RoundingMode.HALF_UP);
     }
+
+    private ProductPreviewDto toProductPreviewDto(ProductEntity itemEntity) {
+        ProductPreviewDto itemDto = new ProductPreviewDto();
+        itemDto.setProductId(itemEntity.getId());
+        itemDto.setProductName(itemEntity.getProductName());
+        itemDto.setProductPrice(getEffectivePrice(itemEntity));
+        itemDto.setProductCount(itemEntity.getProductCount());
+        return itemDto;
+    }
+
     private void restockProduct(Long productId, int amount) {
         if (amount <= 0) {
             return;
