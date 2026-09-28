@@ -1,5 +1,6 @@
-import { Component, EventEmitter, Output, HostListener } from '@angular/core';
+import { Component, EventEmitter, Output, HostListener, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Subject, takeUntil } from 'rxjs';
 import { RestService } from '../../../../services/rest/rest.service';
 import { IUserOrderGroup } from '../../../../interfaces/IUserOrderGroup';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -11,13 +12,15 @@ import { ActivatedRoute, Router } from '@angular/router';
   templateUrl: './order-history.component.html',
   styleUrls: ['./order-history.component.css'],
 })
-export class OrderHistoryComponent {
+export class OrderHistoryComponent implements OnDestroy {
   @Output() closeOrderHistoryComponentEvent = new EventEmitter<void>();
 
   orderGroups: IUserOrderGroup[] = [];
   selectedGroup: IUserOrderGroup | null = null;
   isLoading = false;
   errorMessage = '';
+  private readonly destroy$ = new Subject<void>();
+  private readonly objectUrls = new Set<string>();
 
   constructor(
     private restService: RestService,
@@ -25,6 +28,13 @@ export class OrderHistoryComponent {
     private route: ActivatedRoute
   ) {
     this.loadOrderGroups();
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+    this.objectUrls.forEach((url) => window.URL.revokeObjectURL(url));
+    this.objectUrls.clear();
   }
 
   @HostListener('document:keydown.escape')
@@ -36,24 +46,24 @@ export class OrderHistoryComponent {
     this.isLoading = true;
     this.errorMessage = '';
 
-    this.restService.getUserOrderGroups().subscribe({
+    this.restService.getUserOrderGroups().pipe(takeUntil(this.destroy$)).subscribe({
       next: (groups: IUserOrderGroup[]) => {
         this.orderGroups = groups;
         this.isLoading = false;
 
         this.orderGroups.forEach((group) => {
           group.items.forEach((item) => {
-            this.restService.getProductImage(item.productId).subscribe({
+            this.restService.getProductImage(item.productId).pipe(takeUntil(this.destroy$)).subscribe({
               next: (blob: Blob) => {
                 const url: string = window.URL.createObjectURL(blob);
+                this.objectUrls.add(url);
                 item.productImageUrl = url;
               },
             });
           });
         });
       },
-      error: (err: any) => {
-        console.error(err);
+      error: () => {
         this.isLoading = false;
         this.errorMessage = 'Siparisler yuklenemedi.';
       },

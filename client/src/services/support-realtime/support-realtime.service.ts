@@ -10,11 +10,13 @@ export class SupportRealtimeService {
   private socket: WebSocket | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private connectUserMail = '';
+  private reconnectEnabled = false;
   private readonly eventsSubject = new Subject<ISupportRealtimeEvent>();
   readonly events$: Observable<ISupportRealtimeEvent> =
     this.eventsSubject.asObservable();
 
   connect(userMail?: string) {
+    this.reconnectEnabled = true;
     if (typeof userMail === 'string') {
       this.connectUserMail = userMail;
     }
@@ -32,9 +34,10 @@ export class SupportRealtimeService {
       ? `${supportSocketUrl}?userMail=${encodeURIComponent(normalizedUserMail)}`
       : supportSocketUrl;
 
-    this.socket = new WebSocket(socketUrl);
+    const socket = new WebSocket(socketUrl);
+    this.socket = socket;
 
-    this.socket.onmessage = (event: MessageEvent<string>) => {
+    socket.onmessage = (event: MessageEvent<string>) => {
       try {
         const data = JSON.parse(event.data) as ISupportRealtimeEvent;
         if (data?.type === 'SUPPORT_UPDATED' || data?.type === 'SUPPORT_MESSAGE_CREATED') {
@@ -45,25 +48,34 @@ export class SupportRealtimeService {
       }
     };
 
-    this.socket.onclose = () => {
+    socket.onclose = () => {
+      // Ignore close events from sockets that were intentionally disconnected
+      // or superseded by a newer connection.
+      if (this.socket !== socket) {
+        return;
+      }
       this.socket = null;
-      this.scheduleReconnect();
+      if (this.reconnectEnabled) {
+        this.scheduleReconnect();
+      }
     };
 
-    this.socket.onerror = () => {
+    socket.onerror = () => {
       // onclose handles reconnect
     };
   }
 
   disconnect() {
+    this.reconnectEnabled = false;
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
 
     if (this.socket) {
-      this.socket.close();
+      const socket = this.socket;
       this.socket = null;
+      socket.close();
     }
 
     this.connectUserMail = '';
@@ -76,7 +88,9 @@ export class SupportRealtimeService {
 
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
-      this.connect();
+      if (this.reconnectEnabled) {
+        this.connect();
+      }
     }, 3000);
   }
 }

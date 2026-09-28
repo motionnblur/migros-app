@@ -438,6 +438,42 @@ describe('ProductPageComponent', () => {
     expect(component.items.length).toBe(2);
   });
 
+  it('ignores stale category metadata after a newer category route is loaded', () => {
+    const staleSubCategories = expectRequest('getSubCategories');
+    const staleCount = expectRequest('getProductCountsFromCategory');
+
+    setRoute({ categoryId: '6' }, {});
+    fixture.detectChanges();
+
+    const currentSubCategories = requests('getSubCategories').find(
+      (request) => request.request.params.get('categoryId') === '6',
+    );
+    const currentCount = requests('getProductCountsFromCategory').find(
+      (request) => request.request.params.get('categoryId') === '6',
+    );
+    expect(currentSubCategories).toBeTruthy();
+    expect(currentCount).toBeTruthy();
+    currentSubCategories!.flush([
+      { subCategoryId: 7, subCategoryName: 'Meyve Suyu', productCount: 2 },
+    ]);
+    currentCount!.flush(2);
+    const listing = expectRequest('getProductsFromCategory');
+    expect(listing.request.params.get('categoryId')).toBe('6');
+    listing.flush([product(60)]);
+    fixture.detectChanges();
+
+    staleSubCategories.flush(subCategories);
+    staleCount.flush(40);
+    fixture.detectChanges();
+
+    expect(component.categoryName).toBe('İçecek');
+    expect(component.subCategories.map((item) => item.subCategoryName)).toEqual([
+      'Meyve Suyu',
+    ]);
+    expect(component.totalProductCount).toBe(2);
+    expect(component.items.map((item) => item.productId)).toEqual([60]);
+  });
+
   it('renders a breadcrumb and a return link that preserve the originating state', () => {
     setRoute({ categoryId: '3' }, { subcategory: 'Süt', page: '2' });
     flushMetadata();

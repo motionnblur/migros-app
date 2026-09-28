@@ -14,7 +14,7 @@ import { EventService } from '../../../../services/event/event.service';
 })
 export class ProductUpdaterComponent extends ProductAdderBase {
   @Input() id!: number;
-  buttonString: string = 'Güncelle';
+  buttonString: string = 'Gï¿½ncelle';
   isImageChanged: boolean = false;
 
   constructor(
@@ -28,15 +28,15 @@ export class ProductUpdaterComponent extends ProductAdderBase {
   override ngOnInit(): void {
     super.ngOnInit();
 
-    this.restService.getProductImage(this.id).subscribe((blob) => {
+    this.requests.add(this.restService.getProductImage(this.id).subscribe((blob) => {
       const file = new File([blob], 'image.png', {
         type: 'image/png',
       });
       this.selectedImage = file;
-      this.imageUrl = URL.createObjectURL(blob);
-    });
+      this.setImagePreview(blob);
+    }));
 
-    this.restService.getProductData(this.id).subscribe((data: any) => {
+    this.requests.add(this.restService.getProductData(this.id).subscribe((data: any) => {
       this.productName = data.productName;
       this.subCategoryName = data.subCategoryName;
       this.price = data.productPrice;
@@ -46,7 +46,7 @@ export class ProductUpdaterComponent extends ProductAdderBase {
       this.selectedFormValue = data.productCategoryId;
 
       this.categoryControl.setValue(this.selectedFormValue?.toString() ?? '');
-    });
+    }));
   }
 
   override onImageSelected(event: Event) {
@@ -79,7 +79,7 @@ export class ProductUpdaterComponent extends ProductAdderBase {
       categoryValue: this.selectedFormValue!,
     };
 
-    this.restService.updateProductData(productData).subscribe({
+    this.requests.add(this.restService.updateProductData(productData).subscribe({
       next: (status: boolean) => {
         if (status) {
           this.outProductAdded();
@@ -90,7 +90,7 @@ export class ProductUpdaterComponent extends ProductAdderBase {
         this.validationError =
           error?.error ?? 'Product could not be updated. Please check fields.';
       },
-    });
+    }));
   }
 }
 

@@ -11,6 +11,8 @@ import {
 } from '../../helpers/category-browse-state';
 import { AuthService } from '../../../../services/auth/auth.service';
 import { RestService } from '../../../../services/rest/rest.service';
+import { ObjectUrlManager } from '../../helpers/object-url-manager';
+import { productCartErrorMessage } from '../../helpers/product-cart-error';
 
 export type CartFeedbackKind = 'success' | 'error';
 
@@ -38,7 +40,7 @@ export class ProductPreviewComponent implements OnInit, OnDestroy {
   feedbackKind: CartFeedbackKind | null = null;
   feedbackMessage = '';
 
-  private imageObjectUrl: string | null = null;
+  private readonly imageUrls = new ObjectUrlManager();
   private routeSub: Subscription | null = null;
   private imageSub: Subscription | null = null;
   private cartSub: Subscription | null = null;
@@ -111,18 +113,12 @@ export class ProductPreviewComponent implements OnInit, OnDestroy {
       },
       error: (error: unknown) => {
         this.isAddingToCart = false;
-        this.showFeedback('error', this.resolveErrorMessage(error));
+        this.showFeedback('error', productCartErrorMessage(error));
       },
       complete: () => {
         this.showFeedback('success', `${this.productName} sepete eklendi.`);
       },
     });
-  }
-
-  private resolveErrorMessage(error: unknown): string {
-    const body = (error as { error?: unknown } | null)?.error;
-    const message = typeof body === 'string' ? body.trim() : '';
-    return message || 'Ürün sepete eklenemedi.';
   }
 
   private showFeedback(kind: CartFeedbackKind, message: string): void {
@@ -144,20 +140,15 @@ export class ProductPreviewComponent implements OnInit, OnDestroy {
   }
 
   private setImage(blob: Blob): void {
-    this.releaseImageUrl();
-    this.imageObjectUrl = URL.createObjectURL(blob);
-    this.imageUrl = this.imageObjectUrl;
+    this.imageUrl = this.imageUrls.create(blob);
   }
 
   private clearImage(): void {
-    this.releaseImageUrl();
+    this.imageUrls.release();
     this.imageUrl = null;
   }
 
   private releaseImageUrl(): void {
-    if (this.imageObjectUrl) {
-      URL.revokeObjectURL(this.imageObjectUrl);
-      this.imageObjectUrl = null;
-    }
+    this.imageUrls.release();
   }
 }

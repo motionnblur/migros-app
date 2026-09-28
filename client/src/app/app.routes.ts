@@ -1,6 +1,5 @@
 import { Routes } from '@angular/router';
 import { MainComponent } from '../pages/main/main.component';
-import { AdminComponent } from '../pages/admin/admin.component';
 import { DiscoverComponent } from '../pages/main/components/discover-area/parent/discover-area.component';
 import { ProductPageComponent } from '../pages/main/components/product-page/product-page.component';
 import { SignUserComponent } from '../pages/main/components/sign-user/sign-user.component';
@@ -9,7 +8,6 @@ import { UserProfileComponent } from '../pages/main/components/user-profile/user
 import { OrderTrackerComponent } from '../pages/main/components/order-tracker/order-tracker.component';
 import { OrderHistoryComponent } from '../pages/main/components/order-history/order-history.component';
 import { SupportChatComponent } from '../pages/main/components/support-chat/support-chat.component';
-import { AdminPanelComponent } from '../pages/admin/components/admin-panel/admin-panel.component';
 
 export const routes: Routes = [
   {
@@ -41,27 +39,40 @@ export const routes: Routes = [
   },
   {
     path: 'admin',
-    component: AdminComponent,
+    loadComponent: () =>
+      import('../pages/admin/admin.component').then((module) => module.AdminComponent),
     children: [
       {
         path: '',
         pathMatch: 'full',
-        component: AdminPanelComponent,
+        loadComponent: () =>
+          import('../pages/admin/components/admin-panel/admin-panel.component').then(
+            (module) => module.AdminPanelComponent,
+          ),
         data: { section: 'home' },
       },
       {
         path: 'products',
-        component: AdminPanelComponent,
+        loadComponent: () =>
+          import('../pages/admin/components/admin-panel/admin-panel.component').then(
+            (module) => module.AdminPanelComponent,
+          ),
         data: { section: 'products' },
       },
       {
         path: 'orders',
-        component: AdminPanelComponent,
+        loadComponent: () =>
+          import('../pages/admin/components/admin-panel/admin-panel.component').then(
+            (module) => module.AdminPanelComponent,
+          ),
         data: { section: 'orders' },
       },
       {
         path: 'support',
-        component: AdminPanelComponent,
+        loadComponent: () =>
+          import('../pages/admin/components/admin-panel/admin-panel.component').then(
+            (module) => module.AdminPanelComponent,
+          ),
         data: { section: 'support' },
       },
     ],

@@ -1,5 +1,9 @@
 import { Injectable } from '@angular/core';
-import { EventManager } from '../../classes/EventManager';
+import {
+  EventCallback,
+  EventManager,
+  EventName,
+} from '../../classes/EventManager';
 
 @Injectable({
   providedIn: 'root',
@@ -11,15 +15,21 @@ export class EventService {
     this.eventManager = new EventManager();
   }
 
-  on(eventName: string, callback: (data: any) => void): void {
+  on<K extends EventName>(eventName: K, callback: EventCallback<K>): void {
     this.eventManager.on(eventName, callback);
   }
 
-  off(eventName: string, callback: (data: any) => void): void {
+  off<K extends EventName>(eventName: K, callback: EventCallback<K>): void {
     this.eventManager.off(eventName, callback);
   }
 
-  trigger(eventName: string, data?: any): void {
-    this.eventManager.trigger(eventName, data);
+  trigger(eventName: 'productChanged', data: number): void;
+  trigger(eventName: 'productAdded' | 'editorOpened', data?: undefined): void;
+  trigger(eventName: EventName, data?: number): void {
+    if (eventName === 'productChanged') {
+      this.eventManager.trigger(eventName, data as number);
+    } else {
+      this.eventManager.trigger(eventName, data as undefined);
+    }
   }
 }

@@ -4,6 +4,7 @@ import { RestService } from '../services/rest/rest.service';
 import { IProductData } from '../interfaces/IProductData';
 import { IProductDescription } from '../interfaces/IProductDescription';
 import { SafeHtml } from '@angular/platform-browser';
+import { Subscription } from 'rxjs';
 
 @Directive()
 export abstract class ProductBuyBase {
@@ -24,35 +25,44 @@ export abstract class ProductBuyBase {
 
   protected restService: RestService;
   protected eventManager: EventService;
+  protected readonly requests = new Subscription();
+  private viewInitTimeout: ReturnType<typeof setTimeout> | null = null;
+
   constructor(restService: RestService, eventManager: EventService) {
     this.restService = restService;
     this.eventManager = eventManager;
   }
 
   ngOnInit() {
-    this.restService
-      .getProductData(this.productId)
-      .subscribe((data: IProductData) => {
+    this.requests.add(
+      this.restService.getProductData(this.productId).subscribe((data: IProductData) => {
         this.productData = data;
         this.onProductDataUpdate(data);
-      });
-    this.restService
-      .getProductDescription(this.productId)
-      .subscribe((data: IProductDescription) => {
-        this.productDescriptions = data;
-        const descriptionList = data?.descriptionList ?? [];
-        this.currentProductDescriptionBody = descriptionList.length
-          ? descriptionList[0].descriptionTabContent
-          : '';
-        this.onProductDescritptionUpdate(data);
-      });
-    this.restService.getProductImage(this.productId).subscribe((data: Blob) => {
-      this.releaseProductImageUrl();
-      this.productImageUrl = URL.createObjectURL(data);
-    });
+      }),
+    );
+    this.requests.add(
+      this.restService
+        .getProductDescription(this.productId)
+        .subscribe((data: IProductDescription) => {
+          this.productDescriptions = data;
+          const descriptionList = data?.descriptionList ?? [];
+          this.currentProductDescriptionBody = descriptionList.length
+            ? descriptionList[0].descriptionTabContent
+            : '';
+          this.onProductDescritptionUpdate(data);
+        }),
+    );
+    this.requests.add(
+      this.restService
+        .getProductImage(this.productId)
+        .subscribe((data: Blob) => {
+          this.releaseProductImageUrl();
+          this.productImageUrl = URL.createObjectURL(data);
+        }),
+    );
   }
   ngAfterViewInit() {
-    setTimeout(() => {
+    this.viewInitTimeout = setTimeout(() => {
       const firstTab: HTMLDivElement = document.querySelectorAll(
         '[data-tab-ref]'
       )[0] as HTMLDivElement;
@@ -70,12 +80,15 @@ export abstract class ProductBuyBase {
   }
 
   ngOnDestroy() {
+    this.requests.unsubscribe();
+    if (this.viewInitTimeout !== null) {
+      clearTimeout(this.viewInitTimeout);
+      this.viewInitTimeout = null;
+    }
     this.releaseProductImageUrl();
   }
 
-  protected onProductDescritptionUpdate(data: IProductDescription) {
-    console.log('onProductDescritptionUpdate');
-  }
+  protected onProductDescritptionUpdate(_data: IProductDescription) {}
   protected onProductDataUpdate(data: IProductData) {}
   protected changeTab(index: number, tabRef: HTMLDivElement) {
     this.currentProductDescriptionBody =

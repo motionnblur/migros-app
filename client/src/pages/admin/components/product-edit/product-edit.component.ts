@@ -184,7 +184,7 @@ export class ProductEditComponent extends ProductBuyBase {
       categoryValue: this.categoryValue,
     };
 
-    this.restService.updateProductData(productData).subscribe({
+    this.requests.add(this.restService.updateProductData(productData).subscribe({
       next: (status: boolean) => {
         this.isSavingProduct = false;
         if (status) {
@@ -198,7 +198,7 @@ export class ProductEditComponent extends ProductBuyBase {
           error?.error ?? 'Ürün kaydedilemedi. Lütfen alanları kontrol edin.';
         this.toastService.error('Ürün kaydedilemedi.');
       },
-    });
+    }));
   }
 
   saveDescriptions(): void {
@@ -211,7 +211,7 @@ export class ProductEditComponent extends ProductBuyBase {
 
     if (this.productDescriptionTabsToDelete.length > 0) {
       this.productDescriptionTabsToDelete.forEach((descriptionId) => {
-        this.restService.deleteProductDescription(descriptionId).subscribe();
+        this.requests.add(this.restService.deleteProductDescription(descriptionId).subscribe());
       });
       this.productDescriptionTabsToDelete = [];
     }
@@ -226,7 +226,7 @@ export class ProductEditComponent extends ProductBuyBase {
       return;
     }
 
-    this.restService.addProductDescription(this.productDescriptions).subscribe({
+    this.requests.add(this.restService.addProductDescription(this.productDescriptions).subscribe({
       next: (status: boolean) => {
         this.isSavingDescriptions = false;
         if (status) {
@@ -241,7 +241,7 @@ export class ProductEditComponent extends ProductBuyBase {
         this.saveError = error?.error ?? 'Açıklamalar kaydedilemedi.';
         this.toastService.error('Açıklamalar kaydedilemedi.');
       },
-    });
+    }));
   }
 
   onImageSelected(event: Event): void {

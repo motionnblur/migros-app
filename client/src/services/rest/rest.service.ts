@@ -1,577 +1,248 @@
-import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { map } from 'rxjs';
+import { AccountApiService } from './account-api.service';
+import { AdminApiService } from './admin-api.service';
+import { CartOrdersApiService } from './cart-orders-api.service';
+import { CatalogApiService } from './catalog-api.service';
+import { PaymentApiService } from './payment-api.service';
+import { SupportApiService } from './support-api.service';
 import { IProductUploader } from '../../interfaces/IProductUploader';
 import { IProductUpdater } from '../../interfaces/IProductUpdater';
-import { IAdminProductPreview } from '../../interfaces/IAdminProductPreview';
-import { IProductData } from '../../interfaces/IProductData';
 import { IProductDescription } from '../../interfaces/IProductDescription';
-import { ISubCategory } from '../../interfaces/ISubCategory';
 import { ISignDto } from '../../interfaces/ISignDto';
-import { IUserCartItemDto } from '../../interfaces/IUserCartItemDto';
-import { IOrder } from '../../interfaces/IOrder';
-import { IOrderPage } from '../../interfaces/IOrderPage';
 import { IUserProfileTable } from '../../interfaces/IUserProfileTable';
-import { IChatMessage } from '../../interfaces/IChatMessage';
-import { IUserOrderDetail } from '../../interfaces/IUserOrderDetail';
-import { IUserOrderGroup } from '../../interfaces/IUserOrderGroup';
-import { IProductPreview } from '../../interfaces/IProductPreview';
-import { ICheckoutResponse } from '../../interfaces/ICheckoutResponse';
-import { ICheckoutStatus } from '../../interfaces/ICheckoutStatus';
-import { IPaymentResponse } from '../../interfaces/IPaymentResponse';
-import { IPaymentStatus } from '../../interfaces/IPaymentStatus';
-import { ISupportCustomerSummary } from '../../interfaces/support/ISupportCustomerSummary';
-import { API_BASE_URL } from '../../app/config/backend.config';
 
-@Injectable({
-  providedIn: 'root',
-})
+/**
+ * Compatibility facade for existing components and tests. New API requests
+ * belong in the focused domain services injected below.
+ */
+@Injectable({ providedIn: 'root' })
 export class RestService {
-  getVerifyUser(userMail: string) {
-    return this.http.post(`${API_BASE_URL}/user/verifyUserMail`, null, {
-      params: { userMail },
-      responseType: 'json',
-    });
-  }
-  constructor(private http: HttpClient) {}
+  constructor(
+    private readonly catalogApi: CatalogApiService,
+    private readonly cartOrdersApi: CartOrdersApiService,
+    private readonly paymentApi: PaymentApiService,
+    private readonly accountApi: AccountApiService,
+    private readonly adminApi: AdminApiService,
+    private readonly supportApi: SupportApiService,
+  ) {}
 
-  getProductPageData(categoryId: number, page: number, productRange: number) {
-    return this.http
-      .get(`${API_BASE_URL}/user/supply/getProductsFromCategory`, {
-        params: { categoryId, page, productRange },
-        responseType: 'json',
-      })
-      .pipe(map((response) => response as IProductPreview[]));
-  }
-  getProductPageDataAdmin(
-    categoryId: number,
-    page: number,
-    productRange: number,
-  ) {
-    return this.http.get(
-      `${API_BASE_URL}/admin/supply/getProductsFromCategory`,
-      {
-        params: { categoryId, page, productRange },
-        responseType: 'json',
-      },
-    );
-  }
-  getProductCountsFromCategory(categoryId: number) {
-    return this.http
-      .get(`${API_BASE_URL}/user/supply/getProductCountsFromCategory`, {
-        params: { categoryId },
-        responseType: 'json',
-      })
-      .pipe(map((response) => response as number));
-  }
-  getProductCountsFromCategoryAdmin(categoryId: number) {
-    return this.http.get(
-      `${API_BASE_URL}/admin/supply/getProductCountsFromCategory`,
-      {
-        params: { categoryId },
-        responseType: 'json',
-      },
-    );
-  }
-  getAllProductsAdmin(page: number, productRange: number) {
-    return this.http.get(`${API_BASE_URL}/admin/supply/getAllProducts`, {
-      params: { page, productRange },
-      responseType: 'json',
-    });
-  }
-  getAllProductCountsAdmin() {
-    return this.http.get(`${API_BASE_URL}/admin/supply/getAllProductCounts`, {
-      responseType: 'json',
-    });
-  }
-  getProductCountsFromSubCategory(subcategoryName: string) {
-    return this.http
-      .get(`${API_BASE_URL}/user/supply/getProductCountsFromSubcategory`, {
-        params: { subcategoryName },
-        responseType: 'json',
-      })
-      .pipe(map((response) => response as number));
-  }
-  getProductImage(productId: number) {
-    return this.http.get(`${API_BASE_URL}/user/supply/getProductImage`, {
-      params: { productId },
-      responseType: 'blob',
-    });
-  }
-  getProductData(productId: number) {
-    return this.http
-      .get(`${API_BASE_URL}/user/supply/getProductDataWithProductId`, {
-        params: { productId },
-        responseType: 'json',
-      })
-      .pipe(map((response) => response as IProductData));
-  }
-  getProductDataForUserCart(productId: number) {
-    return this.http
-      .get(`${API_BASE_URL}/user/supply/getProductData`, {
-        params: { productId },
-        responseType: 'json',
-      })
-      .pipe(map((response) => response as IProductData));
-  }
-  getAllProductsFromUserCart() {
-    return this.http
-      .get(`${API_BASE_URL}/user/supply/getProductData`, {
-        responseType: 'json',
-      })
-      .pipe(map((response) => response as IUserCartItemDto[]));
-  }
-  getAllAdminProducts(adminId: number, page: number, productRange: number) {
-    return this.http
-      .get(`${API_BASE_URL}/admin/panel/getAllAdminProducts`, {
-        params: {
-          adminId,
-          page,
-          productRange,
-        },
-        responseType: 'json',
-      })
-      .pipe(map((response) => response as IAdminProductPreview[]));
-  }
-  uploadProductData(productData: IProductUploader) {
-    const formData = new FormData();
-    formData.append('adminId', productData.adminId.toString());
-    formData.append(
-      'productName',
-      this.normalizeStringField(productData.productName),
-    );
-    formData.append(
-      'subCategoryName',
-      this.normalizeStringField(productData.subCategoryName),
-    );
-    formData.append('productPrice', productData.productPrice.toString());
-    formData.append('productCount', productData.productCount.toString());
-    formData.append('productDiscount', productData.productDiscount.toString());
-    formData.append(
-      'productDescription',
-      this.normalizeOptionalStringField(productData.productDescription),
-    );
-    if (productData.selectedImage) {
-      formData.append('selectedImage', productData.selectedImage);
-    }
-    formData.append('categoryValue', productData.categoryValue.toString());
-
-    return this.http
-      .post(`${API_BASE_URL}/admin/panel/uploadProduct`, formData, {
-        responseType: 'text',
-        observe: 'response',
-      })
-      .pipe(map((response) => response.status === 200));
-  }
-  updateProductData(productData: IProductUpdater) {
-    const formData = new FormData();
-    formData.append('adminId', productData.adminId.toString());
-    formData.append('productId', productData.productId.toString());
-    formData.append(
-      'productName',
-      this.normalizeStringField(productData.productName),
-    );
-    formData.append(
-      'subCategoryName',
-      this.normalizeStringField(productData.subCategoryName),
-    );
-    formData.append('productPrice', productData.productPrice.toString());
-    formData.append('productCount', productData.productCount.toString());
-    formData.append('productDiscount', productData.productDiscount.toString());
-    formData.append(
-      'productDescription',
-      this.normalizeOptionalStringField(productData.productDescription),
-    );
-    if (productData.selectedImage) {
-      formData.append('selectedImage', productData.selectedImage);
-    }
-    formData.append('categoryValue', productData.categoryValue.toString());
-
-    return this.http
-      .post(`${API_BASE_URL}/admin/panel/updateProduct`, formData, {
-        responseType: 'text',
-        observe: 'response',
-      })
-      .pipe(map((response) => response.status === 200));
-  }
-  updateOrderStatus(orderId: number, status: string) {
-    return this.http
-      .post(`${API_BASE_URL}/admin/panel/updateOrderStatus`, null, {
-        params: { orderId, status },
-        responseType: 'text',
-        observe: 'response',
-      })
-      .pipe(map((response) => response.status === 200));
-  }
-  uploadUserProfileTableData(table: IUserProfileTable) {
-    const formData = new FormData();
-    formData.append('userFirstName', table.userFirstName);
-    formData.append('userLastName', table.userLastName);
-    formData.append('userAddress', table.userAddress);
-    formData.append('userAddress2', table.userAddress2);
-    formData.append('userTown', table.userTown);
-    formData.append('userCountry', table.userCountry);
-    formData.append('userPostalCode', table.userPostalCode);
-
-    return this.http
-      .post(`${API_BASE_URL}/user/profile/uploadUserProfileTable`, formData, {
-        responseType: 'text',
-        observe: 'response',
-      })
-      .pipe(map((response) => response.status === 200));
-  }
-  getUserProfileTableData() {
-    return this.http
-      .get(`${API_BASE_URL}/user/profile/getUserProfileTable`, {
-        responseType: 'json',
-      })
-      .pipe(map((response) => response as IUserProfileTable));
+  getVerifyUser(userMail: string): ReturnType<AccountApiService['getVerifyUser']> {
+    return this.accountApi.getVerifyUser(userMail);
   }
 
-  deleteProduct(productId: number) {
-    return this.http
-      .delete(`${API_BASE_URL}/admin/panel/deleteProduct`, {
-        params: { productId },
-        responseType: 'text',
-        observe: 'response',
-      })
-      .pipe(map((response) => response.status === 200));
+  getProductPageData(categoryId: number, page: number, productRange: number): ReturnType<CatalogApiService['getProductPageData']> {
+    return this.catalogApi.getProductPageData(categoryId, page, productRange);
   }
 
-  addProductDescription(productDescription: IProductDescription) {
-    const data: IProductDescription = {
-      productId: productDescription.productId,
-      descriptionList: productDescription.descriptionList,
-    };
-    return this.http
-      .post(`${API_BASE_URL}/admin/panel/addProductDescription`, data, {
-        responseType: 'text',
-        observe: 'response',
-      })
-      .pipe(map((response) => response.status === 200));
-  }
-  getProductDescription(productId: number) {
-    return this.http
-      .get(`${API_BASE_URL}/user/supply/getProductDescription`, {
-        params: { productId },
-        responseType: 'json',
-      })
-      .pipe(map((response) => response as IProductDescription));
-  }
-  deleteProductDescription(descriptionId: number) {
-    return this.http
-      .delete(`${API_BASE_URL}/admin/panel/deleteProductDescription`, {
-        params: { descriptionId },
-        responseType: 'text',
-        observe: 'response',
-      })
-      .pipe(map((response) => response.status === 200));
-  }
-  getSubCategories(categoryId: number) {
-    return this.http
-      .get(`${API_BASE_URL}/user/supply/getSubCategories`, {
-        params: { categoryId },
-        responseType: 'json',
-      })
-      .pipe(map((response) => response as ISubCategory[]));
-  }
-  getProducstFromSubCategory(
-    subcategoryName: string,
-    page: number,
-    productRange: number,
-  ) {
-    return this.http
-      .get(`${API_BASE_URL}/user/supply/getProductsFromSubcategory`, {
-        params: { subcategoryName, page, productRange },
-        responseType: 'json',
-      })
-      .pipe(map((response) => response as IProductPreview[]));
-  }
-  signUser(userSignDto: ISignDto) {
-    return this.http
-      .post(`${API_BASE_URL}/user/signup`, userSignDto, {
-        responseType: 'text',
-        observe: 'response',
-      })
-      .pipe(map((response) => response.status === 200));
-  }
-  loginUser(userLoginDto: ISignDto) {
-    return this.http
-      .post(`${API_BASE_URL}/user/login`, userLoginDto, {
-        responseType: 'text',
-        observe: 'response',
-      })
-      .pipe(map((response) => response.status === 200));
-  }
-  resetPassword(payload: { token: string; userPassword: string }) {
-    return this.http
-      .post(`${API_BASE_URL}/user/resetPassword`, payload, {
-        responseType: 'text',
-        observe: 'response',
-      })
-      .pipe(map((response) => response.status === 200));
-  }
-  addProductToUserCart(productId: number) {
-    return this.http
-      .post(`${API_BASE_URL}/user/supply/addProductToUserCart`, null, {
-        params: { productId },
-        responseType: 'text',
-        observe: 'response',
-      })
-      .pipe(map((response) => response.body));
-  }
-  removeProductFromUserCart(productId: number) {
-    return this.http
-      .delete(`${API_BASE_URL}/user/supply/removeProductFromUserCart`, {
-        params: { productId },
-        responseType: 'text',
-        observe: 'response',
-      })
-      .pipe(map((response) => response.body));
-  }
-  updateProductCountInUserCart(productId: number, count: number) {
-    return this.http
-      .post(`${API_BASE_URL}/user/supply/updateProductCountInUserCart`, null, {
-        params: { productId, count },
-        responseType: 'text',
-        observe: 'response',
-      })
-      .pipe(map((response) => response.body));
-  }
-  prepareCheckout() {
-    return this.http
-      .post<ICheckoutResponse>(`${API_BASE_URL}/payment/checkouts`, {})
-      .pipe(map((response) => response as ICheckoutResponse));
+  getProductPageDataAdmin(categoryId: number, page: number, productRange: number): ReturnType<AdminApiService['getProductPageDataAdmin']> {
+    return this.adminApi.getProductPageDataAdmin(categoryId, page, productRange);
   }
 
-  getCheckoutStatus(checkoutId: string) {
-    return this.http
-      .get<ICheckoutStatus>(`${API_BASE_URL}/payment/checkouts/${checkoutId}`)
-      .pipe(map((response) => response as ICheckoutStatus));
+  getProductCountsFromCategory(categoryId: number): ReturnType<CatalogApiService['getProductCountsFromCategory']> {
+    return this.catalogApi.getProductCountsFromCategory(categoryId);
   }
 
-  getPaymentStatus(checkoutId: string) {
-    return this.http
-      .get<IPaymentStatus>(
-        `${API_BASE_URL}/payment/checkouts/${checkoutId}/status`,
-      )
-      .pipe(map((response) => response as IPaymentStatus));
+  getProductCountsFromCategoryAdmin(categoryId: number): ReturnType<AdminApiService['getProductCountsFromCategoryAdmin']> {
+    return this.adminApi.getProductCountsFromCategoryAdmin(categoryId);
   }
 
-  chargeCheckout(checkoutId: string, token: string) {
-    return this.http
-      .post<IPaymentResponse>(
-        `${API_BASE_URL}/payment/checkouts/${checkoutId}/charge`,
-        { token },
-      )
-      .pipe(map((response) => response as IPaymentResponse));
+  getAllProductsAdmin(page: number, productRange: number): ReturnType<AdminApiService['getAllProductsAdmin']> {
+    return this.adminApi.getAllProductsAdmin(page, productRange);
   }
 
-  cancelCheckout(checkoutId: string) {
-    return this.http
-      .post<ICheckoutStatus>(
-        `${API_BASE_URL}/payment/checkouts/${checkoutId}/cancel`,
-        {},
-      )
-      .pipe(map((response) => response as ICheckoutStatus));
+  getAllProductCountsAdmin(): ReturnType<AdminApiService['getAllProductCountsAdmin']> {
+    return this.adminApi.getAllProductCountsAdmin();
   }
 
-  getAllOrders(page: number, productRange: number) {
-    return this.http
-      .get(`${API_BASE_URL}/admin/panel/getAllOrders`, {
-        params: { page, productRange },
-        responseType: 'json',
-      })
-      .pipe(map((response) => response as IOrderPage));
-  }
-  getUserProfileData(orderId: number) {
-    return this.http
-      .get(`${API_BASE_URL}/admin/panel/getUserProfileData`, {
-        params: { orderId },
-        responseType: 'json',
-      })
-      .pipe(map((response) => response as IUserProfileTable));
-  }
-  getAllOrderIds() {
-    return this.http
-      .get(`${API_BASE_URL}/user/supply/getAllOrderIds`, {
-        responseType: 'json',
-      })
-      .pipe(map((response) => response as number[]));
-  }
-  getOrderStatusByOrderId(orderId: number) {
-    return this.http
-      .get(`${API_BASE_URL}/user/supply/getOrderStatusByOrderId`, {
-        params: { orderId },
-        responseType: 'text',
-      })
-      .pipe(map((response) => response as string));
-  }
-  calcelOrder(orderId: number) {
-    return this.http
-      .delete(`${API_BASE_URL}/user/supply/cancelOrder`, {
-        params: { orderId },
-        responseType: 'text',
-        observe: 'response',
-      })
-      .pipe(map((response) => response.status === 200));
-  }
-  getSupportMessages() {
-    return this.http
-      .get(`${API_BASE_URL}/user/support/messages`, {
-        responseType: 'json',
-      })
-      .pipe(map((response) => response as IChatMessage[]));
+  getProductCountsFromSubCategory(subcategoryName: string): ReturnType<CatalogApiService['getProductCountsFromSubCategory']> {
+    return this.catalogApi.getProductCountsFromSubCategory(subcategoryName);
   }
 
-  sendSupportMessage(message: string) {
-    return this.http
-      .post(
-        `${API_BASE_URL}/user/support/send`,
-        { message },
-        {
-          responseType: 'text',
-          observe: 'response',
-        },
-      )
-      .pipe(map((response) => response.status === 200));
+  getProductImage(productId: number): ReturnType<CatalogApiService['getProductImage']> {
+    return this.catalogApi.getProductImage(productId);
   }
 
-  getSupportUsersForAdmin() {
-    return this.http
-      .get(`${API_BASE_URL}/admin/panel/support/users`, {
-        responseType: 'json',
-      })
-      .pipe(map((response) => response as string[]));
+  getProductData(productId: number): ReturnType<CatalogApiService['getProductData']> {
+    return this.catalogApi.getProductData(productId);
   }
 
-  searchSupportCustomersForAdmin(query: string, limit: number = 20) {
-    return this.http
-      .get(`${API_BASE_URL}/admin/panel/support/customers`, {
-        params: { query, limit },
-        responseType: 'json',
-      })
-      .pipe(map((response) => response as ISupportCustomerSummary[]));
+  getProductDataForUserCart(productId: number): ReturnType<CatalogApiService['getProductDataForUserCart']> {
+    return this.catalogApi.getProductDataForUserCart(productId);
   }
 
-  getBannedSupportUsersForAdmin() {
-    return this.http
-      .get(`${API_BASE_URL}/admin/panel/support/banned-users`, {
-        responseType: 'json',
-      })
-      .pipe(map((response) => response as string[]));
+  getAllProductsFromUserCart(): ReturnType<CartOrdersApiService['getAllProductsFromUserCart']> {
+    return this.cartOrdersApi.getAllProductsFromUserCart();
   }
 
-  getSupportMessagesForAdmin(userMail: string) {
-    return this.http
-      .get(`${API_BASE_URL}/admin/panel/support/messages`, {
-        params: { userMail },
-        responseType: 'json',
-      })
-      .pipe(map((response) => response as IChatMessage[]));
-  }
-  sendSupportReplyFromAdmin(userMail: string, message: string) {
-    return this.http
-      .post(
-        `${API_BASE_URL}/admin/panel/support/reply`,
-        { userMail, message },
-        {
-          responseType: 'text',
-          observe: 'response',
-        },
-      )
-      .pipe(map((response) => response.status === 200));
-  }
-  editSupportMessageForAdmin(
-    userMail: string,
-    messageId: number,
-    message: string,
-  ) {
-    return this.http
-      .patch(
-        `${API_BASE_URL}/admin/panel/support/messages/${messageId}`,
-        { userMail, message },
-        {
-          responseType: 'text',
-          observe: 'response',
-        },
-      )
-      .pipe(map((response) => response.status === 200));
+  getAllAdminProducts(adminId: number, page: number, productRange: number): ReturnType<AdminApiService['getAllAdminProducts']> {
+    return this.adminApi.getAllAdminProducts(adminId, page, productRange);
   }
 
-  deleteSupportMessageForAdmin(userMail: string, messageId: number) {
-    return this.http
-      .delete(`${API_BASE_URL}/admin/panel/support/messages/${messageId}`, {
-        params: { userMail },
-        responseType: 'text',
-        observe: 'response',
-      })
-      .pipe(map((response) => response.status === 200));
-  }
-  closeSupportChatForAdmin(userMail: string) {
-    return this.http
-      .post(`${API_BASE_URL}/admin/panel/support/close`, null, {
-        params: { userMail },
-        responseType: 'text',
-        observe: 'response',
-      })
-      .pipe(map((response) => response.status === 200));
-  }
-  banSupportUserFromAdmin(userMail: string) {
-    return this.http
-      .post(`${API_BASE_URL}/admin/panel/support/ban`, null, {
-        params: { userMail },
-        responseType: 'text',
-        observe: 'response',
-      })
-      .pipe(map((response) => response.status === 200));
-  }
-  unbanSupportUserFromAdmin(userMail: string) {
-    return this.http
-      .post(`${API_BASE_URL}/admin/panel/support/unban`, null, {
-        params: { userMail },
-        responseType: 'text',
-        observe: 'response',
-      })
-      .pipe(map((response) => response.status === 200));
+  uploadProductData(productData: IProductUploader): ReturnType<AdminApiService['uploadProductData']> {
+    return this.adminApi.uploadProductData(productData);
   }
 
-  deleteOrder(orderId: number) {
-    return this.http
-      .delete(`${API_BASE_URL}/admin/panel/deleteOrder`, {
-        params: { orderId },
-        responseType: 'text',
-        observe: 'response',
-      })
-      .pipe(map((response) => response.status === 200));
-  }
-  getUserOrders() {
-    return this.http
-      .get(`${API_BASE_URL}/user/supply/getUserOrders`, {
-        responseType: 'json',
-      })
-      .pipe(map((response) => response as IUserOrderDetail[]));
-  }
-  getUserOrderGroups() {
-    return this.http
-      .get(`${API_BASE_URL}/user/supply/getUserOrderGroups`, {
-        responseType: 'json',
-      })
-      .pipe(map((response) => response as IUserOrderGroup[]));
+  updateProductData(productData: IProductUpdater): ReturnType<AdminApiService['updateProductData']> {
+    return this.adminApi.updateProductData(productData);
   }
 
-  private normalizeStringField(value: string): string {
-    return (value ?? '').trim();
+  updateOrderStatus(orderId: number, status: string): ReturnType<AdminApiService['updateOrderStatus']> {
+    return this.adminApi.updateOrderStatus(orderId, status);
   }
 
-  private normalizeOptionalStringField(value: string): string {
-    const normalized = (value ?? '').trim();
-    if (
-      normalized.toLowerCase() === 'undefined' ||
-      normalized.toLowerCase() === 'null'
-    ) {
-      return '';
-    }
-    return normalized;
+  uploadUserProfileTableData(table: IUserProfileTable): ReturnType<AccountApiService['uploadUserProfileTableData']> {
+    return this.accountApi.uploadUserProfileTableData(table);
+  }
+
+  getUserProfileTableData(): ReturnType<AccountApiService['getUserProfileTableData']> {
+    return this.accountApi.getUserProfileTableData();
+  }
+
+  deleteProduct(productId: number): ReturnType<AdminApiService['deleteProduct']> {
+    return this.adminApi.deleteProduct(productId);
+  }
+
+  addProductDescription(productDescription: IProductDescription): ReturnType<AdminApiService['addProductDescription']> {
+    return this.adminApi.addProductDescription(productDescription);
+  }
+
+  getProductDescription(productId: number): ReturnType<CatalogApiService['getProductDescription']> {
+    return this.catalogApi.getProductDescription(productId);
+  }
+
+  deleteProductDescription(descriptionId: number): ReturnType<AdminApiService['deleteProductDescription']> {
+    return this.adminApi.deleteProductDescription(descriptionId);
+  }
+
+  getSubCategories(categoryId: number): ReturnType<CatalogApiService['getSubCategories']> {
+    return this.catalogApi.getSubCategories(categoryId);
+  }
+
+  getProducstFromSubCategory(subcategoryName: string, page: number, productRange: number): ReturnType<CatalogApiService['getProducstFromSubCategory']> {
+    return this.catalogApi.getProducstFromSubCategory(subcategoryName, page, productRange);
+  }
+
+  signUser(userSignDto: ISignDto): ReturnType<AccountApiService['signUser']> {
+    return this.accountApi.signUser(userSignDto);
+  }
+
+  loginUser(userLoginDto: ISignDto): ReturnType<AccountApiService['loginUser']> {
+    return this.accountApi.loginUser(userLoginDto);
+  }
+
+  resetPassword(payload: { token: string; userPassword: string }): ReturnType<AccountApiService['resetPassword']> {
+    return this.accountApi.resetPassword(payload);
+  }
+
+  addProductToUserCart(productId: number): ReturnType<CartOrdersApiService['addProductToUserCart']> {
+    return this.cartOrdersApi.addProductToUserCart(productId);
+  }
+
+  removeProductFromUserCart(productId: number): ReturnType<CartOrdersApiService['removeProductFromUserCart']> {
+    return this.cartOrdersApi.removeProductFromUserCart(productId);
+  }
+
+  updateProductCountInUserCart(productId: number, count: number): ReturnType<CartOrdersApiService['updateProductCountInUserCart']> {
+    return this.cartOrdersApi.updateProductCountInUserCart(productId, count);
+  }
+
+  prepareCheckout(): ReturnType<PaymentApiService['prepareCheckout']> {
+    return this.paymentApi.prepareCheckout();
+  }
+
+  getCheckoutStatus(checkoutId: string): ReturnType<PaymentApiService['getCheckoutStatus']> {
+    return this.paymentApi.getCheckoutStatus(checkoutId);
+  }
+
+  getPaymentStatus(checkoutId: string): ReturnType<PaymentApiService['getPaymentStatus']> {
+    return this.paymentApi.getPaymentStatus(checkoutId);
+  }
+
+  chargeCheckout(checkoutId: string, token: string): ReturnType<PaymentApiService['chargeCheckout']> {
+    return this.paymentApi.chargeCheckout(checkoutId, token);
+  }
+
+  cancelCheckout(checkoutId: string): ReturnType<PaymentApiService['cancelCheckout']> {
+    return this.paymentApi.cancelCheckout(checkoutId);
+  }
+
+  getAllOrders(page: number, productRange: number): ReturnType<AdminApiService['getAllOrders']> {
+    return this.adminApi.getAllOrders(page, productRange);
+  }
+
+  getUserProfileData(orderId: number): ReturnType<AdminApiService['getUserProfileData']> {
+    return this.adminApi.getUserProfileData(orderId);
+  }
+
+  getAllOrderIds(): ReturnType<CartOrdersApiService['getAllOrderIds']> {
+    return this.cartOrdersApi.getAllOrderIds();
+  }
+
+  getOrderStatusByOrderId(orderId: number): ReturnType<CartOrdersApiService['getOrderStatusByOrderId']> {
+    return this.cartOrdersApi.getOrderStatusByOrderId(orderId);
+  }
+
+  calcelOrder(orderId: number): ReturnType<CartOrdersApiService['calcelOrder']> {
+    return this.cartOrdersApi.calcelOrder(orderId);
+  }
+
+  getSupportMessages(): ReturnType<SupportApiService['getSupportMessages']> {
+    return this.supportApi.getSupportMessages();
+  }
+
+  sendSupportMessage(message: string): ReturnType<SupportApiService['sendSupportMessage']> {
+    return this.supportApi.sendSupportMessage(message);
+  }
+
+  getSupportUsersForAdmin(): ReturnType<SupportApiService['getSupportUsersForAdmin']> {
+    return this.supportApi.getSupportUsersForAdmin();
+  }
+
+  searchSupportCustomersForAdmin(query: string, limit = 20): ReturnType<SupportApiService['searchSupportCustomersForAdmin']> {
+    return this.supportApi.searchSupportCustomersForAdmin(query, limit);
+  }
+
+  getBannedSupportUsersForAdmin(): ReturnType<SupportApiService['getBannedSupportUsersForAdmin']> {
+    return this.supportApi.getBannedSupportUsersForAdmin();
+  }
+
+  getSupportMessagesForAdmin(userMail: string): ReturnType<SupportApiService['getSupportMessagesForAdmin']> {
+    return this.supportApi.getSupportMessagesForAdmin(userMail);
+  }
+
+  sendSupportReplyFromAdmin(userMail: string, message: string): ReturnType<SupportApiService['sendSupportReplyFromAdmin']> {
+    return this.supportApi.sendSupportReplyFromAdmin(userMail, message);
+  }
+
+  editSupportMessageForAdmin(userMail: string, messageId: number, message: string): ReturnType<SupportApiService['editSupportMessageForAdmin']> {
+    return this.supportApi.editSupportMessageForAdmin(userMail, messageId, message);
+  }
+
+  deleteSupportMessageForAdmin(userMail: string, messageId: number): ReturnType<SupportApiService['deleteSupportMessageForAdmin']> {
+    return this.supportApi.deleteSupportMessageForAdmin(userMail, messageId);
+  }
+
+  closeSupportChatForAdmin(userMail: string): ReturnType<SupportApiService['closeSupportChatForAdmin']> {
+    return this.supportApi.closeSupportChatForAdmin(userMail);
+  }
+
+  banSupportUserFromAdmin(userMail: string): ReturnType<SupportApiService['banSupportUserFromAdmin']> {
+    return this.supportApi.banSupportUserFromAdmin(userMail);
+  }
+
+  unbanSupportUserFromAdmin(userMail: string): ReturnType<SupportApiService['unbanSupportUserFromAdmin']> {
+    return this.supportApi.unbanSupportUserFromAdmin(userMail);
+  }
+
+  deleteOrder(orderId: number): ReturnType<AdminApiService['deleteOrder']> {
+    return this.adminApi.deleteOrder(orderId);
+  }
+
+  getUserOrders(): ReturnType<CartOrdersApiService['getUserOrders']> {
+    return this.cartOrdersApi.getUserOrders();
+  }
+
+  getUserOrderGroups(): ReturnType<CartOrdersApiService['getUserOrderGroups']> {
+    return this.cartOrdersApi.getUserOrderGroups();
   }
 }

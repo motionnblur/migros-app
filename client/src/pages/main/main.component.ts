@@ -1,6 +1,6 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute, Router, RouterOutlet } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { Subject, Subscription, takeUntil } from 'rxjs';
 
 import { AuthService } from '../../services/auth/auth.service';
 import { RestService } from '../../services/rest/rest.service';
@@ -33,6 +33,7 @@ export class MainComponent implements OnInit, OnDestroy {
   private supportRealtimeSub: Subscription | null = null;
   private queryParamSub: Subscription | null = null;
   private lastSupportPopupUserMail = '';
+  private readonly destroy$ = new Subject<void>();
 
   constructor(
     private authService: AuthService,
@@ -74,7 +75,7 @@ export class MainComponent implements OnInit, OnDestroy {
       }
     );
 
-    this.authService.refreshUserSession().subscribe();
+    this.authService.refreshUserSession().pipe(takeUntil(this.destroy$)).subscribe();
   }
 
   ngOnDestroy(): void {
@@ -82,6 +83,8 @@ export class MainComponent implements OnInit, OnDestroy {
     this.queryParamSub?.unsubscribe();
     this.supportRealtimeSub?.unsubscribe();
     this.supportRealtimeService.disconnect();
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   private checkAuthStatus() {
@@ -228,7 +231,7 @@ export class MainComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.restService.getSupportMessages().subscribe({
+    this.restService.getSupportMessages().pipe(takeUntil(this.destroy$)).subscribe({
       next: (messages: IChatMessage[]) => {
         const latestManagementId = this.getLatestManagementMessageId(messages);
         const lastSeenId = this.getLastSeenManagementMessageId(normalizedUserMail);

@@ -5,7 +5,7 @@ import {
   tick,
   discardPeriodicTasks,
 } from '@angular/core/testing';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 
 import { PaymentComponent } from './payment.component';
 import { RestService } from '../../../../services/rest/rest.service';
@@ -88,8 +88,8 @@ describe('PaymentComponent', () => {
       createToken: jasmine
         .createSpy('createToken')
         .and.returnValue(Promise.resolve({ token: { id: 'tok_visa' } })),
-    };
-    component.card = {};
+    } as any;
+    component.card = { destroy: jasmine.createSpy('destroy') } as any;
 
     fixture.detectChanges();
   });
@@ -141,7 +141,7 @@ describe('PaymentComponent', () => {
 
     await component.handlePayment();
 
-    expect(component.stripe.createToken).not.toHaveBeenCalled();
+    expect(component.stripe!.createToken).not.toHaveBeenCalled();
     expect(restService.chargeCheckout).not.toHaveBeenCalled();
   });
 
@@ -153,7 +153,7 @@ describe('PaymentComponent', () => {
     await Promise.all([first, second]);
 
     expect(restService.chargeCheckout).toHaveBeenCalledTimes(1);
-    expect(component.stripe.createToken).toHaveBeenCalledTimes(1);
+    expect(component.stripe!.createToken).toHaveBeenCalledTimes(1);
   });
 
   it('sends the server checkout id and the payment token', async () => {
@@ -174,6 +174,57 @@ describe('PaymentComponent', () => {
 
     expect(success).toHaveBeenCalled();
     expect(component.isProcessing).toBeFalse();
+  });
+
+  it('does not attempt tokenization when Stripe did not initialize', async () => {
+    component.stripe = null;
+    component.card = null;
+
+    await component.handlePayment();
+
+    expect(component.errorMessage).toContain('could not be initialized');
+    expect(component.isProcessing).toBeFalse();
+    expect(restService.chargeCheckout).not.toHaveBeenCalled();
+  });
+
+  it('shows the Stripe validation failure without submitting a charge', async () => {
+    component.stripe!.createToken = jasmine
+      .createSpy('createToken')
+      .and.returnValue(Promise.resolve({ error: { message: 'Card declined' } }));
+
+    await component.handlePayment();
+
+    expect(component.errorMessage).toBe('Card declined');
+    expect(component.isProcessing).toBeFalse();
+    expect(restService.chargeCheckout).not.toHaveBeenCalled();
+  });
+
+  it('keeps a failed checkout attached to the same id without preparing a replacement', async () => {
+    restService.chargeCheckout.and.returnValue(
+      of({ ...createChargeSuccessResponse(), success: false, pending: false }),
+    );
+    restService.prepareCheckout.calls.reset();
+
+    await component.handlePayment();
+
+    expect(component.errorMessage).toBe('Payment failed. Please try again.');
+    expect(restService.chargeCheckout).toHaveBeenCalledOnceWith('checkout-1', 'tok_visa');
+    expect(restService.prepareCheckout).not.toHaveBeenCalled();
+    expect(component.checkout?.checkoutId).toBe('checkout-1');
+  });
+
+  it('handles rejected token creation without losing the prepared checkout', async () => {
+    component.stripe!.createToken = jasmine
+      .createSpy('createToken')
+      .and.returnValue(Promise.reject(new Error('Stripe unavailable')));
+
+    await component.handlePayment();
+
+    expect(component.errorMessage).toBe('Payment failed. Please try again.');
+    expect(component.isProcessing).toBeFalse();
+    expect(component.checkout?.checkoutId).toBe('checkout-1');
+    expect(restService.chargeCheckout).not.toHaveBeenCalled();
+    expect(restService.prepareCheckout).toHaveBeenCalledTimes(1);
   });
 
   it('recovers the existing checkout status on a network error instead of preparing again', async () => {
@@ -206,6 +257,28 @@ describe('PaymentComponent', () => {
     expect(component.errorMessage).toContain('still being processed');
   });
 
+  it('keeps polling a pending charge against the original checkout only', fakeAsync(() => {
+    restService.chargeCheckout.and.returnValue(
+      of({ ...createChargeSuccessResponse(), success: false, pending: true }),
+    );
+    restService.getPaymentStatus.and.returnValue(
+      of(createFinalizedStatus({ finalized: false, pending: true, state: 'PROCESSING' })),
+    );
+    restService.prepareCheckout.calls.reset();
+
+    void component.handlePayment();
+    tick(0);
+    tick(2000);
+
+    expect(restService.chargeCheckout).toHaveBeenCalledOnceWith('checkout-1', 'tok_visa');
+    expect(restService.getPaymentStatus).toHaveBeenCalledWith('checkout-1');
+    expect(restService.prepareCheckout).not.toHaveBeenCalled();
+    expect(component.checkout?.checkoutId).toBe('checkout-1');
+    expect(component.pendingMessage).toContain('processed');
+    tick(10000);
+    discardPeriodicTasks();
+  }));
+
   it('does not treat a gracefully pending checkout as a hard failure', fakeAsync(() => {
     restService.getPaymentStatus.and.callFake(() =>
       of(
@@ -227,6 +300,24 @@ describe('PaymentComponent', () => {
     // a real 2s timer into the next test, then clean up any chained timers.
     tick(10000);
     discardPeriodicTasks();
+  }));
+
+  it('tears down the card, pending status request, and pending poll timer', fakeAsync(() => {
+    const pendingRequest = new Subject<IPaymentStatus>();
+    const cardDestroy = component.card!.destroy as jasmine.Spy;
+    restService.getPaymentStatus.and.returnValue(pendingRequest);
+    component.pollPaymentStatus('checkout-1', 2);
+    pendingRequest.next(
+      createFinalizedStatus({ finalized: false, pending: true, state: 'PROCESSING' }),
+    );
+
+    fixture.destroy();
+    tick(2000);
+
+    expect(component.card).toBeNull();
+    expect(component.stripe).toBeNull();
+    expect(cardDestroy).toHaveBeenCalled();
+    expect(restService.getPaymentStatus).toHaveBeenCalledTimes(1);
   }));
 
   it('cancels a prepared checkout when the modal is closed before payment', () => {
@@ -309,6 +400,7 @@ describe('PaymentComponent', () => {
     expect(restService.cancelCheckout).toHaveBeenCalledWith('checkout-1');
     expect(restService.getPaymentStatus).toHaveBeenCalledWith('checkout-1');
     expect(restService.prepareCheckout).not.toHaveBeenCalled();
+    expect(restService.chargeCheckout).not.toHaveBeenCalled();
     expect(closed).not.toHaveBeenCalled();
     expect(component.checkout?.checkoutId).toBe('checkout-1');
     expect(component.pendingMessage.length).toBeGreaterThan(0);

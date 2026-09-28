@@ -2,6 +2,7 @@ import {
   Component,
   ElementRef,
   EventEmitter,
+  OnDestroy,
   Output,
   ViewChild,
 } from '@angular/core';
@@ -11,6 +12,12 @@ import { CommonModule } from '@angular/common';
 import { PaymentComponent } from '../payment/payment.component';
 import { data } from '../../../../memory/global-data';
 import { ActivatedRoute, Router } from '@angular/router';
+import { Subscription } from 'rxjs';
+import { ObjectUrlManager } from '../../helpers/object-url-manager';
+import {
+  calculateCartTotal,
+  resolveCartQuantityChange,
+} from '../../helpers/cart-state';
 
 @Component({
   selector: 'app-user-cart',
@@ -19,13 +26,16 @@ import { ActivatedRoute, Router } from '@angular/router';
   templateUrl: './user-cart.component.html',
   styleUrl: './user-cart.component.css',
 })
-export class UserCartComponent {
+export class UserCartComponent implements OnDestroy {
   @ViewChild('buyButton') buyButtonRef!: ElementRef<HTMLButtonElement>;
 
   items: IUserCartItemDto[] = [];
-  itemsToDelete: number[] = [];
-  totalPrice: number = 0;
-  itemCountMap: Map<number, number> = new Map();
+  private readonly itemsToDelete = new Set<number>();
+  private readonly itemCountMap = new Map<number, number>();
+  private readonly productImageUrls = new Set<ObjectUrlManager>();
+  private imageRequests: Subscription[] = [];
+  private cartRequest: Subscription | null = null;
+  totalPrice = 0;
   isPaymentPhaseActive: boolean = false;
   isCartConfirmed: boolean = false;
 
@@ -47,37 +57,48 @@ export class UserCartComponent {
     document.addEventListener('keydown', this.escHandler);
   }
 
-  ngOnDestroy() {
+  ngOnDestroy(): void {
     document.removeEventListener('keydown', this.escHandler);
+    this.cartRequest?.unsubscribe();
+    this.cancelImageRequests();
+    this.releaseProductImages();
     this.saveCartItems();
   }
 
   private loadCart() {
-    this.restService.getAllProductsFromUserCart().subscribe({
+    this.cartRequest?.unsubscribe();
+    this.cancelImageRequests();
+    this.cartRequest = this.restService.getAllProductsFromUserCart().subscribe({
       next: (data: IUserCartItemDto[]) => {
+        this.releaseProductImages();
         this.items = data;
-        this.totalPrice = this.calculateTotal(data);
+        this.totalPrice = calculateCartTotal(data);
 
         this.items.forEach((item) => {
-          this.restService
+          const imageRequest = this.restService
             .getProductImage(item.productId)
             .subscribe((blob: Blob) => {
-              const url: string = window.URL.createObjectURL(blob);
-              item.productImageUrl = url;
+              const imageUrl = new ObjectUrlManager();
+              this.productImageUrls.add(imageUrl);
+              item.productImageUrl = imageUrl.create(blob);
             });
+          this.imageRequests.push(imageRequest);
         });
       },
-      error: (error: any) => {
+      error: (error: unknown) => {
         console.error(error);
       },
     });
   }
 
-  private calculateTotal(items: IUserCartItemDto[]): number {
-    return items.reduce(
-      (total, item) => total + item.productPrice * item.productCount,
-      0,
-    );
+  private cancelImageRequests(): void {
+    this.imageRequests.forEach((request) => request.unsubscribe());
+    this.imageRequests = [];
+  }
+
+  private releaseProductImages(): void {
+    this.productImageUrls.forEach((imageUrl) => imageUrl.release());
+    this.productImageUrls.clear();
   }
 
   private saveCartItems() {
@@ -93,7 +114,7 @@ export class UserCartComponent {
       }
     });
 
-    this.itemsToDelete = [];
+    this.itemsToDelete.clear();
     this.itemCountMap.clear();
   }
 
@@ -103,7 +124,7 @@ export class UserCartComponent {
     });
   }
 
-  public removeProductFromUserCart(productId: number) {
+  public removeProductFromUserCart(productId: number): void {
     const itemToRemove = this.items.find(
       (item) => item.productId === productId,
     );
@@ -111,45 +132,55 @@ export class UserCartComponent {
       this.totalPrice -= itemToRemove.productPrice * itemToRemove.productCount;
     }
 
-    if (!this.itemsToDelete.includes(productId)) {
-      this.itemsToDelete.push(productId);
+    if (!this.itemsToDelete.has(productId)) {
+      this.itemsToDelete.add(productId);
     }
 
     this.itemCountMap.delete(productId);
     this.items = this.items.filter((item) => item.productId !== productId);
   }
 
-  public increaseProductCount(productId: number) {
+  public increaseProductCount(productId: number): void {
     const item = this.items.find((entry) => entry.productId === productId);
-    if (!item) {
+    const change = resolveCartQuantityChange(item, 'increase');
+    if (change.kind === 'stock-limit') {
+      alert(`Bu urunden en fazla ${change.availableStock} adet alabilirsiniz.`);
+      return;
+    }
+    if (change.kind !== 'update' || !item) {
       return;
     }
 
-    if (item.productCount >= item.availableStock) {
-      alert(`Bu urunden en fazla ${item.availableStock} adet alabilirsiniz.`);
-      return;
-    }
-
-    item.productCount++;
-    item.deleteState = false;
+    const updatedItem = { ...item, productCount: change.quantity, deleteState: false };
+    this.items = this.items.map((entry) =>
+      entry.productId === productId ? updatedItem : entry,
+    );
     this.totalPrice += item.productPrice;
-    this.itemCountMap.set(item.productId, item.productCount);
+    this.itemCountMap.set(updatedItem.productId, updatedItem.productCount);
   }
 
-  public decreaseProductCount(productId: number) {
+  public decreaseProductCount(productId: number): void {
     const item = this.items.find((entry) => entry.productId === productId);
-    if (!item) {
+    const change = resolveCartQuantityChange(item, 'decrease');
+    if (change.kind === 'missing' || !item) {
       return;
     }
 
-    if (item.productCount <= 1) {
-      this.removeProductFromUserCart(item.productId);
+    if (change.kind === 'remove') {
+      this.removeProductFromUserCart(productId);
       return;
     }
 
-    item.productCount--;
+    if (change.kind !== 'update') {
+      return;
+    }
+
+    const updatedItem = { ...item, productCount: change.quantity };
+    this.items = this.items.map((entry) =>
+      entry.productId === productId ? updatedItem : entry,
+    );
     this.totalPrice -= item.productPrice;
-    this.itemCountMap.set(item.productId, item.productCount);
+    this.itemCountMap.set(updatedItem.productId, updatedItem.productCount);
   }
 
   public openPaymentComponent() {
@@ -181,7 +212,7 @@ export class UserCartComponent {
   public handleCheckoutPrepared() {
     // The server reserved and removed the cart contents when the snapshot was
     // prepared, so the live cart view must be refreshed from the backend.
-    this.itemsToDelete = [];
+    this.itemsToDelete.clear();
     this.itemCountMap.clear();
     this.isCartConfirmed = false;
     this.loadCart();
@@ -191,7 +222,7 @@ export class UserCartComponent {
     this.isPaymentPhaseActive = false;
     this.isCartConfirmed = false;
     this.items = [];
-    this.itemsToDelete = [];
+    this.itemsToDelete.clear();
     this.itemCountMap.clear();
     this.totalPrice = 0;
     this.router.navigate([{ outlets: { modal: ['order-tracker'] } }], {

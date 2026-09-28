@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Subscription } from 'rxjs';
+import { Subject, Subscription, takeUntil } from 'rxjs';
 import { ActivatedRoute, Router } from '@angular/router';
 
 import { RestService } from '../../../../services/rest/rest.service';
@@ -26,6 +26,7 @@ export class SupportChatComponent implements OnInit, OnDestroy {
   private supportPollingIntervalId: ReturnType<typeof setInterval> | null = null;
   private currentUserMail = '';
   private supportRealtimeSub: Subscription | null = null;
+  private readonly destroy$ = new Subject<void>();
 
   constructor(
     private restService: RestService,
@@ -36,7 +37,7 @@ export class SupportChatComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    this.authService.refreshUserSession().subscribe((isLoggedIn) => {
+    this.authService.refreshUserSession().pipe(takeUntil(this.destroy$)).subscribe((isLoggedIn) => {
       if (!isLoggedIn) {
         this.router.navigate(
           [{ outlets: { modal: ['login'] } }],
@@ -73,6 +74,8 @@ export class SupportChatComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.stopSupportMessagePolling();
     this.supportRealtimeSub?.unsubscribe();
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   public closeSupportChat() {
@@ -88,7 +91,7 @@ export class SupportChatComponent implements OnInit, OnDestroy {
     }
 
     this.isSupportSending = true;
-    this.restService.sendSupportMessage(message).subscribe({
+    this.restService.sendSupportMessage(message).pipe(takeUntil(this.destroy$)).subscribe({
       next: () => {
         this.supportMessageInput = '';
         this.isSupportSending = false;
@@ -108,7 +111,7 @@ export class SupportChatComponent implements OnInit, OnDestroy {
     this.isSupportLoading = true;
     this.supportErrorMessage = '';
 
-    this.restService.getSupportMessages().subscribe({
+    this.restService.getSupportMessages().pipe(takeUntil(this.destroy$)).subscribe({
       next: (messages: IChatMessage[]) => {
         this.supportMessages = messages;
         this.updateLastSeenManagementMessage(messages);

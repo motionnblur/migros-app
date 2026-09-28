@@ -11,6 +11,7 @@ import { FormControl } from '@angular/forms';
 import { RestService } from '../services/rest/rest.service';
 import { EventService } from '../services/event/event.service';
 import { categories } from '../memory/global-data';
+import { Subscription } from 'rxjs';
 
 @Directive()
 export abstract class ProductAdderBase {
@@ -33,7 +34,9 @@ export abstract class ProductAdderBase {
 
   selectedFormValue: number | null = null;
   protected imageUrl: string | null = null;
+  private imageObjectUrl: string | null = null;
   protected categoryControl = new FormControl('');
+  protected readonly requests = new Subscription();
 
   protected boundKeyDownEvent!: (event: KeyboardEvent) => void;
 
@@ -57,16 +60,18 @@ export abstract class ProductAdderBase {
 
   ngOnInit() {
     document.addEventListener('keydown', this.boundKeyDownEvent);
-    this.categoryControl.valueChanges.subscribe((value) => {
+    this.requests.add(this.categoryControl.valueChanges.subscribe((value) => {
       if (value !== null && value !== undefined && value !== '') {
         const parsedValue = Number(value);
         this.selectedFormValue = Number.isNaN(parsedValue) ? null : parsedValue;
       }
-    });
+    }));
   }
 
   ngOnDestroy() {
     document.removeEventListener('keydown', this.boundKeyDownEvent);
+    this.requests.unsubscribe();
+    this.releaseImageUrl();
   }
 
   public outProductAdded() {
@@ -129,10 +134,24 @@ export abstract class ProductAdderBase {
   }
 
   private updateView(image: File | null) {
+    this.releaseImageUrl();
     if (image) {
-      this.imageUrl = URL.createObjectURL(image);
+      this.setImagePreview(image);
     } else {
       this.imageUrl = null;
+    }
+  }
+
+  protected setImagePreview(image: Blob): void {
+    this.releaseImageUrl();
+    this.imageObjectUrl = URL.createObjectURL(image);
+    this.imageUrl = this.imageObjectUrl;
+  }
+
+  private releaseImageUrl(): void {
+    if (this.imageObjectUrl) {
+      URL.revokeObjectURL(this.imageObjectUrl);
+      this.imageObjectUrl = null;
     }
   }
 

@@ -14,7 +14,7 @@ import {
   clampPageToRange,
   countForSelection,
   hasSameBrowseQueryParams,
-  pageCountForProductCount,
+  pageCountForSelection,
   parsePageParam,
   resolveSubCategoryName,
 } from '../../helpers/category-browse-state';
@@ -105,7 +105,12 @@ export class ProductPageComponent implements OnInit, OnDestroy {
   }
 
   get pageCount(): number {
-    return pageCountForProductCount(this.selectionProductCount, this.pageSize);
+    return pageCountForSelection(
+      this.subCategories,
+      this.totalProductCount,
+      this.selectedSubCategoryName,
+      this.pageSize,
+    );
   }
 
   get hasMultiplePages(): boolean {
@@ -238,12 +243,10 @@ export class ProductPageComponent implements OnInit, OnDestroy {
     );
     const resolvedPage = clampPageToRange(
       this.requestedPageParam,
-      pageCountForProductCount(
-        countForSelection(
-          this.subCategories,
-          this.totalProductCount,
-          resolvedSubCategory,
-        ),
+      pageCountForSelection(
+        this.subCategories,
+        this.totalProductCount,
+        resolvedSubCategory,
         this.pageSize,
       ),
     );
@@ -395,12 +398,11 @@ export class ProductPageComponent implements OnInit, OnDestroy {
       return false;
     }
 
-    const httpError = error as HttpErrorResponse | null;
-    if (httpError?.status !== 404) {
+    if (!(error instanceof HttpErrorResponse) || error.status !== 404) {
       return false;
     }
 
-    const body = typeof httpError.error === 'string' ? httpError.error.trim() : '';
+    const body = typeof error.error === 'string' ? error.error.trim() : '';
     return body === '' || body === String(this.currentCategoryId);
   }
 

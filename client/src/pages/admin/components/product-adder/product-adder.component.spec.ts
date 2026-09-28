@@ -63,7 +63,7 @@ describe('ProductAdderComponent', () => {
     component.uploadProductData();
 
     expect(restServiceSpy.uploadProductData).toHaveBeenCalled();
-    expect(eventServiceSpy.trigger).toHaveBeenCalledWith('productAdded');
+    expect(eventServiceSpy.trigger.calls.mostRecent().args[0]).toBe('productAdded');
   });
 
   it('should show backend error when upload fails', () => {

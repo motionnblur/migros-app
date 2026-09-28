@@ -1,24 +1,30 @@
-import { Component, EventEmitter, OnInit, Output } from '@angular/core';
+import { Component, EventEmitter, OnDestroy, OnInit, Output } from '@angular/core';
 import { loadStripe } from '@stripe/stripe-js';
+import type { Stripe, StripeCardElement, StripeElements } from '@stripe/stripe-js';
+import { Subscription } from 'rxjs';
 import { data } from '../../../../memory/global-data';
 import { RestService } from '../../../../services/rest/rest.service';
 import { ICheckoutResponse } from '../../../../interfaces/ICheckoutResponse';
 import { IPaymentStatus } from '../../../../interfaces/IPaymentStatus';
+
+type CreatedStripeToken = NonNullable<
+  Awaited<ReturnType<Stripe['createToken']>>['token']
+>;
 
 @Component({
   selector: 'app-payment',
   templateUrl: './payment.component.html',
   styleUrls: ['./payment.component.css'],
 })
-export class PaymentComponent implements OnInit {
+export class PaymentComponent implements OnInit, OnDestroy {
   private static readonly MAX_STATUS_POLLS = 5;
   private static readonly STATUS_POLL_INTERVAL_MS = 2000;
   static readonly RECONCILIATION_PENDING_CODE =
     'PAYMENT_RECONCILIATION_PENDING';
 
-  stripe: any;
-  elements: any;
-  card: any;
+  stripe: Stripe | null = null;
+  elements: StripeElements | null = null;
+  card: StripeCardElement | null = null;
   isProcessing: boolean = false;
   isPreparing: boolean = false;
   errorMessage: string = '';
@@ -26,6 +32,9 @@ export class PaymentComponent implements OnInit {
   checkout: ICheckoutResponse | null = null;
   displayTotal: string = '';
   displayCurrency: string = 'TRY';
+  private readonly requests = new Subscription();
+  private statusPollTimer: ReturnType<typeof setTimeout> | null = null;
+  private destroyed = false;
 
   @Output() closePaymentComponentEvent = new EventEmitter<void>();
   @Output() paymentSuccess = new EventEmitter<void>();
@@ -34,20 +43,56 @@ export class PaymentComponent implements OnInit {
   constructor(private restService: RestService) {}
 
   ngOnInit() {
-    this.loadStripe();
+    void this.loadStripe();
     this.prepareCheckout();
   }
 
-  async loadStripe() {
-    // Initialize Stripe.js with your public key
-    this.stripe = await loadStripe(
-      'pk_test_51R5GK1RpCkckemuqxqwmtU3jtnARLIiSxsxaeU8lg7wQrJJH8oUxH5ZdykHQCRvFNvSL4duOLcL6XQY5Cwkxjcvp00VDagc07P'
-    );
+  ngOnDestroy(): void {
+    this.destroyed = true;
+    if (this.statusPollTimer !== null) {
+      clearTimeout(this.statusPollTimer);
+      this.statusPollTimer = null;
+    }
+    this.requests.unsubscribe();
+    this.card?.destroy();
+    this.card = null;
+    this.elements = null;
+    this.stripe = null;
+  }
 
-    // Create an instance of Elements and a card element
-    this.elements = this.stripe.elements();
-    this.card = this.elements.create('card');
-    this.card.mount('#card-element');
+  async loadStripe() {
+    try {
+      const stripe = await loadStripe(
+        'pk_test_51R5GK1RpCkckemuqxqwmtU3jtnARLIiSxsxaeU8lg7wQrJJH8oUxH5ZdykHQCRvFNvSL4duOLcL6XQY5Cwkxjcvp00VDagc07P'
+      );
+      if (this.destroyed) {
+        return;
+      }
+      if (!stripe) {
+        this.errorMessage = 'Payment form could not be initialized. Please try again.';
+        return;
+      }
+
+      const elements = stripe.elements();
+      const card = elements.create('card');
+      try {
+        card.mount('#card-element');
+      } catch (error) {
+        card.destroy();
+        throw error;
+      }
+      if (this.destroyed) {
+        card.destroy();
+        return;
+      }
+      this.stripe = stripe;
+      this.elements = elements;
+      this.card = card;
+    } catch {
+      if (!this.destroyed) {
+        this.errorMessage = 'Payment form could not be initialized. Please try again.';
+      }
+    }
   }
 
   // The server computes the immutable checkout snapshot. The client only
@@ -63,7 +108,7 @@ export class PaymentComponent implements OnInit {
       return;
     }
     this.isPreparing = true;
-    this.restService.prepareCheckout().subscribe({
+    this.requests.add(this.restService.prepareCheckout().subscribe({
       next: (checkout: ICheckoutResponse) => {
         this.checkout = checkout;
         this.displayTotal = Number(checkout.totalAmount).toFixed(2);
@@ -76,7 +121,7 @@ export class PaymentComponent implements OnInit {
         this.isPreparing = false;
         this.errorMessage = 'Could not prepare the checkout. Please try again.';
       },
-    });
+    }));
   }
 
   async handlePayment() {
@@ -88,20 +133,34 @@ export class PaymentComponent implements OnInit {
 
     this.errorMessage = '';
     this.pendingMessage = '';
-    this.isProcessing = true;
-
-    const { token, error } = await this.stripe.createToken(this.card);
-
-    if (error) {
-      this.errorMessage = error.message;
-      this.isProcessing = false;
+    if (!this.stripe || !this.card) {
+      this.errorMessage = 'Payment form could not be initialized. Please try again.';
       return;
     }
+    this.isProcessing = true;
 
-    this.processPayment(token);
+    try {
+      const { token, error } = await this.stripe.createToken(this.card);
+      if (this.destroyed) {
+        return;
+      }
+
+      if (error || !token) {
+        this.errorMessage = error?.message || 'Payment failed. Please try again.';
+        this.isProcessing = false;
+        return;
+      }
+
+      this.processPayment(token);
+    } catch {
+      if (!this.destroyed) {
+        this.errorMessage = 'Payment failed. Please try again.';
+        this.isProcessing = false;
+      }
+    }
   }
 
-  processPayment(token: any) {
+  processPayment(token: CreatedStripeToken) {
     const checkoutId = this.checkout!.checkoutId;
     // Mark the local snapshot as processing so a modal close can never treat
     // it as a plain prepared checkout. The server moves it to
@@ -110,7 +169,7 @@ export class PaymentComponent implements OnInit {
       this.checkout.status = 'PAYMENT_PROCESSING';
     }
 
-    this.restService.chargeCheckout(checkoutId, token.id).subscribe({
+    this.requests.add(this.restService.chargeCheckout(checkoutId, token.id).subscribe({
       next: (response) => {
         if (response.success && !response.pending) {
           this.completePayment();
@@ -126,7 +185,7 @@ export class PaymentComponent implements OnInit {
       // instead of starting a new one.
       error: () =>
         this.pollPaymentStatus(checkoutId, PaymentComponent.MAX_STATUS_POLLS),
-    });
+    }));
   }
 
   /**
@@ -135,14 +194,14 @@ export class PaymentComponent implements OnInit {
    * state, so an ambiguous network outcome can never cause a second charge.
    */
   pollPaymentStatus(checkoutId: string, remainingPolls: number) {
-    this.restService.getPaymentStatus(checkoutId).subscribe({
+    this.requests.add(this.restService.getPaymentStatus(checkoutId).subscribe({
       next: (status) => this.applyPaymentStatus(status, checkoutId, remainingPolls),
       error: () => {
         this.isProcessing = false;
         this.errorMessage =
           'Could not verify the payment status. Please check your orders before retrying.';
       },
-    });
+    }));
   }
 
   private applyPaymentStatus(
@@ -158,8 +217,13 @@ export class PaymentComponent implements OnInit {
     if (status.pending && remainingPolls > 0) {
       this.pendingMessage =
         'Payment is being processed. Please wait, do not submit again.';
-      setTimeout(
-        () => this.pollPaymentStatus(checkoutId, remainingPolls - 1),
+      this.statusPollTimer = setTimeout(
+        () => {
+          this.statusPollTimer = null;
+          if (!this.destroyed) {
+            this.pollPaymentStatus(checkoutId, remainingPolls - 1);
+          }
+        },
         PaymentComponent.STATUS_POLL_INTERVAL_MS,
       );
       return;
@@ -201,30 +265,37 @@ export class PaymentComponent implements OnInit {
     }
     const checkoutId = this.checkout?.checkoutId;
     if (checkoutId && this.checkout?.status === 'PREPARED') {
-      this.restService.cancelCheckout(checkoutId).subscribe({
+      this.requests.add(this.restService.cancelCheckout(checkoutId).subscribe({
         next: () => {
           this.checkout = null;
           this.closePaymentComponentEvent.emit();
         },
         error: (error) => this.handleCancelConflict(checkoutId, error),
-      });
+      }));
       return;
     }
     this.closePaymentComponentEvent.emit();
   }
 
-  isReconciliationPendingConflict(error: any): boolean {
-    const body = error?.error;
+  isReconciliationPendingConflict(error: unknown): boolean {
+    if (error === null || typeof error !== 'object') {
+      return false;
+    }
+
+    const errorResponse = error as { status?: unknown; error?: unknown };
+    const body = errorResponse.error;
     return (
-      error?.status === 409 &&
+      errorResponse.status === 409 &&
       body !== null &&
       typeof body === 'object' &&
+      'code' in body &&
       body.code === PaymentComponent.RECONCILIATION_PENDING_CODE &&
+      'pending' in body &&
       body.pending === true
     );
   }
 
-  private handleCancelConflict(checkoutId: string, error: any): void {
+  private handleCancelConflict(checkoutId: string, error: unknown): void {
     if (this.isReconciliationPendingConflict(error)) {
       // Reconciliation is pending: keep the SAME checkout and recover through
       // the existing status endpoint. Never prepare a replacement checkout.

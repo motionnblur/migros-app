@@ -4,7 +4,7 @@ import { CommonModule } from '@angular/common';
 import { AdminService } from './services/admin.service';
 import { AuthService } from '../../services/auth/auth.service';
 import { RouterOutlet } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { Subject, Subscription, takeUntil } from 'rxjs';
 
 @Component({
   selector: 'app-admin',
@@ -18,11 +18,12 @@ export class AdminComponent implements OnInit, OnDestroy {
   isLoginCompleted: boolean = false;
   private sessionPollingIntervalId: ReturnType<typeof setInterval> | null = null;
   private loginStatusSub: Subscription | null = null;
+  private readonly destroy$ = new Subject<void>();
 
   constructor(private adminService: AdminService, private authService: AuthService) {}
 
   ngOnInit(): void {
-    this.loginStatusSub = this.authService.adminLoggedIn$.subscribe(
+    this.loginStatusSub = this.authService.adminLoggedIn$.pipe(takeUntil(this.destroy$)).subscribe(
       (isLoggedIn) => {
         this.isLoginCompleted = isLoggedIn;
         if (isLoggedIn) {
@@ -31,14 +32,14 @@ export class AdminComponent implements OnInit, OnDestroy {
       }
     );
 
-    this.authService.refreshAdminSession().subscribe();
+    this.authService.refreshAdminSession().pipe(takeUntil(this.destroy$)).subscribe();
     this.startSessionPolling();
 
-    this.adminService.getLoginPhaseStatus().subscribe((status) => {
+    this.adminService.getLoginPhaseStatus().pipe(takeUntil(this.destroy$)).subscribe((status) => {
       this.isLoginPhaseActive = status;
     });
 
-    this.adminService.getLoginCompletedStatus().subscribe((status) => {
+    this.adminService.getLoginCompletedStatus().pipe(takeUntil(this.destroy$)).subscribe((status) => {
       if (status) {
         this.isLoginCompleted = true;
         this.isLoginPhaseActive = false;
@@ -49,6 +50,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.stopSessionPolling();
     this.loginStatusSub?.unsubscribe();
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   setLoginPhase(): void {
@@ -58,7 +61,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   private startSessionPolling() {
     this.stopSessionPolling();
     this.sessionPollingIntervalId = setInterval(() => {
-      this.authService.refreshAdminSession().subscribe();
+      this.authService.refreshAdminSession().pipe(takeUntil(this.destroy$)).subscribe();
     }, 15000);
   }
 

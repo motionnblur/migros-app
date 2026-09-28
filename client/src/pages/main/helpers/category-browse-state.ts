@@ -84,6 +84,18 @@ export function pageCountForProductCount(
   return Math.max(1, Math.ceil(count / size));
 }
 
+export function pageCountForSelection(
+  subCategories: readonly ISubCategory[] | null | undefined,
+  categoryProductCount: number,
+  selectedSubCategoryName: string,
+  pageSize: number = PRODUCT_PAGE_SIZE,
+): number {
+  return pageCountForProductCount(
+    countForSelection(subCategories, categoryProductCount, selectedSubCategoryName),
+    pageSize,
+  );
+}
+
 export function clampPageToRange(page: number | null | undefined, pageCount: number): number {
   const upperBound = Math.max(1, Math.floor(pageCount) || 1);
   const requested = page ?? 1;

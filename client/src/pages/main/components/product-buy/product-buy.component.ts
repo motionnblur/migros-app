@@ -20,6 +20,8 @@ import { RestService } from '../../../../services/rest/rest.service';
 import { IDescription } from '../../../../interfaces/IDescription';
 import { IProductData } from '../../../../interfaces/IProductData';
 import { IProductDescription } from '../../../../interfaces/IProductDescription';
+import { ObjectUrlManager } from '../../helpers/object-url-manager';
+import { productCartErrorMessage } from '../../helpers/product-cart-error';
 
 export type BuyFeedbackKind = 'success' | 'error';
 
@@ -51,7 +53,7 @@ export class ProductBuyComponent implements OnChanges, OnDestroy {
   feedbackKind: BuyFeedbackKind | null = null;
   feedbackMessage = '';
 
-  private imageObjectUrl: string | null = null;
+  private readonly imageUrls = new ObjectUrlManager();
   private dataSub: Subscription | null = null;
   private descriptionSub: Subscription | null = null;
   private imageSub: Subscription | null = null;
@@ -140,9 +142,7 @@ export class ProductBuyComponent implements OnChanges, OnDestroy {
       },
       error: (error: unknown) => {
         this.isAddingToCart = false;
-        const body = (error as { error?: unknown } | null)?.error;
-        const message = typeof body === 'string' ? body.trim() : '';
-        this.showFeedback('error', message || 'Ürün sepete eklenemedi.');
+        this.showFeedback('error', productCartErrorMessage(error));
       },
       complete: () => this.showFeedback('success', 'Ürün sepete eklendi.'),
     });
@@ -269,9 +269,7 @@ export class ProductBuyComponent implements OnChanges, OnDestroy {
   }
 
   private setImage(blob: Blob): void {
-    this.releaseImageUrl();
-    this.imageObjectUrl = URL.createObjectURL(blob);
-    this.productImageUrl = this.imageObjectUrl;
+    this.productImageUrl = this.imageUrls.create(blob);
   }
 
   private clearImage(): void {
@@ -280,10 +278,7 @@ export class ProductBuyComponent implements OnChanges, OnDestroy {
   }
 
   private releaseImageUrl(): void {
-    if (this.imageObjectUrl) {
-      URL.revokeObjectURL(this.imageObjectUrl);
-      this.imageObjectUrl = null;
-    }
+    this.imageUrls.release();
   }
 
   private showFeedback(kind: BuyFeedbackKind, message: string): void {
