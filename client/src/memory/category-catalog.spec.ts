@@ -18,6 +18,16 @@ describe('category catalog', () => {
     }
   });
 
+  it('provides a non-empty keyword list for every category', () => {
+    for (const category of CATEGORY_CATALOG) {
+      expect(Array.isArray(category.keywords)).toBe(true);
+      expect(category.keywords.length).toBeGreaterThan(0);
+      for (const keyword of category.keywords) {
+        expect(keyword.trim().length).toBeGreaterThan(0);
+      }
+    }
+  });
+
   it('keeps corrected visible labels without changing ids', () => {
     expect(CATEGORY_CATALOG.find((c) => c.value === 8)?.name).toBe(
       'Atıştırmalık'
@@ -70,9 +80,54 @@ describe('category catalog', () => {
     ).toEqual([3]);
   });
 
+  it('resolves keyword searches to their category', () => {
+    expect(
+      filterCategoriesByQuery(CATEGORY_CATALOG, 'ekmek').map((c) => c.value)
+    ).toEqual([9]);
+    expect(
+      filterCategoriesByQuery(CATEGORY_CATALOG, 'peynir').map((c) => c.value)
+    ).toEqual([3]);
+    expect(
+      filterCategoriesByQuery(CATEGORY_CATALOG, 'kedi').map((c) => c.value)
+    ).toEqual([17]);
+    expect(
+      filterCategoriesByQuery(CATEGORY_CATALOG, 'SAMPuan').map(
+        (c) => c.value
+      )
+    ).toEqual([12]);
+    expect(
+      filterCategoriesByQuery(CATEGORY_CATALOG, 'şampuan').map(
+        (c) => c.value
+      )
+    ).toEqual([12]);
+  });
+
+  it('keeps every placeholder example searchable', () => {
+    for (const example of ['çiçek', 'dondurma', 'ekmek']) {
+      expect(filterCategoriesByQuery(CATEGORY_CATALOG, example).length).toBeGreaterThan(
+        0
+      );
+    }
+  });
+
+  it('returns matching categories once and in catalog order', () => {
+    const multi = filterCategoriesByQuery(CATEGORY_CATALOG, 'su').map(
+      (c) => c.value
+    );
+    expect(multi).toEqual([3, 6]);
+    expect(new Set(multi).size).toBe(multi.length);
+
+    const single = filterCategoriesByQuery(CATEGORY_CATALOG, 'bakim').map(
+      (c) => c.value
+    );
+    expect(single).toEqual([12]);
+    expect(new Set(single).size).toBe(single.length);
+  });
+
   it('returns no category for a query without matches', () => {
     expect(filterCategoriesByQuery(CATEGORY_CATALOG, 'balon patlamasi')).toEqual(
       []
     );
+    expect(filterCategoriesByQuery(CATEGORY_CATALOG, 'xyzzy')).toEqual([]);
   });
 });
