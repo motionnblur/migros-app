@@ -32,7 +32,20 @@
     --landing-space-7: 48px;
 
     --landing-focus-ring: 0 0 0 3px rgba(255, 127, 0, 0.45);
-    --landing-header-offset: 96px;
+    --landing-header-offset: 88px;
+}
+
+/* Sticky header offset per breakpoint (tablet wraps actions, mobile adds a search row) */
+@media (max-width: 767.98px) {
+    :root {
+        --landing-header-offset: 132px;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 991.98px) {
+    :root {
+        --landing-header-offset: 144px;
+    }
 }
 
 html, body {
@@ -119,9 +132,8 @@ body {
   }
 }
 
-/* Landing shell: shared focus, overflow and motion behavior */
+/* Landing shell: shared focus and motion behavior */
 .landing-shell {
-  overflow-x: clip;
   background-color: var(--landing-surface-muted);
 }
 
