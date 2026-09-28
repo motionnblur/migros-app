@@ -1,9 +1,47 @@
+:root {
+    /* Landing page design tokens */
+    --landing-orange: #ff7f00;
+    --landing-orange-strong: #e56f00;
+    --landing-orange-soft: #fff4e6;
+    --landing-orange-deep: #c65d00;
+
+    --landing-surface: #ffffff;
+    --landing-surface-muted: #fafafa;
+    --landing-surface-raised: #f4f5f7;
+    --landing-border: #e6e7e9;
+    --landing-border-strong: #d6d8db;
+
+    --landing-ink: #1f2124;
+    --landing-ink-muted: #6c7278;
+
+    --landing-radius-sm: 8px;
+    --landing-radius-md: 14px;
+    --landing-radius-lg: 22px;
+    --landing-radius-pill: 999px;
+
+    --landing-shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+    --landing-shadow-md: 0 8px 20px rgba(16, 24, 40, 0.08);
+    --landing-shadow-lg: 0 18px 40px rgba(16, 24, 40, 0.14);
+
+    --landing-space-1: 4px;
+    --landing-space-2: 8px;
+    --landing-space-3: 12px;
+    --landing-space-4: 16px;
+    --landing-space-5: 24px;
+    --landing-space-6: 32px;
+    --landing-space-7: 48px;
+
+    --landing-focus-ring: 0 0 0 3px rgba(255, 127, 0, 0.45);
+    --landing-header-offset: 96px;
+}
+
 html, body {
     margin: 0;
     padding: 0;
     width: 100%;
     height: 100%;
 }
+
 .flex {
     display: flex;
 }
@@ -78,5 +116,59 @@ body {
 @media (max-width: 767.98px) {
   html, body {
     font-size: 14px;
+  }
+}
+
+/* Landing shell: shared focus, overflow and motion behavior */
+.landing-shell {
+  overflow-x: clip;
+  background-color: var(--landing-surface-muted);
+}
+
+.landing-shell a,
+.landing-shell button {
+  text-decoration: none;
+}
+
+.landing-shell a:focus-visible,
+.landing-shell button:focus-visible,
+.landing-shell [tabindex]:focus-visible {
+  outline: 3px solid var(--landing-orange);
+  outline-offset: 2px;
+}
+
+.landing-shell input:focus-visible {
+  outline: none;
+  box-shadow: var(--landing-focus-ring);
+}
+
+.landing-shell img {
+  display: block;
+}
+
+.visually-hidden-focusable:not(:focus):not(:focus-within) {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .landing-shell *,
+  .landing-shell *::before,
+  .landing-shell *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

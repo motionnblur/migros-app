@@ -1,0 +1,75 @@
+<section class="landing-hero" aria-labelledby="landing-hero-title">
+  <div class="landing-hero__inner">
+    <div class="landing-hero__copy">
+      <p class="landing-hero__eyebrow">
+        <i class="bi bi-shop-window" aria-hidden="true"></i>
+        Migros Sanal Market
+      </p>
+
+      <h1 id="landing-hero-title" class="landing-hero__title">
+        İhtiyacın olan her şey, tek sepetle kapında.
+      </h1>
+
+      <p class="landing-hero__text">
+        Meyve ve sebzeden kahvaltılıklara, fırından temel gıdaya kadar
+        18 kategoride yüzlerce ürün tek sepette.
+      </p>
+
+      <div class="landing-hero__actions">
+        <button
+          type="button"
+          class="landing-hero__cta"
+          (click)="scrollToCategories()"
+        >
+          Kategorileri keşfet
+          <i class="bi bi-arrow-down" aria-hidden="true"></i>
+        </button>
+      </div>
+
+      <ul class="landing-hero__trust">
+        <li>
+          <i class="bi bi-bag-check" aria-hidden="true"></i>
+          Kolay alışveriş
+        </li>
+        <li>
+          <i class="bi bi-shield-lock" aria-hidden="true"></i>
+          Güvenli ödeme
+        </li>
+        <li>
+          <i class="bi bi-headset" aria-hidden="true"></i>
+          Canlı destek
+        </li>
+      </ul>
+    </div>
+
+    <div class="landing-hero__art" aria-hidden="true">
+      <img
+        class="landing-hero__image"
+        [src]="fruitsImage"
+        alt=""
+        width="150"
+        height="150"
+        loading="eager"
+        decoding="async"
+      />
+      <img
+        class="landing-hero__image"
+        [src]="breakfastImage"
+        alt=""
+        width="150"
+        height="150"
+        loading="eager"
+        decoding="async"
+      />
+      <img
+        class="landing-hero__image"
+        [src]="bakeryImage"
+        alt=""
+        width="150"
+        height="150"
+        loading="eager"
+        decoding="async"
+      />
+    </div>
+  </div>
+</section>

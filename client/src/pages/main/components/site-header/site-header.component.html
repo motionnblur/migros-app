@@ -1,0 +1,133 @@
+<header class="site-header sticky-top">
+  <div class="container site-header__bar">
+    <a class="site-header__brand" routerLink="/" aria-label="Migros Sanal Market ana sayfası">
+      <img
+        class="site-header__brand-logo"
+        [src]="staticImageUrl('migroslogo.png')"
+        alt=""
+        width="40"
+        height="40"
+      />
+      <span class="site-header__brand-name">
+        Migros
+        <strong>Sanal Market</strong>
+      </span>
+    </a>
+
+    <form
+      class="site-header__search"
+      role="search"
+      (ngSubmit)="submitSearch()"
+    >
+      <label class="visually-hidden" for="site-header-search">
+        Kategorilerde ara
+      </label>
+      <i class="bi bi-search site-header__search-icon" aria-hidden="true"></i>
+      <input
+        #searchInput
+        id="site-header-search"
+        type="search"
+        class="site-header__input"
+        [value]="searchTerm"
+        (input)="searchTerm = searchInput.value"
+        placeholder="Kategori ara: çiçek, dondurma, ekmek"
+        autocomplete="off"
+      />
+      <button
+        type="submit"
+        class="site-header__search-button"
+        aria-label="Aramayı gönder"
+      >
+        <i class="bi bi-arrow-right" aria-hidden="true"></i>
+      </button>
+    </form>
+
+    <nav class="site-header__actions" aria-label="Hızlı işlemler">
+      <button
+        type="button"
+        class="site-header__action"
+        aria-label="Sipariş Takibi"
+        (click)="selectAction('orderTracker')"
+      >
+        <i class="bi bi-truck" aria-hidden="true"></i>
+        <span class="site-header__action-label">Sipariş Takibi</span>
+      </button>
+
+      <button
+        type="button"
+        class="site-header__action"
+        aria-label="Sepetim"
+        (click)="selectAction('cart')"
+      >
+        <i class="bi bi-cart3" aria-hidden="true"></i>
+        <span class="site-header__action-label">Sepetim</span>
+      </button>
+
+      @if (!isLoggedIn) {
+        <button
+          type="button"
+          class="site-header__login"
+          aria-label="Üye Ol veya Giriş Yap"
+          (click)="selectAction('login')"
+        >
+          <i class="bi bi-person" aria-hidden="true"></i>
+          <span class="site-header__login-wide">Üye Ol veya Giriş Yap</span>
+          <span class="site-header__login-short">Giriş Yap</span>
+        </button>
+      } @else {
+        <div class="site-header__account">
+          <button
+            type="button"
+            class="site-header__action site-header__account-toggle"
+            [attr.aria-expanded]="isAccountMenuOpen"
+            aria-haspopup="menu"
+            (click)="toggleAccountMenu($event)"
+          >
+            <i class="bi bi-person-circle" aria-hidden="true"></i>
+            <span class="site-header__account-name">{{ accountLabel }}</span>
+            <i class="bi bi-chevron-down" aria-hidden="true"></i>
+          </button>
+
+          @if (isAccountMenuOpen) {
+            <ul class="site-header__dropdown" role="menu" (click)="$event.stopPropagation()">
+              <li role="none">
+                <button type="button" role="menuitem" (click)="selectAction('cart')">
+                  <i class="bi bi-cart3" aria-hidden="true"></i>
+                  Sepetim
+                </button>
+              </li>
+              <li role="none">
+                <button type="button" role="menuitem" (click)="selectAction('profile')">
+                  <i class="bi bi-person" aria-hidden="true"></i>
+                  Profilim
+                </button>
+              </li>
+              <li role="none">
+                <button type="button" role="menuitem" (click)="selectAction('orderHistory')">
+                  <i class="bi bi-receipt" aria-hidden="true"></i>
+                  Siparişlerim
+                </button>
+              </li>
+              <li role="none">
+                <hr class="site-header__divider" />
+              </li>
+              <li role="none">
+                <button
+                  type="button"
+                  role="menuitem"
+                  class="site-header__logout"
+                  (click)="selectAction('logout')"
+                >
+                  <i class="bi bi-box-arrow-right" aria-hidden="true"></i>
+                  Çıkış Yap
+                </button>
+              </li>
+            </ul>
+          }
+        </div>
+      }
+    </nav>
+  </div>
+
+  <div class="site-header__accent" aria-hidden="true"></div>
+</header>

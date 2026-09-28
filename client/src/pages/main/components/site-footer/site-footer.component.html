@@ -1,0 +1,92 @@
+<footer class="site-footer">
+  <div class="container">
+    <div class="site-footer__grid">
+      <div class="site-footer__brand">
+        <a
+          class="site-footer__logo"
+          routerLink="/"
+          aria-label="Migros Sanal Market ana sayfası"
+        >
+          <img
+            [src]="staticImageUrl('migroslogo.png')"
+            alt=""
+            width="36"
+            height="36"
+          />
+          <span class="site-footer__logo-name">
+            Migros
+            <strong>Sanal Market</strong>
+          </span>
+        </a>
+        <p class="site-footer__summary">
+          Migros market alışverişini sade, hızlı ve erişilebilir bir arayüze
+          taşıyan vitrin projesi. 18 kategori, tek sepet ve güvenli ödeme
+          adımları.
+        </p>
+      </div>
+
+      <nav class="site-footer__column" aria-labelledby="site-footer-shortcuts">
+        <h2 id="site-footer-shortcuts" class="site-footer__heading">
+          Kısayollar
+        </h2>
+        <ul class="site-footer__list">
+          <li>
+            <a
+              class="site-footer__link"
+              routerLink="/"
+              fragment="categories"
+            >
+              <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i>
+              Kategoriler
+            </a>
+          </li>
+          <li>
+            <button
+              type="button"
+              class="site-footer__link"
+              (click)="selectAction('orderTracker')"
+            >
+              <i class="bi bi-truck" aria-hidden="true"></i>
+              Sipariş Takibi
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              class="site-footer__link"
+              (click)="selectAction('support')"
+            >
+              <i class="bi bi-headset" aria-hidden="true"></i>
+              Canlı Destek
+            </button>
+          </li>
+        </ul>
+      </nav>
+
+      <div class="site-footer__column" aria-labelledby="site-footer-benefits">
+        <h2 id="site-footer-benefits" class="site-footer__heading">
+          Neden burada
+        </h2>
+        <ul class="site-footer__benefits">
+          <li>
+            <i class="bi bi-basket2" aria-hidden="true"></i>
+            18 kategoride tek sepet
+          </li>
+          <li>
+            <i class="bi bi-shield-check" aria-hidden="true"></i>
+            Güvenli ödeme adımları
+          </li>
+          <li>
+            <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
+            Siparişini anlık takip
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="site-footer__bottom">
+      <p>© 2026 Migros vitrin projesi — eğitim amaçlı bir örnek mağaza.</p>
+      <p class="site-footer__note">Tüm hakları Migros'a aittir.</p>
+    </div>
+  </div>
+</footer>

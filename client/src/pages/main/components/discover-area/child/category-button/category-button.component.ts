@@ -1,12 +1,16 @@
 import { Component, Input } from '@angular/core';
-import { Router } from '@angular/router';
+import { RouterLink } from '@angular/router';
+
 import { environment } from '../../../../../../environments/environment';
-import { staticImageUrl, supabaseImageUrl } from '../../../../../../app/config/supabase-assets';
+import {
+  staticImageUrl,
+  supabaseImageUrl,
+} from '../../../../../../app/config/supabase-assets';
 
 @Component({
   selector: 'app-category-button',
   standalone: true,
-  imports: [],
+  imports: [RouterLink],
   templateUrl: './category-button.component.html',
   styleUrl: './category-button.component.css',
 })
@@ -16,13 +20,11 @@ export class CategoryButtonComponent {
   @Input() name: string = 'Name';
   @Input() categoryId!: number;
 
-  constructor(private router: Router) {}
-
-  openItemPage() {
-    this.router.navigate(['/category', this.categoryId]);
+  public get categoryLink(): (string | number)[] {
+    return ['/category', this.categoryId];
   }
 
-  onImageError(event: Event) {
+  public onImageError(event: Event) {
     if (!environment.production) {
       return;
     }

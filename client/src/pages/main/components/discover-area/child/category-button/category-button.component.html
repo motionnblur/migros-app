@@ -1,11 +1,16 @@
-<div class="category-button" (click)="openItemPage()">
-  <div class="category-button__image__container">
+<a class="category-card" [routerLink]="categoryLink">
+  <span class="category-card__media">
     <img
-      class="category-button__image"
+      class="category-card__image"
       [src]="staticImageUrl(image)"
+      alt=""
+      width="88"
+      height="88"
+      loading="lazy"
+      decoding="async"
       (error)="onImageError($event)"
     />
-  </div>
+  </span>
 
-  <div class="category-button__title">{{ name }}</div>
-</div>
+  <span class="category-card__name">{{ name }}</span>
+</a>

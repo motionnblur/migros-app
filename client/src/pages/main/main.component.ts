@@ -1,6 +1,5 @@
-import { Component, HostListener, OnDestroy, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { ActivatedRoute, Router, RouterLink, RouterOutlet } from '@angular/router';
+import { Component, OnDestroy, OnInit } from '@angular/core';
+import { ActivatedRoute, Router, RouterOutlet } from '@angular/router';
 import { Subscription } from 'rxjs';
 
 import { AuthService } from '../../services/auth/auth.service';
@@ -8,24 +7,30 @@ import { RestService } from '../../services/rest/rest.service';
 import { SupportRealtimeService } from '../../services/support-realtime/support-realtime.service';
 import { IChatMessage } from '../../interfaces/IChatMessage';
 import { ISupportRealtimeEvent } from '../../interfaces/support/ISupportRealtimeEvent';
-import { staticImageUrl } from '../../app/config/supabase-assets';
+import {
+  SiteFooterAction,
+  SiteFooterComponent,
+} from './components/site-footer/site-footer.component';
+import {
+  SiteHeaderAction,
+  SiteHeaderComponent,
+} from './components/site-header/site-header.component';
+import { SupportFabComponent } from './components/support-fab/support-fab.component';
 
 @Component({
   selector: 'app-main',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink],
+  imports: [RouterOutlet, SiteHeaderComponent, SiteFooterComponent, SupportFabComponent],
   templateUrl: './main.component.html',
   styleUrl: './main.component.css',
 })
 export class MainComponent implements OnInit, OnDestroy {
-  readonly staticImageUrl = staticImageUrl;
   isUserSigned = false;
-  loginText = 'Uye Ol veya Giris Yap';
-
-  isMenuOpen = false;
+  searchQuery = '';
 
   private authStatusSub: Subscription | null = null;
   private supportRealtimeSub: Subscription | null = null;
+  private queryParamSub: Subscription | null = null;
   private lastSupportPopupUserMail = '';
 
   constructor(
@@ -39,6 +44,10 @@ export class MainComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.authStatusSub = this.authService.userLoggedIn$.subscribe(() => {
       this.checkAuthStatus();
+    });
+
+    this.queryParamSub = this.route.queryParamMap.subscribe((params) => {
+      this.searchQuery = (params.get('q') ?? '').trim();
     });
 
     this.supportRealtimeSub = this.supportRealtimeService.events$.subscribe(
@@ -69,6 +78,7 @@ export class MainComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.authStatusSub?.unsubscribe();
+    this.queryParamSub?.unsubscribe();
     this.supportRealtimeSub?.unsubscribe();
     this.supportRealtimeService.disconnect();
   }
@@ -76,7 +86,6 @@ export class MainComponent implements OnInit, OnDestroy {
   private checkAuthStatus() {
     if (this.authService.isLoggedIn()) {
       const userMail = this.authService.getUserMail();
-      this.loginText = userMail || 'Can';
       this.isUserSigned = true;
 
       if (userMail) {
@@ -89,24 +98,54 @@ export class MainComponent implements OnInit, OnDestroy {
       }
     } else {
       this.isUserSigned = false;
-      this.loginText = 'Uye Ol veya Giris Yap';
       this.supportRealtimeService.disconnect();
       this.lastSupportPopupUserMail = '';
     }
   }
 
-  public toggleMenu(event: Event) {
-    event.stopPropagation();
-    this.isMenuOpen = !this.isMenuOpen;
-  }
-
-  @HostListener('document:click')
-  public closeMenu() {
-    this.isMenuOpen = false;
-  }
-
   public isUserLoggedIn() {
     return this.isUserSigned;
+  }
+
+  public handleHeaderAction(action: SiteHeaderAction): void {
+    switch (action) {
+      case 'login':
+        this.openLoginComponent();
+        break;
+      case 'cart':
+        this.openCartComponent();
+        break;
+      case 'profile':
+        this.openProfileComponent();
+        break;
+      case 'orderTracker':
+        this.openOrderComponent();
+        break;
+      case 'orderHistory':
+        this.openOrderHistoryComponent();
+        break;
+      case 'logout':
+        this.logoutUser();
+        break;
+    }
+  }
+
+  public handleFooterAction(action: SiteFooterAction): void {
+    if (action === 'orderTracker') {
+      this.openOrderComponent();
+      return;
+    }
+
+    if (action === 'support') {
+      this.openSupportChat();
+    }
+  }
+
+  public handleSearch(term: string): void {
+    const trimmedTerm = (term || '').trim();
+    this.router.navigate(['/'], {
+      queryParams: trimmedTerm ? { q: trimmedTerm } : {},
+    });
   }
 
   public openLoginComponent() {
@@ -115,7 +154,6 @@ export class MainComponent implements OnInit, OnDestroy {
 
   public logoutUser() {
     this.authService.logout();
-    this.isMenuOpen = false;
     this.router.navigate([{ outlets: { modal: null } }], {
       relativeTo: this.route,
     });
@@ -128,7 +166,6 @@ export class MainComponent implements OnInit, OnDestroy {
     }
 
     this.openModal('cart');
-    this.isMenuOpen = false;
   }
 
   public openProfileComponent() {
@@ -138,7 +175,6 @@ export class MainComponent implements OnInit, OnDestroy {
     }
 
     this.openModal('profile');
-    this.isMenuOpen = false;
   }
 
   public openOrderComponent() {
@@ -157,7 +193,6 @@ export class MainComponent implements OnInit, OnDestroy {
     }
 
     this.openModal('order-history');
-    this.isMenuOpen = false;
   }
 
   public openSupportChat() {

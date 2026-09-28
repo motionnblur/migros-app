@@ -1,62 +1,53 @@
-.category-button {
-  width: 144px;
-  height: 180px;
+:host {
+  display: block;
+  height: 100%;
+  min-width: 0;
+}
+
+.category-card {
   display: flex;
   flex-direction: column;
-  background-color: #fafafa;
-}
-.category-button__image__container {
-  width: 143px;
-  height: 135px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  border: 1px solid gainsboro;
-  border-radius: 5%;
-  cursor: pointer;
-}
-.category-button__image {
-  width: 88px;
-  height: 88px;
-  object-fit: contain;
-}
-.category-button__title {
-  margin-top: 5px;
-  height: auto;
-  font-size: 14px;
-  font-weight: 600;
-  color: black;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-.category-button {
-  width: clamp(112px, 30vw, 144px);
-  height: auto;
-  min-height: 155px;
+  height: 100%;
+  min-width: 0;
+  padding: 10px;
+  background: var(--landing-surface);
+  border: 1px solid var(--landing-border);
+  border-radius: var(--landing-radius-md);
+  color: inherit;
+  text-align: center;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
 }
 
-.category-button__image__container {
+.category-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--landing-orange);
+  box-shadow: var(--landing-shadow-md);
+}
+
+.category-card__media {
+  display: grid;
+  place-items: center;
   width: 100%;
   aspect-ratio: 1 / 1;
-  height: auto;
+  overflow: hidden;
+  background: var(--landing-surface-muted);
+  border-radius: var(--landing-radius-sm);
 }
 
-.category-button__image {
-  width: clamp(60px, 18vw, 88px);
-  height: clamp(60px, 18vw, 88px);
+.category-card__image {
+  width: 66%;
+  height: 66%;
+  object-fit: contain;
 }
 
-.category-button__title {
-  padding: 4px;
-  font-size: 12px;
-  text-align: center;
-  align-items: flex-start;
-}
-
-@media (max-width: 575.98px) {
-  .category-button {
-    width: calc(33.333% - 8px);
-    min-width: 96px;
-  }
+.category-card__name {
+  margin-top: 10px;
+  min-height: 2.5em;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--landing-ink);
 }
