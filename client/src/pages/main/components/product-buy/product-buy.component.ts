@@ -1,12 +1,30 @@
-import { EventService } from '../../../../services/event/event.service';
-import { DomSanitizer } from '@angular/platform-browser';
-import { ProductBuyBase } from '../../../../base-components/product-buy.base';
-import { RestService } from '../../../../services/rest/rest.service';
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
-import { AuthService } from '../../../../services/auth/auth.service';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import {
+  Component,
+  ElementRef,
+  EventEmitter,
+  Input,
+  OnChanges,
+  OnDestroy,
+  Output,
+  QueryList,
+  SimpleChanges,
+  ViewChildren,
+} from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { staticImageUrl } from '../../../../app/config/supabase-assets';
+import { Subscription } from 'rxjs';
+
+import { PRODUCT_IMAGE_PLACEHOLDER } from '../../../../app/config/product-image';
+import { AuthService } from '../../../../services/auth/auth.service';
+import { RestService } from '../../../../services/rest/rest.service';
+import { IDescription } from '../../../../interfaces/IDescription';
+import { IProductData } from '../../../../interfaces/IProductData';
+import { IProductDescription } from '../../../../interfaces/IProductDescription';
+
+export type BuyFeedbackKind = 'success' | 'error';
+
+const FEEDBACK_DURATION_MS = 4000;
 
 @Component({
   selector: 'app-product-buy',
@@ -15,9 +33,62 @@ import { staticImageUrl } from '../../../../app/config/supabase-assets';
   templateUrl: './product-buy.component.html',
   styleUrl: './product-buy.component.css',
 })
-export class ProductBuyComponent extends ProductBuyBase {
-  readonly staticImageUrl = staticImageUrl;
-  public selectedTabIndex: number = 0;
+export class ProductBuyComponent implements OnChanges, OnDestroy {
+  @Input() productId!: number;
+  @Output() productNameChange = new EventEmitter<string>();
+
+  @ViewChildren('tabButton') tabButtons!: QueryList<ElementRef<HTMLButtonElement>>;
+
+  readonly placeholderImage = PRODUCT_IMAGE_PLACEHOLDER;
+
+  productData: IProductData | null = null;
+  productDescriptions: IProductDescription | null = null;
+  productImageUrl: string | null = null;
+  currentProductDescriptionBody: SafeHtml = '';
+  selectedTabIndex = 0;
+  isLoading = true;
+  hasLoadError = false;
+  isAddingToCart = false;
+  feedbackKind: BuyFeedbackKind | null = null;
+  feedbackMessage = '';
+
+  private imageObjectUrl: string | null = null;
+  private dataSub: Subscription | null = null;
+  private descriptionSub: Subscription | null = null;
+  private imageSub: Subscription | null = null;
+  private cartSub: Subscription | null = null;
+  private feedbackTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  constructor(
+    private restService: RestService,
+    private sanitizer: DomSanitizer,
+    private authService: AuthService,
+    private router: Router,
+    private route: ActivatedRoute,
+  ) {}
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['productId']) {
+      this.loadProduct();
+    }
+  }
+
+  ngOnDestroy(): void {
+    this.dataSub?.unsubscribe();
+    this.descriptionSub?.unsubscribe();
+    this.imageSub?.unsubscribe();
+    this.cartSub?.unsubscribe();
+    this.clearFeedbackTimeout();
+    this.releaseImageUrl();
+  }
+
+  get descriptionList(): IDescription[] {
+    return this.productDescriptions?.descriptionList ?? [];
+  }
+
+  get hasDescriptions(): boolean {
+    return this.descriptionList.length > 0;
+  }
 
   public get discountedPrice(): number {
     if (!this.productData) return 0;
@@ -40,32 +111,20 @@ export class ProductBuyComponent extends ProductBuyBase {
     return (this.productData?.productCount ?? 0) <= 0;
   }
 
-  constructor(
-    protected override restService: RestService,
-    protected sanitizer: DomSanitizer,
-    protected override eventManager: EventService,
-    private authService: AuthService,
-    private router: Router,
-    private route: ActivatedRoute
-  ) {
-    super(restService, eventManager);
+  public get addButtonLabel(): string {
+    const name = this.productData?.productName ?? 'Ürün';
+    return this.isOutOfStock
+      ? `${name} stokta yok`
+      : `${name} ürününü sepete ekle`;
   }
 
-  public onTabClick(index: number) {
-    this.selectedTabIndex = index;
-    const content =
-      this.productDescriptions.descriptionList[index].descriptionTabContent;
-    this.updateProductDescriptionBody(content);
+  public retry(): void {
+    this.loadProduct();
   }
 
-  private updateProductDescriptionBody(description: string) {
-    this.currentProductDescriptionBody =
-      this.sanitizer.bypassSecurityTrustHtml(description);
-  }
-
-  public addProductToUserCart() {
+  public addProductToUserCart(): void {
     if (this.isOutOfStock) {
-      alert('Bu urun stokta kalmadi.');
+      this.showFeedback('error', 'Bu ürün stokta kalmadı.');
       return;
     }
 
@@ -76,13 +135,166 @@ export class ProductBuyComponent extends ProductBuyBase {
       return;
     }
 
-    this.restService.addProductToUserCart(this.productId).subscribe({
-      next: () => {},
-      error: (error: any) => {
-        const message = error?.error || 'Urun sepete eklenemedi.';
-        alert(message);
+    this.isAddingToCart = true;
+    this.cartSub = this.restService.addProductToUserCart(this.productId).subscribe({
+      next: () => {
+        this.isAddingToCart = false;
       },
-      complete: () => alert('Urun sepete eklendi!'),
+      error: (error: unknown) => {
+        this.isAddingToCart = false;
+        const body = (error as { error?: unknown } | null)?.error;
+        const message = typeof body === 'string' ? body.trim() : '';
+        this.showFeedback('error', message || 'Ürün sepete eklenemedi.');
+      },
+      complete: () => this.showFeedback('success', 'Ürün sepete eklendi.'),
     });
+  }
+
+  public onTabClick(index: number): void {
+    this.selectTab(index);
+  }
+
+  /** Arrow/Home/End navigation between description tabs. */
+  public onTabKeydown(event: KeyboardEvent, index: number): void {
+    const lastIndex = this.descriptionList.length - 1;
+    if (lastIndex < 0) {
+      return;
+    }
+
+    let nextIndex: number | null = null;
+    switch (event.key) {
+      case 'ArrowRight':
+        nextIndex = index >= lastIndex ? 0 : index + 1;
+        break;
+      case 'ArrowLeft':
+        nextIndex = index <= 0 ? lastIndex : index - 1;
+        break;
+      case 'Home':
+        nextIndex = 0;
+        break;
+      case 'End':
+        nextIndex = lastIndex;
+        break;
+      default:
+        return;
+    }
+
+    event.preventDefault();
+    this.selectTab(nextIndex);
+    this.focusTab(nextIndex);
+  }
+
+  public tabId(index: number): string {
+    return `product-description-tab-${this.productId}-${index}`;
+  }
+
+  public tabPanelId(): string {
+    return `product-description-panel-${this.productId}`;
+  }
+
+  private selectTab(index: number): void {
+    if (index < 0 || index >= this.descriptionList.length) {
+      return;
+    }
+
+    this.selectedTabIndex = index;
+    this.currentProductDescriptionBody = this.sanitizer.bypassSecurityTrustHtml(
+      this.descriptionList[index].descriptionTabContent,
+    );
+  }
+
+  private focusTab(index: number): void {
+    const target = this.tabButtons?.get(index)?.nativeElement;
+    target?.focus();
+  }
+
+  private loadProduct(): void {
+    this.dataSub?.unsubscribe();
+    this.descriptionSub?.unsubscribe();
+    this.imageSub?.unsubscribe();
+
+    this.isLoading = true;
+    this.hasLoadError = false;
+    this.productData = null;
+    this.productDescriptions = null;
+    this.selectedTabIndex = 0;
+    this.currentProductDescriptionBody = '';
+    this.clearFeedbackTimeout();
+    this.feedbackKind = null;
+    this.feedbackMessage = '';
+
+    this.dataSub = this.restService.getProductData(this.productId).subscribe({
+      next: (productData) => {
+        this.productData = productData;
+        this.isLoading = false;
+        this.productNameChange.emit(productData?.productName ?? '');
+        this.loadDescriptions();
+        this.loadImage();
+      },
+      error: () => {
+        this.productData = null;
+        this.isLoading = false;
+        this.hasLoadError = true;
+      },
+    });
+  }
+
+  /** Descriptions are supplementary: a failure must not hide the product. */
+  private loadDescriptions(): void {
+    this.descriptionSub = this.restService
+      .getProductDescription(this.productId)
+      .subscribe({
+        next: (description) => {
+          this.productDescriptions = description;
+          this.selectTab(0);
+        },
+        error: () => {
+          this.productDescriptions = null;
+          this.currentProductDescriptionBody = '';
+        },
+      });
+  }
+
+  private loadImage(): void {
+    this.imageSub = this.restService.getProductImage(this.productId).subscribe({
+      next: (blob) => this.setImage(blob),
+      error: () => this.clearImage(),
+    });
+  }
+
+  private setImage(blob: Blob): void {
+    this.releaseImageUrl();
+    this.imageObjectUrl = URL.createObjectURL(blob);
+    this.productImageUrl = this.imageObjectUrl;
+  }
+
+  private clearImage(): void {
+    this.releaseImageUrl();
+    this.productImageUrl = null;
+  }
+
+  private releaseImageUrl(): void {
+    if (this.imageObjectUrl) {
+      URL.revokeObjectURL(this.imageObjectUrl);
+      this.imageObjectUrl = null;
+    }
+  }
+
+  private showFeedback(kind: BuyFeedbackKind, message: string): void {
+    this.clearFeedbackTimeout();
+    this.feedbackKind = kind;
+    this.feedbackMessage = message;
+    this.feedbackTimeout = setTimeout(() => {
+      this.feedbackKind = null;
+      this.feedbackMessage = '';
+      this.feedbackTimeout = null;
+    }, FEEDBACK_DURATION_MS);
+  }
+
+  private clearFeedbackTimeout(): void {
+    if (this.feedbackTimeout !== null) {
+      clearTimeout(this.feedbackTimeout);
+      this.feedbackTimeout = null;
+    }
   }
 }

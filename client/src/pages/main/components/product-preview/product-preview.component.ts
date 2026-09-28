@@ -1,50 +1,99 @@
-import { Component, Input, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute, Router } from '@angular/router';
-import { RestService } from '../../../../services/rest/rest.service';
+import { Component, Input, OnDestroy, OnInit } from '@angular/core';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { Subscription } from 'rxjs';
+
+import { PRODUCT_IMAGE_PLACEHOLDER } from '../../../../app/config/product-image';
+import {
+  BrowseQueryParams,
+  buildBrowseQueryParams,
+  parsePageParam,
+} from '../../helpers/category-browse-state';
 import { AuthService } from '../../../../services/auth/auth.service';
+import { RestService } from '../../../../services/rest/rest.service';
+
+export type CartFeedbackKind = 'success' | 'error';
+
+const FEEDBACK_DURATION_MS = 4000;
 
 @Component({
   selector: 'app-product-preview',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, RouterLink],
   templateUrl: './product-preview.component.html',
   styleUrl: './product-preview.component.css',
 })
-export class ProductPreviewComponent implements OnInit {
+export class ProductPreviewComponent implements OnInit, OnDestroy {
   @Input() productId!: number;
   @Input() productName!: string;
   @Input() productPrice!: number;
   @Input() productCount!: number;
   @Input() categoryId!: number;
 
+  readonly placeholderImage = PRODUCT_IMAGE_PLACEHOLDER;
+
   imageUrl: string | null = null;
+  browseQueryParams: BrowseQueryParams = {};
+  isAddingToCart = false;
+  feedbackKind: CartFeedbackKind | null = null;
+  feedbackMessage = '';
+
+  private imageObjectUrl: string | null = null;
+  private routeSub: Subscription | null = null;
+  private imageSub: Subscription | null = null;
+  private cartSub: Subscription | null = null;
+  private feedbackTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private restService: RestService,
     private authService: AuthService,
     private router: Router,
-    private route: ActivatedRoute
+    private route: ActivatedRoute,
   ) {}
 
-  ngOnInit() {
+  ngOnInit(): void {
+    this.routeSub = this.route.queryParamMap.subscribe((params) => {
+      this.browseQueryParams = buildBrowseQueryParams(
+        params.get('subcategory'),
+        parsePageParam(params.get('page')),
+      );
+    });
+
     if (this.productId) {
-      this.restService.getProductImage(this.productId).subscribe({
-        next: (blob: Blob) => {
-          this.imageUrl = window.URL.createObjectURL(blob);
-        },
-        error: (err) => console.error('Image load failed:', err),
+      this.imageSub = this.restService.getProductImage(this.productId).subscribe({
+        next: (blob: Blob) => this.setImage(blob),
+        error: () => this.clearImage(),
       });
     }
   }
 
-  onProductViewClicked() {
-    this.router.navigate(['/category', this.categoryId, 'product', this.productId]);
+  ngOnDestroy(): void {
+    this.routeSub?.unsubscribe();
+    this.imageSub?.unsubscribe();
+    this.cartSub?.unsubscribe();
+    this.clearFeedbackTimeout();
+    this.releaseImageUrl();
   }
 
-  public addProductToUserCart() {
-    if (this.productCount <= 0) {
-      alert('Bu urun stokta kalmadi.');
+  get isOutOfStock(): boolean {
+    return (this.productCount ?? 0) <= 0;
+  }
+
+  get productLink(): unknown[] {
+    return ['/category', this.categoryId, 'product', this.productId];
+  }
+
+  get addButtonLabel(): string {
+    if (this.isOutOfStock) {
+      return `${this.productName} stokta yok`;
+    }
+
+    return `${this.productName} ürününü sepete ekle`;
+  }
+
+  public addProductToUserCart(): void {
+    if (this.isOutOfStock) {
+      this.showFeedback('error', 'Bu ürün stokta kalmadı.');
       return;
     }
 
@@ -55,15 +104,60 @@ export class ProductPreviewComponent implements OnInit {
       return;
     }
 
-    this.restService.addProductToUserCart(this.productId).subscribe({
-      next: () => {},
-      error: (error: any) => {
-        const message = error?.error || 'Urun sepete eklenemedi.';
-        alert(message);
+    this.isAddingToCart = true;
+    this.cartSub = this.restService.addProductToUserCart(this.productId).subscribe({
+      next: () => {
+        this.isAddingToCart = false;
+      },
+      error: (error: unknown) => {
+        this.isAddingToCart = false;
+        this.showFeedback('error', this.resolveErrorMessage(error));
       },
       complete: () => {
-        alert(`${this.productName} sepete eklendi.`);
+        this.showFeedback('success', `${this.productName} sepete eklendi.`);
       },
     });
+  }
+
+  private resolveErrorMessage(error: unknown): string {
+    const body = (error as { error?: unknown } | null)?.error;
+    const message = typeof body === 'string' ? body.trim() : '';
+    return message || 'Ürün sepete eklenemedi.';
+  }
+
+  private showFeedback(kind: CartFeedbackKind, message: string): void {
+    this.clearFeedbackTimeout();
+    this.feedbackKind = kind;
+    this.feedbackMessage = message;
+    this.feedbackTimeout = setTimeout(() => {
+      this.feedbackKind = null;
+      this.feedbackMessage = '';
+      this.feedbackTimeout = null;
+    }, FEEDBACK_DURATION_MS);
+  }
+
+  private clearFeedbackTimeout(): void {
+    if (this.feedbackTimeout !== null) {
+      clearTimeout(this.feedbackTimeout);
+      this.feedbackTimeout = null;
+    }
+  }
+
+  private setImage(blob: Blob): void {
+    this.releaseImageUrl();
+    this.imageObjectUrl = URL.createObjectURL(blob);
+    this.imageUrl = this.imageObjectUrl;
+  }
+
+  private clearImage(): void {
+    this.releaseImageUrl();
+    this.imageUrl = null;
+  }
+
+  private releaseImageUrl(): void {
+    if (this.imageObjectUrl) {
+      URL.revokeObjectURL(this.imageObjectUrl);
+      this.imageObjectUrl = null;
+    }
   }
 }

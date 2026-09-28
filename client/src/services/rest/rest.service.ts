@@ -36,13 +36,12 @@ export class RestService {
   constructor(private http: HttpClient) {}
 
   getProductPageData(categoryId: number, page: number, productRange: number) {
-    return this.http.get(
-      `${API_BASE_URL}/user/supply/getProductsFromCategory`,
-      {
+    return this.http
+      .get(`${API_BASE_URL}/user/supply/getProductsFromCategory`, {
         params: { categoryId, page, productRange },
         responseType: 'json',
-      },
-    );
+      })
+      .pipe(map((response) => response as IProductPreview[]));
   }
   getProductPageDataAdmin(
     categoryId: number,
@@ -58,13 +57,12 @@ export class RestService {
     );
   }
   getProductCountsFromCategory(categoryId: number) {
-    return this.http.get(
-      `${API_BASE_URL}/user/supply/getProductCountsFromCategory`,
-      {
+    return this.http
+      .get(`${API_BASE_URL}/user/supply/getProductCountsFromCategory`, {
         params: { categoryId },
         responseType: 'json',
-      },
-    );
+      })
+      .pipe(map((response) => response as number));
   }
   getProductCountsFromCategoryAdmin(categoryId: number) {
     return this.http.get(
@@ -87,13 +85,12 @@ export class RestService {
     });
   }
   getProductCountsFromSubCategory(subcategoryName: string) {
-    return this.http.get(
-      `${API_BASE_URL}/user/supply/getProductCountsFromSubCategory`,
-      {
+    return this.http
+      .get(`${API_BASE_URL}/user/supply/getProductCountsFromSubcategory`, {
         params: { subcategoryName },
         responseType: 'json',
-      },
-    );
+      })
+      .pipe(map((response) => response as number));
   }
   getProductImage(productId: number) {
     return this.http.get(`${API_BASE_URL}/user/supply/getProductImage`, {

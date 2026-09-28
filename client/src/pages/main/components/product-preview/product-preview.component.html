@@ -1,35 +1,58 @@
-<div class="card h-100 product-card shadow-sm border-0 transition-hover">
-  <div class="product-img-wrapper p-3" (click)="onProductViewClicked()">
-    <img
-      [src]="imageUrl || 'assets/placeholder.png'"
-      class="card-img-top img-fluid"
-      [alt]="productName"
-    />
-  </div>
-
-  <div class="card-body d-flex flex-column pt-0">
-    <h6 class="card-title text-dark mb-1 text-truncate" (click)="onProductViewClicked()" title="{{ productName }}">
+<article class="product-card">
+  <a
+    class="product-card__link"
+    [routerLink]="productLink"
+    [queryParams]="browseQueryParams"
+  >
+    <span class="product-card__media">
+      <img
+        class="product-card__image"
+        [src]="imageUrl || placeholderImage"
+        alt=""
+        loading="lazy"
+        decoding="async"
+      />
+    </span>
+    <span class="product-card__name" [title]="productName">
       {{ productName }}
-    </h6>
+    </span>
+  </a>
 
-    <div class="small mb-2" [ngClass]="productCount > 0 ? 'text-success' : 'text-danger'">
-      {{ productCount > 0 ? ('Stok: ' + productCount) : 'Tukendi' }}
-    </div>
+  <div class="product-card__body">
+    <p class="product-card__stock" [class.product-card__stock--out]="isOutOfStock">
+      @if (isOutOfStock) {
+        Tükendi
+      } @else {
+        Stok: {{ productCount }}
+      }
+    </p>
 
-    <div class="mt-auto d-flex justify-content-between align-items-center">
-      <div class="product-price">
-        <span class="fs-5 fw-bold text-orange">{{ productPrice | number:'1.2-2' }}</span>
-        <span class="ms-1 small text-orange fw-semibold">TL</span>
-      </div>
+    <div class="product-card__footer">
+      <p class="product-card__price">
+        <span class="product-card__amount">{{ productPrice | number: '1.2-2' }}</span>
+        <span class="product-card__currency">TL</span>
+      </p>
 
       <button
         type="button"
-        class="btn btn-orange-action rounded-circle d-flex align-items-center justify-content-center shadow-sm"
-        [disabled]="productCount <= 0"
+        class="product-card__add"
+        [disabled]="isOutOfStock || isAddingToCart"
+        [attr.aria-label]="addButtonLabel"
         (click)="addProductToUserCart()"
-        title="Sepete Ekle">
-        <i class="bi bi-plus-lg text-white"></i>
+      >
+        <i class="bi bi-plus-lg" aria-hidden="true"></i>
       </button>
     </div>
+
+    @if (feedbackMessage) {
+      <p
+        class="product-card__feedback"
+        [class.product-card__feedback--success]="feedbackKind === 'success'"
+        [class.product-card__feedback--error]="feedbackKind === 'error'"
+        [attr.role]="feedbackKind === 'error' ? 'alert' : 'status'"
+      >
+        {{ feedbackMessage }}
+      </p>
+    }
   </div>
-</div>
+</article>

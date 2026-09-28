@@ -1,57 +1,173 @@
-<div class="container py-4">
-  <div class="row g-4">
+<div class="category-page">
+  @if (isProductDetailView) {
+    <div class="category-page__detail-header">
+      <nav class="breadcrumb-nav" aria-label="Sayfa yolu">
+        <ol class="breadcrumb-nav__list">
+          <li class="breadcrumb-nav__item">
+            <a class="breadcrumb-nav__link" routerLink="/">Ana sayfa</a>
+          </li>
+          <li class="breadcrumb-nav__item">
+            <a
+              class="breadcrumb-nav__link"
+              [routerLink]="categoryLink"
+              [queryParams]="browseQueryParams"
+            >
+              {{ categoryName }}
+            </a>
+          </li>
+          @if (selectedSubCategoryName) {
+            <li class="breadcrumb-nav__item">
+              <a
+                class="breadcrumb-nav__link"
+                [routerLink]="categoryLink"
+                [queryParams]="browseQueryParams"
+              >
+                {{ selectedSubCategoryName }}
+              </a>
+            </li>
+          }
+          @if (productName) {
+            <li
+              class="breadcrumb-nav__item breadcrumb-nav__item--current"
+              aria-current="page"
+            >
+              {{ productName }}
+            </li>
+          }
+        </ol>
+      </nav>
 
-    <div class="col-12 col-lg-4 col-xl-3 col-xxl-2">
-      <div class="card shadow-sm border-0 sticky-top" style="top: 20px; z-index: 100;">
-        <div class="card-body p-0">
-          <div class="p-3 border-bottom bg-white">
-            <h6 class="fw-bold mb-1">{{ categoryName }}</h6>
-            <span class="badge bg-primary-soft text-primary">{{ totalProductCount }} Urun</span>
-          </div>
-          <div class="p-2">
-            <div class="list-group list-group-flush">
-              <button *ngFor="let item of subCategories"
-                      (click)="onSubCategoryClicked(item.subCategoryName)"
-                      class="list-group-item list-group-item-action border-0 rounded-2 mb-1 d-flex justify-content-between align-items-center small">
-                {{ item.subCategoryName }}
-                <span class="badge bg-light text-dark border">{{ item.productCount }}</span>
+      <a
+        class="back-link"
+        [routerLink]="categoryLink"
+        [queryParams]="browseQueryParams"
+      >
+        <i class="bi bi-arrow-left" aria-hidden="true"></i>
+        {{ backLinkLabel }}
+      </a>
+    </div>
+
+    <app-product-buy
+      [productId]="detailProductId"
+      (productNameChange)="onProductNameChange($event)"
+    />
+  } @else {
+    <div class="category-page__header">
+      <div>
+        <h1 class="category-page__title">{{ categoryName }}</h1>
+        <p class="category-page__summary">
+          <span class="category-page__selection">{{ selectionLabel }}</span>
+          <span class="category-page__count">{{ selectionProductCount }} ürün</span>
+        </p>
+      </div>
+    </div>
+
+    <div class="category-page__body">
+      <aside class="category-page__sidebar" aria-label="Alt kategoriler">
+        <nav class="subcategory-nav">
+          <ul class="subcategory-nav__list">
+            <li class="subcategory-nav__entry">
+              <button
+                type="button"
+                class="subcategory-nav__item"
+                [class.is-selected]="selectedSubCategoryName === ''"
+                [attr.aria-current]="selectedSubCategoryName === '' ? 'true' : null"
+                (click)="selectAllProducts()"
+              >
+                <span class="subcategory-nav__name">{{ allProductsLabel }}</span>
+                <span class="subcategory-nav__count">{{ totalProductCount }}</span>
               </button>
+            </li>
+
+            @for (item of subCategories; track item.subCategoryName) {
+              <li class="subcategory-nav__entry">
+                <button
+                  type="button"
+                  class="subcategory-nav__item"
+                  [class.is-selected]="isSubCategorySelected(item.subCategoryName)"
+                  [attr.aria-current]="
+                    isSubCategorySelected(item.subCategoryName) ? 'true' : null
+                  "
+                  (click)="selectSubCategory(item.subCategoryName)"
+                >
+                  <span class="subcategory-nav__name">
+                    {{ item.subCategoryName }}
+                  </span>
+                  <span class="subcategory-nav__count">{{ item.productCount }}</span>
+                </button>
+              </li>
+            }
+          </ul>
+        </nav>
+      </aside>
+
+      <section class="category-page__content" aria-label="Ürünler">
+        @if (isLoading) {
+          <div class="product-grid" aria-busy="true" aria-live="polite">
+            <span class="visually-hidden">Ürünler yükleniyor…</span>
+            @for (placeholder of [1, 2, 3, 4, 5, 6, 7, 8]; track placeholder) {
+              <div class="product-skeleton" aria-hidden="true">
+                <div class="product-skeleton__media"></div>
+                <div class="product-skeleton__line"></div>
+                <div class="product-skeleton__line product-skeleton__line--short"></div>
+              </div>
+            }
+          </div>
+        } @else if (hasLoadError) {
+          <div class="listing-state listing-state--error" role="alert">
+            <p class="listing-state__title">Ürünler yüklenemedi.</p>
+            <p class="listing-state__text">
+              Bağlantı sorunu yaşanmış olabilir. Tekrar denemek için aşağıdaki
+              düğmeyi kullan.
+            </p>
+            <button type="button" class="listing-state__action" (click)="retry()">
+              <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
+              Tekrar dene
+            </button>
+          </div>
+        } @else if (isEmptySelection) {
+          <div class="listing-state" role="status">
+            <i class="bi bi-basket listing-state__icon" aria-hidden="true"></i>
+            <p class="listing-state__title">Bu seçimde ürün bulunamadı</p>
+            <p class="listing-state__text">
+              {{ selectionLabel }} için stokta ürün şu anda yok. Tüm ürünleri
+              görmek için aşağıdaki seçeneği kullan.
+            </p>
+            @if (selectedSubCategoryName) {
+              <button
+                type="button"
+                class="listing-state__action"
+                (click)="selectAllProducts()"
+              >
+                <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i>
+                {{ allProductsLabel }}
+              </button>
+            }
+          </div>
+        } @else {
+          <div class="product-grid">
+            @for (item of items; track item.productId) {
+              <app-product-preview
+                [productId]="item.productId"
+                [productName]="item.productName"
+                [productPrice]="item.productPrice"
+                [productCount]="item.productCount"
+                [categoryId]="currentCategoryId"
+              />
+            }
+          </div>
+
+          @if (hasMultiplePages) {
+            <div class="category-page__pagination">
+              <app-product-page-switcher
+                [currentPage]="currentPage"
+                [pageCount]="pageCount"
+                (pageChange)="onPageSelected($event)"
+              />
             </div>
-          </div>
-        </div>
-      </div>
+          }
+        }
+      </section>
     </div>
-
-    <div class="col-12 col-lg-8 col-xl-9 col-xxl-10">
-      <div class="product-content-area">
-
-        <div *ngIf="hasProductPreviewOpened"
-             class="row g-3 row-cols-2 row-cols-md-3 row-cols-lg-4 row-cols-xl-5 row-cols-xxl-6 animate-fade-in">
-          <div class="col" *ngFor="let item of items">
-            <app-product-preview
-              [productId]="item.productId"
-              [productName]="item.productName"
-              [productPrice]="item.productPrice"
-              [productCount]="item.productCount"
-              [categoryId]="currentCategoryId"
-            />
-          </div>
-        </div>
-
-        <div class="product-buy-view" *ngIf="hasProductBuyViewOpened">
-          <app-product-buy [productId]="selectedProductId"/>
-        </div>
-
-        <div class="mt-5 d-flex justify-content-center" *ngIf="!hasProductBuyViewOpened">
-          <app-product-page-switcher
-            (changePageEvent)="changePage($event)"
-            (changePageToFirstEvent)="changePageToFirst()"
-            (changePageToLastEvent)="changePageToLast($event)"
-          />
-        </div>
-      </div>
-    </div>
-
-  </div>
+  }
 </div>
-

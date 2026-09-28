@@ -1,82 +1,316 @@
-/* 1. Layout & Grid Control */
-.container {
-  /* This prevents the content from spreading too thin on 27"+ monitors */
-  max-width: 1400px;
+.category-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--landing-space-4);
 }
 
-.product-content-area {
-  min-height: 80vh; /* Keeps the footer from jumping up on empty categories */
-  padding-bottom: 3rem;
+.category-page__header {
+  padding-bottom: var(--landing-space-3);
+  border-bottom: 1px solid var(--landing-border);
 }
 
-/* 2. Custom Brand Styling */
-.bg-soft-primary {
-  background-color: rgba(13, 110, 253, 0.1) !important;
+.category-page__title {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--landing-ink);
 }
 
-.list-group-item-action {
-  transition: all 0.2s ease;
-  border: none !important;
-  margin-bottom: 2px;
+.category-page__summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--landing-space-2);
+  margin: var(--landing-space-1) 0 0;
+  font-size: 0.9rem;
+  color: var(--landing-ink-muted);
 }
 
-.list-group-item-action:hover {
-  background-color: #fff4e6 !important; /* Light orange tint */
-  color: #fd7e14 !important;
-  transform: translateX(5px); /* Subtle nudge effect */
+.category-page__selection {
+  font-weight: 600;
+  color: var(--landing-ink);
 }
 
-/* 3. Sticky Sidebar Optimization */
-.sticky-top {
-  /* Adjust 'top' if you have a fixed header/navbar (e.g., 80px) */
-  top: 20px;
-  z-index: 100;
+.category-page__count {
+  padding: 0.1rem 0.55rem;
+  border-radius: var(--landing-radius-pill);
+  background-color: var(--landing-orange-soft);
+  color: var(--landing-orange-deep);
+  font-size: 0.8rem;
+  font-weight: 700;
 }
 
-/* 4. Modern Animations */
-.animate-fade-in {
-  animation: fadeIn 0.4s ease-out;
+.category-page__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--landing-space-4);
+  align-items: start;
 }
 
-.animate-slide-up {
-  animation: slideUp 0.5s cubic-bezier(0.165, 0.84, 0.44, 1);
+.category-page__sidebar {
+  min-width: 0;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
+.category-page__content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--landing-space-5);
+}
+
+.category-page__pagination {
+  display: flex;
+  justify-content: center;
+}
+
+/* Chip row on phones, sidebar on desktop */
+.subcategory-nav {
+  min-width: 0;
+}
+
+.subcategory-nav__list {
+  display: flex;
+  gap: var(--landing-space-2);
+  margin: 0;
+  padding: 0 0 var(--landing-space-1);
+  list-style: none;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.subcategory-nav__entry {
+  flex: 0 0 auto;
+}
+
+.subcategory-nav__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--landing-space-2);
+  min-height: 44px;
+  padding: 0 var(--landing-space-3);
+  border: 1px solid var(--landing-border);
+  border-radius: var(--landing-radius-pill);
+  background-color: var(--landing-surface);
+  color: var(--landing-ink);
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.subcategory-nav__item:hover {
+  border-color: var(--landing-orange);
+  background-color: var(--landing-orange-soft);
+  color: var(--landing-orange-deep);
+}
+
+.subcategory-nav__item.is-selected {
+  border-color: var(--landing-orange);
+  background-color: var(--landing-orange);
+  color: #fff;
+}
+
+.subcategory-nav__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.6rem;
+  padding: 0 0.35rem;
+  border-radius: var(--landing-radius-pill);
+  background-color: var(--landing-surface-raised);
+  color: var(--landing-ink-muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.subcategory-nav__item.is-selected .subcategory-nav__count {
+  background-color: rgba(255, 255, 255, 0.28);
+  color: #fff;
+}
+
+.product-grid {
+  display: grid;
+  /* Two columns on phones, three on tablets, four on desktop. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--landing-space-3);
+}
+
+.product-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--landing-space-2);
+  padding: var(--landing-space-3);
+  border: 1px solid var(--landing-border);
+  border-radius: var(--landing-radius-md);
+  background-color: var(--landing-surface);
+}
+
+.product-skeleton__media {
+  aspect-ratio: 1 / 1;
+  border-radius: var(--landing-radius-sm);
+  background-color: var(--landing-surface-raised);
+}
+
+.product-skeleton__line {
+  height: 0.75rem;
+  border-radius: var(--landing-radius-sm);
+  background-color: var(--landing-surface-raised);
+}
+
+.product-skeleton__line--short {
+  width: 60%;
+}
+
+.listing-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--landing-space-2);
+  padding: var(--landing-space-7) var(--landing-space-4);
+  border: 1px solid var(--landing-border);
+  border-radius: var(--landing-radius-md);
+  background-color: var(--landing-surface);
+  text-align: center;
+}
+
+.listing-state--error {
+  border-color: #f3c2bd;
+  background-color: #fdf3f2;
+}
+
+.listing-state__icon {
+  font-size: 2rem;
+  color: var(--landing-orange);
+}
+
+.listing-state__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--landing-ink);
+}
+
+.listing-state__text {
+  margin: 0;
+  max-width: 46ch;
+  font-size: 0.9rem;
+  color: var(--landing-ink-muted);
+}
+
+.listing-state__action {
+  min-height: 44px;
+  padding: 0 var(--landing-space-4);
+  border: 1px solid var(--landing-orange);
+  border-radius: var(--landing-radius-pill);
+  background-color: var(--landing-orange);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.listing-state__action:hover {
+  background-color: var(--landing-orange-strong);
+}
+
+.category-page__detail-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--landing-space-2);
+}
+
+.breadcrumb-nav__list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--landing-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+}
+
+.breadcrumb-nav__item + .breadcrumb-nav__item::before {
+  content: '/';
+  margin-right: var(--landing-space-1);
+  color: var(--landing-ink-muted);
+}
+
+.breadcrumb-nav__link {
+  color: var(--landing-ink-muted);
+  text-decoration: none;
+}
+
+.breadcrumb-nav__link:hover {
+  color: var(--landing-orange-deep);
+  text-decoration: underline;
+}
+
+.breadcrumb-nav__item--current {
+  color: var(--landing-ink);
+  font-weight: 600;
+  max-width: 32ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.back-link {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--landing-space-2);
+  min-height: 44px;
+  padding: 0 var(--landing-space-3);
+  border: 1px solid var(--landing-border);
+  border-radius: var(--landing-radius-pill);
+  background-color: var(--landing-surface);
+  color: var(--landing-ink);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.back-link:hover {
+  border-color: var(--landing-orange);
+  background-color: var(--landing-orange-soft);
+  color: var(--landing-orange-deep);
+}
+
+@media (min-width: 768px) {
+  /* Three columns on tablets */
+  .product-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-  to {
-    opacity: 1;
-  }
 }
 
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* 5. Responsive Fixes */
-@media (max-width: 991px) {
-  .sticky-top {
-    position: relative !important;
-    top: 0 !important;
-    margin-bottom: 20px;
+@media (min-width: 992px) {
+  .category-page__body {
+    grid-template-columns: 250px minmax(0, 1fr);
+    gap: var(--landing-space-5);
   }
 
-  /* On tablets/phones, let's make the list items a bit larger for touch */
-  .list-group-item-action {
-    padding: 12px 15px;
+  .category-page__sidebar {
+    position: sticky;
+    top: calc(var(--landing-header-offset) + var(--landing-space-2));
   }
-}
 
-/* Ensure the product grid stays centered on ultra-wide screens */
-.row.g-3 {
-  justify-content: flex-start;
+  .subcategory-nav__list {
+    flex-direction: column;
+    overflow-x: visible;
+    padding-bottom: 0;
+  }
+
+  .subcategory-nav__item {
+    width: 100%;
+    justify-content: space-between;
+    border-radius: var(--landing-radius-sm);
+  }
+
+  /* Four columns on desktop */
+  .product-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
