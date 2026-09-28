@@ -90,6 +90,13 @@ describe('SiteHeaderComponent', () => {
     expect(emitted).toEqual(['orderTracker', 'cart']);
   });
 
+  it('omits the account panel entirely when logged out', () => {
+    expect(query('.site-header__login')).toBeTruthy();
+    expect(query('.site-header__account')).toBeNull();
+    expect(element.querySelector('#site-header-account-panel')).toBeNull();
+    expect(document.getElementById('site-header-account-panel')).toBeNull();
+  });
+
   it('submits an explicit trimmed search instead of searching while typing', () => {
     const submitted: string[] = [];
     component.searchSubmitted.subscribe((term) => submitted.push(term));
@@ -170,22 +177,45 @@ describe('SiteHeaderComponent', () => {
       const toggle = toggleButton();
       expect(toggle).toBeTruthy();
       expect(toggle.getAttribute('aria-expanded')).toBe('false');
-      expect(toggle.getAttribute('aria-controls')).toBe(
-        'site-header-account-panel'
-      );
+      const controls = toggle.getAttribute('aria-controls');
+      expect(controls).toBe('site-header-account-panel');
       expect(toggle.hasAttribute('aria-haspopup')).toBe(false);
-      expect(panel()).toBeNull();
+
+      const collapsed = panel();
+      expect(collapsed).toBeTruthy();
+      expect(collapsed?.id).toBe(controls ?? '');
+      expect(document.getElementById('site-header-account-panel')).toBe(
+        collapsed
+      );
+      expect(collapsed?.hidden).toBe(true);
+      expect(collapsed?.hasAttribute('hidden')).toBe(true);
+      expect(getComputedStyle(collapsed as Element).display).toBe('none');
+
+      const buttons = panelButtons();
+      expect(buttons.length).toBe(4);
+      buttons.forEach((button) => {
+        expect(button.offsetParent).toBeNull();
+      });
     });
 
     it('associates the toggle with the revealed panel and removes menu roles', () => {
+      const collapsedPanel = panel() as HTMLElement;
+      expect(collapsedPanel).toBeTruthy();
+
       const toggle = openToggle();
 
       const revealed = panel();
       expect(revealed).toBeTruthy();
+      expect(revealed).toBe(collapsedPanel);
+      expect(document.getElementById('site-header-account-panel')).toBe(
+        collapsedPanel
+      );
       expect(revealed?.tagName).toBe('UL');
       const controls = toggle.getAttribute('aria-controls');
       expect(controls).toBe('site-header-account-panel');
       expect(revealed?.id).toBe(controls ?? '');
+      expect(revealed?.hidden).toBe(false);
+      expect(revealed?.hasAttribute('hidden')).toBe(false);
       expect(revealed?.hasAttribute('role')).toBe(false);
 
       const forbiddenRoles = Array.from(element.querySelectorAll('[role]'))
@@ -194,10 +224,29 @@ describe('SiteHeaderComponent', () => {
           (role) => role === 'menu' || role === 'menuitem' || role === 'none'
         );
       expect(forbiddenRoles).toEqual([]);
+      expect(element.querySelectorAll('[aria-haspopup]').length).toBe(0);
+    });
+
+    it('never applies forbidden menu ARIA semantics in either state', () => {
+      const forbiddenRoles = (): (string | null)[] =>
+        Array.from(element.querySelectorAll('[role]'))
+          .map((node) => node.getAttribute('role'))
+          .filter(
+            (role) => role === 'menu' || role === 'menuitem' || role === 'none'
+          );
+
+      expect(forbiddenRoles()).toEqual([]);
+      expect(element.querySelectorAll('[aria-haspopup]').length).toBe(0);
+
+      openToggle();
+
+      expect(forbiddenRoles()).toEqual([]);
+      expect(element.querySelectorAll('[aria-haspopup]').length).toBe(0);
     });
 
     it('keeps the account actions as native buttons in document order', () => {
       openToggle();
+      expect(panel()?.hidden).toBe(false);
       const buttons = panelButtons();
 
       expect(
@@ -211,6 +260,7 @@ describe('SiteHeaderComponent', () => {
         expect(button.disabled).toBe(false);
         expect(button.getAttribute('tabindex')).toBeNull();
         expect(button.closest('li')).toBeTruthy();
+        expect(button.offsetParent).not.toBeNull();
         button.focus();
         expect(document.activeElement).toBe(button);
       });
@@ -241,7 +291,9 @@ describe('SiteHeaderComponent', () => {
         expect(emitted).toEqual(
           expectations.slice(0, index + 1).map((e) => e.action)
         );
-        expect(panel()).toBeNull();
+        expect(panel()).toBeTruthy();
+        expect(panel()?.hidden).toBe(true);
+        expect(panel()?.hasAttribute('hidden')).toBe(true);
         expect(toggleButton().getAttribute('aria-expanded')).toBe('false');
       });
     });
@@ -249,6 +301,7 @@ describe('SiteHeaderComponent', () => {
     it('closes the disclosure on escape, prevents the default and restores focus', () => {
       const toggle = openToggle();
       expect(toggle.getAttribute('aria-expanded')).toBe('true');
+      expect(panel()?.hidden).toBe(false);
 
       toggle.focus();
       expect(document.activeElement).toBe(toggle);
@@ -261,7 +314,9 @@ describe('SiteHeaderComponent', () => {
 
       expect(notPrevented).toBe(false);
       expect(toggle.getAttribute('aria-expanded')).toBe('false');
-      expect(panel()).toBeNull();
+      expect(panel()).toBeTruthy();
+      expect(panel()?.hidden).toBe(true);
+      expect(getComputedStyle(panel() as Element).display).toBe('none');
       expect(document.activeElement).toBe(toggle);
     });
 
@@ -277,7 +332,8 @@ describe('SiteHeaderComponent', () => {
 
       expect(notPrevented).toBe(true);
       expect(toggle.getAttribute('aria-expanded')).toBe('false');
-      expect(panel()).toBeNull();
+      expect(panel()).toBeTruthy();
+      expect(panel()?.hidden).toBe(true);
       expect(document.activeElement).toBe(actionButton);
       expect(document.activeElement).not.toBe(toggle);
     });
@@ -297,7 +353,8 @@ describe('SiteHeaderComponent', () => {
       fixture.detectChanges();
 
       expect(toggle.getAttribute('aria-expanded')).toBe('false');
-      expect(panel()).toBeNull();
+      expect(panel()).toBeTruthy();
+      expect(panel()?.hidden).toBe(true);
       expect(emitted).toEqual([]);
       expect(document.activeElement).toBe(actionButton);
     });

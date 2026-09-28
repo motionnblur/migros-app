@@ -182,17 +182,25 @@ describe('MainComponent', () => {
       const toggle = query<HTMLButtonElement>('.site-header__account-toggle');
       expect(toggle.getAttribute('aria-expanded')).toBe('false');
 
+      const panel = query<HTMLElement>('#site-header-account-panel');
+      expect(panel).toBeTruthy();
+      expect(panel.hidden).toBe(true);
+
       toggle.click();
       fixture.detectChanges();
       expect(query('.site-header__account-toggle').getAttribute('aria-expanded')).toBe(
         'true'
       );
+      expect(query('#site-header-account-panel')).toBe(panel);
+      expect(panel.hidden).toBe(false);
 
       document.dispatchEvent(new Event('click', { bubbles: true }));
       fixture.detectChanges();
       expect(query('.site-header__account-toggle').getAttribute('aria-expanded')).toBe(
         'false'
       );
+      expect(query('#site-header-account-panel')).toBe(panel);
+      expect(panel.hidden).toBe(true);
     });
   });
 
