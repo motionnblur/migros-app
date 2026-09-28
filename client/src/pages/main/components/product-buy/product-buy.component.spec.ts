@@ -36,6 +36,30 @@ describe('ProductBuyComponent', () => {
     ],
   };
 
+  const unsafeDescription =
+    '<p onclick="steal()">Merhaba <em>dünya</em></p>' +
+    '<a href="javascript:steal()">bağlantı</a>';
+
+  function descriptionPanel(): HTMLElement {
+    return fixture.nativeElement.querySelector('.product-description-content');
+  }
+
+  function tabButtons(): HTMLButtonElement[] {
+    return Array.from(
+      fixture.nativeElement.querySelectorAll(
+        '[role="tab"]',
+      ) as NodeListOf<HTMLButtonElement>,
+    );
+  }
+
+  function descriptionElement(selector: string): HTMLElement {
+    const element = descriptionPanel().querySelector(selector) as HTMLElement | null;
+    if (!element) {
+      throw new Error(`Expected "${selector}" inside the description panel.`);
+    }
+    return element;
+  }
+
   function setProductId(productId: number): void {
     fixture.componentRef.setInput('productId', productId);
     fixture.detectChanges();
@@ -380,5 +404,167 @@ describe('ProductBuyComponent', () => {
     flushImage();
 
     expect(component.productImageUrl).toBeTruthy();
+  });
+
+  it('sanitizes the first description tab instead of trusting the stored HTML', () => {
+    setProductId(11);
+    flushProductData();
+    flushDescriptions({
+      productId: 11,
+      descriptionList: [
+        { descriptionId: 1, descriptionTabName: 'Özellikler', descriptionTabContent: unsafeDescription },
+        { descriptionId: 2, descriptionTabName: 'Kullanım', descriptionTabContent: '<p>İki</p>' },
+      ],
+    });
+
+    const panel = descriptionPanel();
+    expect(component.selectedTabIndex).toBe(0);
+    expect(descriptionElement('em').textContent).toContain('dünya');
+    expect(panel.textContent).toContain('Merhaba');
+    expect(descriptionElement('p').hasAttribute('onclick')).toBeFalse();
+    expect(descriptionElement('a').getAttribute('href')).not.toMatch(/^javascript:/i);
+  });
+
+  it('sanitizes a description tab selected after the first one', () => {
+    setProductId(11);
+    flushProductData();
+    flushDescriptions({
+      productId: 11,
+      descriptionList: [
+        { descriptionId: 1, descriptionTabName: 'Özellikler', descriptionTabContent: '<p>Bir</p>' },
+        { descriptionId: 2, descriptionTabName: 'Kullanım', descriptionTabContent: unsafeDescription },
+      ],
+    });
+
+    tabButtons()[1].click();
+    fixture.detectChanges();
+
+    const panel = descriptionPanel();
+    expect(component.selectedTabIndex).toBe(1);
+    expect(descriptionElement('em').textContent).toContain('dünya');
+    expect(panel.textContent).toContain('Merhaba');
+    expect(descriptionElement('p').hasAttribute('onclick')).toBeFalse();
+    expect(descriptionElement('a').getAttribute('href')).not.toMatch(/^javascript:/i);
+  });
+
+  it('keeps tab keyboard navigation and the empty-description behaviour', () => {
+    setProductId(11);
+    flushProductData();
+    flushDescriptions({
+      productId: 11,
+      descriptionList: [
+        { descriptionId: 1, descriptionTabName: 'Özellikler', descriptionTabContent: '<p><em>Bir</em></p>' },
+        { descriptionId: 2, descriptionTabName: 'Kullanım', descriptionTabContent: '<p><strong>İki</strong></p>' },
+      ],
+    });
+
+    const tabs = tabButtons();
+    tabs[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    fixture.detectChanges();
+
+    expect(component.selectedTabIndex).toBe(1);
+    expect(descriptionElement('strong').textContent).toContain('İki');
+
+    tabs[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+    fixture.detectChanges();
+    expect(component.selectedTabIndex).toBe(1);
+
+    tabs[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+    fixture.detectChanges();
+    expect(component.selectedTabIndex).toBe(0);
+    expect(descriptionElement('em').textContent).toContain('Bir');
+
+    setProductId(12);
+    flushProductData({ ...product, productName: 'Yoğurt' });
+    flushDescriptions({ productId: 12, descriptionList: [] });
+    expect(fixture.nativeElement.querySelector('[role="tablist"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.product-detail__name').textContent).toContain(
+      'Yoğurt',
+    );
+  });
+
+  it('cancels the previous product requests instead of showing their late response', () => {
+    setProductId(11);
+    const staleData = requests('getProductDataWithProductId')[0];
+
+    setProductId(12);
+
+    expect(staleData.cancelled).toBeTrue();
+    expect(component.isLoading).toBeTrue();
+    expect(fixture.nativeElement.querySelector('[role="tablist"]')).toBeNull();
+
+    flushProductData({ ...product, productName: 'Yoğurt' });
+    flushDescriptions();
+    expect(fixture.nativeElement.querySelector('.product-detail__name').textContent).toContain(
+      'Yoğurt',
+    );
+  });
+
+  it('revokes the previous object URL and shows the placeholder until the new image arrives', () => {
+    const revokeSpy = spyOn(URL, 'revokeObjectURL').and.callThrough();
+
+    setProductId(11);
+    flushProductData();
+    flushImage();
+    const firstImageUrl = component.productImageUrl as string;
+    expect(firstImageUrl).toBeTruthy();
+
+    setProductId(12);
+
+    expect(component.productImageUrl).toBeNull();
+    expect(revokeSpy).toHaveBeenCalledWith(firstImageUrl);
+
+    flushProductData({ ...product, productName: 'Yoğurt' });
+    expect(
+      (fixture.nativeElement.querySelector('.product-detail__image') as HTMLImageElement)
+        .getAttribute('src'),
+    ).toContain('data:image/svg+xml');
+
+    flushImage();
+    const image = fixture.nativeElement.querySelector(
+      '.product-detail__image',
+    ) as HTMLImageElement;
+    expect(image.getAttribute('src')).toBe(component.productImageUrl);
+    expect(component.productImageUrl).not.toBe(firstImageUrl);
+  });
+
+  it('never brings the previous product name or image back when the new ones fail', () => {
+    const emittedNames: string[] = [];
+    component.productNameChange.subscribe((name) => emittedNames.push(name));
+
+    setProductId(11);
+    flushProductData();
+    flushImage();
+    const firstImageUrl = component.productImageUrl;
+
+    setProductId(12);
+    requests('getProductDataWithProductId')[0].flush('boom', {
+      status: 500,
+      statusText: 'Server Error',
+    });
+    fixture.detectChanges();
+
+    expect(component.productImageUrl).toBeNull();
+    expect(component.productImageUrl).not.toBe(firstImageUrl);
+    expect(emittedNames).toEqual(['Tam Süt']);
+    expect(fixture.nativeElement.querySelector('.product-detail__name')).toBeNull();
+  });
+
+  it('drops a pending add-to-cart when the product changes', () => {
+    setProductId(11);
+    flushProductData();
+    flushDescriptions();
+    flushImage();
+
+    (fixture.nativeElement.querySelector('.product-detail__add') as HTMLButtonElement)
+      .click();
+    const cartRequest = requests('addProductToUserCart')[0];
+    expect(cartRequest).toBeTruthy();
+
+    setProductId(12);
+
+    expect(cartRequest.cancelled).toBeTrue();
+    expect(component.isAddingToCart).toBeFalse();
+    expect(fixture.nativeElement.querySelector('.product-detail__feedback')).toBeNull();
   });
 });

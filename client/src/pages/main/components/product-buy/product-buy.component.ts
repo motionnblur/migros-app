@@ -1,5 +1,4 @@
 import { CommonModule } from '@angular/common';
-import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import {
   Component,
   ElementRef,
@@ -44,7 +43,7 @@ export class ProductBuyComponent implements OnChanges, OnDestroy {
   productData: IProductData | null = null;
   productDescriptions: IProductDescription | null = null;
   productImageUrl: string | null = null;
-  currentProductDescriptionBody: SafeHtml = '';
+  currentProductDescriptionBody = '';
   selectedTabIndex = 0;
   isLoading = true;
   hasLoadError = false;
@@ -61,7 +60,6 @@ export class ProductBuyComponent implements OnChanges, OnDestroy {
 
   constructor(
     private restService: RestService,
-    private sanitizer: DomSanitizer,
     private authService: AuthService,
     private router: Router,
     private route: ActivatedRoute,
@@ -198,9 +196,9 @@ export class ProductBuyComponent implements OnChanges, OnDestroy {
     }
 
     this.selectedTabIndex = index;
-    this.currentProductDescriptionBody = this.sanitizer.bypassSecurityTrustHtml(
-      this.descriptionList[index].descriptionTabContent,
-    );
+    // Kept as a plain string: the `[innerHTML]` binding sanitizes the stored
+    // admin-entered markup, so no event handler or unsafe URL survives.
+    this.currentProductDescriptionBody = this.descriptionList[index].descriptionTabContent ?? '';
   }
 
   private focusTab(index: number): void {
@@ -212,13 +210,21 @@ export class ProductBuyComponent implements OnChanges, OnDestroy {
     this.dataSub?.unsubscribe();
     this.descriptionSub?.unsubscribe();
     this.imageSub?.unsubscribe();
+    // A pending add-to-cart belongs to the previous product: its feedback must
+    // not surface on the new one.
+    this.cartSub?.unsubscribe();
+    this.cartSub = null;
 
     this.isLoading = true;
     this.hasLoadError = false;
+    this.isAddingToCart = false;
     this.productData = null;
     this.productDescriptions = null;
     this.selectedTabIndex = 0;
     this.currentProductDescriptionBody = '';
+    // The old product's image must not stay visible next to the new data.
+    this.releaseImageUrl();
+    this.productImageUrl = null;
     this.clearFeedbackTimeout();
     this.feedbackKind = null;
     this.feedbackMessage = '';

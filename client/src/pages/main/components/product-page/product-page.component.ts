@@ -198,9 +198,10 @@ export class ProductPageComponent implements OnInit, OnDestroy {
     const productId = this.parseProductId(params.get('productId'));
     if (productId !== this.selectedProductId) {
       this.selectedProductId = productId;
-      if (productId === null) {
-        this.productName = '';
-      } else {
+      // The detail view is reused for a different product, so the previous
+      // breadcrumb name belongs to a product that is no longer shown.
+      this.productName = '';
+      if (productId !== null) {
         this.scrollToTop();
       }
     }
@@ -258,6 +259,11 @@ export class ProductPageComponent implements OnInit, OnDestroy {
 
     if (this.isProductDetailView) {
       this.items = [];
+      // Invalidate the loaded state and any pending listing response: the
+      // listing is torn down for the detail view, so returning to this
+      // selection must fetch the page again instead of rendering nothing.
+      this.hasLoadedSelection = false;
+      this.latestRequestId++;
       return;
     }
 

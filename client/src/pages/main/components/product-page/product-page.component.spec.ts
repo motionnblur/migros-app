@@ -90,6 +90,23 @@ describe('ProductPageComponent', () => {
     fixture.detectChanges();
   }
 
+  function flushProductDetail(productId: number, productName: string): void {
+    expectRequest('getProductDataWithProductId').flush({
+      productId,
+      productName,
+      subCategoryName: 'Süt',
+      productPrice: 50,
+      productCount: 4,
+      productDiscount: 0,
+      productCategoryId: 3,
+    });
+    fixture.detectChanges();
+    requests('getProductDescription').forEach((request) =>
+      request.flush({ productId, descriptionList: [] }),
+    );
+    flushProductImages();
+  }
+
   beforeEach(async () => {
     paramMap = new BehaviorSubject<ParamMap>(convertToParamMap({ categoryId: '3' }));
     queryParamMap = new BehaviorSubject<ParamMap>(convertToParamMap({}));
@@ -460,5 +477,104 @@ describe('ProductPageComponent', () => {
     expect(component.categoryName).toBe('İçecek');
     expect(component.selectedSubCategoryName).toBe('');
     expect(component.currentPage).toBe(1);
+  });
+
+  it('reloads the same selection after the return link leaves the detail view', () => {
+    setRoute({ categoryId: '3' }, { subcategory: 'Süt', page: '2' });
+    flushMetadata();
+    expectRequest('getProductsFromSubcategory').flush([product(1)]);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('app-product-preview').length).toBe(1);
+
+    setRoute({ categoryId: '3', productId: '11' }, { subcategory: 'Süt', page: '2' });
+    fixture.detectChanges();
+    expect(component.isProductDetailView).toBeTrue();
+
+    setRoute({ categoryId: '3' }, { subcategory: 'Süt', page: '2' });
+    fixture.detectChanges();
+
+    expect(component.isProductDetailView).toBeFalse();
+    expect(component.isLoading).toBeTrue();
+    expect(component.isEmptySelection).toBeFalse();
+
+    const restored = expectRequest('getProductsFromSubcategory');
+    expect(restored.request.params.get('subcategoryName')).toBe('Süt');
+    expect(restored.request.params.get('page')).toBe('1');
+    restored.flush([product(1), product(2)]);
+    fixture.detectChanges();
+
+    expect(component.isEmptySelection).toBeFalse();
+    expect(fixture.nativeElement.querySelectorAll('app-product-preview').length).toBe(2);
+  });
+
+  it('ignores a listing response that arrives while the detail view is open', () => {
+    flushMetadata();
+    const stale = expectRequest('getProductsFromCategory');
+
+    setRoute({ categoryId: '3', productId: '11' }, {});
+    fixture.detectChanges();
+    expect(component.isProductDetailView).toBeTrue();
+
+    // The pending listing resolves after the detail view replaced it: it must
+    // neither render rows nor mark the selection as already loaded.
+    stale.flush([product(1), product(2)]);
+    fixture.detectChanges();
+    expect(component.items.length).toBe(0);
+    expect(component.isEmptySelection).toBeFalse();
+
+    setRoute({ categoryId: '3' }, {});
+    fixture.detectChanges();
+
+    const fresh = expectRequest('getProductsFromCategory');
+    expect(fresh).not.toBe(stale);
+    expect(component.isLoading).toBeTrue();
+
+    fresh.flush([product(9)]);
+    fixture.detectChanges();
+    expect(component.items.length).toBe(1);
+    expect(fixture.nativeElement.querySelectorAll('app-product-preview').length).toBe(1);
+  });
+
+  it('loads the requested category page after a direct product link and its return link', () => {
+    setRoute({ categoryId: '3', productId: '11' }, { subcategory: 'Peynir' });
+    flushMetadata();
+    fixture.detectChanges();
+
+    expect(component.isProductDetailView).toBeTrue();
+    expect(requests('getProductsFromSubcategory').length).toBe(0);
+
+    setRoute({ categoryId: '3' }, { subcategory: 'Peynir' });
+    fixture.detectChanges();
+
+    const listing = expectRequest('getProductsFromSubcategory');
+    expect(listing.request.params.get('subcategoryName')).toBe('Peynir');
+    listing.flush([product(1)]);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelectorAll('app-product-preview').length).toBe(1);
+  });
+
+  it('clears the breadcrumb product name when the routed product changes', () => {
+    flushMetadata();
+    setRoute({ categoryId: '3', productId: '11' }, {});
+    fixture.detectChanges();
+
+    flushProductDetail(11, 'Tam Süt');
+    expect(component.productName).toBe('Tam Süt');
+    expect(
+      fixture.nativeElement.querySelector('.breadcrumb-nav__item--current').textContent,
+    ).toContain('Tam Süt');
+
+    setRoute({ categoryId: '3', productId: '12' }, {});
+    fixture.detectChanges();
+
+    expect(component.productName).toBe('');
+    expect(fixture.nativeElement.querySelector('.breadcrumb-nav__item--current')).toBeNull();
+
+    flushProductDetail(12, 'Yoğurt');
+    expect(component.productName).toBe('Yoğurt');
+    expect(
+      fixture.nativeElement.querySelector('.breadcrumb-nav__item--current').textContent,
+    ).toContain('Yoğurt');
   });
 });
