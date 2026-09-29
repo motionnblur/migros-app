@@ -1,6 +1,5 @@
 package com.example.MigrosBackend.controller.user.support;
 
-import com.example.MigrosBackend.config.security.AuthCookies;
 import com.example.MigrosBackend.dto.user.support.SupportMessageDto;
 import com.example.MigrosBackend.dto.user.support.SupportSendMessageDto;
 import com.example.MigrosBackend.helper.AuthTokenResolver;
@@ -8,7 +7,6 @@ import com.example.MigrosBackend.service.support.UserSupportChatService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -18,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("user/support")
+@RequestMapping("/user/support")
 public class UserSupportController {
     private final UserSupportChatService userSupportChatService;
     private final AuthTokenResolver authTokenResolver;
@@ -30,16 +28,13 @@ public class UserSupportController {
     }
 
     @GetMapping("messages")
-    public ResponseEntity<List<SupportMessageDto>> getSupportMessages(
-            @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
-        return ResponseEntity.ok(userSupportChatService.getMessagesForUser(authTokenResolver.requireToken(token)));
+    public ResponseEntity<List<SupportMessageDto>> getSupportMessages() {
+        return ResponseEntity.ok(userSupportChatService.getMessagesForUser(authTokenResolver.requireAuthenticatedUserMail()));
     }
 
     @PostMapping("send")
-    public ResponseEntity<Void> sendSupportMessage(
-            @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token,
-            @Valid @RequestBody SupportSendMessageDto dto) {
-        userSupportChatService.addUserMessage(authTokenResolver.requireToken(token), dto.getMessage());
+    public ResponseEntity<Void> sendSupportMessage(@Valid @RequestBody SupportSendMessageDto dto) {
+        userSupportChatService.addUserMessage(authTokenResolver.requireAuthenticatedUserMail(), dto.getMessage());
         return ResponseEntity.ok().build();
     }
 }

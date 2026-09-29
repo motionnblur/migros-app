@@ -8,6 +8,7 @@ import com.example.MigrosBackend.exception.shared.WrongPasswordException;
 import com.example.MigrosBackend.helper.AuthTokenResolver;
 import com.example.MigrosBackend.service.admin.sign.AdminSignupService;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
+import com.example.MigrosBackend.service.global.LogService;
 import com.example.MigrosBackend.service.global.TokenService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
@@ -53,6 +54,9 @@ class AdminSignControllerTest {
 
     @MockBean
     private TokenService tokenService;
+
+    @MockBean
+    private LogService logService;
 
     @Autowired
     private ObjectMapper objectMapper;

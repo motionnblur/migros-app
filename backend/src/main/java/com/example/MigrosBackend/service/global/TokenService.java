@@ -10,6 +10,8 @@ import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
 import java.security.MessageDigest;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.Date;
 
@@ -30,11 +32,14 @@ public class TokenService {
     private final byte[] adminSecretBytes;
     private final SecretKey userSigningKey;
     private final SecretKey adminSigningKey;
+    private final Clock clock;
 
     public TokenService(@Value("${jwt.user-secret:}") String userSecret,
-                        @Value("${jwt.admin-secret:}") String adminSecret) {
+                        @Value("${jwt.admin-secret:}") String adminSecret,
+                        Clock clock) {
         this.userSecretBytes = requireSecret(userSecret, "jwt.user-secret");
         this.adminSecretBytes = requireSecret(adminSecret, "jwt.admin-secret");
+        this.clock = clock;
 
         if (MessageDigest.isEqual(userSecretBytes, adminSecretBytes)) {
             throw new IllegalStateException("jwt.user-secret and jwt.admin-secret must be different");
@@ -65,11 +70,12 @@ public class TokenService {
     }
 
     private String generateToken(String subject, String sessionType, SecretKey signingKey) {
+        Instant now = clock.instant();
         return Jwts.builder()
                 .subject(subject)
                 .claim(SESSION_TYPE_CLAIM, sessionType)
-                .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + TOKEN_TTL_MILLIS))
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(now.plusMillis(TOKEN_TTL_MILLIS)))
                 .signWith(signingKey)
                 .compact();
     }
@@ -78,6 +84,7 @@ public class TokenService {
         try {
             Claims claims = Jwts.parser()
                     .verifyWith(signingKey)
+                    .clock(() -> Date.from(clock.instant()))
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();

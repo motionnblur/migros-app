@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("admin/supply")
+@RequestMapping("/admin/supply")
 public class AdminSupplyController {
     private final AdminSupplyService adminSupplyService;
     private final UserSupplyService userSupplyService;
@@ -25,14 +25,14 @@ public class AdminSupplyController {
     }
 
     @PostMapping("addCategory")
-    private ResponseEntity<Void> addCategory(@RequestParam String categoryName) {
+    public ResponseEntity<Void> addCategory(@RequestParam String categoryName) {
         adminSupplyService.addCategory(categoryName);
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("getProductCountsFromCategory")
-    public int getProductCountsFromCategory(@RequestParam Long categoryId) {
-        return userSupplyService.getProductCountsFromCategory(categoryId);
+    public ResponseEntity<Integer> getProductCountsFromCategory(@RequestParam Long categoryId) {
+        return ResponseEntity.ok(userSupplyService.getProductCountsFromCategory(categoryId));
     }
 
     @GetMapping("getProductsFromCategory")

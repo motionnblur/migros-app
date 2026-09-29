@@ -67,24 +67,48 @@ public class FileService {
         }
     }
 
-    public Path resolveImagePath(String storedPath) {
+    /**
+     * Resolves a stored image reference to a file inside the upload directory.
+     *
+     * <p>The stored value is never trusted as a path. Whether the database holds
+     * a bare file name, a legacy absolute path, or a value crafted to escape,
+     * only its final name component is used and the result is confined to
+     * {@code uploadDir} with the same parent-equality check the write path uses.
+     * Refusing to return an arbitrary existing absolute path prevents a row in
+     * {@code product_image_entity} from pointing image serving at any file on
+     * the host.
+     *
+     * @throws IOException if the value cannot be reduced to a plain file name
+     *                     confined to the upload directory
+     */
+    public Path resolveImagePath(String storedPath) throws IOException {
         if (storedPath == null || storedPath.isBlank()) {
             return uploadDir;
         }
 
-        String normalized = storedPath.trim().replace("\\", "/");
-        Path rawPath = Paths.get(normalized);
-        if (rawPath.isAbsolute() && Files.exists(rawPath)) {
-            return rawPath.normalize();
+        String fileName = extractFileName(storedPath);
+        Path resolved = uploadDir.resolve(fileName).normalize();
+        if (!resolved.getParent().equals(uploadDir)) {
+            throw new IOException("Refusing to resolve an image path outside the upload directory: " + storedPath);
         }
+        return resolved;
+    }
 
-        // Backward compatibility for older relative paths like UploadFolder/image_x.png.
-        Path relativeCandidate = Paths.get(normalized);
-        if (Files.exists(relativeCandidate)) {
-            return relativeCandidate.toAbsolutePath().normalize();
+    /**
+     * Reduces a stored value to its final name component.
+     *
+     * <p>Both separators are normalized first so a Windows-style path cannot
+     * smuggle a directory past a Unix path parser. A value whose final component
+     * is empty, is a directory reference, or still carries a drive-relative
+     * prefix is rejected rather than resolved.
+     */
+    private static String extractFileName(String storedPath) throws IOException {
+        String normalized = storedPath.trim().replace('\\', '/');
+        int lastSeparator = normalized.lastIndexOf('/');
+        String fileName = lastSeparator >= 0 ? normalized.substring(lastSeparator + 1) : normalized;
+        if (fileName.isEmpty() || ".".equals(fileName) || "..".equals(fileName) || fileName.indexOf(':') >= 0) {
+            throw new IOException("Refusing to resolve an image path outside the upload directory: " + storedPath);
         }
-
-        String fileName = rawPath.getFileName() != null ? rawPath.getFileName().toString() : normalized;
-        return uploadDir.resolve(fileName).normalize();
+        return fileName;
     }
 }

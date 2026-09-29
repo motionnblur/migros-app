@@ -11,6 +11,7 @@ import com.example.MigrosBackend.filter.JwtRequestFilter;
 import com.example.MigrosBackend.helper.AuthTokenResolver;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.service.admin.sign.AdminSignupService;
+import com.example.MigrosBackend.service.global.LogService;
 import com.example.MigrosBackend.service.global.TokenService;
 import com.example.MigrosBackend.service.user.payment.CheckoutService;
 import com.example.MigrosBackend.service.user.payment.UserPaymentService;
@@ -72,6 +73,9 @@ class SecurityAccessRulesTest {
     private AdminEntityRepository adminEntityRepository;
 
     @MockBean
+    private LogService logService;
+
+    @MockBean
     private CheckoutService checkoutService;
 
     @MockBean
@@ -81,8 +85,8 @@ class SecurityAccessRulesTest {
     void userCookie_GrantsAccessToProfileEndpoint() throws Exception {
         String token = "user.jwt.token";
         when(tokenService.validateAndExtractUser(token)).thenReturn("user@example.com");
-        when(authTokenResolver.requireToken(token)).thenReturn(token);
-        when(userProfileService.getUserProfileTable(token)).thenReturn(new UserProfileTableDto());
+        when(authTokenResolver.requireAuthenticatedUserMail()).thenReturn("user@example.com");
+        when(userProfileService.getUserProfileTable("user@example.com")).thenReturn(new UserProfileTableDto());
 
         mockMvc.perform(get("/user/profile/getUserProfileTable")
                         .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, token)))

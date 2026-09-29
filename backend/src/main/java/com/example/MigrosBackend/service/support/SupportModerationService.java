@@ -1,6 +1,7 @@
 package com.example.MigrosBackend.service.support;
 
 import com.example.MigrosBackend.entity.user.SupportMessageEntity;
+import com.example.MigrosBackend.entity.user.SupportMessageSender;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.exception.shared.SupportSyncConflictException;
@@ -11,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -25,16 +27,19 @@ public class SupportModerationService {
     private final SupportMessageEntityRepository supportMessageEntityRepository;
     private final SupportChatNotificationCoordinator notificationCoordinator;
     private final SupportChatGuards guards;
+    private final Clock clock;
 
     @Autowired
     public SupportModerationService(UserEntityRepository userEntityRepository,
                                     SupportMessageEntityRepository supportMessageEntityRepository,
                                     SupportChatNotificationCoordinator notificationCoordinator,
-                                    SupportChatGuards guards) {
+                                    SupportChatGuards guards,
+                                    Clock clock) {
         this.userEntityRepository = userEntityRepository;
         this.supportMessageEntityRepository = supportMessageEntityRepository;
         this.notificationCoordinator = notificationCoordinator;
         this.guards = guards;
+        this.clock = clock;
     }
 
     public void addManagementMessage(String userMail, String message) {
@@ -51,12 +56,12 @@ public class SupportModerationService {
 
         SupportMessageEntity entity = new SupportMessageEntity();
         entity.setUserMail(userMail);
-        entity.setSender("MANAGEMENT");
+        entity.setSender(SupportMessageSender.MANAGEMENT.name());
         entity.setMessage(trimmedMessage);
         entity.setExternalMessageId(SupportChatGuards.safeTrimToNull(externalMessageId));
-        entity.setCreatedAt(LocalDateTime.now());
+        entity.setCreatedAt(LocalDateTime.now(clock));
         entity = supportMessageEntityRepository.save(entity);
-        notificationCoordinator.broadcastSupportMessageCreated(userMail, "MANAGEMENT", entity.getId());
+        notificationCoordinator.broadcastSupportMessageCreated(userMail, SupportMessageSender.MANAGEMENT.name(), entity.getId());
     }
 
     // Pre-existing ban-check asymmetry: addManagementMessage refuses to write
@@ -79,12 +84,12 @@ public class SupportModerationService {
                 .findByUserMailAndExternalMessageId(userMail, trimmedExternalMessageId)
                 .orElseThrow(() -> new GeneralException("Editable support message not found"));
 
-        if (!"MANAGEMENT".equals(entity.getSender())) {
+        if (!SupportMessageSender.MANAGEMENT.name().equals(entity.getSender())) {
             throw new GeneralException("Only management messages can be edited");
         }
 
         entity.setMessage(trimmedMessage);
-        entity.setEditedAt(LocalDateTime.now());
+        entity.setEditedAt(LocalDateTime.now(clock));
         supportMessageEntityRepository.save(entity);
         notificationCoordinator.broadcastSupportUpdate(userMail);
     }
@@ -102,7 +107,7 @@ public class SupportModerationService {
                 .findByUserMailAndExternalMessageId(userMail, trimmedExternalMessageId)
                 .orElseThrow(() -> new GeneralException("Deletable support message not found"));
 
-        if (!"MANAGEMENT".equals(entity.getSender())) {
+        if (!SupportMessageSender.MANAGEMENT.name().equals(entity.getSender())) {
             throw new GeneralException("Only management messages can be deleted");
         }
 
@@ -131,7 +136,7 @@ public class SupportModerationService {
         String supportServiceMessageId = resolveSupportServiceMessageId(entity, "edit");
 
         entity.setMessage(trimmedMessage);
-        entity.setEditedAt(LocalDateTime.now());
+        entity.setEditedAt(LocalDateTime.now(clock));
         supportMessageEntityRepository.save(entity);
 
         notificationCoordinator.publishSupportMessageEdited(userMail, supportServiceMessageId, trimmedMessage);
@@ -193,15 +198,16 @@ public class SupportModerationService {
     }
 
     private boolean isEditableByAdmin(String sender) {
-        return "USER".equals(sender) || "MANAGEMENT".equals(sender);
+        return SupportMessageSender.USER.name().equals(sender)
+                || SupportMessageSender.MANAGEMENT.name().equals(sender);
     }
 
     private String resolveSupportServiceMessageId(SupportMessageEntity entity, String operation) {
-        if ("USER".equals(entity.getSender())) {
+        if (SupportMessageSender.USER.name().equals(entity.getSender())) {
             return String.valueOf(entity.getId());
         }
 
-        if ("MANAGEMENT".equals(entity.getSender())) {
+        if (SupportMessageSender.MANAGEMENT.name().equals(entity.getSender())) {
             String externalMessageId = SupportChatGuards.safeTrim(entity.getExternalMessageId());
             if (externalMessageId.isEmpty()) {
                 throw new SupportSyncConflictException("This management message is legacy and cannot be synced for " + operation);

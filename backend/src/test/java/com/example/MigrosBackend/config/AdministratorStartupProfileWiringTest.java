@@ -2,7 +2,6 @@ package com.example.MigrosBackend.config;
 
 import com.example.MigrosBackend.entity.admin.AdminEntity;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
-import com.example.MigrosBackend.repository.category.CategoryEntityRepository;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.SmartInitializingSingleton;
@@ -34,7 +33,6 @@ class AdministratorStartupProfileWiringTest {
                     assertThat(guard).isInstanceOf(SmartInitializingSingleton.class);
                     assertThat(guard).isNotInstanceOf(CommandLineRunner.class);
                     assertThat(context).hasBean("localDefaultAdministratorInitializer");
-                    assertThat(context).hasBean("initializeCategories");
                 });
     }
 
@@ -75,7 +73,6 @@ class AdministratorStartupProfileWiringTest {
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     assertThat(context).hasBean("localDefaultAdministratorInitializer");
-                    assertThat(context).hasBean("initializeCategories");
                 });
     }
 
@@ -105,35 +102,15 @@ class AdministratorStartupProfileWiringTest {
                 });
     }
 
-    @Test
-    void categoryInitializationIsAvailableInEveryProfile() {
-        assertCategoryBeanPresentIn(null);
-        assertCategoryBeanPresentIn("local");
-        assertCategoryBeanPresentIn("prod");
-    }
-
-    private void assertCategoryBeanPresentIn(String activeProfile) {
-        ApplicationContextRunner runner = contextRunner(null);
-        if (activeProfile != null) {
-            runner = runner.withInitializer(context -> context.getEnvironment().setActiveProfiles(activeProfile));
-        }
-        runner.run(context -> {
-            assertThat(context).hasNotFailed();
-            assertThat(context).hasBean("initializeCategories");
-        });
-    }
-
     private ApplicationContextRunner contextRunner(AdminEntity admin) {
         return new ApplicationContextRunner()
-                .withUserConfiguration(AdministratorStartupConfiguration.class, StartupConfiguration.class,
-                        AdminStartupProfilePolicy.class)
+                .withUserConfiguration(AdministratorStartupConfiguration.class, AdminStartupProfilePolicy.class)
                 .withBean(AdminEntityRepository.class, () -> {
                     AdminEntityRepository repository = mock(AdminEntityRepository.class);
                     when(repository.findByAdminName("admin")).thenReturn(admin);
                     repositoryRef.set(repository);
                     return repository;
                 })
-                .withBean(CategoryEntityRepository.class, () -> mock(CategoryEntityRepository.class))
                 .withBean(PasswordEncoder.class, BCryptPasswordEncoder::new);
     }
 

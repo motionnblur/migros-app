@@ -65,7 +65,8 @@ class UserMailUniquenessMigrationPostgresTest {
         assertTrue(survivorId < duplicateId, "test setup must create two distinct user rows");
 
         MigrateResult result = migrate();
-        assertEquals(1, result.migrationsExecuted, "only V9 should still be pending");
+        assertEquals(MigrationTestSupport.versionedMigrationCount() - 8, result.migrationsExecuted,
+                "everything after V8 must still be pending here");
 
         assertEquals(1, singleLong("SELECT COUNT(*) FROM user_entity WHERE user_mail = 'dup@migros.com'"),
                 "duplicate mailboxes must be merged to one row");

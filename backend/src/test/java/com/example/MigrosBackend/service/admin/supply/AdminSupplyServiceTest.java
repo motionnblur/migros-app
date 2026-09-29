@@ -11,7 +11,6 @@ import com.example.MigrosBackend.entity.category.CategoryEntity;
 import com.example.MigrosBackend.entity.product.ProductDescriptionEntity;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.product.ProductImageEntity;
-import com.example.MigrosBackend.exception.admin.AdminHasNoProductException;
 import com.example.MigrosBackend.exception.admin.AdminNotFoundException;
 import com.example.MigrosBackend.exception.admin.FileUploadFailedException;
 import com.example.MigrosBackend.exception.admin.ProductNotFoundException;
@@ -474,11 +473,11 @@ class AdminSupplyServiceTest {
     }
 
     @Test
-    void getAllAdminProducts_shouldThrowAdminHasNoProductException_whenEmpty() {
+    void getAllAdminProducts_shouldReturnEmptyList_whenEmpty() {
         Page<ProductEntity> emptyPage = new PageImpl<>(Collections.emptyList(), PageRequest.of(0, 5), 0);
         when(productEntityRepository.findByAdminEntityId(eq(1L), any(Pageable.class))).thenReturn(emptyPage);
 
-        assertThrows(AdminHasNoProductException.class, () -> adminSupplyService.getAllAdminProducts(1L, 0, 5));
+        assertTrue(adminSupplyService.getAllAdminProducts(1L, 0, 5).isEmpty());
     }
 
     @Test

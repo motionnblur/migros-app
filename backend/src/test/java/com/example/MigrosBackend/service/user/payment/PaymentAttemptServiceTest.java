@@ -21,6 +21,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
@@ -61,8 +62,9 @@ class PaymentAttemptServiceTest {
     void setUp() {
         paymentAttemptService = new PaymentAttemptService(
                 checkoutEntityRepository, paymentAttemptEntityRepository, checkoutService,
-                new PaymentAttemptLeases(120),
-                new PaymentUserResolver(tokenService, userEntityRepository));
+                new PaymentAttemptLeases(120, Clock.systemDefaultZone()),
+                new PaymentUserResolver(tokenService, userEntityRepository),
+                Clock.systemDefaultZone());
         user = new UserEntity();
         user.setId(USER_ID);
         user.setUserMail(EMAIL);
@@ -335,7 +337,7 @@ class PaymentAttemptServiceTest {
 
         assertEquals(PaymentAttemptStatus.PROCESSING, processing.getStatus());
         assertEquals("owner", processing.getLeaseOwner());
-        verify(checkoutService, never()).failPayment(any());
+        verify(checkoutService, never()).releaseIfDefinitelyUncharged(any());
     }
 
     @Test
@@ -406,7 +408,7 @@ class PaymentAttemptServiceTest {
         assertThrows(PaymentStateException.class,
                 () -> paymentAttemptService.recordDecline(succeeded.getId(), "owner", "card_declined"));
         assertEquals(PaymentAttemptStatus.CHARGE_SUCCEEDED, succeeded.getStatus());
-        verify(checkoutService, never()).failPayment(any());
+        verify(checkoutService, never()).releaseIfDefinitelyUncharged(any());
     }
 
     @Test

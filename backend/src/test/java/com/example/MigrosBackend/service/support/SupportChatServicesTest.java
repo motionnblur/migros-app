@@ -5,10 +5,8 @@ import com.example.MigrosBackend.entity.user.SupportMessageEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.exception.admin.UserNotFoundException;
 import com.example.MigrosBackend.exception.shared.GeneralException;
-import com.example.MigrosBackend.exception.shared.InvalidTokenException;
 import com.example.MigrosBackend.repository.user.SupportMessageEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
-import com.example.MigrosBackend.service.global.TokenService;
 import com.example.MigrosBackend.websocket.SupportChatWebSocketHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,6 +16,7 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
@@ -30,15 +29,12 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class SupportChatServicesTest {
-    private static final String TOKEN = "token";
     private static final String USER_MAIL = "user@mail.com";
 
     @Mock
     private SupportMessageEntityRepository supportMessageEntityRepository;
     @Mock
     private UserEntityRepository userEntityRepository;
-    @Mock
-    private TokenService tokenService;
     @Mock
     private SupportChatWebSocketHandler supportChatWebSocketHandler;
     @Mock
@@ -62,14 +58,15 @@ class SupportChatServicesTest {
                 supportChatWebSocketHandler, supportInternalEventService);
         userSupportChatService = new UserSupportChatService(
                 supportMessageEntityRepository,
-                tokenService,
                 notificationCoordinator,
-                guards);
+                guards,
+                Clock.systemDefaultZone());
         supportModerationService = new SupportModerationService(
                 userEntityRepository,
                 supportMessageEntityRepository,
                 notificationCoordinator,
-                guards);
+                guards,
+                Clock.systemDefaultZone());
         supportCustomerDirectoryService = new SupportCustomerDirectoryService(
                 userEntityRepository,
                 supportMessageEntityRepository,
@@ -78,16 +75,15 @@ class SupportChatServicesTest {
     }
 
     @Test
-    void getMessagesForUser_shouldReturnMappedDtos_whenTokenValidAndNotBanned() {
+    void getMessagesForUser_shouldReturnMappedDtos_whenUserNotBanned() {
         SupportMessageEntity first = new SupportMessageEntity(1L, USER_MAIL, "USER", "Hello", LocalDateTime.now().minusMinutes(1));
         SupportMessageEntity second = new SupportMessageEntity(2L, USER_MAIL, "MANAGEMENT", "Hi there", LocalDateTime.now());
 
-        when(tokenService.validateAndExtractUser(TOKEN)).thenReturn(USER_MAIL);
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(user);
         when(supportMessageEntityRepository.findByUserMailOrderByCreatedAtAscIdAsc(USER_MAIL))
                 .thenReturn(Arrays.asList(first, second));
 
-        List<SupportMessageDto> result = userSupportChatService.getMessagesForUser(TOKEN);
+        List<SupportMessageDto> result = userSupportChatService.getMessagesForUser(USER_MAIL);
 
         assertEquals(2, result.size());
         assertEquals(1L, result.get(0).getId());
@@ -98,38 +94,28 @@ class SupportChatServicesTest {
     }
 
     @Test
-    void getMessagesForUser_shouldThrowInvalidToken_whenTokenInvalid() {
-        when(tokenService.validateAndExtractUser(TOKEN)).thenThrow(new InvalidTokenException());
-
-        assertThrows(InvalidTokenException.class, () -> userSupportChatService.getMessagesForUser(TOKEN));
-    }
-
-    @Test
     void getMessagesForUser_shouldThrowGeneralException_whenUserBanned() {
         user.setBanned(true);
-        when(tokenService.validateAndExtractUser(TOKEN)).thenReturn(USER_MAIL);
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(user);
 
-        GeneralException ex = assertThrows(GeneralException.class, () -> userSupportChatService.getMessagesForUser(TOKEN));
+        GeneralException ex = assertThrows(GeneralException.class, () -> userSupportChatService.getMessagesForUser(USER_MAIL));
         assertEquals("You are banned from live support.", ex.getMessage());
     }
 
     @Test
     void addUserMessage_shouldThrowGeneralException_whenMessageBlank() {
-        when(tokenService.validateAndExtractUser(TOKEN)).thenReturn(USER_MAIL);
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(user);
 
-        assertThrows(GeneralException.class, () -> userSupportChatService.addUserMessage(TOKEN, "   "));
+        assertThrows(GeneralException.class, () -> userSupportChatService.addUserMessage(USER_MAIL, "   "));
         verify(supportMessageEntityRepository, never()).save(any());
         verify(supportChatWebSocketHandler, never()).broadcastSupportUpdate(any());
     }
 
     @Test
     void addUserMessage_shouldTrimAndPersist_andBroadcast() {
-        when(tokenService.validateAndExtractUser(TOKEN)).thenReturn(USER_MAIL);
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(user);
 
-        userSupportChatService.addUserMessage(TOKEN, "  hello  ");
+        userSupportChatService.addUserMessage(USER_MAIL, "  hello  ");
 
         ArgumentCaptor<SupportMessageEntity> captor = ArgumentCaptor.forClass(SupportMessageEntity.class);
         verify(supportMessageEntityRepository).save(captor.capture());
@@ -143,7 +129,6 @@ class SupportChatServicesTest {
     @Test
     void addUserMessage_shouldPublishPersistedMessageBeforeBroadcast() {
         LocalDateTime createdAt = LocalDateTime.of(2025, 3, 4, 5, 6);
-        when(tokenService.validateAndExtractUser(TOKEN)).thenReturn(USER_MAIL);
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(user);
         when(supportMessageEntityRepository.save(any(SupportMessageEntity.class))).thenAnswer(invocation -> {
             SupportMessageEntity saved = invocation.getArgument(0);
@@ -152,7 +137,7 @@ class SupportChatServicesTest {
             return saved;
         });
 
-        userSupportChatService.addUserMessage(TOKEN, "  hello  ");
+        userSupportChatService.addUserMessage(USER_MAIL, "  hello  ");
 
         ArgumentCaptor<SupportMessageEntity> savedMessage = ArgumentCaptor.forClass(SupportMessageEntity.class);
         InOrder sideEffects = inOrder(supportMessageEntityRepository, supportInternalEventService, supportChatWebSocketHandler);
@@ -166,14 +151,13 @@ class SupportChatServicesTest {
 
     @Test
     void addUserMessage_shouldNotPublishOrBroadcastWhenPersistenceFails() {
-        when(tokenService.validateAndExtractUser(TOKEN)).thenReturn(USER_MAIL);
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(user);
         IllegalStateException persistenceFailure = new IllegalStateException("database unavailable");
         when(supportMessageEntityRepository.save(any(SupportMessageEntity.class))).thenThrow(persistenceFailure);
 
         IllegalStateException thrown = assertThrows(
                 IllegalStateException.class,
-                () -> userSupportChatService.addUserMessage(TOKEN, "hello")
+                () -> userSupportChatService.addUserMessage(USER_MAIL, "hello")
         );
 
         assertSame(persistenceFailure, thrown);
@@ -181,11 +165,10 @@ class SupportChatServicesTest {
     }
 
     @Test
-    void addUserMessage_shouldThrowUserNotFound_whenTokenUserMissing() {
-        when(tokenService.validateAndExtractUser(TOKEN)).thenReturn(USER_MAIL);
+    void addUserMessage_shouldThrowUserNotFound_whenUserMissing() {
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(null);
 
-        assertThrows(UserNotFoundException.class, () -> userSupportChatService.addUserMessage(TOKEN, "msg"));
+        assertThrows(UserNotFoundException.class, () -> userSupportChatService.addUserMessage(USER_MAIL, "msg"));
     }
 
     @Test

@@ -120,4 +120,67 @@ class FileServiceTest {
             Files.deleteIfExists(outside);
         }
     }
+
+    @Test
+    void resolveImagePath_ResolvesAPlainStoredNameUnderUploadDir() throws IOException {
+        FileService fileService = new FileService(tempDir.toString());
+
+        assertEquals(uploadDir().resolve("image_x.png"),
+                fileService.resolveImagePath("image_x.png"));
+    }
+
+    @Test
+    void resolveImagePath_ExtractsTheNameFromAnAbsoluteStoredPathUnderUploadDir() throws IOException {
+        FileService fileService = new FileService(tempDir.toString());
+        String storedLegacyPath = uploadDir().resolve("image_legacy.png").toString();
+
+        assertEquals(uploadDir().resolve("image_legacy.png"),
+                fileService.resolveImagePath(storedLegacyPath));
+    }
+
+    @Test
+    void resolveImagePath_ConfinesAnAbsolutePathThatEscapesUploadDir() throws IOException {
+        Path outside = tempDir.resolveSibling("secret.png");
+        Files.writeString(outside, "do not serve me");
+        FileService fileService = new FileService(tempDir.toString());
+
+        try {
+            Path resolved = fileService.resolveImagePath(outside.toString());
+
+            assertEquals(uploadDir().resolve("secret.png"), resolved);
+            assertTrue(resolved.startsWith(uploadDir()),
+                    "an absolute stored path must never be returned verbatim");
+        } finally {
+            Files.deleteIfExists(outside);
+        }
+    }
+
+    @Test
+    void resolveImagePath_ConfinesTraversalAndSeparatorVariants() throws IOException {
+        FileService fileService = new FileService(tempDir.toString());
+
+        assertEquals(uploadDir().resolve("escaped.png"),
+                fileService.resolveImagePath("../escaped.png"));
+        assertEquals(uploadDir().resolve("evil.png"),
+                fileService.resolveImagePath("..\\..\\evil.png"));
+        assertEquals(uploadDir().resolve("passwd"),
+                fileService.resolveImagePath("/etc/passwd"));
+        assertEquals(uploadDir().resolve("system.ini"),
+                fileService.resolveImagePath("C:\\Windows\\system.ini"));
+        assertEquals(uploadDir().resolve("image.png"),
+                fileService.resolveImagePath("nested/dir/image.png"));
+    }
+
+    @Test
+    void resolveImagePath_RejectsDirectoryReferences() {
+        FileService fileService = new FileService(tempDir.toString());
+
+        assertThrows(IOException.class, () -> fileService.resolveImagePath(".."));
+        assertThrows(IOException.class, () -> fileService.resolveImagePath("."));
+        assertThrows(IOException.class, () -> fileService.resolveImagePath("/"));
+    }
+
+    private Path uploadDir() {
+        return tempDir.toAbsolutePath().normalize();
+    }
 }

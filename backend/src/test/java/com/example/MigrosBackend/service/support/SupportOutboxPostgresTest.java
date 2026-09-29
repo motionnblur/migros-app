@@ -6,7 +6,7 @@ import com.example.MigrosBackend.entity.user.SupportMessageEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.repository.user.SupportMessageEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
-import com.example.MigrosBackend.service.global.TokenService;
+import com.example.MigrosBackend.websocket.SupportChatWebSocketHandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
@@ -21,6 +21,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -48,6 +49,10 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 /**
  * The support outbox must survive a commit boundary, retry with a stable
@@ -176,8 +181,9 @@ class SupportOutboxPostgresTest {
     private SupportOutboxDispatcher dispatcher;
     @Autowired
     private SupportOutboxStore outboxStore;
-    @Autowired
-    private TokenService tokenService;
+    @MockitoBean
+    private SupportChatWebSocketHandler supportChatWebSocketHandler;
+
     @Autowired
     private ObjectMapper objectMapper;
     @Autowired
@@ -516,6 +522,31 @@ class SupportOutboxPostgresTest {
     }
 
     @Test
+    void aCommittedChatMutationBroadcastsExactlyOnceAfterCommit() {
+        ensureUser(MAIL);
+
+        inTransaction(() -> {
+            userSupportChatService.addUserMessage(MAIL, "broadcast after commit");
+            verify(supportChatWebSocketHandler, never()).broadcastSupportUpdate(anyString());
+            return null;
+        });
+
+        verify(supportChatWebSocketHandler, times(1)).broadcastSupportUpdate(MAIL);
+    }
+
+    @Test
+    void aRolledBackChatMutationProducesNoBroadcast() {
+        ensureUser(MAIL);
+
+        assertThrows(IllegalStateException.class, () -> inTransaction(() -> {
+            userSupportChatService.addUserMessage(MAIL, "never broadcast");
+            throw new IllegalStateException("force rollback");
+        }));
+
+        verify(supportChatWebSocketHandler, never()).broadcastSupportUpdate(anyString());
+    }
+
+    @Test
     void theOutboxTableRejectsAnUnknownStatus() {
         sendUserMessage("guarded");
         assertThrows(RuntimeException.class, () -> jdbcTemplate.update(
@@ -541,7 +572,6 @@ class SupportOutboxPostgresTest {
     @Test
     void aLaterWriteForOneCustomerWaitsForTheEarlierOneToCommit() throws Exception {
         ensureUser(MAIL);
-        String token = tokenService.generateUserToken(MAIL);
         CountDownLatch firstWriteStored = new CountDownLatch(1);
         CountDownLatch releaseFirstWrite = new CountDownLatch(1);
 
@@ -550,7 +580,7 @@ class SupportOutboxPostgresTest {
         Future<?> secondWrite;
         try {
             firstWrite = pool.submit(() -> inTransaction(() -> {
-                userSupportChatService.addUserMessage(token, "first");
+                userSupportChatService.addUserMessage(MAIL, "first");
                 firstWriteStored.countDown();
                 await(releaseFirstWrite);
                 return null;
@@ -558,7 +588,7 @@ class SupportOutboxPostgresTest {
             assertTrue(firstWriteStored.await(30, TimeUnit.SECONDS),
                     "the first write must insert its event before the second one starts");
 
-            secondWrite = pool.submit(() -> userSupportChatService.addUserMessage(token, "second"));
+            secondWrite = pool.submit(() -> userSupportChatService.addUserMessage(MAIL, "second"));
             assertTrue(blocksOn(secondWrite),
                     "a second write for the same customer must not be able to take a sequence number "
                             + "while an earlier one is still uncommitted; that is exactly how sequence "
@@ -619,7 +649,7 @@ class SupportOutboxPostgresTest {
 
     private void sendUserMessageFor(String mail, String message) {
         ensureUser(mail);
-        userSupportChatService.addUserMessage(tokenService.generateUserToken(mail), message);
+        userSupportChatService.addUserMessage(mail, message);
     }
 
     private void ensureUser(String mail) {

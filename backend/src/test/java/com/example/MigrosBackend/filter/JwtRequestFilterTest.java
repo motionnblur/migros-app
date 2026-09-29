@@ -22,6 +22,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.io.IOException;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -63,6 +64,46 @@ class JwtRequestFilterTest {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/admin/login");
 
         assertTrue(jwtRequestFilter.shouldNotFilter(request));
+    }
+
+    @Test
+    void adminPaths_AreAdminClassified_andAdminLookalikeIsNot() {
+        for (String path : List.of("/admin", "/admin/panel", "/admin/ws/support")) {
+            assertTrue(JwtRequestFilter.isAdminPath(path), path + " must be admin-classified");
+        }
+        assertFalse(JwtRequestFilter.isAdminPath("/adminfoo"),
+                "a bare prefix match must not classify /adminfoo as admin");
+    }
+
+    @Test
+    void adminLookalikePath_FallsThroughToUserClassification() throws ServletException, IOException {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        request.setServletPath("/adminfoo");
+        request.setCookies(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "user.jwt.token"));
+
+        when(tokenService.validateAndExtractUser("user.jwt.token")).thenReturn("customer@email.com");
+
+        jwtRequestFilter.doFilterInternal(request, response, filterChain);
+
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        assertNotNull(authentication);
+        assertEquals("customer@email.com", authentication.getName());
+        assertTrue(authentication.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_USER")));
+    }
+
+    @Test
+    void exactAdminPath_IgnoresUserCookie() throws ServletException, IOException {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        request.setServletPath("/admin");
+        request.setCookies(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "user.jwt.token"));
+
+        jwtRequestFilter.doFilterInternal(request, response, filterChain);
+
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+        verifyNoInteractions(tokenService);
+        verify(filterChain).doFilter(request, response);
     }
 
     @Test

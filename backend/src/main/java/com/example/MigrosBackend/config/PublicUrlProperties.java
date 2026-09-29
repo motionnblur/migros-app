@@ -1,42 +1,30 @@
 package com.example.MigrosBackend.config;
 
-import jakarta.annotation.PostConstruct;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.stereotype.Component;
 
 import java.net.URI;
 import java.net.URISyntaxException;
 
-@Component
+/**
+ * Validated public origins for the links the backend hands to users.
+ *
+ * <p>Constructor-bound: a missing or malformed origin fails bean creation (and
+ * therefore startup) as soon as the properties are bound, instead of relying on
+ * a later {@code @PostConstruct} pass. The bind prefix stays {@code app} because
+ * the two origins are declared as {@code app.frontend-base-url} and
+ * {@code app.backend-base-url} in every profile; registration is explicit via
+ * {@code @EnableConfigurationProperties} on the application class, which is
+ * what constructor binding requires.
+ */
 @ConfigurationProperties(prefix = "app")
-public class PublicUrlProperties {
+public record PublicUrlProperties(String backendBaseUrl, String frontendBaseUrl) {
 
     static final String FRONTEND_PROPERTY = "app.frontend-base-url";
     static final String BACKEND_PROPERTY = "app.backend-base-url";
 
-    private String frontendBaseUrl;
-    private String backendBaseUrl;
-
-    public String getFrontendBaseUrl() {
-        return frontendBaseUrl;
-    }
-
-    public void setFrontendBaseUrl(String frontendBaseUrl) {
-        this.frontendBaseUrl = frontendBaseUrl;
-    }
-
-    public String getBackendBaseUrl() {
-        return backendBaseUrl;
-    }
-
-    public void setBackendBaseUrl(String backendBaseUrl) {
-        this.backendBaseUrl = backendBaseUrl;
-    }
-
-    @PostConstruct
-    public void validate() {
-        normalizedBackendBaseUrl();
-        normalizedFrontendBaseUrl();
+    public PublicUrlProperties {
+        normalizeOrigin(BACKEND_PROPERTY, backendBaseUrl);
+        normalizeOrigin(FRONTEND_PROPERTY, frontendBaseUrl);
     }
 
     public String normalizedBackendBaseUrl() {
@@ -47,7 +35,7 @@ public class PublicUrlProperties {
         return normalizeOrigin(FRONTEND_PROPERTY, frontendBaseUrl);
     }
 
-    static String normalizeOrigin(String propertyName, String value) {
+    private static String normalizeOrigin(String propertyName, String value) {
         String trimmed = value == null ? "" : value.trim();
         if (trimmed.isEmpty()) {
             throw new IllegalStateException(

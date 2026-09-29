@@ -1,6 +1,5 @@
 package com.example.MigrosBackend.controller.user.supply;
 
-import com.example.MigrosBackend.config.security.AuthCookies;
 import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionListDto;
 import com.example.MigrosBackend.dto.user.category.SubCategoryDto;
 import com.example.MigrosBackend.dto.user.order.UserOrderDetailDto;
@@ -15,7 +14,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -26,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("user/supply")
+@RequestMapping("/user/supply")
 public class UserSupplyController {
     private final UserSupplyService userSupplyService;
     private final UserCartService userCartService;
@@ -54,7 +52,7 @@ public class UserSupplyController {
     }
 
     @GetMapping("getProductsFromSubcategory")
-    public ResponseEntity<List<ProductPreviewDto>> getSubProductsFromCategory(@RequestParam String subcategoryName,
+    public ResponseEntity<List<ProductPreviewDto>> getProductsFromSubcategory(@RequestParam String subcategoryName,
                                                                               @RequestParam int page,
                                                                               @RequestParam int productRange) {
         return ResponseEntity.ok(userSupplyService.getProductsFromSubcategory(subcategoryName, page, productRange));
@@ -89,72 +87,64 @@ public class UserSupplyController {
     }
 
     @PostMapping("addProductToUserCart")
-    public ResponseEntity<Void> addProductToUserCart(@RequestParam Long productId,
-                                                     @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
-        userCartService.addProductToCart(productId, authTokenResolver.requireToken(token));
+    public ResponseEntity<Void> addProductToUserCart(@RequestParam Long productId) {
+        userCartService.addProductToCart(productId, authTokenResolver.requireAuthenticatedUserMail());
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("getProductData")
-    public ResponseEntity<List<UserCartItemDto>> getProductData(
-            @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
-        return ResponseEntity.ok(userCartService.getCartData(authTokenResolver.requireToken(token)));
+    public ResponseEntity<List<UserCartItemDto>> getProductData() {
+        return ResponseEntity.ok(userCartService.getCartData(authTokenResolver.requireAuthenticatedUserMail()));
     }
 
     @GetMapping("getProductDataWithProductId")
-    private ResponseEntity<ProductDetailDto> getProductData(@RequestParam Long productId) {
+    public ResponseEntity<ProductDetailDto> getProductData(@RequestParam Long productId) {
         return ResponseEntity.ok(userSupplyService.getProductData(productId));
     }
 
     @GetMapping("getProductDescription")
-    private ResponseEntity<ProductDescriptionListDto> getProductDescription(@RequestParam Long productId) {
+    public ResponseEntity<ProductDescriptionListDto> getProductDescription(@RequestParam Long productId) {
         return ResponseEntity.ok(userSupplyService.getProductDescription(productId));
     }
 
     @DeleteMapping("removeProductFromUserCart")
-    public ResponseEntity<Void> removeProductFromUserCart(@RequestParam Long productId,
-                                                          @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
-        userCartService.removeProductFromCart(productId, authTokenResolver.requireToken(token));
+    public ResponseEntity<Void> removeProductFromUserCart(@RequestParam Long productId) {
+        userCartService.removeProductFromCart(productId, authTokenResolver.requireAuthenticatedUserMail());
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("updateProductCountInUserCart")
     public ResponseEntity<Void> updateProductCountInUserCart(@RequestParam Long productId,
-                                                             @RequestParam int count,
-                                                             @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
-        userCartService.updateProductCountInCart(productId, count, authTokenResolver.requireToken(token));
+                                                             @RequestParam int count) {
+        userCartService.updateProductCountInCart(productId, count, authTokenResolver.requireAuthenticatedUserMail());
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("getAllOrderIds")
-    public ResponseEntity<List<Long>> getAllOrderIds(
-            @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
-        return ResponseEntity.ok(userSupplyService.getAllOrderIds(authTokenResolver.requireToken(token)));
+    public ResponseEntity<List<Long>> getAllOrderIds() {
+        return ResponseEntity.ok(userSupplyService.getAllOrderIds(authTokenResolver.requireAuthenticatedUserMail()));
     }
 
     @DeleteMapping("cancelOrder")
-    public ResponseEntity<Void> cancelOrder(@RequestParam Long orderId,
-                                            @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
-        userSupplyService.cancelOrder(orderId, authTokenResolver.requireToken(token));
+    public ResponseEntity<Void> cancelOrder(@RequestParam Long orderId) {
+        userSupplyService.cancelOrder(orderId, authTokenResolver.requireAuthenticatedUserMail());
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("getOrderStatusByOrderId")
-    public ResponseEntity<String> getOrderStatusByOrderId(@RequestParam Long orderId,
-                                                          @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
-        return ResponseEntity.ok(userSupplyService.getOrderStatusByOrderId(orderId, authTokenResolver.requireToken(token)));
+    public ResponseEntity<String> getOrderStatusByOrderId(@RequestParam Long orderId) {
+        return ResponseEntity.ok(userSupplyService.getOrderStatusByOrderId(orderId,
+                authTokenResolver.requireAuthenticatedUserMail()));
     }
 
     @GetMapping("getUserOrders")
-    public ResponseEntity<List<UserOrderDetailDto>> getUserOrders(
-            @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
-        return ResponseEntity.ok(userSupplyService.getUserOrderDetails(authTokenResolver.requireToken(token)));
+    public ResponseEntity<List<UserOrderDetailDto>> getUserOrders() {
+        return ResponseEntity.ok(userSupplyService.getUserOrderDetails(authTokenResolver.requireAuthenticatedUserMail()));
     }
 
     @GetMapping("getUserOrderGroups")
-    public ResponseEntity<List<UserOrderGroupDto>> getUserOrderGroups(
-            @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
-        return ResponseEntity.ok(userSupplyService.getUserOrderGroups(authTokenResolver.requireToken(token)));
+    public ResponseEntity<List<UserOrderGroupDto>> getUserOrderGroups() {
+        return ResponseEntity.ok(userSupplyService.getUserOrderGroups(authTokenResolver.requireAuthenticatedUserMail()));
     }
 }
 

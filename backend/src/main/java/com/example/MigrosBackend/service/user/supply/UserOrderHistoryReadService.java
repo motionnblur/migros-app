@@ -12,7 +12,6 @@ import com.example.MigrosBackend.repository.product.ProductEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderGroupEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
-import com.example.MigrosBackend.service.global.TokenService;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -24,27 +23,24 @@ import java.util.stream.Collectors;
 @Service
 final class UserOrderHistoryReadService {
     private final UserEntityRepository userEntityRepository;
-    private final TokenService tokenService;
     private final OrderEntityRepository orderEntityRepository;
     private final OrderGroupEntityRepository orderGroupEntityRepository;
     private final ProductEntityRepository productEntityRepository;
 
     UserOrderHistoryReadService(
             UserEntityRepository userEntityRepository,
-            TokenService tokenService,
             OrderEntityRepository orderEntityRepository,
             OrderGroupEntityRepository orderGroupEntityRepository,
             ProductEntityRepository productEntityRepository
     ) {
         this.userEntityRepository = userEntityRepository;
-        this.tokenService = tokenService;
         this.orderEntityRepository = orderEntityRepository;
         this.orderGroupEntityRepository = orderGroupEntityRepository;
         this.productEntityRepository = productEntityRepository;
     }
 
-    List<Long> getAllOrderIds(String token) {
-        UserEntity user = getValidatedUserFromToken(token);
+    List<Long> getAllOrderIds(String userMail) {
+        UserEntity user = requireUserByMail(userMail);
 
         List<Long> ids = new ArrayList<>();
         ids.addAll(orderGroupEntityRepository.findByUserId(user.getId()).stream().map(OrderGroupEntity::getId).toList());
@@ -52,8 +48,8 @@ final class UserOrderHistoryReadService {
         return ids.stream().distinct().toList();
     }
 
-    String getOrderStatusByOrderId(Long orderId, String token) {
-        UserEntity user = getValidatedUserFromToken(token);
+    String getOrderStatusByOrderId(Long orderId, String userMail) {
+        UserEntity user = requireUserByMail(userMail);
 
         OrderGroupEntity orderGroup = orderGroupEntityRepository.findByIdAndUserId(orderId, user.getId()).orElse(null);
         if (orderGroup != null) {
@@ -70,8 +66,8 @@ final class UserOrderHistoryReadService {
         return legacyOrder.getStatus();
     }
 
-    List<UserOrderDetailDto> getUserOrderDetails(String token) {
-        UserEntity user = getValidatedUserFromToken(token);
+    List<UserOrderDetailDto> getUserOrderDetails(String userMail) {
+        UserEntity user = requireUserByMail(userMail);
 
         List<UserOrderDetailDto> result = new ArrayList<>();
 
@@ -99,8 +95,8 @@ final class UserOrderHistoryReadService {
         return result;
     }
 
-    List<UserOrderGroupDto> getUserOrderGroups(String token) {
-        UserEntity user = getValidatedUserFromToken(token);
+    List<UserOrderGroupDto> getUserOrderGroups(String userMail) {
+        UserEntity user = requireUserByMail(userMail);
 
         List<UserOrderGroupDto> result = new ArrayList<>();
 
@@ -167,12 +163,10 @@ final class UserOrderHistoryReadService {
         return dto;
     }
 
-    private UserEntity getValidatedUserFromToken(String token) {
-        String userName = tokenService.validateAndExtractUser(token);
-
-        UserEntity user = userEntityRepository.findByUserMail(userName);
+    private UserEntity requireUserByMail(String userMail) {
+        UserEntity user = userEntityRepository.findByUserMail(userMail);
         if (user == null) {
-            throw new UserNotFoundException(userName);
+            throw new UserNotFoundException(userMail);
         }
 
         return user;

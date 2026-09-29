@@ -105,10 +105,9 @@ public class UserPaymentService {
             LOG.warn("Ambiguous Stripe outcome for attempt {} checkout {}: {}",
                     claim.attemptId(), checkoutId, ambiguous.getClass().getSimpleName());
             PaymentStatusDto status = paymentAttemptService.getStatus(userToken, checkoutId);
-            return new PaymentResponseDto(
-                    false, true, checkoutId.toString(), attemptId(claim), status.checkoutStatus(),
-                    status.state(), status.chargeId(), status.totalAmount(), status.amountMinor(),
-                    status.currency(), "Payment status is uncertain and will be reconciled");
+            return response(claim, status, ResponseOutcome.PENDING, checkoutId,
+                    status.state(), status.chargeId(),
+                    "Payment status is uncertain and will be reconciled");
         }
 
         if (charge == null || charge.getId() == null) {
@@ -126,10 +125,9 @@ public class UserPaymentService {
             LOG.warn("Charge success fenced out for attempt {} checkout {}: another worker owns the lease",
                     claim.attemptId(), checkoutId);
             PaymentStatusDto status = paymentAttemptService.getStatus(userToken, checkoutId);
-            return new PaymentResponseDto(
-                    false, true, checkoutId.toString(), attemptId(claim), status.checkoutStatus(),
-                    status.state(), status.chargeId(), status.totalAmount(), status.amountMinor(),
-                    status.currency(), "Payment status is uncertain and will be reconciled");
+            return response(claim, status, ResponseOutcome.PENDING, checkoutId,
+                    status.state(), status.chargeId(),
+                    "Payment status is uncertain and will be reconciled");
         }
         return finalizeExistingCharge(claim, userToken, checkoutId, charge.getId());
     }
@@ -142,11 +140,7 @@ public class UserPaymentService {
             // Another worker owns the finalization window; converge on its
             // result instead of stealing the lease.
             PaymentStatusDto status = paymentAttemptService.getStatus(userToken, checkoutId);
-            return new PaymentResponseDto(
-                    true, true, checkoutId.toString(), attemptId(claim), status.checkoutStatus(),
-                    status.state() == null ? PaymentAttemptStatus.CHARGE_SUCCEEDED.name() : status.state(),
-                    chargeId, status.totalAmount(), status.amountMinor(), status.currency(),
-                    "Payment succeeded and is being finalized");
+            return chargeSucceededPendingResponse(claim, status, checkoutId, chargeId);
         }
         boolean finalized = paymentFinalizationService.finalizeOrder(
                 claim.attemptId(), checkoutId, chargeId, claim.leaseOwner());
@@ -156,11 +150,18 @@ public class UserPaymentService {
         // Stripe already captured the money. Never report this as an ordinary
         // decline; the attempt stays recoverable and finalization retries.
         PaymentStatusDto status = paymentAttemptService.getStatus(userToken, checkoutId);
-        return new PaymentResponseDto(
-                true, true, checkoutId.toString(), attemptId(claim), status.checkoutStatus(),
-                status.state() == null ? PaymentAttemptStatus.CHARGE_SUCCEEDED.name() : status.state(),
-                chargeId, status.totalAmount(), status.amountMinor(), status.currency(),
-                "Payment succeeded and is being finalized");
+        return chargeSucceededPendingResponse(claim, status, checkoutId, chargeId);
+    }
+
+    private PaymentResponseDto chargeSucceededPendingResponse(PaymentClaim claim,
+                                                              PaymentStatusDto status,
+                                                              UUID checkoutId,
+                                                              String chargeId) {
+        String state = status.state() == null
+                ? PaymentAttemptStatus.CHARGE_SUCCEEDED.name()
+                : status.state();
+        return response(claim, status, ResponseOutcome.SUCCEEDED_PENDING, checkoutId,
+                state, chargeId, "Payment succeeded and is being finalized");
     }
 
     private void retryFinalization(String userToken, UUID checkoutId, PaymentStatusDto status) {
@@ -173,19 +174,15 @@ public class UserPaymentService {
 
     private PaymentResponseDto finalizedResponse(PaymentClaim claim, String userToken, UUID checkoutId) {
         PaymentStatusDto status = paymentAttemptService.getStatus(userToken, checkoutId);
-        return new PaymentResponseDto(
-                true, false, checkoutId.toString(), attemptId(claim), status.checkoutStatus(),
-                status.state(), status.chargeId(), status.totalAmount(), status.amountMinor(),
-                status.currency(), null);
+        return response(claim, status, ResponseOutcome.SUCCEEDED, checkoutId,
+                status.state(), status.chargeId(), null);
     }
 
     private PaymentResponseDto pendingResponse(PaymentClaim claim, String userToken, UUID checkoutId,
                                                String message) {
         PaymentStatusDto status = paymentAttemptService.getStatus(userToken, checkoutId);
-        return new PaymentResponseDto(
-                false, true, checkoutId.toString(), attemptId(claim), status.checkoutStatus(),
-                status.state(), status.chargeId(), status.totalAmount(), status.amountMinor(),
-                status.currency(), message);
+        return response(claim, status, ResponseOutcome.PENDING, checkoutId,
+                status.state(), status.chargeId(), message);
     }
 
     private PaymentResponseDto terminalResponse(PaymentClaim claim, String userToken, UUID checkoutId) {
@@ -196,10 +193,41 @@ public class UserPaymentService {
             case MANUAL_REVIEW -> "Payment requires manual review";
             default -> "Payment cannot be completed for this checkout";
         };
+        return response(claim, status, ResponseOutcome.TERMINAL, checkoutId,
+                status.state(), status.chargeId(), message);
+    }
+
+    /**
+     * The two DTO booleans ({@code success}, {@code pending}) are adjacent and
+     * positionally identical in the record, so they are selected here by a
+     * named outcome instead of being passed as bare literals at each call site.
+     */
+    private enum ResponseOutcome {
+        SUCCEEDED(true, false),
+        SUCCEEDED_PENDING(true, true),
+        PENDING(false, true),
+        TERMINAL(false, false);
+
+        private final boolean success;
+        private final boolean pending;
+
+        ResponseOutcome(boolean success, boolean pending) {
+            this.success = success;
+            this.pending = pending;
+        }
+    }
+
+    private PaymentResponseDto response(PaymentClaim claim,
+                                        PaymentStatusDto status,
+                                        ResponseOutcome outcome,
+                                        UUID checkoutId,
+                                        String state,
+                                        String chargeId,
+                                        String error) {
         return new PaymentResponseDto(
-                false, false, checkoutId.toString(), attemptId(claim), status.checkoutStatus(),
-                status.state(), status.chargeId(), status.totalAmount(), status.amountMinor(),
-                status.currency(), message);
+                outcome.success, outcome.pending, checkoutId.toString(), attemptId(claim),
+                status.checkoutStatus(), state, chargeId, status.totalAmount(), status.amountMinor(),
+                status.currency(), error);
     }
 
     private String attemptId(PaymentClaim claim) {

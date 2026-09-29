@@ -12,7 +12,6 @@ import com.example.MigrosBackend.entity.product.ProductImageEntity;
 import com.example.MigrosBackend.exception.admin.ProductNotFoundException;
 import com.example.MigrosBackend.exception.shared.FileNotFoundException;
 import com.example.MigrosBackend.exception.shared.GeneralException;
-import com.example.MigrosBackend.exception.user.CategoryHasNoProductException;
 import com.example.MigrosBackend.exception.user.CategoryNotFoundException;
 import com.example.MigrosBackend.repository.category.CategoryEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductDescriptionEntityRepository;
@@ -64,10 +63,11 @@ public final class UserCatalogReadService {
 
         Pageable pageable = PageRequest.of(page, itemRange);
         Page<ProductEntity> entities = productEntityRepository.findByCategoryEntityIdAndProductCountGreaterThan(categoryId, 0, pageable);
-        if (entities.isEmpty()) {
-            throw new CategoryHasNoProductException(categoryId.toString());
-        }
-
+        // An existing category with no in-stock rows, or a page past the last
+        // one, is an empty page rather than an error: the client sizes and
+        // clamps the page from the category/subcategory count and renders the
+        // returned empty list as an empty listing. Only a nonexistent category
+        // id is rejected (above) and keeps the existing 404 mapping.
         return entities.stream().map(this::toProductPreviewDto).collect(Collectors.toList());
     }
 
@@ -117,16 +117,12 @@ public final class UserCatalogReadService {
         CategoryEntity categoryEntity = categoryEntityRepository.findById(categoryId)
                 .orElseThrow(() -> new CategoryNotFoundException(categoryId.toString()));
 
-        return categoryEntity.getItemEntities().stream()
-                .filter(itemEntity -> itemEntity.getProductCount() > 0)
-                .filter(itemEntity -> itemEntity.getSubcategoryName() != null && !itemEntity.getSubcategoryName().isEmpty())
-                .collect(Collectors.groupingBy(ProductEntity::getSubcategoryName, Collectors.counting()))
-                .entrySet().stream()
-                .map(entry -> {
+        return productEntityRepository.countProductsBySubcategory(categoryId).stream()
+                .map(count -> {
                     SubCategoryDto dto = new SubCategoryDto();
                     dto.setSubCategoryId(categoryEntity.getId());
-                    dto.setSubCategoryName(entry.getKey());
-                    dto.setProductCount(entry.getValue().intValue());
+                    dto.setSubCategoryName(count.subcategoryName());
+                    dto.setProductCount((int) count.productCount());
                     return dto;
                 }).collect(Collectors.toList());
     }

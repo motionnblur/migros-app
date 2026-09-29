@@ -4,7 +4,6 @@ import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
-import com.example.MigrosBackend.service.global.TokenService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -69,8 +68,6 @@ class UserCartConcurrencyPostgresTest {
     @Autowired
     private ProductEntityRepository productEntityRepository;
     @Autowired
-    private TokenService tokenService;
-    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     private final ExecutorService executor = Executors.newCachedThreadPool();
@@ -90,17 +87,17 @@ class UserCartConcurrencyPostgresTest {
         UserEntity user = createUser("cart-race@migros.com");
         ProductEntity first = createProduct("CartFirst");
         ProductEntity second = createProduct("CartSecond");
-        String token = tokenService.generateUserToken(user.getUserMail());
+        String userMail = user.getUserMail();
 
         CountDownLatch start = new CountDownLatch(1);
         Future<Void> firstAdd = executor.submit(() -> {
             start.await();
-            userCartService.addProductToCart(first.getId(), token);
+            userCartService.addProductToCart(first.getId(), userMail);
             return null;
         });
         Future<Void> secondAdd = executor.submit(() -> {
             start.await();
-            userCartService.addProductToCart(second.getId(), token);
+            userCartService.addProductToCart(second.getId(), userMail);
             return null;
         });
         start.countDown();

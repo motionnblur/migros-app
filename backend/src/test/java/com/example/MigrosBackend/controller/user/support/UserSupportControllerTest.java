@@ -53,8 +53,8 @@ class UserSupportControllerTest {
         SupportMessageDto dto = new SupportMessageDto();
         dto.setMessage("Hello");
 
-        when(authTokenResolver.requireToken("token")).thenReturn("token");
-        when(userSupportChatService.getMessagesForUser("token")).thenReturn(List.of(dto));
+        when(authTokenResolver.requireAuthenticatedUserMail()).thenReturn("user@example.com");
+        when(userSupportChatService.getMessagesForUser("user@example.com")).thenReturn(List.of(dto));
 
         mockMvc.perform(get("/user/support/messages")
                         .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "token")))
@@ -67,8 +67,8 @@ class UserSupportControllerTest {
         SupportSendMessageDto dto = new SupportSendMessageDto();
         dto.setMessage("Need help");
 
-        when(authTokenResolver.requireToken("token")).thenReturn("token");
-        doNothing().when(userSupportChatService).addUserMessage("token", "Need help");
+        when(authTokenResolver.requireAuthenticatedUserMail()).thenReturn("user@example.com");
+        doNothing().when(userSupportChatService).addUserMessage("user@example.com", "Need help");
 
         mockMvc.perform(post("/user/support/send")
                         .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "token"))
@@ -76,7 +76,7 @@ class UserSupportControllerTest {
                         .content(objectMapper.writeValueAsString(dto)))
                 .andExpect(status().isOk());
 
-        verify(userSupportChatService).addUserMessage("token", "Need help");
+        verify(userSupportChatService).addUserMessage("user@example.com", "Need help");
     }
 
     @Test

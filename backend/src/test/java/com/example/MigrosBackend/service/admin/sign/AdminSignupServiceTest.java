@@ -6,9 +6,7 @@ import com.example.MigrosBackend.exception.admin.AdminNotFoundException;
 import com.example.MigrosBackend.exception.shared.WrongPasswordException;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.service.global.EncryptService;
-import com.example.MigrosBackend.service.global.LogService;
 import com.example.MigrosBackend.service.global.TokenService;
-import jakarta.servlet.http.HttpServletRequest;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
@@ -19,8 +17,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
-
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -36,11 +32,7 @@ class AdminSignupServiceTest {
     @Mock
     private EncryptService encryptService;
     @Mock
-    private LogService logService;
-    @Mock
     private TokenService tokenService;
-    @Mock
-    private HttpServletRequest request;
 
     @InjectMocks
     private AdminSignupService adminSignupService;
@@ -52,13 +44,11 @@ class AdminSignupServiceTest {
         dto.setAdminPassword("password");
 
         when(adminEntityRepository.findByAdminName(dto.getAdminName())).thenReturn(null);
-        when(logService.getClientIp(request)).thenReturn("127.0.0.1");
 
         assertThrows(AdminNotFoundException.class,
-                () -> adminSignupService.login(dto, request));
+                () -> adminSignupService.login(dto, "127.0.0.1"));
 
         verify(adminEntityRepository).findByAdminName(dto.getAdminName());
-        verify(logService).getClientIp(request);
         verify(encryptService, never()).getEncryptedPassword(anyString());
     }
 
@@ -73,15 +63,13 @@ class AdminSignupServiceTest {
         entity.setAdminPassword("correctHashedPassword");
 
         when(adminEntityRepository.findByAdminName(dto.getAdminName())).thenReturn(entity);
-        when(logService.getClientIp(request)).thenReturn("127.0.0.1");
         when(encryptService.checkIfPasswordMatches(dto.getAdminPassword(), entity.getAdminPassword()))
                 .thenReturn(false);
 
         assertThrows(WrongPasswordException.class,
-                () -> adminSignupService.login(dto, request));
+                () -> adminSignupService.login(dto, "127.0.0.1"));
 
         verify(encryptService).checkIfPasswordMatches(dto.getAdminPassword(), entity.getAdminPassword());
-        verify(logService).getClientIp(request);
         verify(encryptService, never()).getEncryptedPassword(anyString());
     }
 
@@ -100,7 +88,7 @@ class AdminSignupServiceTest {
                 .thenReturn(true);
         when(tokenService.generateAdminToken(entity.getAdminName())).thenReturn("mockToken");
 
-        String token = adminSignupService.login(dto, request);
+        String token = adminSignupService.login(dto, "127.0.0.1");
 
         assertEquals("mockToken", token);
         verify(tokenService).generateAdminToken(entity.getAdminName());
@@ -113,7 +101,6 @@ class AdminSignupServiceTest {
         dto.setAdminPassword("SuperSecret123!");
 
         when(adminEntityRepository.findByAdminName(dto.getAdminName())).thenReturn(null);
-        when(logService.getClientIp(request)).thenReturn("203.0.113.7");
 
         ListAppender<ILoggingEvent> appender = new ListAppender<>();
         appender.start();
@@ -122,7 +109,8 @@ class AdminSignupServiceTest {
         loginLogger.setLevel(Level.WARN);
         loginLogger.addAppender(appender);
         try {
-            assertThrows(AdminNotFoundException.class, () -> adminSignupService.login(dto, request));
+            assertThrows(AdminNotFoundException.class,
+                    () -> adminSignupService.login(dto, "203.0.113.7"));
         } finally {
             loginLogger.detachAppender(appender);
             loginLogger.setLevel(previousLevel);

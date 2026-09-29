@@ -19,11 +19,11 @@ import com.example.MigrosBackend.repository.category.CategoryEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductDescriptionEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductImageEntityRepository;
+import com.example.MigrosBackend.repository.product.SubcategoryCount;
 import com.example.MigrosBackend.repository.user.OrderEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderGroupEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
 import com.example.MigrosBackend.service.global.FileService;
-import com.example.MigrosBackend.service.global.TokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,7 +32,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
-
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -64,9 +64,6 @@ class UserSupplyServiceTest {
     private UserEntityRepository userEntityRepository;
 
     @Mock
-    private TokenService tokenService;
-
-    @Mock
     private OrderEntityRepository orderEntityRepository;
 
     @Mock
@@ -80,7 +77,6 @@ class UserSupplyServiceTest {
 
     private UserSupplyService userSupplyService;
 
-    private static final String TOKEN = "valid-token";
     private static final String USER_MAIL = "user@migros.com";
 
     private UserEntity user;
@@ -94,7 +90,6 @@ class UserSupplyServiceTest {
 
         userSupplyService = new UserSupplyService(
                 userEntityRepository,
-                tokenService,
                 orderEntityRepository,
                 orderGroupEntityRepository,
                 new UserCatalogReadService(
@@ -105,7 +100,6 @@ class UserSupplyServiceTest {
                         fileService),
                 new UserOrderHistoryReadService(
                         userEntityRepository,
-                        tokenService,
                         orderEntityRepository,
                         orderGroupEntityRepository,
                         productEntityRepository),
@@ -113,7 +107,6 @@ class UserSupplyServiceTest {
     }
 
     private void stubAuthenticatedUser() {
-        when(tokenService.validateAndExtractUser(TOKEN)).thenReturn(USER_MAIL);
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(user);
     }
 
@@ -142,20 +135,10 @@ class UserSupplyServiceTest {
         CategoryEntity category = new CategoryEntity();
         category.setId(9L);
 
-        ProductEntity fruitsInStock = new ProductEntity();
-        fruitsInStock.setSubcategoryName("Fruits");
-        fruitsInStock.setProductCount(2);
-
-        ProductEntity fruitsSoldOut = new ProductEntity();
-        fruitsSoldOut.setSubcategoryName("Fruits");
-        fruitsSoldOut.setProductCount(0);
-
-        ProductEntity dairyInStock = new ProductEntity();
-        dairyInStock.setSubcategoryName("Dairy");
-        dairyInStock.setProductCount(1);
-
-        category.setItemEntities(List.of(fruitsInStock, fruitsSoldOut, dairyInStock));
         when(categoryEntityRepository.findById(9L)).thenReturn(Optional.of(category));
+        when(productEntityRepository.countProductsBySubcategory(9L)).thenReturn(List.of(
+                new SubcategoryCount("Fruits", 1),
+                new SubcategoryCount("Dairy", 1)));
 
         List<SubCategoryDto> result = userSupplyService.getSubCategories(9L);
 
@@ -165,6 +148,7 @@ class UserSupplyServiceTest {
                 .findFirst()
                 .orElseThrow();
         assertEquals(1, fruits.getProductCount());
+        assertEquals(9L, fruits.getSubCategoryId());
     }
 
     @Test
@@ -224,7 +208,7 @@ class UserSupplyServiceTest {
         when(orderGroupEntityRepository.findByIdAndUserIdForUpdate(90L, user.getId()))
                 .thenReturn(Optional.of(group));
 
-        userSupplyService.cancelOrder(90L, TOKEN);
+        userSupplyService.cancelOrder(90L, USER_MAIL);
 
         InOrder restockOrder = inOrder(productEntityRepository);
         restockOrder.verify(productEntityRepository).incrementStock(11L, 2);
@@ -246,7 +230,7 @@ class UserSupplyServiceTest {
         when(orderGroupEntityRepository.findByIdAndUserIdForUpdate(91L, user.getId()))
                 .thenReturn(Optional.of(group));
 
-        assertThrows(GeneralException.class, () -> userSupplyService.cancelOrder(91L, TOKEN));
+        assertThrows(GeneralException.class, () -> userSupplyService.cancelOrder(91L, USER_MAIL));
         verify(productEntityRepository, never()).incrementStock(any(), anyInt());
         verify(orderEntityRepository, never()).deleteAll(any());
         verify(orderGroupEntityRepository, never()).delete(any());
@@ -266,7 +250,7 @@ class UserSupplyServiceTest {
         when(orderEntityRepository.findByIdAndUserIdAndOrderGroupIsNullForUpdate(92L, user.getId()))
                 .thenReturn(Optional.of(legacyOrder));
 
-        userSupplyService.cancelOrder(92L, TOKEN);
+        userSupplyService.cancelOrder(92L, USER_MAIL);
 
         verify(productEntityRepository).incrementStock(11L, 2);
         verify(orderEntityRepository).delete(legacyOrder);
@@ -281,7 +265,7 @@ class UserSupplyServiceTest {
         when(orderEntityRepository.findByIdAndUserIdAndOrderGroupIsNullForUpdate(93L, user.getId()))
                 .thenReturn(Optional.empty());
 
-        assertThrows(GeneralException.class, () -> userSupplyService.cancelOrder(93L, TOKEN));
+        assertThrows(GeneralException.class, () -> userSupplyService.cancelOrder(93L, USER_MAIL));
         verify(productEntityRepository, never()).incrementStock(any(), anyInt());
     }
     @Test
@@ -327,7 +311,7 @@ class UserSupplyServiceTest {
     }
 
     @Test
-    void getProductImage_ThrowsFileNotFoundException_WhenImageFileIsMissing() {
+    void getProductImage_ThrowsFileNotFoundException_WhenImageFileIsMissing() throws IOException {
         ProductImageEntity image = new ProductImageEntity();
         image.setId(1L);
         image.setImagePath("missing-image.png");
@@ -344,7 +328,7 @@ class UserSupplyServiceTest {
         when(orderGroupEntityRepository.findByUserId(user.getId())).thenReturn(List.of());
         when(orderEntityRepository.findByUserIdAndOrderGroupIsNull(user.getId())).thenReturn(List.of());
 
-        List<UserOrderDetailDto> result = userSupplyService.getUserOrderDetails(TOKEN);
+        List<UserOrderDetailDto> result = userSupplyService.getUserOrderDetails(USER_MAIL);
 
         assertEquals(0, result.size());
         verify(productEntityRepository, never()).findAllById(any());
@@ -382,7 +366,7 @@ class UserSupplyServiceTest {
         when(orderEntityRepository.findByUserIdAndOrderGroupIsNull(user.getId())).thenReturn(List.of(legacyOrder));
         when(productEntityRepository.findAllById(any())).thenReturn(List.of(existingProduct));
 
-        List<UserOrderDetailDto> result = userSupplyService.getUserOrderDetails(TOKEN);
+        List<UserOrderDetailDto> result = userSupplyService.getUserOrderDetails(USER_MAIL);
 
         assertEquals(2, result.size());
 
@@ -404,9 +388,8 @@ class UserSupplyServiceTest {
         assertEquals(0, new BigDecimal("5").compareTo(second.getTotalPrice()));
         assertEquals("Pending", second.getStatus());
 
-        InOrder repositoryOrder = inOrder(tokenService, userEntityRepository, orderGroupEntityRepository,
+        InOrder repositoryOrder = inOrder(userEntityRepository, orderGroupEntityRepository,
                 orderEntityRepository, productEntityRepository);
-        repositoryOrder.verify(tokenService).validateAndExtractUser(TOKEN);
         repositoryOrder.verify(userEntityRepository).findByUserMail(USER_MAIL);
         repositoryOrder.verify(orderGroupEntityRepository).findByUserId(user.getId());
         repositoryOrder.verify(orderEntityRepository).findByUserIdAndOrderGroupIsNull(user.getId());
@@ -419,7 +402,7 @@ class UserSupplyServiceTest {
         when(orderGroupEntityRepository.findByUserId(user.getId())).thenReturn(List.of());
         when(orderEntityRepository.findByUserIdAndOrderGroupIsNull(user.getId())).thenReturn(List.of());
 
-        List<UserOrderGroupDto> result = userSupplyService.getUserOrderGroups(TOKEN);
+        List<UserOrderGroupDto> result = userSupplyService.getUserOrderGroups(USER_MAIL);
 
         assertEquals(0, result.size());
         verify(productEntityRepository, never()).findAllById(any());
@@ -458,7 +441,7 @@ class UserSupplyServiceTest {
         when(orderEntityRepository.findByUserIdAndOrderGroupIsNull(user.getId())).thenReturn(List.of(legacyOrder));
         when(productEntityRepository.findAllById(any())).thenReturn(List.of(product));
 
-        List<UserOrderGroupDto> result = userSupplyService.getUserOrderGroups(TOKEN);
+        List<UserOrderGroupDto> result = userSupplyService.getUserOrderGroups(USER_MAIL);
 
         assertEquals(2, result.size());
         assertEquals(20L, result.get(0).getOrderGroupId());
@@ -499,7 +482,7 @@ class UserSupplyServiceTest {
         when(orderGroupEntityRepository.findByUserId(user.getId())).thenReturn(List.of(groupA, groupB));
         when(orderEntityRepository.findByUserIdAndOrderGroupIsNull(user.getId())).thenReturn(List.of(legacyA, legacyB));
 
-        List<Long> result = userSupplyService.getAllOrderIds(TOKEN);
+        List<Long> result = userSupplyService.getAllOrderIds(USER_MAIL);
 
         assertEquals(List.of(11L, 12L, 13L), result);
     }
@@ -510,7 +493,7 @@ class UserSupplyServiceTest {
         when(orderGroupEntityRepository.findByUserId(user.getId())).thenReturn(List.of());
         when(orderEntityRepository.findByUserIdAndOrderGroupIsNull(user.getId())).thenReturn(List.of());
 
-        List<Long> result = userSupplyService.getAllOrderIds(TOKEN);
+        List<Long> result = userSupplyService.getAllOrderIds(USER_MAIL);
 
         assertEquals(0, result.size());
     }
@@ -525,7 +508,7 @@ class UserSupplyServiceTest {
 
         when(orderGroupEntityRepository.findByIdAndUserId(500L, user.getId())).thenReturn(Optional.of(group));
 
-        String result = userSupplyService.getOrderStatusByOrderId(500L, TOKEN);
+        String result = userSupplyService.getOrderStatusByOrderId(500L, USER_MAIL);
 
         assertEquals("Pending", result);
         verify(orderEntityRepository, never()).findByIdAndUserIdAndOrderGroupIsNull(any(), any());
@@ -542,7 +525,7 @@ class UserSupplyServiceTest {
         when(orderGroupEntityRepository.findByIdAndUserId(501L, user.getId())).thenReturn(Optional.empty());
         when(orderEntityRepository.findByIdAndUserIdAndOrderGroupIsNull(501L, user.getId())).thenReturn(Optional.of(legacyOrder));
 
-        String result = userSupplyService.getOrderStatusByOrderId(501L, TOKEN);
+        String result = userSupplyService.getOrderStatusByOrderId(501L, USER_MAIL);
 
         assertEquals("Delivered", result);
     }
@@ -554,7 +537,7 @@ class UserSupplyServiceTest {
         when(orderGroupEntityRepository.findByIdAndUserId(999L, user.getId())).thenReturn(Optional.empty());
         when(orderEntityRepository.findByIdAndUserIdAndOrderGroupIsNull(999L, user.getId())).thenReturn(Optional.empty());
 
-        assertThrows(GeneralException.class, () -> userSupplyService.getOrderStatusByOrderId(999L, TOKEN));
+        assertThrows(GeneralException.class, () -> userSupplyService.getOrderStatusByOrderId(999L, USER_MAIL));
     }
 }
 

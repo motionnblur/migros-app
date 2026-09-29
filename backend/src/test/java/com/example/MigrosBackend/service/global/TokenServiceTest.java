@@ -7,6 +7,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.Date;
 
@@ -36,7 +41,7 @@ class TokenServiceTest {
 
     @BeforeEach
     void setUp() {
-        tokenService = new TokenService(USER_SECRET, ADMIN_SECRET);
+        tokenService = new TokenService(USER_SECRET, ADMIN_SECRET, Clock.systemDefaultZone());
     }
 
     @Test
@@ -116,45 +121,46 @@ class TokenServiceTest {
 
     @Test
     void constructor_Throws_WhenSecretsAreMissing() {
-        assertThrows(IllegalStateException.class, () -> new TokenService(null, ADMIN_SECRET));
-        assertThrows(IllegalStateException.class, () -> new TokenService(USER_SECRET, null));
-        assertThrows(IllegalStateException.class, () -> new TokenService("", ADMIN_SECRET));
-        assertThrows(IllegalStateException.class, () -> new TokenService(USER_SECRET, "  "));
+        assertThrows(IllegalStateException.class, () -> new TokenService(null, ADMIN_SECRET, fixedClock()));
+        assertThrows(IllegalStateException.class, () -> new TokenService(USER_SECRET, null, fixedClock()));
+        assertThrows(IllegalStateException.class, () -> new TokenService("", ADMIN_SECRET, fixedClock()));
+        assertThrows(IllegalStateException.class, () -> new TokenService(USER_SECRET, "  ", fixedClock()));
     }
 
     @Test
     void constructor_Throws_WhenSecretIsTooShort() {
-        assertThrows(IllegalStateException.class, () -> new TokenService(SHORT_SECRET, ADMIN_SECRET));
-        assertThrows(IllegalStateException.class, () -> new TokenService(USER_SECRET, SHORT_SECRET));
+        assertThrows(IllegalStateException.class, () -> new TokenService(SHORT_SECRET, ADMIN_SECRET, fixedClock()));
+        assertThrows(IllegalStateException.class, () -> new TokenService(USER_SECRET, SHORT_SECRET, fixedClock()));
     }
 
     @Test
     void constructor_Throws_WhenSecretsAreIdentical() {
         assertThrows(IllegalStateException.class,
-                () -> new TokenService(IDENTICAL_SECRET, IDENTICAL_SECRET));
+                () -> new TokenService(IDENTICAL_SECRET, IDENTICAL_SECRET, fixedClock()));
     }
 
     @Test
     void constructor_Throws_WhenSecretIsNotValidBase64() {
-        assertThrows(IllegalStateException.class, () -> new TokenService(NOT_BASE64_SECRET, ADMIN_SECRET));
-        assertThrows(IllegalStateException.class, () -> new TokenService(USER_SECRET, NOT_BASE64_SECRET));
+        assertThrows(IllegalStateException.class, () -> new TokenService(NOT_BASE64_SECRET, ADMIN_SECRET, fixedClock()));
+        assertThrows(IllegalStateException.class, () -> new TokenService(USER_SECRET, NOT_BASE64_SECRET, fixedClock()));
     }
 
     @Test
     void constructor_Throws_ForUserPlaceholderSecret() {
         assertThrows(IllegalStateException.class,
-                () -> new TokenService(PLACEHOLDER_USER_SECRET, ADMIN_SECRET));
+                () -> new TokenService(PLACEHOLDER_USER_SECRET, ADMIN_SECRET, fixedClock()));
     }
 
     @Test
     void constructor_Throws_ForAdminPlaceholderSecret() {
         assertThrows(IllegalStateException.class,
-                () -> new TokenService(USER_SECRET, PLACEHOLDER_ADMIN_SECRET));
+                () -> new TokenService(USER_SECRET, PLACEHOLDER_ADMIN_SECRET, fixedClock()));
     }
 
     @Test
     void constructor_AcceptsBase64UrlSecrets() {
-        TokenService urlTokenService = new TokenService(base64Url(repeatedBytes(0x11)), base64Url(repeatedBytes(0x22)));
+        TokenService urlTokenService = new TokenService(
+                base64Url(repeatedBytes(0x11)), base64Url(repeatedBytes(0x22)), fixedClock());
 
         String token = urlTokenService.generateUserToken(testUsername);
 
@@ -174,6 +180,55 @@ class TokenServiceTest {
     @Test
     void getTokenTtlMillis_ShouldReturnThreeMinutes() {
         assertEquals(1000L * 60 * 3, tokenService.getTokenTtlMillis());
+    }
+
+    @Test
+    void token_ExpiresWhenTheInjectedClockAdvancesPastTheTtl() {
+        MutableClock clock = new MutableClock(Instant.parse("2026-01-01T12:00:00Z"));
+        TokenService clockedService = new TokenService(USER_SECRET, ADMIN_SECRET, clock);
+
+        String token = clockedService.generateUserToken(testUsername);
+
+        clock.advance(Duration.ofMinutes(3).minusSeconds(1));
+        assertEquals(testUsername, clockedService.validateAndExtractUser(token),
+                "the token must still be valid one second before the TTL");
+
+        clock.advance(Duration.ofSeconds(2));
+        assertThrows(InvalidTokenException.class,
+                () -> clockedService.validateAndExtractUser(token),
+                "advancing the injected clock past the TTL must expire the token without sleeping");
+    }
+
+    private static Clock fixedClock() {
+        return Clock.fixed(Instant.parse("2026-01-01T12:00:00Z"), ZoneOffset.UTC);
+    }
+
+    /** A clock the test moves explicitly, so expiry is deterministic. */
+    private static final class MutableClock extends Clock {
+        private volatile Instant instant;
+
+        private MutableClock(Instant instant) {
+            this.instant = instant;
+        }
+
+        private void advance(Duration duration) {
+            this.instant = this.instant.plus(duration);
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
+
+        @Override
+        public Instant instant() {
+            return instant;
+        }
     }
 
     private static String base64(String value) {

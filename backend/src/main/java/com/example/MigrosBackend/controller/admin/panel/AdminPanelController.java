@@ -18,7 +18,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 @RestController
-@RequestMapping("admin/panel")
+@RequestMapping("/admin/panel")
 public class AdminPanelController {
     private final AdminSupplyService adminSupplyService;
     private final AdminOrderService adminOrderService;
@@ -30,34 +30,34 @@ public class AdminPanelController {
     }
 
     @PostMapping("addProductDescription")
-    private ResponseEntity<Void> addProductDescription(@RequestBody ProductDescriptionListDto productDescriptions) {
+    public ResponseEntity<Void> addProductDescription(@RequestBody ProductDescriptionListDto productDescriptions) {
         adminSupplyService.addProductDescription(productDescriptions);
         return ResponseEntity.ok().build();
     }
 
     @DeleteMapping("deleteProductDescription")
-    private ResponseEntity<Void> deleteProductDescription(@RequestParam Long descriptionId) {
+    public ResponseEntity<Void> deleteProductDescription(@RequestParam Long descriptionId) {
         adminSupplyService.deleteProductDescription(descriptionId);
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("getProductDescription")
-    private ResponseEntity<ProductDescriptionListDto> getProductDescription(@RequestParam Long productId) {
+    public ResponseEntity<ProductDescriptionListDto> getProductDescription(@RequestParam Long productId) {
         return ResponseEntity.ok(adminSupplyService.getProductDescription(productId));
     }
 
     @GetMapping("getAllAdminProducts")
-    private ResponseEntity<List<AdminProductPreviewDto>> getAllAdminProducts(@RequestParam Long adminId, @RequestParam int page, @RequestParam int productRange) {
+    public ResponseEntity<List<AdminProductPreviewDto>> getAllAdminProducts(@RequestParam Long adminId, @RequestParam int page, @RequestParam int productRange) {
         return ResponseEntity.ok(adminSupplyService.getAllAdminProducts(adminId, page, productRange));
     }
 
     @GetMapping("getProductData")
-    private ResponseEntity<ProductDetailDto> getProductData(@RequestParam Long productId) {
+    public ResponseEntity<ProductDetailDto> getProductData(@RequestParam Long productId) {
         return ResponseEntity.ok(adminSupplyService.getProductData(productId));
     }
 
     @PostMapping("addProduct")
-    private ResponseEntity<Void> addProduct(@Valid @RequestBody AdminAddItemDto adminAddItemDto) {
+    public ResponseEntity<Void> addProduct(@Valid @RequestBody AdminAddItemDto adminAddItemDto) {
         adminSupplyService.addProduct(adminAddItemDto);
         return ResponseEntity.ok().build();
     }
@@ -95,13 +95,13 @@ public class AdminPanelController {
     }
 
     @DeleteMapping("deleteProduct")
-    private ResponseEntity<Void> deleteProduct(@RequestParam Long productId) {
+    public ResponseEntity<Void> deleteProduct(@RequestParam Long productId) {
         adminSupplyService.deleteProduct(productId);
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("getAllOrders")
-    public ResponseEntity<OrderPageDto> getOrder(@RequestParam int page, @RequestParam int productRange) {
+    public ResponseEntity<OrderPageDto> getAllOrders(@RequestParam int page, @RequestParam int productRange) {
         return ResponseEntity.ok(adminOrderService.getAllOrders(page, productRange));
     }
 

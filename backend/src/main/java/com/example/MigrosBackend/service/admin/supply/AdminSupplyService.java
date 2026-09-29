@@ -6,7 +6,6 @@ import com.example.MigrosBackend.entity.admin.AdminEntity;
 import com.example.MigrosBackend.entity.category.CategoryEntity;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.product.ProductImageEntity;
-import com.example.MigrosBackend.exception.admin.AdminHasNoProductException;
 import com.example.MigrosBackend.exception.admin.AdminNotFoundException;
 import com.example.MigrosBackend.exception.admin.ProductNotFoundException;
 import com.example.MigrosBackend.exception.shared.GeneralException;
@@ -230,8 +229,10 @@ public void addProduct(AdminAddItemDto adminAddItemDto) {
     public List<AdminProductPreviewDto> getAllAdminProducts(Long adminId, int page, int productRange) {
         Pageable pageable = PageRequest.of(page, productRange);
         Page<ProductEntity> entities = productEntityRepository.findByAdminEntityId(adminId, pageable);
-        if (entities.isEmpty()) throw new AdminHasNoProductException(adminId.toString());
-
+        // An empty page is a valid result. The admin client sizes its paginator
+        // from the separate product-count endpoint, so it never uses an error as
+        // an end-of-pages signal; returning the empty list lets a transiently
+        // empty page render instead of surfacing a 404.
         return entities.stream().map(productEntity -> {
             AdminProductPreviewDto productPreviewDto = new AdminProductPreviewDto();
             productPreviewDto.setProductId(productEntity.getId());

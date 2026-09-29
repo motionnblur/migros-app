@@ -105,8 +105,8 @@ public class SecurityConfiguration {
                         .ignoringRequestMatchers("/payment/webhook", "/internal/**"))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/csrf").permitAll()
-                        .requestMatchers("/admin/login", "/admin/logout").permitAll()
-                        .requestMatchers("/user/login", "/user/logout").permitAll()
+                        .requestMatchers(SecurityPaths.ADMIN_LOGIN, SecurityPaths.ADMIN_LOGOUT).permitAll()
+                        .requestMatchers(SecurityPaths.USER_LOGIN, SecurityPaths.USER_LOGOUT).permitAll()
                         .requestMatchers("/user/signup", "/user/signup/**").permitAll()
                         .requestMatchers("/user/verifyUserMail", "/user/resetPassword").permitAll()
                         .requestMatchers("/user/session").hasRole("USER")

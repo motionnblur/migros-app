@@ -27,7 +27,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.context.ConfigurationPropertiesAutoConfiguration;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.mail.MailSendException;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -76,9 +78,7 @@ class UserSignupServiceTest {
     }
 
     private UserSignupService serviceWith(String backendBaseUrl, String frontendBaseUrl) {
-        PublicUrlProperties publicUrlProperties = new PublicUrlProperties();
-        publicUrlProperties.setBackendBaseUrl(backendBaseUrl);
-        publicUrlProperties.setFrontendBaseUrl(frontendBaseUrl);
+        PublicUrlProperties publicUrlProperties = new PublicUrlProperties(backendBaseUrl, frontendBaseUrl);
         return new UserSignupService(
                 userEntityRepository,
                 new PendingSignupStorage(pendingSignupEntityRepository, transactionManager),
@@ -511,34 +511,29 @@ class UserSignupServiceTest {
         );
 
         for (String invalid : invalidValues) {
-            PublicUrlProperties badBackend = new PublicUrlProperties();
-            badBackend.setBackendBaseUrl(invalid);
-            badBackend.setFrontendBaseUrl(FRONTEND_BASE_URL);
             IllegalStateException backendFailure = assertThrows(
-                    IllegalStateException.class, badBackend::validate, "expected backend rejection for: " + invalid);
+                    IllegalStateException.class,
+                    () -> new PublicUrlProperties(invalid, FRONTEND_BASE_URL),
+                    "expected backend rejection for: " + invalid);
             assertTrue(backendFailure.getMessage().contains("app.backend-base-url"),
                     "failure must name app.backend-base-url but was: " + backendFailure.getMessage());
 
-            PublicUrlProperties badFrontend = new PublicUrlProperties();
-            badFrontend.setFrontendBaseUrl(invalid);
-            badFrontend.setBackendBaseUrl(BACKEND_BASE_URL);
             IllegalStateException frontendFailure = assertThrows(
-                    IllegalStateException.class, badFrontend::validate, "expected frontend rejection for: " + invalid);
+                    IllegalStateException.class,
+                    () -> new PublicUrlProperties(BACKEND_BASE_URL, invalid),
+                    "expected frontend rejection for: " + invalid);
             assertTrue(frontendFailure.getMessage().contains("app.frontend-base-url"),
                     "failure must name app.frontend-base-url but was: " + frontendFailure.getMessage());
         }
 
-        PublicUrlProperties valid = new PublicUrlProperties();
-        valid.setBackendBaseUrl(BACKEND_BASE_URL);
-        valid.setFrontendBaseUrl(FRONTEND_BASE_URL);
-        assertDoesNotThrow(valid::validate);
+        assertDoesNotThrow(() -> new PublicUrlProperties(BACKEND_BASE_URL, FRONTEND_BASE_URL));
     }
 
     @Test
     void productionProfileRequiresBothPublicOrigins() {
         ApplicationContextRunner runner = new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(ConfigurationPropertiesAutoConfiguration.class))
-                .withUserConfiguration(PublicUrlProperties.class);
+                .withUserConfiguration(PublicUrlPropertiesConfiguration.class);
 
         runner.withInitializer(context -> context.getEnvironment().setActiveProfiles("prod"))
                 .withPropertyValues("app.backend-base-url=" + BACKEND_BASE_URL)
@@ -565,5 +560,10 @@ class UserSignupServiceTest {
             current = current.getCause();
         }
         return current.getMessage() == null ? "" : current.getMessage();
+    }
+
+    @Configuration
+    @EnableConfigurationProperties(PublicUrlProperties.class)
+    static class PublicUrlPropertiesConfiguration {
     }
 }

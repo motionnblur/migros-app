@@ -24,6 +24,17 @@ class PaymentUserResolver {
     }
 
     UserEntity requireUser(String userToken) {
+        return resolve(tokenService, userEntityRepository, userToken);
+    }
+
+    /**
+     * Shared token-to-user resolution so every payment consumer delegates to
+     * this single implementation instead of keeping a private copy. Kept as a
+     * static helper for callers (e.g. {@code CheckoutService}) that already hold
+     * the two collaborators and cannot take a new constructor dependency.
+     */
+    static UserEntity resolve(TokenService tokenService, UserEntityRepository userEntityRepository,
+                              String userToken) {
         String userMail = tokenService.validateAndExtractUser(userToken);
         UserEntity user = userEntityRepository.findByUserMail(userMail);
         if (user == null) {

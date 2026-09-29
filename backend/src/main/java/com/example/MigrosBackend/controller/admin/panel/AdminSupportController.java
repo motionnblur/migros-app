@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping("admin/panel")
+@RequestMapping("/admin/panel")
 public class AdminSupportController {
     private final UserSupportChatService userSupportChatService;
     private final SupportCustomerDirectoryService supportCustomerDirectoryService;
@@ -84,14 +84,20 @@ public class AdminSupportController {
         return ResponseEntity.ok().build();
     }
 
+    // Both DELETE and POST are kept for client compatibility: older admin
+    // clients close a chat with POST while newer ones use DELETE. They are the
+    // same operation, so both delegate to one shared handler.
     @DeleteMapping("support/close")
     public ResponseEntity<Void> closeSupportChatDelete(@RequestParam String userMail) {
-        supportModerationService.closeChat(userMail);
-        return ResponseEntity.ok().build();
+        return closeSupportChat(userMail);
     }
 
     @PostMapping("support/close")
     public ResponseEntity<Void> closeSupportChatPost(@RequestParam String userMail) {
+        return closeSupportChat(userMail);
+    }
+
+    private ResponseEntity<Void> closeSupportChat(String userMail) {
         supportModerationService.closeChat(userMail);
         return ResponseEntity.ok().build();
     }

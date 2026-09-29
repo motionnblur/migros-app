@@ -59,7 +59,7 @@ class UserProfileControllerTest {
 
     @Test
     void uploadUserProfileTable_shouldReturnOk() throws Exception {
-        when(authTokenResolver.requireToken("sample-token")).thenReturn("sample-token");
+        when(authTokenResolver.requireAuthenticatedUserMail()).thenReturn("user@example.com");
         doNothing().when(userProfileService).uploadUserProfileTable(
                 anyString(), anyString(), anyString(), anyString(),
                 anyString(), anyString(), anyString(), anyString()
@@ -80,7 +80,7 @@ class UserProfileControllerTest {
 
     @Test
     void getUserProfileTable_shouldReturnProfileDto() throws Exception {
-        when(authTokenResolver.requireToken("sample-token")).thenReturn("sample-token");
+        when(authTokenResolver.requireAuthenticatedUserMail()).thenReturn("user@example.com");
         when(userProfileService.getUserProfileTable(anyString())).thenReturn(userProfileTableDto);
 
         mockMvc.perform(get("/user/profile/getUserProfileTable")
@@ -101,8 +101,8 @@ class UserProfileControllerTest {
     }
 
     @Test
-    void getUserProfileTable_shouldReturnNotFound_whenCookieMissing() throws Exception {
-        when(authTokenResolver.requireToken(null)).thenThrow(new TokenNotFoundException());
+    void getUserProfileTable_shouldReturnNotFound_whenNoAuthenticatedUser() throws Exception {
+        when(authTokenResolver.requireAuthenticatedUserMail()).thenThrow(new TokenNotFoundException());
 
         mockMvc.perform(get("/user/profile/getUserProfileTable"))
                 .andExpect(status().isNotFound());

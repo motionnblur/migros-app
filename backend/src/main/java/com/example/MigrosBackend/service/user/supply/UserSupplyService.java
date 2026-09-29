@@ -15,7 +15,6 @@ import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.repository.user.OrderEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderGroupEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
-import com.example.MigrosBackend.service.global.TokenService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
@@ -27,7 +26,6 @@ import java.util.List;
 @Service
 public class UserSupplyService {
     private final UserEntityRepository userEntityRepository;
-    private final TokenService tokenService;
     private final OrderEntityRepository orderEntityRepository;
     private final OrderGroupEntityRepository orderGroupEntityRepository;
     private final UserCatalogReadService catalogReadService;
@@ -37,7 +35,6 @@ public class UserSupplyService {
     @Autowired
     public UserSupplyService(
             UserEntityRepository userEntityRepository,
-            TokenService tokenService,
             OrderEntityRepository orderEntityRepository,
             OrderGroupEntityRepository orderGroupEntityRepository,
             UserCatalogReadService catalogReadService,
@@ -45,7 +42,6 @@ public class UserSupplyService {
             OrderStockRestocker orderStockRestocker
     ) {
         this.userEntityRepository = userEntityRepository;
-        this.tokenService = tokenService;
         this.orderEntityRepository = orderEntityRepository;
         this.orderGroupEntityRepository = orderGroupEntityRepository;
         this.catalogReadService = catalogReadService;
@@ -97,12 +93,12 @@ public class UserSupplyService {
         return catalogReadService.getProductData(productId);
     }
 
-    public List<Long> getAllOrderIds(String token) {
-        return orderHistoryReadService.getAllOrderIds(token);
+    public List<Long> getAllOrderIds(String userMail) {
+        return orderHistoryReadService.getAllOrderIds(userMail);
     }
 
-    public String getOrderStatusByOrderId(Long orderId, String token) {
-        return orderHistoryReadService.getOrderStatusByOrderId(orderId, token);
+    public String getOrderStatusByOrderId(Long orderId, String userMail) {
+        return orderHistoryReadService.getOrderStatusByOrderId(orderId, userMail);
     }
 
     /**
@@ -127,8 +123,8 @@ public class UserSupplyService {
      * a line belonging to a completely different order.
      */
     @Transactional
-    public void cancelOrder(Long orderId, String token) {
-        UserEntity user = getValidatedUserFromToken(token);
+    public void cancelOrder(Long orderId, String userMail) {
+        UserEntity user = requireUserByMail(userMail);
 
         OrderGroupEntity orderGroup = orderGroupEntityRepository
                 .findByIdAndUserIdForUpdate(orderId, user.getId())
@@ -162,20 +158,18 @@ public class UserSupplyService {
         return catalogReadService.getProductDescription(productId);
     }
 
-    public List<UserOrderDetailDto> getUserOrderDetails(String token) {
-        return orderHistoryReadService.getUserOrderDetails(token);
+    public List<UserOrderDetailDto> getUserOrderDetails(String userMail) {
+        return orderHistoryReadService.getUserOrderDetails(userMail);
     }
 
-    public List<UserOrderGroupDto> getUserOrderGroups(String token) {
-        return orderHistoryReadService.getUserOrderGroups(token);
+    public List<UserOrderGroupDto> getUserOrderGroups(String userMail) {
+        return orderHistoryReadService.getUserOrderGroups(userMail);
     }
 
-    private UserEntity getValidatedUserFromToken(String token) {
-        String userName = tokenService.validateAndExtractUser(token);
-
-        UserEntity user = userEntityRepository.findByUserMail(userName);
+    private UserEntity requireUserByMail(String userMail) {
+        UserEntity user = userEntityRepository.findByUserMail(userMail);
         if (user == null) {
-            throw new UserNotFoundException(userName);
+            throw new UserNotFoundException(userMail);
         }
 
         return user;

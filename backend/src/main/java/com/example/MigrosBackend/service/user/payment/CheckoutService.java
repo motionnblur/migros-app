@@ -32,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -58,6 +59,7 @@ public class CheckoutService {
     private final OrderEntityRepository orderEntityRepository;
     private final PaymentAttemptEntityRepository paymentAttemptEntityRepository;
     private final PaymentAmountConverter paymentAmountConverter;
+    private final Clock clock;
     private final int checkoutTtlMinutes;
 
     public CheckoutService(TokenService tokenService,
@@ -69,6 +71,7 @@ public class CheckoutService {
                            OrderEntityRepository orderEntityRepository,
                            PaymentAttemptEntityRepository paymentAttemptEntityRepository,
                            PaymentAmountConverter paymentAmountConverter,
+                           Clock clock,
                            @Value("${payment.checkout.ttl-minutes:15}") int checkoutTtlMinutes) {
         this.tokenService = tokenService;
         this.userEntityRepository = userEntityRepository;
@@ -79,13 +82,14 @@ public class CheckoutService {
         this.orderEntityRepository = orderEntityRepository;
         this.paymentAttemptEntityRepository = paymentAttemptEntityRepository;
         this.paymentAmountConverter = paymentAmountConverter;
+        this.clock = clock;
         this.checkoutTtlMinutes = checkoutTtlMinutes;
     }
 
     @Transactional
     public CheckoutResponseDto prepareCheckout(String userToken) {
         UserEntity user = lockAuthenticatedUser(userToken);
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
 
         List<CheckoutEntity> liveCheckouts =
                 checkoutEntityRepository.findByUserIdAndStatusIn(user.getId(), CheckoutStatus.liveStatuses());
@@ -178,7 +182,7 @@ public class CheckoutService {
         UserEntity user = authenticatedUser(userToken);
         CheckoutEntity checkout = checkoutEntityRepository.findOwnedByIdForUpdate(checkoutId, user.getId())
                 .orElseThrow(CheckoutNotFoundException::new);
-        expireIfNeeded(checkout, LocalDateTime.now());
+        expireIfNeeded(checkout, LocalDateTime.now(clock));
         return toStatus(checkout);
     }
 
@@ -188,7 +192,7 @@ public class CheckoutService {
         CheckoutEntity checkout = checkoutEntityRepository.findOwnedByIdForUpdate(checkoutId, user.getId())
                 .orElseThrow(CheckoutNotFoundException::new);
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         expireIfNeeded(checkout, now);
 
         if (checkout.getStatus() == CheckoutStatus.PAID || checkout.getStatus() == CheckoutStatus.CONSUMED) {
@@ -216,7 +220,7 @@ public class CheckoutService {
         CheckoutEntity checkout = checkoutEntityRepository.findOwnedByIdForUpdate(checkoutId, user.getId())
                 .orElseThrow(CheckoutNotFoundException::new);
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         expireIfNeeded(checkout, now);
 
         if (checkout.getStatus() == CheckoutStatus.PAYMENT_PROCESSING) {
@@ -252,7 +256,7 @@ public class CheckoutService {
 
         checkout.setStatus(CheckoutStatus.PAID);
         checkout.setStripeChargeId(chargeId);
-        checkout.setUpdatedAt(LocalDateTime.now());
+        checkout.setUpdatedAt(LocalDateTime.now(clock));
         finalizeOrder(checkout);
         return toStatus(checkout);
     }
@@ -277,7 +281,7 @@ public class CheckoutService {
      * closed and keep the reservation for reconciliation.
      */
     @Transactional
-    public void failPayment(UUID checkoutId) {
+    public void releaseIfDefinitelyUncharged(UUID checkoutId) {
         CheckoutEntity checkout = checkoutEntityRepository.findByIdForUpdate(checkoutId).orElse(null);
         if (checkout == null || checkout.getStatus() != CheckoutStatus.PAYMENT_PROCESSING) {
             return;
@@ -295,12 +299,12 @@ public class CheckoutService {
         }
         releaseReservation(checkout);
         checkout.setStatus(CheckoutStatus.CANCELLED);
-        checkout.setUpdatedAt(LocalDateTime.now());
+        checkout.setUpdatedAt(LocalDateTime.now(clock));
     }
 
     @Transactional(readOnly = true)
     public List<UUID> findExpiredCheckoutIds() {
-        return checkoutEntityRepository.findExpiredIds(CheckoutStatus.expirableStatuses(), LocalDateTime.now());
+        return checkoutEntityRepository.findExpiredIds(CheckoutStatus.expirableStatuses(), LocalDateTime.now(clock));
     }
 
     @Transactional
@@ -309,7 +313,7 @@ public class CheckoutService {
         if (checkout == null) {
             return false;
         }
-        return expireIfNeeded(checkout, LocalDateTime.now());
+        return expireIfNeeded(checkout, LocalDateTime.now(clock));
     }
 
     private void finalizeOrder(CheckoutEntity checkout) {
@@ -347,7 +351,7 @@ public class CheckoutService {
         OrderGroupEntity group = new OrderGroupEntity();
         group.setUserEntity(user);
         group.setUserId(user.getId());
-        group.setCreatedAt(LocalDateTime.now());
+        group.setCreatedAt(LocalDateTime.now(clock));
         group.setStatus(ORDER_PENDING_STATUS);
         group = orderGroupEntityRepository.save(group);
 
@@ -366,7 +370,7 @@ public class CheckoutService {
 
         checkout.setOrderGroupEntityId(group.getId());
         checkout.setStatus(CheckoutStatus.CONSUMED);
-        checkout.setUpdatedAt(LocalDateTime.now());
+        checkout.setUpdatedAt(LocalDateTime.now(clock));
         checkoutEntityRepository.saveAndFlush(checkout);
     }
 
@@ -404,12 +408,7 @@ public class CheckoutService {
     }
 
     private UserEntity authenticatedUser(String userToken) {
-        String userMail = tokenService.validateAndExtractUser(userToken);
-        UserEntity user = userEntityRepository.findByUserMail(userMail);
-        if (user == null) {
-            throw new UserNotFoundException(userMail);
-        }
-        return user;
+        return PaymentUserResolver.resolve(tokenService, userEntityRepository, userToken);
     }
 
     private CheckoutResponseDto toResponse(CheckoutEntity checkout) {

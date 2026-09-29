@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -28,13 +29,16 @@ public class PaymentReconciliationJob {
 
     private final PaymentAttemptService paymentAttemptService;
     private final PaymentRecoveryService paymentRecoveryService;
+    private final Clock clock;
     private final int staleAfterSeconds;
 
     public PaymentReconciliationJob(PaymentAttemptService paymentAttemptService,
                                     PaymentRecoveryService paymentRecoveryService,
+                                    Clock clock,
                                     @Value("${payment.recovery.stale-after-seconds:300}") int staleAfterSeconds) {
         this.paymentAttemptService = paymentAttemptService;
         this.paymentRecoveryService = paymentRecoveryService;
+        this.clock = clock;
         this.staleAfterSeconds = staleAfterSeconds;
     }
 
@@ -42,7 +46,7 @@ public class PaymentReconciliationJob {
             fixedDelayString = "${payment.recovery.scan-ms:60000}",
             initialDelayString = "${payment.recovery.initial-delay-ms:60000}")
     public void reconcileStuckAttempts() {
-        LocalDateTime threshold = LocalDateTime.now().minusSeconds(staleAfterSeconds);
+        LocalDateTime threshold = LocalDateTime.now(clock).minusSeconds(staleAfterSeconds);
         List<UUID> staleIds = paymentAttemptService.findStaleAttemptIds(RECOVERABLE, threshold);
         for (UUID attemptId : staleIds) {
             try {

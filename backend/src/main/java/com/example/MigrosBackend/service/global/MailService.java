@@ -1,5 +1,6 @@
 package com.example.MigrosBackend.service.global;
 
+import com.example.MigrosBackend.exception.user.MailSendingFailedException;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,7 +9,6 @@ import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
@@ -17,6 +17,7 @@ import org.thymeleaf.context.Context;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,9 +38,15 @@ public class MailService {
                        @Value("${app.mail.provider:auto}") String provider,
                        @Value("${resend.api.key:}") String resendApiKey,
                        @Value("${app.mail.from:}") String configuredFromAddress,
-                       @Value("${spring.mail.username:}") String smtpUsername) {
+                       @Value("${spring.mail.username:}") String smtpUsername,
+                       @Value("${app.mail.http-connect-timeout-ms:5000}") long connectTimeoutMs,
+                       @Value("${app.mail.http-read-timeout-ms:10000}") long readTimeoutMs) {
         this.mailSender = mailSender;
-        this.restTemplate = restTemplateBuilder.rootUri("https://api.resend.com").build();
+        this.restTemplate = restTemplateBuilder
+                .rootUri("https://api.resend.com")
+                .setConnectTimeout(Duration.ofMillis(connectTimeoutMs))
+                .setReadTimeout(Duration.ofMillis(readTimeoutMs))
+                .build();
         this.templateEngine = templateEngine;
         this.provider = provider == null ? "auto" : provider.trim().toLowerCase();
         this.resendApiKey = resendApiKey == null ? "" : resendApiKey.trim();
@@ -88,30 +95,33 @@ public class MailService {
         if (resendApiKey.isEmpty()) {
             throw new MessagingException("RESEND_API_KEY is not configured.");
         }
+        if (fromAddress.isEmpty()) {
+            throw new MessagingException(
+                    "Mail sender address is not configured. Set APP_MAIL_FROM or MAIL_USERNAME.");
+        }
 
-        String resendFromAddress = fromAddress.isEmpty() ? "onboarding@resend.dev" : fromAddress;
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(resendApiKey);
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("from", resendFromAddress);
+        payload.put("from", fromAddress);
         payload.put("to", List.of(to));
         payload.put("subject", subject);
         payload.put("html", htmlContent);
 
         try {
-            ResponseEntity<String> response = restTemplate.postForEntity(
+            // A 4xx/5xx response, a connection failure, and a connect/read
+            // timeout all surface as a RestClientException here and share the
+            // single failure path below, so the signup flow revokes the token
+            // it already committed for this send.
+            restTemplate.postForEntity(
                     "/emails",
                     new HttpEntity<>(payload, headers),
                     String.class
             );
-
-            if (!response.getStatusCode().is2xxSuccessful()) {
-                throw new MessagingException("Resend request failed with status code: " + response.getStatusCode().value());
-            }
         } catch (RestClientException ex) {
-            throw new MessagingException("Failed to send email via Resend API.", ex);
+            throw new MailSendingFailedException();
         }
     }
 }

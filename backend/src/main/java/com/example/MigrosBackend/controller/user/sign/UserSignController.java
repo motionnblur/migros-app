@@ -3,6 +3,7 @@ package com.example.MigrosBackend.controller.user.sign;
 import com.example.MigrosBackend.config.security.AuthCookieService;
 import com.example.MigrosBackend.config.security.AuthCookies;
 import com.example.MigrosBackend.dto.user.sign.ResetPasswordDto;
+import com.example.MigrosBackend.dto.user.sign.UserSessionDto;
 import com.example.MigrosBackend.dto.user.sign.UserSignDto;
 import com.example.MigrosBackend.helper.AuthTokenResolver;
 import com.example.MigrosBackend.service.global.TokenService;
@@ -19,10 +20,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Map;
-
 @RestController
-@RequestMapping("user")
+@RequestMapping("/user")
 public class UserSignController {
 
     private final UserSignupService userSignupService;
@@ -42,25 +41,25 @@ public class UserSignController {
     }
 
     @PostMapping("signup")
-    private ResponseEntity<Void> addItem(@Valid @RequestBody UserSignDto userSignDto) {
+    public ResponseEntity<Void> signup(@Valid @RequestBody UserSignDto userSignDto) {
         userSignupService.signup(userSignDto);
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("signup/confirm")
-    private ResponseEntity<String> confirm(@RequestParam String token) {
+    public ResponseEntity<String> confirm(@RequestParam String token) {
         userSignupService.confirm(token);
         return ResponseEntity.ok("Your account has been created successfully, you can close this page now.");
     }
 
     @GetMapping("signup/confirmUserMail")
-    private ResponseEntity<String> confirmUserMail(@RequestParam String token) {
+    public ResponseEntity<String> confirmUserMail(@RequestParam String token) {
         userSignupService.confirmUserMail(token);
         return ResponseEntity.ok("Your mail has been verified successfully, you can close this page now.");
     }
 
     @PostMapping("login")
-    private ResponseEntity<Void> login(@Valid @RequestBody UserSignDto userSignDto) {
+    public ResponseEntity<Void> login(@Valid @RequestBody UserSignDto userSignDto) {
         String token = userSignupService.login(userSignDto);
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, authCookieService.createUserSessionCookie(token).toString())
@@ -68,28 +67,28 @@ public class UserSignController {
     }
 
     @PostMapping("logout")
-    private ResponseEntity<Void> logout() {
+    public ResponseEntity<Void> logout() {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, authCookieService.clearUserSessionCookie().toString())
                 .build();
     }
 
     @GetMapping("session")
-    private ResponseEntity<Map<String, String>> session(
+    public ResponseEntity<UserSessionDto> session(
             @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
         String userToken = authTokenResolver.requireToken(token);
         String userMail = tokenService.validateAndExtractUser(userToken);
-        return ResponseEntity.ok(Map.of("userMail", userMail));
+        return ResponseEntity.ok(new UserSessionDto(userMail));
     }
 
     @PostMapping("verifyUserMail")
-    private ResponseEntity<Void> verifyUserMail(@RequestParam String userMail) {
+    public ResponseEntity<Void> verifyUserMail(@RequestParam String userMail) {
         userSignupService.verifyUserMail(userMail);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("resetPassword")
-    private ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordDto resetPasswordDto) {
+    public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordDto resetPasswordDto) {
         userSignupService.resetPassword(resetPasswordDto);
         return ResponseEntity.ok().build();
     }

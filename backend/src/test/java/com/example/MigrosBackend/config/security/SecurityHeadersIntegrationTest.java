@@ -10,6 +10,7 @@ import com.example.MigrosBackend.filter.JwtRequestFilter;
 import com.example.MigrosBackend.helper.AuthTokenResolver;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.service.admin.sign.AdminSignupService;
+import com.example.MigrosBackend.service.global.LogService;
 import com.example.MigrosBackend.service.global.TokenService;
 import com.example.MigrosBackend.service.user.profile.UserProfileService;
 import jakarta.servlet.http.Cookie;
@@ -60,12 +61,15 @@ class SecurityHeadersIntegrationTest {
     @MockBean
     private AdminEntityRepository adminEntityRepository;
 
+    @MockBean
+    private LogService logService;
+
     @Test
     void authenticatedUserResponse_hasSecurityHeaders() throws Exception {
         String token = "user.jwt.token";
         when(tokenService.validateAndExtractUser(token)).thenReturn("user@example.com");
-        when(authTokenResolver.requireToken(token)).thenReturn(token);
-        when(userProfileService.getUserProfileTable(token)).thenReturn(new UserProfileTableDto());
+        when(authTokenResolver.requireAuthenticatedUserMail()).thenReturn("user@example.com");
+        when(userProfileService.getUserProfileTable("user@example.com")).thenReturn(new UserProfileTableDto());
 
         ResultActions result = mockMvc.perform(get("/user/profile/getUserProfileTable")
                 .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, token)));
@@ -100,8 +104,8 @@ class SecurityHeadersIntegrationTest {
     void handledExceptionResponse_hasSecurityHeaders() throws Exception {
         String token = "user.jwt.token";
         when(tokenService.validateAndExtractUser(token)).thenReturn("user@example.com");
-        when(authTokenResolver.requireToken(token)).thenReturn(token);
-        when(userProfileService.getUserProfileTable(token)).thenThrow(new MailSendingFailedException());
+        when(authTokenResolver.requireAuthenticatedUserMail()).thenReturn("user@example.com");
+        when(userProfileService.getUserProfileTable("user@example.com")).thenThrow(new MailSendingFailedException());
 
         ResultActions result = mockMvc.perform(get("/user/profile/getUserProfileTable")
                 .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, token)));

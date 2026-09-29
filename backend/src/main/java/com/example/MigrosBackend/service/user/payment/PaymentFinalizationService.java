@@ -1,6 +1,5 @@
 package com.example.MigrosBackend.service.user.payment;
 
-import com.example.MigrosBackend.entity.checkout.CheckoutEntity;
 import com.example.MigrosBackend.entity.payment.PaymentAttemptEntity;
 import com.example.MigrosBackend.entity.payment.PaymentAttemptStatus;
 import com.example.MigrosBackend.exception.user.CheckoutNotFoundException;
@@ -15,8 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.UUID;
 
 /**
@@ -53,15 +50,18 @@ public class PaymentFinalizationService {
     private final PaymentAttemptService paymentAttemptService;
     private final CheckoutEntityRepository checkoutEntityRepository;
     private final PaymentAttemptEntityRepository paymentAttemptEntityRepository;
+    private final PaymentAttemptLeases leases;
 
     public PaymentFinalizationService(CheckoutService checkoutService,
                                       PaymentAttemptService paymentAttemptService,
                                       CheckoutEntityRepository checkoutEntityRepository,
-                                      PaymentAttemptEntityRepository paymentAttemptEntityRepository) {
+                                      PaymentAttemptEntityRepository paymentAttemptEntityRepository,
+                                      PaymentAttemptLeases leases) {
         this.checkoutService = checkoutService;
         this.paymentAttemptService = paymentAttemptService;
         this.checkoutEntityRepository = checkoutEntityRepository;
         this.paymentAttemptEntityRepository = paymentAttemptEntityRepository;
+        this.leases = leases;
     }
 
     /**
@@ -136,21 +136,11 @@ public class PaymentFinalizationService {
      * worker.
      */
     private void fenceWorker(UUID attemptId, UUID checkoutId, String chargeId, String leaseOwner) {
-        CheckoutEntity checkout = checkoutEntityRepository.findByIdForUpdate(checkoutId)
-                .orElseThrow(CheckoutNotFoundException::new);
-        PaymentAttemptEntity attempt = paymentAttemptEntityRepository.findByIdForUpdate(attemptId)
-                .orElseThrow(PaymentAttemptNotFoundException::new);
-        if (!checkoutId.equals(attempt.getCheckoutId())) {
-            throw new PaymentStateException("Payment attempt does not belong to the checkout");
-        }
-        if (attempt.getStatus() == PaymentAttemptStatus.ORDER_FINALIZED) {
+        PaymentAttemptEntity attempt = lockAndValidateFence(attemptId, checkoutId);
+        if (attempt == null) {
             return;
         }
-        if (attempt.getStatus() != PaymentAttemptStatus.CHARGE_SUCCEEDED) {
-            throw new PaymentStateException(
-                    "Cannot finalize an order from state " + attempt.getStatus());
-        }
-        requireCurrentLease(attempt, leaseOwner);
+        leases.requireCurrentLease(attempt, leaseOwner);
         requireChargeMatch(attempt, chargeId);
     }
 
@@ -160,19 +150,9 @@ public class PaymentFinalizationService {
      * attempt-checkout linkage before any mutation. Takes no worker token.
      */
     private void fenceProvider(UUID attemptId, UUID checkoutId, String chargeId) {
-        CheckoutEntity checkout = checkoutEntityRepository.findByIdForUpdate(checkoutId)
-                .orElseThrow(CheckoutNotFoundException::new);
-        PaymentAttemptEntity attempt = paymentAttemptEntityRepository.findByIdForUpdate(attemptId)
-                .orElseThrow(PaymentAttemptNotFoundException::new);
-        if (!checkoutId.equals(attempt.getCheckoutId())) {
-            throw new PaymentStateException("Payment attempt does not belong to the checkout");
-        }
-        if (attempt.getStatus() == PaymentAttemptStatus.ORDER_FINALIZED) {
+        PaymentAttemptEntity attempt = lockAndValidateFence(attemptId, checkoutId);
+        if (attempt == null) {
             return;
-        }
-        if (attempt.getStatus() != PaymentAttemptStatus.CHARGE_SUCCEEDED) {
-            throw new PaymentStateException(
-                    "Cannot finalize an order from state " + attempt.getStatus());
         }
         if (chargeId != null && attempt.getStripeChargeId() != null
                 && !chargeId.equals(attempt.getStripeChargeId())) {
@@ -180,13 +160,29 @@ public class PaymentFinalizationService {
         }
     }
 
-    private void requireCurrentLease(PaymentAttemptEntity attempt, String leaseOwner) {
-        if (leaseOwner == null || leaseOwner.isBlank()
-                || attempt.getLeaseOwner() == null
-                || !constantTimeEquals(attempt.getLeaseOwner(), leaseOwner)) {
-            throw new StalePaymentLeaseException(
-                    "Stale payment lease: the attempt is owned by another worker");
+    /**
+     * Shared fence body: locks checkout first, then the attempt, and validates
+     * the attempt-checkout linkage and the forward-only state before any
+     * mutation. Returns {@code null} when the attempt is already
+     * {@code ORDER_FINALIZED}, so the caller skips the token/charge tail
+     * exactly as the two original fences did.
+     */
+    private PaymentAttemptEntity lockAndValidateFence(UUID attemptId, UUID checkoutId) {
+        checkoutEntityRepository.findByIdForUpdate(checkoutId)
+                .orElseThrow(CheckoutNotFoundException::new);
+        PaymentAttemptEntity attempt = paymentAttemptEntityRepository.findByIdForUpdate(attemptId)
+                .orElseThrow(PaymentAttemptNotFoundException::new);
+        if (!checkoutId.equals(attempt.getCheckoutId())) {
+            throw new PaymentStateException("Payment attempt does not belong to the checkout");
         }
+        if (attempt.getStatus() == PaymentAttemptStatus.ORDER_FINALIZED) {
+            return null;
+        }
+        if (attempt.getStatus() != PaymentAttemptStatus.CHARGE_SUCCEEDED) {
+            throw new PaymentStateException(
+                    "Cannot finalize an order from state " + attempt.getStatus());
+        }
+        return attempt;
     }
 
     private void requireChargeMatch(PaymentAttemptEntity attempt, String chargeId) {
@@ -196,11 +192,5 @@ public class PaymentFinalizationService {
         if (attempt.getStripeChargeId() != null && !chargeId.equals(attempt.getStripeChargeId())) {
             throw new PaymentStateException("Provider charge id does not match the recorded charge");
         }
-    }
-
-    private boolean constantTimeEquals(String stored, String presented) {
-        return MessageDigest.isEqual(
-                stored.getBytes(StandardCharsets.UTF_8),
-                presented.getBytes(StandardCharsets.UTF_8));
     }
 }

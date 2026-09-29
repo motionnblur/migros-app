@@ -11,6 +11,7 @@ import com.example.MigrosBackend.filter.JwtRequestFilter;
 import com.example.MigrosBackend.helper.AuthTokenResolver;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.service.admin.sign.AdminSignupService;
+import com.example.MigrosBackend.service.global.LogService;
 import com.example.MigrosBackend.service.global.TokenService;
 import com.example.MigrosBackend.service.support.SupportCustomerDirectoryService;
 import com.example.MigrosBackend.service.support.SupportModerationService;
@@ -100,6 +101,9 @@ class SecurityPublicRoutesTest {
 
     @MockBean
     private AdminEntityRepository adminEntityRepository;
+
+    @MockBean
+    private LogService logService;
 
     @Test
     void unmappedPathIsForbidden() throws Exception {

@@ -40,6 +40,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc(addFilters = false)
 class UserSupplyControllerTest {
     private static final String SESSION_TOKEN = "session-token";
+    private static final String USER_MAIL = "user@example.com";
 
     @Autowired
     private MockMvc mockMvc;
@@ -117,15 +118,15 @@ class UserSupplyControllerTest {
 
     @Test
     void addProductToUserCart_shouldReturnOk() throws Exception {
-        when(authTokenResolver.requireToken(SESSION_TOKEN)).thenReturn(SESSION_TOKEN);
-        doNothing().when(userCartService).addProductToCart(1L, SESSION_TOKEN);
+        when(authTokenResolver.requireAuthenticatedUserMail()).thenReturn(USER_MAIL);
+        doNothing().when(userCartService).addProductToCart(1L, USER_MAIL);
 
         mockMvc.perform(post("/user/supply/addProductToUserCart")
                         .param("productId", "1")
                         .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, SESSION_TOKEN)))
                 .andExpect(status().isOk());
 
-        verify(userCartService).addProductToCart(1L, SESSION_TOKEN);
+        verify(userCartService).addProductToCart(1L, USER_MAIL);
     }
 
     @Test
@@ -139,8 +140,8 @@ class UserSupplyControllerTest {
     }
 
     @Test
-    void addProductToUserCart_shouldReturnNotFound_whenCookieMissing() throws Exception {
-        when(authTokenResolver.requireToken(null)).thenThrow(new TokenNotFoundException());
+    void addProductToUserCart_shouldReturnNotFound_whenNoAuthenticatedUser() throws Exception {
+        when(authTokenResolver.requireAuthenticatedUserMail()).thenThrow(new TokenNotFoundException());
 
         mockMvc.perform(post("/user/supply/addProductToUserCart")
                         .param("productId", "1"))
@@ -149,22 +150,22 @@ class UserSupplyControllerTest {
 
     @Test
     void removeProductFromUserCart_shouldReturnOk() throws Exception {
-        when(authTokenResolver.requireToken(SESSION_TOKEN)).thenReturn(SESSION_TOKEN);
-        doNothing().when(userCartService).removeProductFromCart(1L, SESSION_TOKEN);
+        when(authTokenResolver.requireAuthenticatedUserMail()).thenReturn(USER_MAIL);
+        doNothing().when(userCartService).removeProductFromCart(1L, USER_MAIL);
 
         mockMvc.perform(delete("/user/supply/removeProductFromUserCart")
                         .param("productId", "1")
                         .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, SESSION_TOKEN)))
                 .andExpect(status().isOk());
 
-        verify(userCartService).removeProductFromCart(1L, SESSION_TOKEN);
+        verify(userCartService).removeProductFromCart(1L, USER_MAIL);
     }
 
     @Test
     void getAllOrderIds_shouldReturnList() throws Exception {
-        when(authTokenResolver.requireToken(SESSION_TOKEN)).thenReturn(SESSION_TOKEN);
+        when(authTokenResolver.requireAuthenticatedUserMail()).thenReturn(USER_MAIL);
         List<Long> orderIds = List.of(100L, 101L);
-        when(userSupplyService.getAllOrderIds(SESSION_TOKEN)).thenReturn(orderIds);
+        when(userSupplyService.getAllOrderIds(USER_MAIL)).thenReturn(orderIds);
 
         mockMvc.perform(get("/user/supply/getAllOrderIds")
                         .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, SESSION_TOKEN)))
@@ -174,8 +175,8 @@ class UserSupplyControllerTest {
 
     @Test
     void getOrderStatusByOrderId_shouldReturnStatus() throws Exception {
-        when(authTokenResolver.requireToken(SESSION_TOKEN)).thenReturn(SESSION_TOKEN);
-        when(userSupplyService.getOrderStatusByOrderId(100L, SESSION_TOKEN)).thenReturn("DELIVERED");
+        when(authTokenResolver.requireAuthenticatedUserMail()).thenReturn(USER_MAIL);
+        when(userSupplyService.getOrderStatusByOrderId(100L, USER_MAIL)).thenReturn("DELIVERED");
 
         mockMvc.perform(get("/user/supply/getOrderStatusByOrderId")
                         .param("orderId", "100")
@@ -305,8 +306,8 @@ class UserSupplyControllerTest {
 
         List<UserCartItemDto> cartItems = List.of(item1, item2);
 
-        when(authTokenResolver.requireToken(SESSION_TOKEN)).thenReturn(SESSION_TOKEN);
-        when(userCartService.getCartData(SESSION_TOKEN)).thenReturn(cartItems);
+        when(authTokenResolver.requireAuthenticatedUserMail()).thenReturn(USER_MAIL);
+        when(userCartService.getCartData(USER_MAIL)).thenReturn(cartItems);
 
         mockMvc.perform(get("/user/supply/getProductData")
                         .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, SESSION_TOKEN))
@@ -320,7 +321,7 @@ class UserSupplyControllerTest {
                 .andExpect(jsonPath("$[1].productId").value(102))
                 .andExpect(jsonPath("$[1].productName").value("Bread"));
 
-        verify(userCartService, times(1)).getCartData(SESSION_TOKEN);
+        verify(userCartService, times(1)).getCartData(USER_MAIL);
     }
 
     @Test
@@ -380,8 +381,8 @@ class UserSupplyControllerTest {
         Long productId = 101L;
         int count = 5;
 
-        when(authTokenResolver.requireToken(SESSION_TOKEN)).thenReturn(SESSION_TOKEN);
-        doNothing().when(userCartService).updateProductCountInCart(productId, count, SESSION_TOKEN);
+        when(authTokenResolver.requireAuthenticatedUserMail()).thenReturn(USER_MAIL);
+        doNothing().when(userCartService).updateProductCountInCart(productId, count, USER_MAIL);
 
         mockMvc.perform(post("/user/supply/updateProductCountInUserCart")
                         .param("productId", productId.toString())
@@ -390,7 +391,7 @@ class UserSupplyControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
 
-        verify(userCartService, times(1)).updateProductCountInCart(productId, count, SESSION_TOKEN);
+        verify(userCartService, times(1)).updateProductCountInCart(productId, count, USER_MAIL);
     }
 
     @Test
@@ -408,8 +409,8 @@ class UserSupplyControllerTest {
     void cancelOrder_ShouldReturnOk() throws Exception {
         Long orderId = 99L;
 
-        when(authTokenResolver.requireToken(SESSION_TOKEN)).thenReturn(SESSION_TOKEN);
-        doNothing().when(userSupplyService).cancelOrder(orderId, SESSION_TOKEN);
+        when(authTokenResolver.requireAuthenticatedUserMail()).thenReturn(USER_MAIL);
+        doNothing().when(userSupplyService).cancelOrder(orderId, USER_MAIL);
 
         mockMvc.perform(delete("/user/supply/cancelOrder")
                         .param("orderId", orderId.toString())
@@ -417,19 +418,19 @@ class UserSupplyControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
 
-        verify(userSupplyService, times(1)).cancelOrder(orderId, SESSION_TOKEN);
+        verify(userSupplyService, times(1)).cancelOrder(orderId, USER_MAIL);
     }
 
     @Test
     void getUserOrders_shouldReturnList() throws Exception {
-        when(authTokenResolver.requireToken(SESSION_TOKEN)).thenReturn(SESSION_TOKEN);
+        when(authTokenResolver.requireAuthenticatedUserMail()).thenReturn(USER_MAIL);
 
         UserOrderDetailDto detail = new UserOrderDetailDto();
         detail.setOrderId(1L);
         detail.setProductName("Milk");
         List<UserOrderDetailDto> details = List.of(detail);
 
-        when(userSupplyService.getUserOrderDetails(SESSION_TOKEN)).thenReturn(details);
+        when(userSupplyService.getUserOrderDetails(USER_MAIL)).thenReturn(details);
 
         mockMvc.perform(get("/user/supply/getUserOrders")
                         .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, SESSION_TOKEN)))
@@ -438,8 +439,8 @@ class UserSupplyControllerTest {
     }
 
     @Test
-    void getUserOrders_shouldReturnNotFound_whenCookieMissing() throws Exception {
-        when(authTokenResolver.requireToken(null)).thenThrow(new TokenNotFoundException());
+    void getUserOrders_shouldReturnNotFound_whenNoAuthenticatedUser() throws Exception {
+        when(authTokenResolver.requireAuthenticatedUserMail()).thenThrow(new TokenNotFoundException());
 
         mockMvc.perform(get("/user/supply/getUserOrders"))
                 .andExpect(status().isNotFound());
@@ -447,13 +448,13 @@ class UserSupplyControllerTest {
 
     @Test
     void getUserOrderGroups_shouldReturnList() throws Exception {
-        when(authTokenResolver.requireToken(SESSION_TOKEN)).thenReturn(SESSION_TOKEN);
+        when(authTokenResolver.requireAuthenticatedUserMail()).thenReturn(USER_MAIL);
 
         UserOrderGroupDto group = new UserOrderGroupDto();
         group.setOrderGroupId(10L);
         List<UserOrderGroupDto> groups = List.of(group);
 
-        when(userSupplyService.getUserOrderGroups(SESSION_TOKEN)).thenReturn(groups);
+        when(userSupplyService.getUserOrderGroups(USER_MAIL)).thenReturn(groups);
 
         mockMvc.perform(get("/user/supply/getUserOrderGroups")
                         .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, SESSION_TOKEN)))

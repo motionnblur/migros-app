@@ -1,5 +1,6 @@
 package com.example.MigrosBackend.service.support;
 
+import com.example.MigrosBackend.entity.support.SupportOutboxStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.RowMapper;
@@ -77,6 +78,17 @@ public class SupportOutboxStore {
     private static final RowCallbackHandler IGNORE_ROW = resultSet -> {
     };
 
+    /**
+     * The status tokens embedded in the SQL below. They are derived from
+     * {@link SupportOutboxStatus} so a renamed enum constant becomes a compile
+     * error here rather than a claim scan that silently matches nothing.
+     * Package-private so the guard test can assert the enum names and the
+     * tokens cannot drift apart.
+     */
+    static final String STATUS_PENDING = SupportOutboxStatus.PENDING.name();
+    static final String STATUS_PROCESSING = SupportOutboxStatus.PROCESSING.name();
+    static final String STATUS_DELIVERED = SupportOutboxStatus.DELIVERED.name();
+
     private final JdbcTemplate jdbcTemplate;
 
     public SupportOutboxStore(JdbcTemplate jdbcTemplate) {
@@ -111,7 +123,7 @@ public class SupportOutboxStore {
                 "INSERT INTO support_outbox_entity "
                         + "(event_id, event_type, user_mail, payload, status, attempt_count, "
                         + "next_attempt_at, created_at) "
-                        + "VALUES (?, ?, ?, ?, 'PENDING', 0, ?, ?)",
+                        + "VALUES (?, ?, ?, ?, '" + STATUS_PENDING + "', 0, ?, ?)",
                 eventId, eventType, userMail, payload,
                 Timestamp.valueOf(now), Timestamp.valueOf(now));
     }
@@ -171,12 +183,12 @@ public class SupportOutboxStore {
         }
         Timestamp nowTs = Timestamp.valueOf(now);
         List<ClaimedEvent> claimed = jdbcTemplate.query(
-                "UPDATE support_outbox_entity SET status = 'PROCESSING', lease_owner = ?, "
+                "UPDATE support_outbox_entity SET status = '" + STATUS_PROCESSING + "', lease_owner = ?, "
                         + "lease_expires_at = ?, attempt_count = attempt_count + 1 "
                         + "WHERE event_id = ? "
-                        + "AND (status = 'PENDING' "
+                        + "AND (status = '" + STATUS_PENDING + "' "
                         + "AND (next_attempt_at IS NULL OR next_attempt_at <= ?) "
-                        + "OR (status = 'PROCESSING' "
+                        + "OR (status = '" + STATUS_PROCESSING + "' "
                         + "AND (lease_expires_at IS NULL OR lease_expires_at <= ?))) "
                         + "RETURNING event_id, event_type, user_mail, payload, attempt_count, lease_owner",
                 CLAIMED_EVENT_MAPPER, leaseOwner,
@@ -195,9 +207,9 @@ public class SupportOutboxStore {
             return Transition.STALE_CLAIM;
         }
         return jdbcTemplate.update(
-                "UPDATE support_outbox_entity SET status = 'DELIVERED', delivered_at = ?, "
+                "UPDATE support_outbox_entity SET status = '" + STATUS_DELIVERED + "', delivered_at = ?, "
                         + "lease_owner = NULL, lease_expires_at = NULL, last_error = NULL "
-                        + "WHERE event_id = ? AND status = 'PROCESSING' AND lease_owner = ?",
+                        + "WHERE event_id = ? AND status = '" + STATUS_PROCESSING + "' AND lease_owner = ?",
                 Timestamp.valueOf(deliveredAt), eventId, leaseOwner) == 1
                 ? Transition.APPLIED
                 : Transition.STALE_CLAIM;
@@ -220,9 +232,9 @@ public class SupportOutboxStore {
             return Transition.STALE_CLAIM;
         }
         return jdbcTemplate.update(
-                "UPDATE support_outbox_entity SET status = 'PENDING', last_error = ?, "
+                "UPDATE support_outbox_entity SET status = '" + STATUS_PENDING + "', last_error = ?, "
                         + "next_attempt_at = ?, lease_owner = NULL, lease_expires_at = NULL "
-                        + "WHERE event_id = ? AND status = 'PROCESSING' AND lease_owner = ?",
+                        + "WHERE event_id = ? AND status = '" + STATUS_PROCESSING + "' AND lease_owner = ?",
                 errorCode, Timestamp.valueOf(nextAttemptAt), eventId, leaseOwner) == 1
                 ? Transition.APPLIED
                 : Transition.STALE_CLAIM;
@@ -252,14 +264,14 @@ public class SupportOutboxStore {
         Timestamp nowTs = Timestamp.valueOf(now);
         return jdbcTemplate.queryForList(
                 "SELECT o.event_id FROM support_outbox_entity o "
-                        + "WHERE ((o.status = 'PENDING' "
+                        + "WHERE ((o.status = '" + STATUS_PENDING + "' "
                         + "AND (o.next_attempt_at IS NULL OR o.next_attempt_at <= ?)) "
-                        + "OR (o.status = 'PROCESSING' "
+                        + "OR (o.status = '" + STATUS_PROCESSING + "' "
                         + "AND (o.lease_expires_at IS NULL OR o.lease_expires_at <= ?))) "
                         + "AND NOT EXISTS (SELECT 1 FROM support_outbox_entity p "
                         + "WHERE p.user_mail = o.user_mail "
                         + "AND p.sequence_no < o.sequence_no "
-                        + "AND p.status IN ('PENDING', 'PROCESSING')) "
+                        + "AND p.status IN ('" + STATUS_PENDING + "', '" + STATUS_PROCESSING + "')) "
                         + "ORDER BY o.sequence_no ASC LIMIT ?",
                 String.class, nowTs, nowTs, limit);
     }
@@ -272,7 +284,7 @@ public class SupportOutboxStore {
     public int deleteDeliveredBefore(LocalDateTime cutoff) {
         return jdbcTemplate.update(
                 "DELETE FROM support_outbox_entity "
-                        + "WHERE status = 'DELIVERED' AND delivered_at IS NOT NULL AND delivered_at < ?",
+                        + "WHERE status = '" + STATUS_DELIVERED + "' AND delivered_at IS NOT NULL AND delivered_at < ?",
                 Timestamp.valueOf(cutoff));
     }
 

@@ -12,7 +12,6 @@ import com.example.MigrosBackend.repository.user.OrderEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderGroupEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
 import com.example.MigrosBackend.service.admin.supply.AdminOrderService;
-import com.example.MigrosBackend.service.global.TokenService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -88,8 +87,6 @@ class OrderStatusConcurrencyPostgresTest {
     private OrderGroupEntityRepository orderGroupEntityRepository;
     @Autowired
     private OrderEntityRepository orderEntityRepository;
-    @Autowired
-    private TokenService tokenService;
     @Autowired
     private JdbcTemplate jdbcTemplate;
     @Autowired
@@ -227,7 +224,7 @@ class OrderStatusConcurrencyPostgresTest {
         UserEntity user = createUser("stampede@migros.com");
         ProductEntity product = createProduct("Stampede", "10.00", 1);
         OrderGroupEntity group = createPendingGroup(user, product, 1);
-        String token = tokenService.generateUserToken(user.getUserMail());
+        String userMail = user.getUserMail();
 
         // Hold the row lock so every cancellation is already queued behind it;
         // they then run strictly one after another, which is the exact
@@ -235,7 +232,7 @@ class OrderStatusConcurrencyPostgresTest {
         List<Future<Boolean>> queued = new ArrayList<>();
         try (Connection blocker = holdOrderGroupRowLock(group.getId())) {
             for (int i = 0; i < 6; i++) {
-                queued.add(submit(() -> attempt(() -> userSupplyService.cancelOrder(group.getId(), token))));
+                queued.add(submit(() -> attempt(() -> userSupplyService.cancelOrder(group.getId(), userMail))));
             }
             assertTrue(blocksOn(queued.get(0)), "the first cancellation must wait for the row lock");
             Thread.sleep(200);
@@ -304,10 +301,10 @@ class OrderStatusConcurrencyPostgresTest {
         ProductEntity product = createProduct("LateCancel", "10.00", 5);
         OrderGroupEntity group = createPendingGroup(user, product, 1);
         adminOrderService.updateOrderStatus(group.getId(), "Shipped");
-        String token = tokenService.generateUserToken(user.getUserMail());
+        String userMail = user.getUserMail();
 
         assertThrows(GeneralException.class,
-                () -> userSupplyService.cancelOrder(group.getId(), token));
+                () -> userSupplyService.cancelOrder(group.getId(), userMail));
 
         assertEquals(5, productEntityRepository.findById(product.getId()).orElseThrow().getProductCount());
     }
@@ -325,9 +322,9 @@ class OrderStatusConcurrencyPostgresTest {
         legacy.setTotalPrice(new BigDecimal("10.00"));
         legacy.setStatus("Pending");
         orderEntityRepository.saveAndFlush(legacy);
-        String token = tokenService.generateUserToken(user.getUserMail());
+        String userMail = user.getUserMail();
 
-        userSupplyService.cancelOrder(legacy.getId(), token);
+        userSupplyService.cancelOrder(legacy.getId(), userMail);
 
         assertEquals(2, productEntityRepository.findById(product.getId()).orElseThrow().getProductCount());
         assertTrue(orderEntityRepository.findById(legacy.getId()).isEmpty());
@@ -346,12 +343,12 @@ class OrderStatusConcurrencyPostgresTest {
         legacy.setTotalPrice(new BigDecimal("10.00"));
         legacy.setStatus("Pending");
         orderEntityRepository.saveAndFlush(legacy);
-        String token = tokenService.generateUserToken(user.getUserMail());
+        String userMail = user.getUserMail();
 
         List<Future<Boolean>> queued = new ArrayList<>();
         try (Connection blocker = holdOrderEntityRowLock(legacy.getId())) {
-            queued.add(submit(() -> attempt(() -> userSupplyService.cancelOrder(legacy.getId(), token))));
-            queued.add(submit(() -> attempt(() -> userSupplyService.cancelOrder(legacy.getId(), token))));
+            queued.add(submit(() -> attempt(() -> userSupplyService.cancelOrder(legacy.getId(), userMail))));
+            queued.add(submit(() -> attempt(() -> userSupplyService.cancelOrder(legacy.getId(), userMail))));
             assertTrue(blocksOn(queued.get(0)), "a legacy cancellation must wait for the row lock");
         }
 
@@ -434,13 +431,13 @@ class OrderStatusConcurrencyPostgresTest {
 
         // Nor may a customer's cancellation claim it, nor a status read expose it.
         assertThrows(GeneralException.class, () -> userSupplyService.cancelOrder(
-                doomedGroupId, tokenService.generateUserToken(other.getUserMail())));
+                doomedGroupId, other.getUserMail()));
         assertThrows(GeneralException.class, () -> userSupplyService.cancelOrder(
-                doomedGroupId, tokenService.generateUserToken(owner.getUserMail())));
+                doomedGroupId, owner.getUserMail()));
         assertTrue(orderEntityRepository.findById(collidingLineId).isPresent());
 
         assertThrows(GeneralException.class, () -> userSupplyService.getOrderStatusByOrderId(
-                doomedGroupId, tokenService.generateUserToken(owner.getUserMail())));
+                doomedGroupId, owner.getUserMail()));
         assertThrows(OrderNotFoundException.class,
                 () -> adminOrderService.getUserProfileData(doomedGroupId));
 
@@ -453,9 +450,9 @@ class OrderStatusConcurrencyPostgresTest {
         UserEntity user = createUser("real-legacy@migros.com");
         ProductEntity product = createProduct("RealLegacy", "10.00", 1);
         OrderEntity legacy = saveLegacyOrder(user, product, 1);
-        String token = tokenService.generateUserToken(user.getUserMail());
+        String userMail = user.getUserMail();
 
-        assertEquals("Pending", userSupplyService.getOrderStatusByOrderId(legacy.getId(), token));
+        assertEquals("Pending", userSupplyService.getOrderStatusByOrderId(legacy.getId(), userMail));
 
         adminOrderService.updateOrderStatus(legacy.getId(), "Shipped");
         assertEquals("Shipped", orderEntityRepository.findById(legacy.getId()).orElseThrow().getStatus());

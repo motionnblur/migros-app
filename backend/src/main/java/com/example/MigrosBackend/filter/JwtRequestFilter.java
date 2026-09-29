@@ -1,6 +1,7 @@
 package com.example.MigrosBackend.filter;
 
 import com.example.MigrosBackend.config.security.AuthCookies;
+import com.example.MigrosBackend.config.security.SecurityPaths;
 import com.example.MigrosBackend.exception.shared.InvalidTokenException;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
@@ -34,8 +35,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
-        String requestPath = resolveRequestPath(request);
-        return requestPath.equals("/admin/login") || requestPath.equals("/user/login");
+        return SecurityPaths.FILTER_SKIPPED_PATHS.contains(resolveRequestPath(request));
     }
 
     @Override
@@ -52,11 +52,21 @@ public class JwtRequestFilter extends OncePerRequestFilter {
     }
 
     private Optional<UsernamePasswordAuthenticationToken> resolveAuthentication(HttpServletRequest request) {
-        if (resolveRequestPath(request).startsWith("/admin")) {
+        if (isAdminPath(resolveRequestPath(request))) {
             return authenticateAdmin(request);
         }
 
         return authenticateUser(request);
+    }
+
+    /**
+     * An administrator path is exactly {@code /admin} or a descendant of
+     * {@code /admin/}. A bare prefix test would also classify {@code /adminfoo}
+     * as administrator-scoped and ignore the user session cookie there.
+     */
+    static boolean isAdminPath(String path) {
+        return path.equals(SecurityPaths.ADMIN_ROOT)
+                || path.startsWith(SecurityPaths.ADMIN_ROOT + "/");
     }
 
     private Optional<UsernamePasswordAuthenticationToken> authenticateAdmin(HttpServletRequest request) {
@@ -67,6 +77,12 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 
         try {
             String adminName = tokenService.validateAndExtractAdmin(token);
+            // Policy: the administrator subject is re-checked against the
+            // database on every request, so deleting an administrator revokes
+            // access immediately. The user path deliberately does not do the
+            // same lookup; a deleted user keeps access until the token expires.
+            // The stricter administrator side is kept and the user-side TTL
+            // window is accepted. Do not add a per-request user lookup here.
             if (adminEntityRepository.findByAdminName(adminName) == null) {
                 return Optional.empty();
             }

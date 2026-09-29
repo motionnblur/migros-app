@@ -6,7 +6,6 @@ import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
-import com.example.MigrosBackend.service.global.TokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,12 +33,8 @@ class UserCartServiceTest {
     @Mock
     private UserEntityRepository userEntityRepository;
 
-    @Mock
-    private TokenService tokenService;
-
     private UserCartService userCartService;
 
-    private static final String TOKEN = "valid-token";
     private static final String USER_MAIL = "user@migros.com";
 
     private UserEntity user;
@@ -54,16 +49,14 @@ class UserCartServiceTest {
         UserCatalogReadService catalogReadService =
                 new UserCatalogReadService(null, null, null, null, null);
         userCartService = new UserCartService(
-                productEntityRepository, userEntityRepository, tokenService, catalogReadService);
+                productEntityRepository, userEntityRepository, catalogReadService);
     }
 
     private void stubAuthenticatedUser() {
-        when(tokenService.validateAndExtractUser(TOKEN)).thenReturn(USER_MAIL);
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(user);
     }
 
     private void stubAuthenticatedUserForUpdate() {
-        when(tokenService.validateAndExtractUser(TOKEN)).thenReturn(USER_MAIL);
         when(userEntityRepository.findByUserMailForUpdate(USER_MAIL)).thenReturn(Optional.of(user));
     }
 
@@ -79,7 +72,7 @@ class UserCartServiceTest {
 
         when(productEntityRepository.findById(20L)).thenReturn(Optional.of(product));
 
-        assertThrows(GeneralException.class, () -> userCartService.addProductToCart(20L, TOKEN));
+        assertThrows(GeneralException.class, () -> userCartService.addProductToCart(20L, USER_MAIL));
         verify(userEntityRepository, never()).save(any());
     }
 
@@ -88,7 +81,7 @@ class UserCartServiceTest {
         stubAuthenticatedUserForUpdate();
         user.setProductsIdsInCart(null);
 
-        userCartService.removeProductFromCart(20L, TOKEN);
+        userCartService.removeProductFromCart(20L, USER_MAIL);
 
         assertEquals(List.of(), user.getProductsIdsInCart());
         verify(userEntityRepository).save(user);
@@ -103,7 +96,7 @@ class UserCartServiceTest {
 
         when(productEntityRepository.findById(25L)).thenReturn(Optional.of(product));
 
-        assertThrows(GeneralException.class, () -> userCartService.updateProductCountInCart(25L, 4, TOKEN));
+        assertThrows(GeneralException.class, () -> userCartService.updateProductCountInCart(25L, 4, USER_MAIL));
         verify(userEntityRepository, never()).save(any());
     }
 
@@ -127,7 +120,7 @@ class UserCartServiceTest {
 
         when(productEntityRepository.findAllById(any())).thenReturn(List.of(inStock, soldOut));
 
-        List<UserCartItemDto> result = userCartService.getCartData(TOKEN);
+        List<UserCartItemDto> result = userCartService.getCartData(USER_MAIL);
 
         assertEquals(1, result.size());
         assertEquals(1L, result.get(0).getProductId());

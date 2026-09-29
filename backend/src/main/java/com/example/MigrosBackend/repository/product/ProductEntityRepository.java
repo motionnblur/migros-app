@@ -9,14 +9,11 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
-@Repository
 public interface ProductEntityRepository extends JpaRepository<ProductEntity, Long> {
-    ProductEntity findByProductName(String productName);
-
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM ProductEntity p WHERE p.id = :id")
     Optional<ProductEntity> findByIdForUpdate(@Param("id") Long id);
@@ -38,4 +35,23 @@ public interface ProductEntityRepository extends JpaRepository<ProductEntity, Lo
     Page<ProductEntity> findByProductCountGreaterThan(int productCount, Pageable pageable);
 
     int countByProductCountGreaterThan(int productCount);
+
+    /**
+     * Counts in-stock products per subcategory for one category in the database,
+     * rather than loading the whole product list to group it in memory. The
+     * filters mirror the previous in-memory stream: stock greater than zero and
+     * a present, non-empty subcategory name.
+     */
+    @Query("""
+            SELECT new com.example.MigrosBackend.repository.product.SubcategoryCount(
+                       p.subcategoryName, COUNT(p))
+            FROM ProductEntity p
+            WHERE p.categoryEntity.id = :categoryId
+              AND p.productCount > 0
+              AND p.subcategoryName IS NOT NULL
+              AND p.subcategoryName <> ''
+            GROUP BY p.subcategoryName
+            ORDER BY p.subcategoryName ASC
+            """)
+    List<SubcategoryCount> countProductsBySubcategory(@Param("categoryId") Long categoryId);
 }

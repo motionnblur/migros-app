@@ -33,6 +33,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -91,6 +92,7 @@ class CheckoutServiceTest {
                 orderEntityRepository,
                 paymentAttemptEntityRepository,
                 converter,
+                Clock.systemDefaultZone(),
                 15);
 
         user = new UserEntity();
@@ -448,7 +450,7 @@ class CheckoutServiceTest {
     }
 
     @Test
-    void failPayment_ReleasesStockOnlyForProvenFailedFinalAttempt() {
+    void releaseIfDefinitelyUncharged_ReleasesStockOnlyForProvenFailedFinalAttempt() {
         CheckoutEntity processing = checkout(CheckoutStatus.PAYMENT_PROCESSING, "10.00");
         when(checkoutEntityRepository.findByIdForUpdate(processing.getId())).thenReturn(Optional.of(processing));
         when(paymentAttemptEntityRepository.findByCheckoutId(processing.getId()))
@@ -456,45 +458,45 @@ class CheckoutServiceTest {
         when(checkoutItemEntityRepository.findByCheckout_IdOrderByProductIdAsc(processing.getId()))
                 .thenReturn(List.of(item(processing, 101L, 2, "5.00", "10.00")));
 
-        checkoutService.failPayment(processing.getId());
+        checkoutService.releaseIfDefinitelyUncharged(processing.getId());
 
         assertEquals(CheckoutStatus.CANCELLED, processing.getStatus());
         verify(productEntityRepository, times(1)).incrementStock(101L, 2);
     }
 
     @Test
-    void failPayment_KeepsReservationWhenAttemptStillProcessing() {
+    void releaseIfDefinitelyUncharged_KeepsReservationWhenAttemptStillProcessing() {
         CheckoutEntity processing = checkout(CheckoutStatus.PAYMENT_PROCESSING, "10.00");
         when(checkoutEntityRepository.findByIdForUpdate(processing.getId())).thenReturn(Optional.of(processing));
         when(paymentAttemptEntityRepository.findByCheckoutId(processing.getId()))
                 .thenReturn(Optional.of(paymentAttempt(processing.getId(), PaymentAttemptStatus.PROCESSING, null)));
 
-        checkoutService.failPayment(processing.getId());
+        checkoutService.releaseIfDefinitelyUncharged(processing.getId());
 
         assertEquals(CheckoutStatus.PAYMENT_PROCESSING, processing.getStatus());
         verify(productEntityRepository, never()).incrementStock(anyLong(), anyInt());
     }
 
     @Test
-    void failPayment_KeepsReservationWhenNoAttemptProvesNoCharge() {
+    void releaseIfDefinitelyUncharged_KeepsReservationWhenNoAttemptProvesNoCharge() {
         CheckoutEntity processing = checkout(CheckoutStatus.PAYMENT_PROCESSING, "10.00");
         when(checkoutEntityRepository.findByIdForUpdate(processing.getId())).thenReturn(Optional.of(processing));
         when(paymentAttemptEntityRepository.findByCheckoutId(processing.getId())).thenReturn(Optional.empty());
 
-        checkoutService.failPayment(processing.getId());
+        checkoutService.releaseIfDefinitelyUncharged(processing.getId());
 
         assertEquals(CheckoutStatus.PAYMENT_PROCESSING, processing.getStatus());
         verify(productEntityRepository, never()).incrementStock(anyLong(), anyInt());
     }
 
     @Test
-    void failPayment_KeepsReservationWhenChargeIdPresent() {
+    void releaseIfDefinitelyUncharged_KeepsReservationWhenChargeIdPresent() {
         CheckoutEntity processing = checkout(CheckoutStatus.PAYMENT_PROCESSING, "10.00");
         when(checkoutEntityRepository.findByIdForUpdate(processing.getId())).thenReturn(Optional.of(processing));
         when(paymentAttemptEntityRepository.findByCheckoutId(processing.getId()))
                 .thenReturn(Optional.of(paymentAttempt(processing.getId(), PaymentAttemptStatus.FAILED_FINAL, "ch_1")));
 
-        checkoutService.failPayment(processing.getId());
+        checkoutService.releaseIfDefinitelyUncharged(processing.getId());
 
         assertEquals(CheckoutStatus.PAYMENT_PROCESSING, processing.getStatus());
         verify(productEntityRepository, never()).incrementStock(anyLong(), anyInt());

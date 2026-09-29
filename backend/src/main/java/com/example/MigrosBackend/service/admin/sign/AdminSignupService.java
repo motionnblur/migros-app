@@ -6,9 +6,7 @@ import com.example.MigrosBackend.exception.admin.AdminNotFoundException;
 import com.example.MigrosBackend.exception.shared.WrongPasswordException;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.service.global.EncryptService;
-import com.example.MigrosBackend.service.global.LogService;
 import com.example.MigrosBackend.service.global.TokenService;
-import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,28 +18,25 @@ public class AdminSignupService {
 
     private final AdminEntityRepository adminEntityRepository;
     private final EncryptService encryptService;
-    private final LogService logService;
     private final TokenService tokenService;
 
     @Autowired
     public AdminSignupService(AdminEntityRepository adminEntityRepository,
                               EncryptService encryptService,
-                              LogService logService,
                               TokenService tokenService) {
         this.adminEntityRepository = adminEntityRepository;
         this.encryptService = encryptService;
-        this.logService = logService;
         this.tokenService = tokenService;
     }
 
-    public String login(AdminSignDto adminSignDto, HttpServletRequest request) {
+    public String login(AdminSignDto adminSignDto, String clientAddress) {
         AdminEntity adminEntity = adminEntityRepository.findByAdminName(adminSignDto.getAdminName());
         if (adminEntity == null) {
-            logFailedLogin(adminSignDto.getAdminName(), request, "account_not_found");
+            logFailedLogin(adminSignDto.getAdminName(), clientAddress, "account_not_found");
             throw new AdminNotFoundException(adminSignDto.getAdminName());
         }
         if (!encryptService.checkIfPasswordMatches(adminSignDto.getAdminPassword(), adminEntity.getAdminPassword())) {
-            logFailedLogin(adminSignDto.getAdminName(), request, "password_mismatch");
+            logFailedLogin(adminSignDto.getAdminName(), clientAddress, "password_mismatch");
             throw new WrongPasswordException();
         }
 
@@ -54,9 +49,12 @@ public class AdminSignupService {
      * password nor a hash derived from it (including the BCrypt hash of a
      * non-existent account) is ever computed for logging, because a
      * password-derived value in a log file is a credential-equivalent secret.
+     *
+     * <p>The caller resolves the address from the servlet request (via
+     * {@code LogService}) so this service stays free of the servlet API.
      */
-    private void logFailedLogin(String adminName, HttpServletRequest request, String reason) {
+    private void logFailedLogin(String adminName, String clientAddress, String reason) {
         loginLogger.warn("Failed login attempt | User: {} | IP: {} | Reason: {}",
-                adminName, logService.getClientIp(request), reason);
+                adminName, clientAddress, reason);
     }
 }

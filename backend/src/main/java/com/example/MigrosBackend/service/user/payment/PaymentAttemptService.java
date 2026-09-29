@@ -20,6 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -61,18 +62,21 @@ public class PaymentAttemptService {
     private final CheckoutService checkoutService;
     private final PaymentAttemptLeases leases;
     private final PaymentUserResolver userResolver;
+    private final Clock clock;
 
     @Autowired
     public PaymentAttemptService(CheckoutEntityRepository checkoutEntityRepository,
                                  PaymentAttemptEntityRepository paymentAttemptEntityRepository,
                                  CheckoutService checkoutService,
                                  PaymentAttemptLeases leases,
-                                 PaymentUserResolver userResolver) {
+                                 PaymentUserResolver userResolver,
+                                 Clock clock) {
         this.checkoutEntityRepository = checkoutEntityRepository;
         this.paymentAttemptEntityRepository = paymentAttemptEntityRepository;
         this.checkoutService = checkoutService;
         this.leases = leases;
         this.userResolver = userResolver;
+        this.clock = clock;
     }
 
     /**
@@ -103,7 +107,7 @@ public class PaymentAttemptService {
             verifySnapshot(attempt, checkout);
         }
 
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(clock);
         PaymentAttemptStatus state = attempt.getStatus();
 
         if (state.isFinalized()) {
@@ -141,7 +145,7 @@ public class PaymentAttemptService {
         PaymentAttemptEntity attempt = paymentAttemptEntityRepository.findByIdForUpdate(attemptId)
                 .orElseThrow(PaymentAttemptNotFoundException::new);
         return PaymentAttemptMapper.describe(attempt, PaymentAttemptDecisionPolicy.forStatus(
-                attempt.getStatus(), attempt, LocalDateTime.now()), null);
+                attempt.getStatus(), attempt, LocalDateTime.now(clock)), null);
     }
 
     /**
@@ -188,7 +192,7 @@ public class PaymentAttemptService {
         attempt.setStripeChargeId(chargeId);
         attempt.setProviderStatus("succeeded");
         transition(attempt, PaymentAttemptStatus.CHARGE_SUCCEEDED);
-        leases.extendLease(attempt, LocalDateTime.now());
+        leases.extendLease(attempt, LocalDateTime.now(clock));
         save(attempt);
         return PaymentAttemptMapper.toStatus(attempt);
     }
@@ -397,7 +401,7 @@ public class PaymentAttemptService {
         leases.clearLease(attempt);
         transition(attempt, PaymentAttemptStatus.FAILED_FINAL);
         save(attempt);
-        checkoutService.failPayment(attempt.getCheckoutId());
+        checkoutService.releaseIfDefinitelyUncharged(attempt.getCheckoutId());
     }
 
     /**
@@ -423,7 +427,7 @@ public class PaymentAttemptService {
         leases.clearLease(attempt);
         transition(attempt, PaymentAttemptStatus.FAILED_FINAL);
         save(attempt);
-        checkoutService.failPayment(attempt.getCheckoutId());
+        checkoutService.releaseIfDefinitelyUncharged(attempt.getCheckoutId());
     }
 
     @Transactional(readOnly = true)
@@ -479,7 +483,7 @@ public class PaymentAttemptService {
                 .orElseThrow(PaymentAttemptNotFoundException::new);
         boolean changed = attachConflictEvidence(attempt, chargeId);
         if (changed) {
-            attempt.setUpdatedAt(LocalDateTime.now());
+            attempt.setUpdatedAt(LocalDateTime.now(clock));
             save(attempt);
         }
     }
@@ -551,7 +555,7 @@ public class PaymentAttemptService {
             return null;
         }
         return PaymentAttemptMapper.describe(attempt, PaymentAttemptDecisionPolicy.forStatus(
-                attempt.getStatus(), attempt, LocalDateTime.now()), null);
+                attempt.getStatus(), attempt, LocalDateTime.now(clock)), null);
     }
 
     @Transactional(readOnly = true)
@@ -569,8 +573,8 @@ public class PaymentAttemptService {
         attempt.setAmountMinor(start.amountMinor());
         attempt.setCurrency(start.currency());
         attempt.setStatus(PaymentAttemptStatus.CREATED);
-        attempt.setCreatedAt(LocalDateTime.now());
-        attempt.setUpdatedAt(LocalDateTime.now());
+        attempt.setCreatedAt(LocalDateTime.now(clock));
+        attempt.setUpdatedAt(LocalDateTime.now(clock));
         return paymentAttemptEntityRepository.saveAndFlush(attempt);
     }
 
@@ -612,7 +616,7 @@ public class PaymentAttemptService {
                     "Illegal payment transition " + attempt.getStatus() + " -> " + next);
         }
         attempt.setStatus(next);
-        attempt.setUpdatedAt(LocalDateTime.now());
+        attempt.setUpdatedAt(LocalDateTime.now(clock));
     }
 
     private void reject(PaymentAttemptEntity attempt, PaymentAttemptStatus next, String reason) {

@@ -55,6 +55,13 @@ public class PaymentWebhookService {
 
     private static final Logger LOG = LoggerFactory.getLogger(PaymentWebhookService.class);
 
+    private static final String EVENT_CHARGE_SUCCEEDED = "charge.succeeded";
+    private static final String EVENT_CHARGE_FAILED = "charge.failed";
+    private static final String EVENT_CHARGE_REFUNDED = "charge.refunded";
+    private static final String EVENT_CHARGE_DISPUTE_CREATED = "charge.dispute.created";
+    private static final String EVENT_CHARGE_DISPUTE_FUNDS_WITHDRAWN = "charge.dispute.funds_withdrawn";
+    private static final String EVENT_CHARGE_DISPUTE_CLOSED = "charge.dispute.closed";
+
     private final StripeEventStore stripeEventStore;
     private final PaymentAttemptService paymentAttemptService;
     private final PaymentFinalizationService paymentFinalizationService;
@@ -124,7 +131,9 @@ public class PaymentWebhookService {
             return;
         }
         StoredEvent claimed = claim.get();
-        String leaseOwner = claimed.leaseOwner() != null ? claimed.leaseOwner() : claimToken;
+        // tryClaim's UPDATE ... RETURNING always emits the owner it just wrote,
+        // so the claimed row cannot carry a null lease owner.
+        String leaseOwner = claimed.leaseOwner();
         afterClaim(eventId);
 
         Event effective = event;
@@ -177,7 +186,9 @@ public class PaymentWebhookService {
             return false;
         }
         StoredEvent claimed = claim.get();
-        String leaseOwner = claimed.leaseOwner() != null ? claimed.leaseOwner() : claimToken;
+        // tryClaim's UPDATE ... RETURNING always emits the owner it just wrote,
+        // so the claimed row cannot carry a null lease owner.
+        String leaseOwner = claimed.leaseOwner();
         if (claimed.payload() == null || claimed.payload().isBlank()) {
             stripeEventStore.markExhaustedReview(eventId, leaseOwner, "missing_payload");
             LOG.error("Stripe event {} has no stored payload; held for manual review", eventId);
@@ -287,16 +298,17 @@ public class PaymentWebhookService {
 
     private WebhookOutcome process(Event event, String eventType) {
         switch (eventType) {
-            case "charge.succeeded" -> {
+            case EVENT_CHARGE_SUCCEEDED -> {
                 return handleChargeSucceeded(chargeOf(event));
             }
-            case "charge.failed" -> {
+            case EVENT_CHARGE_FAILED -> {
                 return handleChargeFailed(chargeOf(event));
             }
-            case "charge.refunded" -> {
+            case EVENT_CHARGE_REFUNDED -> {
                 return handleChargeRefunded(chargeOf(event));
             }
-            case "charge.dispute.created", "charge.dispute.funds_withdrawn", "charge.dispute.closed" -> {
+            case EVENT_CHARGE_DISPUTE_CREATED, EVENT_CHARGE_DISPUTE_FUNDS_WITHDRAWN,
+                 EVENT_CHARGE_DISPUTE_CLOSED -> {
                 return handleDispute(event);
             }
             default -> {
@@ -538,7 +550,7 @@ public class PaymentWebhookService {
         String chargeId = charge.getId();
         String metadataCheckoutId = charge.getMetadata() == null
                 ? null
-                : charge.getMetadata().get(StripePaymentGatewayImpl.CHECKOUT_ID_METADATA_KEY);
+                : charge.getMetadata().get(StripePaymentGateway.CHECKOUT_ID_METADATA_KEY);
         UUID metadataCheckout = null;
         if (metadataCheckoutId != null) {
             try {

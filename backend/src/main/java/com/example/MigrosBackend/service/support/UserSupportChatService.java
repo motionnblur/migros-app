@@ -2,40 +2,41 @@ package com.example.MigrosBackend.service.support;
 
 import com.example.MigrosBackend.dto.user.support.SupportMessageDto;
 import com.example.MigrosBackend.entity.user.SupportMessageEntity;
+import com.example.MigrosBackend.entity.user.SupportMessageSender;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.repository.user.SupportMessageEntityRepository;
-import com.example.MigrosBackend.service.global.TokenService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * User-side live chat: token-validated conversation reads and message writes.
+ * User-side live chat: conversation reads and message writes for the identity
+ * resolved once in the controller.
  */
 @Service
 public class UserSupportChatService {
     private final SupportMessageEntityRepository supportMessageEntityRepository;
-    private final TokenService tokenService;
     private final SupportChatNotificationCoordinator notificationCoordinator;
     private final SupportChatGuards guards;
+    private final Clock clock;
 
     @Autowired
     public UserSupportChatService(SupportMessageEntityRepository supportMessageEntityRepository,
-                                  TokenService tokenService,
                                   SupportChatNotificationCoordinator notificationCoordinator,
-                                  SupportChatGuards guards) {
+                                  SupportChatGuards guards,
+                                  Clock clock) {
         this.supportMessageEntityRepository = supportMessageEntityRepository;
-        this.tokenService = tokenService;
         this.notificationCoordinator = notificationCoordinator;
         this.guards = guards;
+        this.clock = clock;
     }
 
-    public List<SupportMessageDto> getMessagesForUser(String token) {
-        String userMail = getValidUserMailFromToken(token);
+    public List<SupportMessageDto> getMessagesForUser(String userMail) {
         UserEntity user = guards.requireUser(userMail);
         assertNotBanned(user);
 
@@ -52,8 +53,7 @@ public class UserSupportChatService {
      * neither does.
      */
     @Transactional
-    public void addUserMessage(String token, String message) {
-        String userMail = getValidUserMailFromToken(token);
+    public void addUserMessage(String userMail, String message) {
         UserEntity user = guards.requireUser(userMail);
         assertNotBanned(user);
 
@@ -61,9 +61,9 @@ public class UserSupportChatService {
 
         SupportMessageEntity entity = new SupportMessageEntity();
         entity.setUserMail(userMail);
-        entity.setSender("USER");
+        entity.setSender(SupportMessageSender.USER.name());
         entity.setMessage(trimmedMessage);
-        entity.setCreatedAt(LocalDateTime.now());
+        entity.setCreatedAt(LocalDateTime.now(clock));
         entity = supportMessageEntityRepository.save(entity);
 
         notificationCoordinator.publishCustomerMessageCreated(entity, userMail);
@@ -78,13 +78,6 @@ public class UserSupportChatService {
     private List<SupportMessageDto> getMappedMessagesForUserMail(String userMail) {
         return SupportMessageMapper.toDtos(
                 supportMessageEntityRepository.findByUserMailOrderByCreatedAtAscIdAsc(userMail));
-    }
-
-    private String getValidUserMailFromToken(String token) {
-        String userMail = tokenService.validateAndExtractUser(token);
-        guards.requireUser(userMail);
-
-        return userMail;
     }
 
     private void assertNotBanned(UserEntity user) {

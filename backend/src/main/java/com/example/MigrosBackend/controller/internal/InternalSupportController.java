@@ -25,7 +25,7 @@ import java.util.List;
  * this controller, so the handlers only translate HTTP and delegate.
  */
 @RestController
-@RequestMapping("internal/support")
+@RequestMapping("/internal/support")
 public class InternalSupportController {
     private final SupportCustomerDirectoryService supportCustomerDirectoryService;
     private final SupportModerationService supportModerationService;

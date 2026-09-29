@@ -14,6 +14,7 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
@@ -54,7 +55,8 @@ class SupportModerationServiceTest {
                 userEntityRepository,
                 supportMessageEntityRepository,
                 new SupportChatNotificationCoordinator(supportChatWebSocketHandler, supportInternalEventService),
-                new SupportChatGuards(userEntityRepository));
+                new SupportChatGuards(userEntityRepository),
+                Clock.systemDefaultZone());
     }
 
     @Test

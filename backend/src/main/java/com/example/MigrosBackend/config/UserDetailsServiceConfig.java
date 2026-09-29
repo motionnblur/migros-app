@@ -12,8 +12,6 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
 @Configuration
@@ -34,15 +32,15 @@ public class UserDetailsServiceConfig {
             AdminEntity admin = adminEntityRepository.findByAdminName(username);
             if (admin != null) {
                 // Return admin user details with a specific role
-                List<GrantedAuthority> authorities = Arrays.asList(new SimpleGrantedAuthority("ROLE_ADMIN"));
+                List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_ADMIN"));
                 return new User(admin.getAdminName(), admin.getAdminPassword(), authorities);
             }
 
             // If no admin is found, try to find a regular user
-            UserEntity user = userEntityRepository.findByUserMail(username); // Assuming findByUsername method
+            UserEntity user = userEntityRepository.findByUserMail(username);
             if (user != null) {
                 // Return regular user details with a specific role
-                List<GrantedAuthority> authorities = Arrays.asList(new SimpleGrantedAuthority("ROLE_USER"));
+                List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_USER"));
                 return new User(user.getUserName(), user.getUserPassword(), authorities);
             }
 

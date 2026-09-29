@@ -8,7 +8,6 @@ import com.example.MigrosBackend.exception.admin.UserNotFoundException;
 import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
-import com.example.MigrosBackend.service.global.TokenService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,29 +33,26 @@ import java.util.stream.Collectors;
 public class UserCartService {
     private final ProductEntityRepository productEntityRepository;
     private final UserEntityRepository userEntityRepository;
-    private final TokenService tokenService;
     private final UserCatalogReadService catalogReadService;
 
     public UserCartService(ProductEntityRepository productEntityRepository,
                            UserEntityRepository userEntityRepository,
-                           TokenService tokenService,
                            UserCatalogReadService catalogReadService) {
         this.productEntityRepository = productEntityRepository;
         this.userEntityRepository = userEntityRepository;
-        this.tokenService = tokenService;
         this.catalogReadService = catalogReadService;
     }
 
     @Transactional
-    public void clearUserCart(String userToken) {
-        UserEntity user = getValidatedUserFromToken(userToken);
+    public void clearUserCart(String userMail) {
+        UserEntity user = requireUserByMail(userMail);
         user.setProductsIdsInCart(new ArrayList<>());
         userEntityRepository.save(user);
     }
 
     @Transactional
-    public void addProductToCart(Long productId, String token) {
-        UserEntity user = getValidatedUserFromTokenForUpdate(token);
+    public void addProductToCart(Long productId, String userMail) {
+        UserEntity user = requireUserByMailForUpdate(userMail);
         ProductEntity product = productEntityRepository.findById(productId)
                 .orElseThrow(() -> new ProductNotFoundException(productId.toString()));
 
@@ -80,8 +76,8 @@ public class UserCartService {
     // existing test locks that write in. The response is identical either way;
     // a follow-up can make the read pure once no caller relies on the write.
     @Transactional
-    public List<UserCartItemDto> getCartData(String token) {
-        UserEntity user = getValidatedUserFromToken(token);
+    public List<UserCartItemDto> getCartData(String userMail) {
+        UserEntity user = requireUserByMail(userMail);
 
         if (user.getProductsIdsInCart() == null || user.getProductsIdsInCart().isEmpty()) {
             return new ArrayList<>();
@@ -132,20 +128,20 @@ public class UserCartService {
     }
 
     @Transactional
-    public void removeProductFromCart(Long productId, String token) {
-        UserEntity user = getValidatedUserFromTokenForUpdate(token);
+    public void removeProductFromCart(Long productId, String userMail) {
+        UserEntity user = requireUserByMailForUpdate(userMail);
 
         getOrInitializeCart(user).removeAll(Collections.singleton(productId));
         userEntityRepository.save(user);
     }
 
     @Transactional
-    public void updateProductCountInCart(Long productId, int count, String token) {
+    public void updateProductCountInCart(Long productId, int count, String userMail) {
         if (count <= 0) {
             throw new GeneralException("Count can not be negative or zero");
         }
 
-        UserEntity user = getValidatedUserFromTokenForUpdate(token);
+        UserEntity user = requireUserByMailForUpdate(userMail);
         ProductEntity product = productEntityRepository.findById(productId)
                 .orElseThrow(() -> new ProductNotFoundException(productId.toString()));
 
@@ -177,21 +173,17 @@ public class UserCartService {
         return user.getProductsIdsInCart();
     }
 
-    private UserEntity getValidatedUserFromToken(String token) {
-        String userName = tokenService.validateAndExtractUser(token);
-
-        UserEntity user = userEntityRepository.findByUserMail(userName);
+    private UserEntity requireUserByMail(String userMail) {
+        UserEntity user = userEntityRepository.findByUserMail(userMail);
         if (user == null) {
-            throw new UserNotFoundException(userName);
+            throw new UserNotFoundException(userMail);
         }
 
         return user;
     }
 
-    private UserEntity getValidatedUserFromTokenForUpdate(String token) {
-        String userName = tokenService.validateAndExtractUser(token);
-
-        return userEntityRepository.findByUserMailForUpdate(userName)
-                .orElseThrow(() -> new UserNotFoundException(userName));
+    private UserEntity requireUserByMailForUpdate(String userMail) {
+        return userEntityRepository.findByUserMailForUpdate(userMail)
+                .orElseThrow(() -> new UserNotFoundException(userMail));
     }
 }

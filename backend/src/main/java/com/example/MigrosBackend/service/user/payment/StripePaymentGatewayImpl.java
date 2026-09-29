@@ -15,17 +15,15 @@ import java.util.Optional;
 @Service
 public class StripePaymentGatewayImpl implements StripePaymentGateway {
 
-    static final String CHECKOUT_ID_METADATA_KEY = "checkout_id";
-
     @Override
     public Charge charge(String sourceToken, long amountMinor, String currency,
                          String idempotencyKey, String checkoutId) throws StripeException {
         ChargeCreateParams params = ChargeCreateParams.builder()
                 .setAmount(amountMinor)
                 .setCurrency(currency)
-                .setDescription("Example charge")
+                .setDescription("Migros order " + checkoutId)
                 .setSource(sourceToken)
-                .putMetadata(CHECKOUT_ID_METADATA_KEY, checkoutId)
+                .putMetadata(StripePaymentGateway.CHECKOUT_ID_METADATA_KEY, checkoutId)
                 .build();
 
         RequestOptions options = RequestOptions.builder()
@@ -42,7 +40,8 @@ public class StripePaymentGatewayImpl implements StripePaymentGateway {
         }
         String sanitized = checkoutId.replace("'", "");
         ChargeSearchParams params = ChargeSearchParams.builder()
-                .setQuery("metadata['" + CHECKOUT_ID_METADATA_KEY + "']:'" + sanitized + "'")
+                .setQuery("metadata['" + StripePaymentGateway.CHECKOUT_ID_METADATA_KEY
+                        + "']:'" + sanitized + "'")
                 .setLimit(1L)
                 .build();
 

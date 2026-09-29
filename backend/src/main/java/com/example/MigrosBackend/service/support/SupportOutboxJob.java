@@ -57,10 +57,17 @@ public class SupportOutboxJob {
             fixedDelayString = "${support.outbox.cleanup-scan-ms:3600000}",
             initialDelayString = "${support.outbox.cleanup-initial-delay-ms:3600000}")
     public void purgeDeliveredEvents() {
-        int deleted = outboxStore.deleteDeliveredBefore(
-                LocalDateTime.now(clock).minusDays(retentionDays));
-        if (deleted > 0) {
-            LOG.info("Support outbox retention deleted {} delivered events", deleted);
+        try {
+            int deleted = outboxStore.deleteDeliveredBefore(
+                    LocalDateTime.now(clock).minusDays(retentionDays));
+            if (deleted > 0) {
+                LOG.info("Support outbox retention deleted {} delivered events", deleted);
+            }
+        } catch (RuntimeException ex) {
+            // A failing retention scan must not kill the scheduler: undelivered
+            // records are never touched here, and the next tick retries the
+            // delivered ones.
+            LOG.error("Support outbox retention scan failed: {}", ex.getClass().getSimpleName());
         }
     }
 }

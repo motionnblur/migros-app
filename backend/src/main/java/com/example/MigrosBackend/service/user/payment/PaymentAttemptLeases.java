@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -20,9 +21,11 @@ import java.util.UUID;
 class PaymentAttemptLeases {
 
     private final long leaseSeconds;
+    private final Clock clock;
 
-    PaymentAttemptLeases(@Value("${payment.attempt.lease-seconds:120}") long leaseSeconds) {
+    PaymentAttemptLeases(@Value("${payment.attempt.lease-seconds:120}") long leaseSeconds, Clock clock) {
         this.leaseSeconds = leaseSeconds;
+        this.clock = clock;
     }
 
     String acquireLease(PaymentAttemptEntity attempt, LocalDateTime now) {
@@ -68,6 +71,6 @@ class PaymentAttemptLeases {
     void clearLease(PaymentAttemptEntity attempt) {
         attempt.setLeaseOwner(null);
         attempt.setLeaseExpiresAt(null);
-        attempt.setUpdatedAt(LocalDateTime.now());
+        attempt.setUpdatedAt(LocalDateTime.now(clock));
     }
 }

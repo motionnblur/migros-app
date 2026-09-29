@@ -32,6 +32,13 @@ public class SupportChatWebSocketHandler extends TextWebSocketHandler {
     public static final String ATTR_USER_MAIL = "userMail";
     public static final String ATTR_IS_ADMIN = "isAdmin";
 
+    /**
+     * Realtime event type names. The client matches on these exact strings, so
+     * their values must never change.
+     */
+    public static final String EVENT_TYPE_SUPPORT_UPDATED = "SUPPORT_UPDATED";
+    public static final String EVENT_TYPE_SUPPORT_MESSAGE_CREATED = "SUPPORT_MESSAGE_CREATED";
+
     private static final Logger log = LoggerFactory.getLogger(SupportChatWebSocketHandler.class);
     private static final int SEND_TIME_LIMIT_MILLIS = 10_000;
     private static final int SEND_BUFFER_SIZE_LIMIT_BYTES = 512 * 1024;
@@ -73,11 +80,11 @@ public class SupportChatWebSocketHandler extends TextWebSocketHandler {
     }
 
     public void broadcastSupportUpdate(String userMail) {
-        sendToTargets(new SupportRealtimeEventDto("SUPPORT_UPDATED", userMail, null, null), userMail);
+        sendToTargets(new SupportRealtimeEventDto(EVENT_TYPE_SUPPORT_UPDATED, userMail, null, null), userMail);
     }
 
     public void broadcastSupportMessageCreated(String userMail, String sender, Long messageId) {
-        sendToTargets(new SupportRealtimeEventDto("SUPPORT_MESSAGE_CREATED", userMail, sender, messageId), userMail);
+        sendToTargets(new SupportRealtimeEventDto(EVENT_TYPE_SUPPORT_MESSAGE_CREATED, userMail, sender, messageId), userMail);
     }
 
     private void sendToTargets(SupportRealtimeEventDto event, String userMail) {
