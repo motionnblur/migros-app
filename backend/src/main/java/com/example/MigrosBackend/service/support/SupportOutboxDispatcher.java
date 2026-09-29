@@ -42,15 +42,30 @@ import java.util.UUID;
  * configured attempt count is therefore a logging threshold for operator
  * attention, not a delivery budget.
  *
- * <p>The HTTP client has finite connect and read timeouts, themselves shorter
- * than the delivery lease. Without them a single hung connection would keep the
- * lease far longer than intended, and the row would be reclaimed and delivered
- * again by another worker while the first request was still in flight.
+ * <p>The HTTP client has finite connect and read timeouts, and their
+ * <em>sum</em> is kept well inside the delivery lease. Without them a single
+ * hung connection would keep the lease far longer than intended, and the row
+ * would be reclaimed and delivered again by another worker while the first
+ * request was still in flight. The two budgets add up because a request spends
+ * the connect timeout before it can even start the read timeout.
+ *
+ * <p>Every decision that needs a timestamp reads the clock at the moment it is
+ * made, never once per batch. A batch is a sequence of independent deliveries,
+ * each with its own send, and a scan that times its claims against the instant
+ * it started hands every event a lease that is already partly spent by the
+ * events before it: the lease lapses while the request is still in flight, and
+ * the retry is scheduled from a timestamp the failure happened long after.
  */
 @Service
 public class SupportOutboxDispatcher {
 
     private static final Logger LOG = LoggerFactory.getLogger(SupportOutboxDispatcher.class);
+
+    /**
+     * Absolute floor for the headroom a lease keeps free for the completion
+     * write, so a short lease is not configured down to zero slack.
+     */
+    private static final long MIN_LEASE_MARGIN_MILLIS = 1_000L;
 
     private final SupportOutboxStore outboxStore;
     private final RestTemplate restTemplate;
@@ -60,6 +75,7 @@ public class SupportOutboxDispatcher {
     private final int escalationThreshold;
     private final Duration connectTimeout;
     private final Duration readTimeout;
+    private final long totalTimeoutMillis;
     private final long backoffBaseSeconds;
     private final long backoffMaxSeconds;
     private final int pageSize;
@@ -83,6 +99,8 @@ public class SupportOutboxDispatcher {
         this.leaseSeconds = requirePositive(leaseSeconds, "support.outbox.lease-seconds");
         this.connectTimeout = boundedTimeout(connectTimeoutMillis, "support.service.connect-timeout-ms");
         this.readTimeout = boundedTimeout(readTimeoutMillis, "support.service.read-timeout-ms");
+        this.totalTimeoutMillis = requireFitsInLease(
+                this.connectTimeout.toMillis() + this.readTimeout.toMillis());
         this.escalationThreshold = Math.max(1, escalationThreshold);
         this.restTemplate = supportServiceBaseUrl == null || supportServiceBaseUrl.isBlank()
                 ? null
@@ -125,12 +143,55 @@ public class SupportOutboxDispatcher {
         return timeout;
     }
 
+    /**
+     * Both timeouts have to fit in one lease together, and with room to spare.
+     *
+     * <p>Checking each of them against the lease separately accepts a
+     * configuration where neither is individually wrong and the pair is
+     * unusable: a request can burn the whole connect budget and then the whole
+     * read budget, because the read only starts once the connection is up. That
+     * total is what the lease has to absorb, so it is the total that is
+     * compared. A {@code 60s} connect plus a {@code 60s} read inside a
+     * {@code 120s} lease passes both individual checks and still leaves a
+     * request that outlives its lease.
+     *
+     * <p>The margin covers the work the lease does not measure: the completion
+     * update after the request returns, and the ordinary scheduling delay of a
+     * worker that is descheduled mid-send. Without it, a request that merely
+     * fits would still be reclaimed while the worker is recording the outcome.
+     */
+    private long requireFitsInLease(long combinedMillis) {
+        long leaseMillis = leaseSeconds * 1000L;
+        long margin = leaseMarginMillis();
+        if (combinedMillis + margin > leaseMillis) {
+            throw new IllegalStateException("support.service.connect-timeout-ms plus "
+                    + "support.service.read-timeout-ms (" + combinedMillis + "ms) must leave at least "
+                    + margin + "ms of the support.outbox.lease-seconds budget (" + leaseMillis + "ms): "
+                    + "a request can spend the connect timeout and then the read timeout, so the lease "
+                    + "has to cover their sum, not each of them on its own");
+        }
+        return combinedMillis;
+    }
+
+    /**
+     * Headroom kept free inside the lease: a tenth of it, and never less than a
+     * second so that a very short lease still has room for the completion write.
+     */
+    private long leaseMarginMillis() {
+        return Math.max(MIN_LEASE_MARGIN_MILLIS, leaseSeconds * 1000L / 10);
+    }
+
     long connectTimeoutMillis() {
         return connectTimeout.toMillis();
     }
 
     long readTimeoutMillis() {
         return readTimeout.toMillis();
+    }
+
+    /** The worst-case in-flight time of one delivery attempt. */
+    long totalTimeoutMillis() {
+        return totalTimeoutMillis;
     }
 
     /**
@@ -142,12 +203,13 @@ public class SupportOutboxDispatcher {
             return 0;
         }
 
-        LocalDateTime now = LocalDateTime.now(clock);
-        List<String> dueEventIds = outboxStore.findDue(pageSize, now);
+        // Only the scan is batched: it selects candidates once, and each claim
+        // is timed on its own below.
+        List<String> dueEventIds = outboxStore.findDue(pageSize, LocalDateTime.now(clock));
 
         int delivered = 0;
         for (String eventId : dueEventIds) {
-            if (deliverOnce(eventId, now)) {
+            if (deliverOnce(eventId)) {
                 delivered++;
             }
         }
@@ -159,12 +221,18 @@ public class SupportOutboxDispatcher {
      *
      * @return {@code true} only when this worker durably marked it delivered
      */
-    public boolean deliverOnce(String eventId, LocalDateTime now) {
+    public boolean deliverOnce(String eventId) {
+        // Timed here, not once per batch: a slow event earlier in the page can
+        // push this claim most of a lease into the past, and a lease that is
+        // already spent when it is taken is a lease another worker may reclaim
+        // while this request is still in flight.
+        LocalDateTime claimedAt = LocalDateTime.now(clock);
+
         // A fresh token per attempt: it is the fencing token that proves to the
         // completion update that this worker still owns the record.
         String leaseOwner = UUID.randomUUID().toString();
         Optional<SupportOutboxStore.ClaimedEvent> claimed =
-                outboxStore.tryClaim(eventId, leaseOwner, now, leaseSeconds);
+                outboxStore.tryClaim(eventId, leaseOwner, claimedAt, leaseSeconds);
         if (claimed.isEmpty()) {
             // Another worker holds a valid lease, or an earlier event for this
             // customer is still undelivered. Nothing to do; it stays queued.
@@ -175,7 +243,7 @@ public class SupportOutboxDispatcher {
         try {
             post(SupportOutboxEventType.valueOf(event.eventType()), event.payload());
         } catch (RuntimeException ex) {
-            recordFailure(event, leaseOwner, now, ex);
+            recordFailure(event, leaseOwner, ex);
             return false;
         }
 
@@ -191,10 +259,21 @@ public class SupportOutboxDispatcher {
         return transition == SupportOutboxStore.Transition.APPLIED;
     }
 
+    /**
+     * Reschedules a failed attempt, measured from the moment it actually
+     * failed.
+     *
+     * <p>Backoff has to start at the failure, not at the claim or at the start
+     * of the batch. Measured from an earlier timestamp it is already partly
+     * spent by the time it is written, so a send that took as long as its
+     * backoff is retried immediately - which is a tight retry loop against a
+     * receiver that is already refusing.
+     */
     private void recordFailure(SupportOutboxStore.ClaimedEvent event, String leaseOwner,
-                               LocalDateTime now, RuntimeException failure) {
+                               RuntimeException failure) {
+        LocalDateTime failedAt = LocalDateTime.now(clock);
         String errorCode = SupportOutboxStore.sanitizeError(failure);
-        LocalDateTime nextAttemptAt = now.plusSeconds(backoffSeconds(event.attemptCount()));
+        LocalDateTime nextAttemptAt = failedAt.plusSeconds(backoffSeconds(event.attemptCount()));
         outboxStore.scheduleRetry(event.eventId(), leaseOwner, errorCode, nextAttemptAt);
 
         // Event ids and error types only: the payload holds customer text.

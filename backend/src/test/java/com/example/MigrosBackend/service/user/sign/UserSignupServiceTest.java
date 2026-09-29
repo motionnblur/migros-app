@@ -29,6 +29,7 @@ import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.context.ConfigurationPropertiesAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.mail.MailSendException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.thymeleaf.context.Context;
 
@@ -293,6 +294,60 @@ class UserSignupServiceTest {
         assertThrows(MailSendingFailedException.class, () -> {
             userSignupService.signup(signupDto);
         });
+
+        String issuedToken = savedPendingToken();
+        verify(pendingSignupEntityRepository).deleteById(issuedToken);
+    }
+
+    /**
+     * Spring reports most mail failures unchecked.
+     *
+     * <p>{@code JavaMailSenderImpl.send} wraps an SMTP refusal in
+     * {@code MailSendException}, and an unassemblable message becomes a
+     * {@code MailPreparationException}; both are {@code MailException} and
+     * neither is a {@code MessagingException}. Catching only the checked
+     * exception let the most common failure of all escape as an unexpected
+     * runtime error, which skipped the revocation and left a confirmation token
+     * nobody ever received redeemable for its whole lifetime - while the caller
+     * saw a raw framework error instead of the mail-failure response.
+     */
+    @Test
+    void signup_RevokesTheCommittedTokenAndReportsTheMailFailure_WhenTheSenderFailsUnchecked()
+            throws MessagingException {
+        when(userEntityRepository.existsByUserMail(signupDto.getUserMail())).thenReturn(false);
+        when(passwordValidator.isPasswordStrongEnough(signupDto.getUserPassword())).thenReturn(true);
+        when(encryptService.getEncryptedPassword(anyString())).thenReturn("hashed_password");
+
+        doThrow(new MailSendException("SMTP connection refused"))
+                .when(mailService)
+                .sendMimeMessage(anyString(), anyString(), anyString(), any());
+
+        MailSendingFailedException failure = assertThrows(MailSendingFailedException.class,
+                () -> userSignupService.signup(signupDto));
+
+        assertEquals("Mail sending failed. Please try again later.", failure.getMessage(),
+                "an unchecked mail failure must produce the same response as a checked one");
+
+        String issuedToken = savedPendingToken();
+        verify(pendingSignupEntityRepository).deleteById(issuedToken);
+    }
+
+    @Test
+    void verifyUserMail_RevokesTheCommittedTokenAndReportsTheMailFailure_WhenTheSenderFailsUnchecked()
+            throws MessagingException {
+        when(userEntityRepository.findByUserMail(SIGNUP_EMAIL)).thenReturn(existingUser());
+
+        doThrow(new MailSendException("SMTP connection refused"))
+                .when(mailService)
+                .sendMimeMessage(anyString(), anyString(), anyString(), any());
+
+        MailSendingFailedException failure = assertThrows(MailSendingFailedException.class,
+                () -> userSignupService.verifyUserMail(SIGNUP_EMAIL));
+
+        assertEquals("Mail sending failed. Please try again later.", failure.getMessage());
+
+        String issuedToken = savedPendingToken();
+        verify(pendingSignupEntityRepository).deleteById(issuedToken);
     }
 
     @Test

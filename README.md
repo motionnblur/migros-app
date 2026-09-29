@@ -302,9 +302,15 @@ commit the populated copy. The template is enforced by
   sequence order really is commit order and a retry can never overtake an
   earlier undelivered event.
 * The outbound call uses finite connect and read timeouts
-  (`SUPPORT_SERVICE_CONNECT_TIMEOUT_MS`, `SUPPORT_SERVICE_READ_TIMEOUT_MS`) that
-  must stay below `SUPPORT_OUTBOX_LEASE_SECONDS`; startup fails otherwise,
-  because a delivery that outlives its lease is delivered twice at once.
+  (`SUPPORT_SERVICE_CONNECT_TIMEOUT_MS`, `SUPPORT_SERVICE_READ_TIMEOUT_MS`). They
+  are spent one after the other, so their sum must stay below
+  `SUPPORT_OUTBOX_LEASE_SECONDS` with a margin left for the completion update;
+  startup fails otherwise, because a delivery that outlives its lease is
+  delivered twice at once.
+* Each claim, retry and completion is timed by reading the clock at that moment,
+  not once per batch. A batch of due events is a sequence of independent sends,
+  so a lease or a backoff measured from the instant the scan started is already
+  spent by the time the event is claimed or rescheduled.
 * Stored payloads may contain customer message text: they are never logged and
   never exposed through the API.
 

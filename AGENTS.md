@@ -64,7 +64,12 @@ Backend packages follow a mostly standard layered layout:
     transactional and `PendingSignupStorage.store` commits on its own. A mail
     failure revokes the already-committed token with `deleteCommitted` and still
     reports `MailSendingFailedException`; a failing cleanup is logged, never the
-    token, and never replaces the reported failure.
+    token, and never replaces the reported failure. That revocation only happens
+    if the failure is translated, so the send must catch Spring's **unchecked**
+    `MailException` (`MailSendException` from an SMTP refusal,
+    `MailPreparationException` from an unassemblable message) alongside the
+    checked `MessagingException`. Catching only the checked one skips the
+    revocation and surfaces a raw framework error.
   - `PendingTokenPurpose` binds each token to one flow. `confirm` and
     `confirmUserMail` accept only `SIGNUP`; `resetPassword` accepts only
     `PASSWORD_RESET`. A mismatch is reported as "token not found" so a caller
@@ -103,9 +108,14 @@ Backend packages follow a mostly standard layered layout:
       threshold; `support.outbox.alert-after-attempts` only raises the log to
       ERROR. A terminal state would both lose the event and unblock the
       customer's queue behind it. V8 re-arms rows an earlier schema parked.
-    - The outbound HTTP call has finite connect/read timeouts that must stay
-      below the delivery lease; startup fails otherwise, because a delivery that
-      outlives its lease is delivered twice concurrently.
+    - The outbound HTTP call has finite connect/read timeouts. They are spent
+      one after the other, so their **sum** must stay below the delivery lease
+      with a margin for the completion update; startup fails otherwise, because
+      a delivery that outlives its lease is delivered twice concurrently. Each
+      claim and each retry is timed by reading the clock at that moment, never
+      once per batch: a batch is a sequence of independent sends, and a lease
+      measured from the start of the batch is already spent by the time the
+      event is claimed.
     - Stored payloads may contain customer message text: never log them and
       never expose them through the API. Retention deletes `DELIVERED` rows
       only.

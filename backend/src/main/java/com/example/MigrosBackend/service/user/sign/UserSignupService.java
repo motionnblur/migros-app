@@ -23,6 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.MailException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
@@ -230,13 +231,27 @@ public class UserSignupService {
         }
     }
 
+    /**
+     * Sends the link, translating every way the send can fail into the single
+     * exception the caller reports.
+     *
+     * <p>Spring's mail support reports most failures unchecked.
+     * {@code JavaMailSenderImpl.send} wraps an SMTP refusal in
+     * {@code MailSendException}, and a message it cannot even assemble becomes a
+     * {@code MailPreparationException}; both are {@link MailException} and
+     * neither is a {@code MessagingException}. Catching only the checked
+     * exception therefore let the common failure escape as an unexpected
+     * runtime error, which skipped the revocation in
+     * {@link #sendLinkOrRevoke} and left a credential nobody ever received
+     * redeemable for its whole lifetime.
+     */
     private void sendLink(String userMail, String link) {
         Context context = new Context();
         context.setVariable("confirmationLink", link);
 
         try {
             mailService.sendMimeMessage(userMail, "Welcome to Migros!", "confirmation-email", context);
-        } catch (MessagingException e) {
+        } catch (MessagingException | MailException e) {
             throw new MailSendingFailedException();
         }
     }
