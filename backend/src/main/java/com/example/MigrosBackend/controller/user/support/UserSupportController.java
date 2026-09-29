@@ -4,7 +4,7 @@ import com.example.MigrosBackend.config.security.AuthCookies;
 import com.example.MigrosBackend.dto.user.support.SupportMessageDto;
 import com.example.MigrosBackend.dto.user.support.SupportSendMessageDto;
 import com.example.MigrosBackend.helper.AuthTokenResolver;
-import com.example.MigrosBackend.service.support.SupportChatService;
+import com.example.MigrosBackend.service.support.UserSupportChatService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -20,26 +20,26 @@ import java.util.List;
 @RestController
 @RequestMapping("user/support")
 public class UserSupportController {
-    private final SupportChatService supportChatService;
+    private final UserSupportChatService userSupportChatService;
     private final AuthTokenResolver authTokenResolver;
 
     @Autowired
-    public UserSupportController(SupportChatService supportChatService, AuthTokenResolver authTokenResolver) {
-        this.supportChatService = supportChatService;
+    public UserSupportController(UserSupportChatService userSupportChatService, AuthTokenResolver authTokenResolver) {
+        this.userSupportChatService = userSupportChatService;
         this.authTokenResolver = authTokenResolver;
     }
 
     @GetMapping("messages")
     public ResponseEntity<List<SupportMessageDto>> getSupportMessages(
             @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
-        return ResponseEntity.ok(supportChatService.getMessagesForUser(authTokenResolver.requireToken(token)));
+        return ResponseEntity.ok(userSupportChatService.getMessagesForUser(authTokenResolver.requireToken(token)));
     }
 
     @PostMapping("send")
     public ResponseEntity<Void> sendSupportMessage(
             @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token,
             @Valid @RequestBody SupportSendMessageDto dto) {
-        supportChatService.addUserMessage(authTokenResolver.requireToken(token), dto.getMessage());
+        userSupportChatService.addUserMessage(authTokenResolver.requireToken(token), dto.getMessage());
         return ResponseEntity.ok().build();
     }
 }

@@ -1,13 +1,12 @@
 package com.example.MigrosBackend.entity.user;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.util.Objects;
 
 @Entity
-@Data
 @Getter
 @Setter
 @AllArgsConstructor
@@ -32,13 +31,31 @@ public class OrderEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_entity_id", referencedColumnName = "user_entity_id")
-    @JsonBackReference("user-orders")
     private UserEntity userEntity;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_group_entity_id", referencedColumnName = "order_group_entity_id")
-    @JsonBackReference("group-orders")
     private OrderGroupEntity orderGroup;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        OrderEntity other = (OrderEntity) o;
+        return id != null && id.equals(other.id);
+    }
+
+    @Override
+    public int hashCode() {
+        if (id == null) {
+            return System.identityHashCode(this);
+        }
+        return Objects.hash(getClass(), id);
+    }
 }
 
 

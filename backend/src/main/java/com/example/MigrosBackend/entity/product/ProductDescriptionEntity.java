@@ -1,11 +1,11 @@
 package com.example.MigrosBackend.entity.product;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.Objects;
+
 @Entity
-@Data
 @Getter
 @Setter
 @AllArgsConstructor
@@ -20,6 +20,25 @@ public class ProductDescriptionEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_entity_id", referencedColumnName = "product_entity_id")
-    @JsonBackReference
     private ProductEntity productEntity;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        ProductDescriptionEntity other = (ProductDescriptionEntity) o;
+        return id != null && id.equals(other.id);
+    }
+
+    @Override
+    public int hashCode() {
+        if (id == null) {
+            return System.identityHashCode(this);
+        }
+        return Objects.hash(getClass(), id);
+    }
 }

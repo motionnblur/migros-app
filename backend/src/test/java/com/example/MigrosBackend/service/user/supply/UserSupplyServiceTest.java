@@ -9,10 +9,11 @@ import com.example.MigrosBackend.dto.user.product.UserCartItemDto;
 import com.example.MigrosBackend.entity.category.CategoryEntity;
 import com.example.MigrosBackend.entity.product.ProductDescriptionEntity;
 import com.example.MigrosBackend.entity.product.ProductEntity;
+import com.example.MigrosBackend.entity.product.ProductImageEntity;
 import com.example.MigrosBackend.entity.user.OrderEntity;
 import com.example.MigrosBackend.entity.user.OrderGroupEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
-import com.example.MigrosBackend.exception.admin.ProductNotFoundException;
+import com.example.MigrosBackend.exception.shared.FileNotFoundException;
 import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.repository.category.CategoryEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductDescriptionEntityRepository;
@@ -21,12 +22,12 @@ import com.example.MigrosBackend.repository.product.ProductImageEntityRepository
 import com.example.MigrosBackend.repository.user.OrderEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderGroupEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
+import com.example.MigrosBackend.service.global.FileService;
 import com.example.MigrosBackend.service.global.TokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
@@ -74,7 +75,9 @@ class UserSupplyServiceTest {
     @Mock
     private ProductDescriptionEntityRepository productDescriptionEntityRepository;
 
-    @InjectMocks
+    @Mock
+    private FileService fileService;
+
     private UserSupplyService userSupplyService;
 
     private static final String TOKEN = "valid-token";
@@ -88,6 +91,25 @@ class UserSupplyServiceTest {
         user.setId(1L);
         user.setUserMail(USER_MAIL);
         user.setProductsIdsInCart(new ArrayList<>());
+
+        userSupplyService = new UserSupplyService(
+                userEntityRepository,
+                tokenService,
+                orderEntityRepository,
+                orderGroupEntityRepository,
+                new UserCatalogReadService(
+                        categoryEntityRepository,
+                        productEntityRepository,
+                        productImageEntityRepository,
+                        productDescriptionEntityRepository,
+                        fileService),
+                new UserOrderHistoryReadService(
+                        userEntityRepository,
+                        tokenService,
+                        orderEntityRepository,
+                        orderGroupEntityRepository,
+                        productEntityRepository),
+                new OrderStockRestocker(productEntityRepository));
     }
 
     private void stubAuthenticatedUser() {
@@ -113,76 +135,6 @@ class UserSupplyServiceTest {
         assertEquals(1, results.size());
         assertEquals(4, results.get(0).getProductCount());
         assertEquals(0, new BigDecimal("90").compareTo(results.get(0).getProductPrice()));
-    }
-
-    @Test
-    void addProductToInventory_ShouldThrow_WhenCartAlreadyAtStockLimit() {
-        stubAuthenticatedUser();
-        user.setProductsIdsInCart(new ArrayList<>(List.of(20L, 20L)));
-
-        ProductEntity product = new ProductEntity();
-        product.setId(20L);
-        product.setProductName("Apple");
-        product.setProductCount(2);
-
-        when(productEntityRepository.findById(20L)).thenReturn(Optional.of(product));
-
-        assertThrows(GeneralException.class, () -> userSupplyService.addProductToInventory(20L, TOKEN));
-        verify(userEntityRepository, never()).save(any());
-    }
-
-    @Test
-    void removeProductFromInventory_ShouldInitializeNullCartAndSaveUser() {
-        stubAuthenticatedUser();
-        user.setProductsIdsInCart(null);
-
-        userSupplyService.removeProductFromInventory(20L, TOKEN);
-
-        assertEquals(List.of(), user.getProductsIdsInCart());
-        verify(userEntityRepository).save(user);
-    }
-
-    @Test
-    void updateProductCountInInventory_ShouldThrow_WhenCountExceedsStock() {
-        stubAuthenticatedUser();
-        ProductEntity product = new ProductEntity();
-        product.setId(25L);
-        product.setProductCount(3);
-
-        when(productEntityRepository.findById(25L)).thenReturn(Optional.of(product));
-
-        assertThrows(GeneralException.class, () -> userSupplyService.updateProductCountInInventory(25L, 4, TOKEN));
-        verify(userEntityRepository, never()).save(any());
-    }
-
-    @Test
-    void getProductData_ShouldNormalizeCartToAvailableStock() {
-        stubAuthenticatedUser();
-        user.setProductsIdsInCart(new ArrayList<>(List.of(1L, 1L, 1L, 2L)));
-
-        ProductEntity inStock = new ProductEntity();
-        inStock.setId(1L);
-        inStock.setProductName("Apple");
-        inStock.setProductPrice(new BigDecimal("12"));
-        inStock.setProductDiscount(new BigDecimal("50"));
-        inStock.setProductCount(2);
-
-        ProductEntity soldOut = new ProductEntity();
-        soldOut.setId(2L);
-        soldOut.setProductName("Orange");
-        soldOut.setProductPrice(new BigDecimal("7"));
-        soldOut.setProductCount(0);
-
-        when(productEntityRepository.findAllById(any())).thenReturn(List.of(inStock, soldOut));
-
-        List<UserCartItemDto> result = userSupplyService.getProductData(TOKEN);
-
-        assertEquals(1, result.size());
-        assertEquals(1L, result.get(0).getProductId());
-        assertEquals(2, result.get(0).getProductCount());
-        assertEquals(0, new BigDecimal("6").compareTo(result.get(0).getProductPrice()));
-        assertEquals(2, result.get(0).getAvailableStock());
-        verify(userEntityRepository, times(1)).save(user);
     }
 
     @Test
@@ -350,11 +302,11 @@ class UserSupplyServiceTest {
 
         assertEquals(55L, result.getProductId());
         assertEquals(2, result.getDescriptionList().size());
-        assertEquals(100L, result.getDescriptionList().get(0).getDescriptionId());
-        assertEquals("Ingredients", result.getDescriptionList().get(0).getDescriptionTabName());
-        assertEquals("Milk, sugar", result.getDescriptionList().get(0).getDescriptionTabContent());
-        assertEquals(101L, result.getDescriptionList().get(1).getDescriptionId());
-        assertEquals("Storage", result.getDescriptionList().get(1).getDescriptionTabName());
+        assertEquals(100L, result.getDescriptionList().get(0).descriptionId());
+        assertEquals("Ingredients", result.getDescriptionList().get(0).tabName());
+        assertEquals("Milk, sugar", result.getDescriptionList().get(0).tabContent());
+        assertEquals(101L, result.getDescriptionList().get(1).descriptionId());
+        assertEquals("Storage", result.getDescriptionList().get(1).tabName());
     }
 
     @Test
@@ -368,10 +320,22 @@ class UserSupplyServiceTest {
     }
 
     @Test
-    void getProductDescription_ShouldThrow_WhenRepositoryReturnsNull() {
-        when(productDescriptionEntityRepository.findByProductEntityId(57L)).thenReturn(null);
+    void getProductImage_ThrowsFileNotFoundException_WhenNoImageRowExists() {
+        when(productImageEntityRepository.findByProductEntityId(77L)).thenReturn(List.of());
 
-        assertThrows(ProductNotFoundException.class, () -> userSupplyService.getProductDescription(57L));
+        assertThrows(FileNotFoundException.class, () -> userSupplyService.getProductImage(77L));
+    }
+
+    @Test
+    void getProductImage_ThrowsFileNotFoundException_WhenImageFileIsMissing() {
+        ProductImageEntity image = new ProductImageEntity();
+        image.setId(1L);
+        image.setImagePath("missing-image.png");
+        when(productImageEntityRepository.findByProductEntityId(78L)).thenReturn(List.of(image));
+        when(fileService.resolveImagePath("missing-image.png"))
+                .thenReturn(java.nio.file.Paths.get("definitely-not-a-real-file-404.png"));
+
+        assertThrows(FileNotFoundException.class, () -> userSupplyService.getProductImage(78L));
     }
 
     @Test

@@ -60,8 +60,9 @@ class PaymentAttemptServiceTest {
     @BeforeEach
     void setUp() {
         paymentAttemptService = new PaymentAttemptService(
-                tokenService, userEntityRepository, checkoutEntityRepository,
-                paymentAttemptEntityRepository, checkoutService, 120);
+                checkoutEntityRepository, paymentAttemptEntityRepository, checkoutService,
+                new PaymentAttemptLeases(120),
+                new PaymentUserResolver(tokenService, userEntityRepository));
         user = new UserEntity();
         user.setId(USER_ID);
         user.setUserMail(EMAIL);

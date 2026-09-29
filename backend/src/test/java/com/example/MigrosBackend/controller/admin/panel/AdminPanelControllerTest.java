@@ -2,20 +2,22 @@ package com.example.MigrosBackend.controller.admin.panel;
 
 import com.example.MigrosBackend.dto.admin.panel.AdminAddItemDto;
 import com.example.MigrosBackend.dto.admin.panel.AdminProductPreviewDto;
+import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionTabDto;
 import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionListDto;
-import com.example.MigrosBackend.dto.admin.panel.ProductDto2;
 import com.example.MigrosBackend.dto.order.OrderDto;
 import com.example.MigrosBackend.dto.order.OrderPageDto;
 import com.example.MigrosBackend.dto.user.UserProfileTableDto;
+import com.example.MigrosBackend.dto.user.product.ProductDetailDto;
 import com.example.MigrosBackend.dto.user.product.ProductDto;
 import com.example.MigrosBackend.exception.shared.GeneralException;
-import com.example.MigrosBackend.service.admin.supply.AdminSupplyService;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
+import com.example.MigrosBackend.service.admin.supply.AdminOrderService;
+import com.example.MigrosBackend.service.admin.supply.AdminSupplyService;
 import com.example.MigrosBackend.service.global.TokenService;
-import com.example.MigrosBackend.service.user.supply.UserOrderService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -27,10 +29,12 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 import java.math.BigDecimal;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -45,7 +49,7 @@ class AdminPanelControllerTest {
     private AdminSupplyService adminSupplyService;
 
     @MockBean
-    private UserOrderService userOrderService;
+    private AdminOrderService adminOrderService;
 
     @MockBean
     private AdminEntityRepository adminEntityRepository;
@@ -115,7 +119,7 @@ class AdminPanelControllerTest {
 
     @Test
     void getProductData_shouldReturnOk() throws Exception {
-        ProductDto2 productDto2 = new ProductDto2();
+        ProductDetailDto productDto2 = new ProductDetailDto();
         when(adminSupplyService.getProductData(anyLong())).thenReturn(productDto2);
 
         mockMvc.perform(get("/admin/panel/getProductData")
@@ -223,7 +227,7 @@ class AdminPanelControllerTest {
         pageDto.setItems(List.of(order));
         pageDto.setTotal(1);
 
-        when(userOrderService.getAllOrders(anyInt(), anyInt())).thenReturn(pageDto);
+        when(adminOrderService.getAllOrders(anyInt(), anyInt())).thenReturn(pageDto);
 
         mockMvc.perform(get("/admin/panel/getAllOrders")
                         .param("page", "0")
@@ -235,7 +239,7 @@ class AdminPanelControllerTest {
     @Test
     void getUserProfileData_shouldReturnOk() throws Exception {
         UserProfileTableDto profile = new UserProfileTableDto();
-        when(userOrderService.getUserProfileData(anyLong())).thenReturn(profile);
+        when(adminOrderService.getUserProfileData(anyLong())).thenReturn(profile);
 
         mockMvc.perform(get("/admin/panel/getUserProfileData")
                         .param("orderId", "1"))
@@ -304,5 +308,72 @@ class AdminPanelControllerTest {
                         .param("categoryValue", "1"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    void getProductData_jsonShapeIsFrozen() throws Exception {
+        ProductDetailDto product = new ProductDetailDto();
+        product.setProductName("Organic Honey");
+        product.setSubCategoryName("Sweeteners");
+        product.setProductPrice(new BigDecimal("15.50"));
+        product.setProductCount(100);
+        product.setProductDiscount(new BigDecimal("10.0"));
+        product.setProductDescription("Pure natural honey.");
+        product.setProductCategoryId(5);
+
+        when(adminSupplyService.getProductData(anyLong())).thenReturn(product);
+
+        String expectedJson = "{\"productName\":\"Organic Honey\",\"subCategoryName\":\"Sweeteners\","
+                + "\"productPrice\":15.50,\"productCount\":100,\"productDiscount\":10.0,"
+                + "\"productDescription\":\"Pure natural honey.\",\"productCategoryId\":5}";
+
+        mockMvc.perform(get("/admin/panel/getProductData")
+                        .param("productId", "50"))
+                .andExpect(status().isOk())
+                .andExpect(content().json(expectedJson, true));
+    }
+
+    @Test
+    void addProductDescription_requestShapeIsFrozen() throws Exception {
+        String requestJson = "{\"productId\":50,\"descriptionList\":["
+                + "{\"descriptionId\":101,\"descriptionTabName\":\"Ingredients\","
+                + "\"descriptionTabContent\":\"Sugar, Spice, Everything Nice\"}]}";
+
+        mockMvc.perform(post("/admin/panel/addProductDescription")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<ProductDescriptionListDto> captor = ArgumentCaptor.forClass(ProductDescriptionListDto.class);
+        verify(adminSupplyService).addProductDescription(captor.capture());
+        ProductDescriptionListDto captured = captor.getValue();
+        assertEquals(50L, captured.getProductId());
+        assertEquals(1, captured.getDescriptionList().size());
+        assertEquals(101L, captured.getDescriptionList().get(0).descriptionId());
+        assertEquals("Ingredients", captured.getDescriptionList().get(0).tabName());
+        assertEquals("Sugar, Spice, Everything Nice", captured.getDescriptionList().get(0).tabContent());
+    }
+
+    @Test
+    void getProductDescription_jsonShapeIsFrozen() throws Exception {
+        ProductDescriptionTabDto desc1 = new ProductDescriptionTabDto(101L, "Ingredients", "Sugar, Spice, Everything Nice");
+        ProductDescriptionTabDto desc2 = new ProductDescriptionTabDto(102L, "Storage", "<p>Keep dry</p>");
+
+        ProductDescriptionListDto resultDto = new ProductDescriptionListDto();
+        resultDto.setProductId(50L);
+        resultDto.setDescriptionList(List.of(desc1, desc2));
+
+        when(adminSupplyService.getProductDescription(anyLong())).thenReturn(resultDto);
+
+        String expectedJson = "{\"productId\":50,\"descriptionList\":["
+                + "{\"descriptionId\":101,\"descriptionTabName\":\"Ingredients\","
+                + "\"descriptionTabContent\":\"Sugar, Spice, Everything Nice\"},"
+                + "{\"descriptionId\":102,\"descriptionTabName\":\"Storage\","
+                + "\"descriptionTabContent\":\"<p>Keep dry</p>\"}]}";
+
+        mockMvc.perform(get("/admin/panel/getProductDescription")
+                        .param("productId", "50"))
+                .andExpect(status().isOk())
+                .andExpect(content().json(expectedJson, true));
     }
 }

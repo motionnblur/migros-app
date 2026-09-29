@@ -1,18 +1,20 @@
 package com.example.MigrosBackend.controller.user.supply;
 
 import com.example.MigrosBackend.config.security.AuthCookies;
-import com.example.MigrosBackend.dto.admin.panel.DescriptionsDto;
+import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionTabDto;
 import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionListDto;
-import com.example.MigrosBackend.dto.admin.panel.ProductDto2;
 import com.example.MigrosBackend.dto.user.category.SubCategoryDto;
 import com.example.MigrosBackend.dto.user.order.UserOrderDetailDto;
 import com.example.MigrosBackend.dto.user.order.UserOrderGroupDto;
+import com.example.MigrosBackend.dto.user.product.ProductDetailDto;
 import com.example.MigrosBackend.dto.user.product.ProductPreviewDto;
 import com.example.MigrosBackend.dto.user.product.UserCartItemDto;
+import com.example.MigrosBackend.exception.shared.FileNotFoundException;
 import com.example.MigrosBackend.exception.shared.TokenNotFoundException;
 import com.example.MigrosBackend.helper.AuthTokenResolver;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
+import com.example.MigrosBackend.service.user.supply.UserCartService;
 import com.example.MigrosBackend.service.user.supply.UserSupplyService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
@@ -47,6 +49,9 @@ class UserSupplyControllerTest {
 
     @MockBean
     private UserSupplyService userSupplyService;
+
+    @MockBean
+    private UserCartService userCartService;
 
     @MockBean
     private AuthTokenResolver authTokenResolver;
@@ -102,16 +107,25 @@ class UserSupplyControllerTest {
     }
 
     @Test
+    void getProductImage_shouldReturnNotFound_whenImageIsMissing() throws Exception {
+        when(userSupplyService.getProductImage(999L)).thenThrow(new FileNotFoundException());
+
+        mockMvc.perform(get("/user/supply/getProductImage")
+                        .param("productId", "999"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void addProductToUserCart_shouldReturnOk() throws Exception {
         when(authTokenResolver.requireToken(SESSION_TOKEN)).thenReturn(SESSION_TOKEN);
-        doNothing().when(userSupplyService).addProductToInventory(1L, SESSION_TOKEN);
+        doNothing().when(userCartService).addProductToCart(1L, SESSION_TOKEN);
 
         mockMvc.perform(post("/user/supply/addProductToUserCart")
                         .param("productId", "1")
                         .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, SESSION_TOKEN)))
                 .andExpect(status().isOk());
 
-        verify(userSupplyService).addProductToInventory(1L, SESSION_TOKEN);
+        verify(userCartService).addProductToCart(1L, SESSION_TOKEN);
     }
 
     @Test
@@ -121,7 +135,7 @@ class UserSupplyControllerTest {
                         .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, SESSION_TOKEN)))
                 .andExpect(status().isMethodNotAllowed());
 
-        verify(userSupplyService, never()).addProductToInventory(anyLong(), anyString());
+        verify(userCartService, never()).addProductToCart(anyLong(), anyString());
     }
 
     @Test
@@ -136,14 +150,14 @@ class UserSupplyControllerTest {
     @Test
     void removeProductFromUserCart_shouldReturnOk() throws Exception {
         when(authTokenResolver.requireToken(SESSION_TOKEN)).thenReturn(SESSION_TOKEN);
-        doNothing().when(userSupplyService).removeProductFromInventory(1L, SESSION_TOKEN);
+        doNothing().when(userCartService).removeProductFromCart(1L, SESSION_TOKEN);
 
         mockMvc.perform(delete("/user/supply/removeProductFromUserCart")
                         .param("productId", "1")
                         .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, SESSION_TOKEN)))
                 .andExpect(status().isOk());
 
-        verify(userSupplyService).removeProductFromInventory(1L, SESSION_TOKEN);
+        verify(userCartService).removeProductFromCart(1L, SESSION_TOKEN);
     }
 
     @Test
@@ -292,7 +306,7 @@ class UserSupplyControllerTest {
         List<UserCartItemDto> cartItems = List.of(item1, item2);
 
         when(authTokenResolver.requireToken(SESSION_TOKEN)).thenReturn(SESSION_TOKEN);
-        when(userSupplyService.getProductData(SESSION_TOKEN)).thenReturn(cartItems);
+        when(userCartService.getCartData(SESSION_TOKEN)).thenReturn(cartItems);
 
         mockMvc.perform(get("/user/supply/getProductData")
                         .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, SESSION_TOKEN))
@@ -306,14 +320,14 @@ class UserSupplyControllerTest {
                 .andExpect(jsonPath("$[1].productId").value(102))
                 .andExpect(jsonPath("$[1].productName").value("Bread"));
 
-        verify(userSupplyService, times(1)).getProductData(SESSION_TOKEN);
+        verify(userCartService, times(1)).getCartData(SESSION_TOKEN);
     }
 
     @Test
     void getProductDataWithProductId_ShouldReturnProduct() throws Exception {
         Long productId = 50L;
 
-        ProductDto2 mockProduct = new ProductDto2();
+        ProductDetailDto mockProduct = new ProductDetailDto();
         mockProduct.setProductName("Organic Honey");
         mockProduct.setSubCategoryName("Sweeteners");
         mockProduct.setProductPrice(new BigDecimal("15.50"));
@@ -341,7 +355,7 @@ class UserSupplyControllerTest {
     void getProductDescription_ShouldReturnNestedDescriptions() throws Exception {
         Long productId = 50L;
 
-        DescriptionsDto desc1 = new DescriptionsDto(101L, "Ingredients", "Sugar, Spice, Everything Nice");
+        ProductDescriptionTabDto desc1 = new ProductDescriptionTabDto(101L, "Ingredients", "Sugar, Spice, Everything Nice");
 
         ProductDescriptionListDto resultDto = new ProductDescriptionListDto();
         resultDto.setProductId(productId);
@@ -367,7 +381,7 @@ class UserSupplyControllerTest {
         int count = 5;
 
         when(authTokenResolver.requireToken(SESSION_TOKEN)).thenReturn(SESSION_TOKEN);
-        doNothing().when(userSupplyService).updateProductCountInInventory(productId, count, SESSION_TOKEN);
+        doNothing().when(userCartService).updateProductCountInCart(productId, count, SESSION_TOKEN);
 
         mockMvc.perform(post("/user/supply/updateProductCountInUserCart")
                         .param("productId", productId.toString())
@@ -376,7 +390,7 @@ class UserSupplyControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk());
 
-        verify(userSupplyService, times(1)).updateProductCountInInventory(productId, count, SESSION_TOKEN);
+        verify(userCartService, times(1)).updateProductCountInCart(productId, count, SESSION_TOKEN);
     }
 
     @Test
@@ -387,7 +401,7 @@ class UserSupplyControllerTest {
                         .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, SESSION_TOKEN)))
                 .andExpect(status().isMethodNotAllowed());
 
-        verify(userSupplyService, never()).updateProductCountInInventory(anyLong(), anyInt(), anyString());
+        verify(userCartService, never()).updateProductCountInCart(anyLong(), anyInt(), anyString());
     }
 
     @Test
@@ -445,6 +459,58 @@ class UserSupplyControllerTest {
                         .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, SESSION_TOKEN)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].orderGroupId").value(10));
+    }
+
+    @Test
+    void getProductDataWithProductId_jsonShapeIsFrozen() throws Exception {
+        Long productId = 50L;
+
+        ProductDetailDto product = new ProductDetailDto();
+        product.setProductName("Organic Honey");
+        product.setSubCategoryName("Sweeteners");
+        product.setProductPrice(new BigDecimal("15.50"));
+        product.setProductCount(100);
+        product.setProductDiscount(new BigDecimal("10.0"));
+        product.setProductDescription("Pure natural honey.");
+        product.setProductCategoryId(5);
+
+        when(userSupplyService.getProductData(productId)).thenReturn(product);
+
+        String expectedJson = "{\"productName\":\"Organic Honey\",\"subCategoryName\":\"Sweeteners\","
+                + "\"productPrice\":15.50,\"productCount\":100,\"productDiscount\":10.0,"
+                + "\"productDescription\":\"Pure natural honey.\",\"productCategoryId\":5}";
+
+        mockMvc.perform(get("/user/supply/getProductDataWithProductId")
+                        .param("productId", productId.toString())
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(content().json(expectedJson, true));
+    }
+
+    @Test
+    void getProductDescription_jsonShapeIsFrozen() throws Exception {
+        Long productId = 50L;
+
+        ProductDescriptionTabDto desc1 = new ProductDescriptionTabDto(101L, "Ingredients", "Sugar, Spice, Everything Nice");
+        ProductDescriptionTabDto desc2 = new ProductDescriptionTabDto(102L, "Storage", "<p>Keep dry</p>");
+
+        ProductDescriptionListDto resultDto = new ProductDescriptionListDto();
+        resultDto.setProductId(productId);
+        resultDto.setDescriptionList(List.of(desc1, desc2));
+
+        when(userSupplyService.getProductDescription(productId)).thenReturn(resultDto);
+
+        String expectedJson = "{\"productId\":50,\"descriptionList\":["
+                + "{\"descriptionId\":101,\"descriptionTabName\":\"Ingredients\","
+                + "\"descriptionTabContent\":\"Sugar, Spice, Everything Nice\"},"
+                + "{\"descriptionId\":102,\"descriptionTabName\":\"Storage\","
+                + "\"descriptionTabContent\":\"<p>Keep dry</p>\"}]}";
+
+        mockMvc.perform(get("/user/supply/getProductDescription")
+                        .param("productId", productId.toString())
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(content().json(expectedJson, true));
     }
 }
 

@@ -7,6 +7,8 @@ import com.example.MigrosBackend.dto.error.ValidationErrorDto;
 import com.example.MigrosBackend.dto.payment.CheckoutConflictDto;
 import jakarta.mail.MessagingException;
 import jakarta.validation.ConstraintViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,12 +17,17 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 
 import java.util.List;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
     @ExceptionHandler(GeneralException.class)
     public ResponseEntity<String> handleGeneralException(GeneralException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
@@ -38,6 +45,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MailSendingFailedException.class)
     public ResponseEntity<String> handleMailSendingFailed(MailSendingFailedException ex) {
+        log.error("Mail sending failed", ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ex.getMessage());
     }
 
@@ -48,6 +56,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(UserAlreadyExistsException.class)
     public ResponseEntity<String> handleUserAlreadyExists(UserAlreadyExistsException ex) {
+        logClientError(ex);
         return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
     }
 
@@ -63,11 +72,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(WrongPasswordException.class)
     public ResponseEntity<String> handleWrongPassword(WrongPasswordException ex) {
+        logClientError(ex);
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ex.getMessage());
     }
 
     @ExceptionHandler(MessagingException.class)
     public ResponseEntity<String> handleMessaging(MessagingException ex) {
+        log.error("Messaging failure", ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Failed to send email.");
     }
 
@@ -83,6 +94,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(FileUploadFailedException.class)
     public ResponseEntity<String> handleFileUploadFailed(FileUploadFailedException ex) {
+        log.error("File upload failed", ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ex.getMessage());
     }
 
@@ -108,11 +120,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(InvalidTokenException.class)
     public ResponseEntity<String> handleInvalidToken(InvalidTokenException ex) {
+        logClientError(ex);
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ex.getMessage());
     }
 
     @ExceptionHandler(SupportSyncConflictException.class)
     public ResponseEntity<String> handleSupportSyncConflict(SupportSyncConflictException ex) {
+        logClientError(ex);
         return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
     }
 
@@ -133,6 +147,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(CheckoutConflictException.class)
     public ResponseEntity<CheckoutConflictDto> handleCheckoutConflict(CheckoutConflictException ex) {
+        logClientError(ex);
         CheckoutConflictDto body = new CheckoutConflictDto(
                 ex.getCode(),
                 ex.getMessage(),
@@ -144,6 +159,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(CheckoutStateException.class)
     public ResponseEntity<CheckoutConflictDto> handleCheckoutState(CheckoutStateException ex) {
+        logClientError(ex);
         CheckoutConflictDto body = new CheckoutConflictDto(
                 "CHECKOUT_CONFLICT",
                 ex.getMessage(),
@@ -155,6 +171,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(PaymentStateException.class)
     public ResponseEntity<String> handlePaymentState(PaymentStateException ex) {
+        logClientError(ex);
         return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
     }
 
@@ -235,11 +252,24 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ValidationErrorDto> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+        logClientError(ex);
         ValidationErrorDto body = new ValidationErrorDto(
                 "DATA_INTEGRITY_VIOLATION",
                 "Request conflicts with the current state of the resource",
                 HttpStatus.CONFLICT.value(),
                 null);
         return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
+    private static void logClientError(Throwable ex) {
+        log.warn("{} at {}", ex.getClass().getSimpleName(), requestPath());
+    }
+
+    private static String requestPath() {
+        RequestAttributes attributes = RequestContextHolder.getRequestAttributes();
+        if (attributes instanceof ServletRequestAttributes servletAttributes) {
+            return servletAttributes.getRequest().getRequestURI();
+        }
+        return "unknown";
     }
 }

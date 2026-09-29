@@ -169,7 +169,9 @@ class SupportOutboxPostgresTest {
     @Autowired
     private SupportMessageEntityRepository supportMessageEntityRepository;
     @Autowired
-    private SupportChatService supportChatService;
+    private UserSupportChatService userSupportChatService;
+    @Autowired
+    private SupportModerationService supportModerationService;
     @Autowired
     private SupportOutboxDispatcher dispatcher;
     @Autowired
@@ -476,8 +478,8 @@ class SupportOutboxPostgresTest {
                 .findByUserMailOrderByCreatedAtAscIdAsc(MAIL).get(0).getId();
         assertEquals(1, dispatcher.deliverDueEvents());
 
-        supportChatService.editMessageForAdmin(MAIL, messageId, "edited");
-        supportChatService.deleteMessageForAdmin(MAIL, messageId);
+        supportModerationService.editMessageForAdmin(MAIL, messageId, "edited");
+        supportModerationService.deleteMessageForAdmin(MAIL, messageId);
 
         assertEquals(2, pendingCount());
         assertEquals(1, dispatcher.deliverDueEvents());
@@ -499,12 +501,13 @@ class SupportOutboxPostgresTest {
         legacy.setUserMail(MAIL);
         legacy.setSender("MANAGEMENT");
         legacy.setMessage("legacy");
+        legacy.setCreatedAt(LocalDateTime.now());
         supportMessageEntityRepository.saveAndFlush(legacy);
 
         // A legacy management message has no external id, so the admin delete
         // path fails after the row change is staged.
         RuntimeException failure = assertThrows(RuntimeException.class,
-                () -> supportChatService.deleteMessageForAdmin(MAIL, legacy.getId()));
+                () -> supportModerationService.deleteMessageForAdmin(MAIL, legacy.getId()));
         assertTrue(failure.getMessage().contains("legacy"), failure.getMessage());
 
         assertEquals(0, pendingCount(),
@@ -547,7 +550,7 @@ class SupportOutboxPostgresTest {
         Future<?> secondWrite;
         try {
             firstWrite = pool.submit(() -> inTransaction(() -> {
-                supportChatService.addUserMessage(token, "first");
+                userSupportChatService.addUserMessage(token, "first");
                 firstWriteStored.countDown();
                 await(releaseFirstWrite);
                 return null;
@@ -555,7 +558,7 @@ class SupportOutboxPostgresTest {
             assertTrue(firstWriteStored.await(30, TimeUnit.SECONDS),
                     "the first write must insert its event before the second one starts");
 
-            secondWrite = pool.submit(() -> supportChatService.addUserMessage(token, "second"));
+            secondWrite = pool.submit(() -> userSupportChatService.addUserMessage(token, "second"));
             assertTrue(blocksOn(secondWrite),
                     "a second write for the same customer must not be able to take a sequence number "
                             + "while an earlier one is still uncommitted; that is exactly how sequence "
@@ -616,7 +619,7 @@ class SupportOutboxPostgresTest {
 
     private void sendUserMessageFor(String mail, String message) {
         ensureUser(mail);
-        supportChatService.addUserMessage(tokenService.generateUserToken(mail), message);
+        userSupportChatService.addUserMessage(tokenService.generateUserToken(mail), message);
     }
 
     private void ensureUser(String mail) {

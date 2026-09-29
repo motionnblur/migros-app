@@ -1,39 +1,46 @@
-package com.example.MigrosBackend.service.user.supply;
+package com.example.MigrosBackend.service.admin.supply;
 
+import com.example.MigrosBackend.dto.order.OrderDto;
+import com.example.MigrosBackend.dto.order.OrderPageDto;
 import com.example.MigrosBackend.entity.user.OrderEntity;
 import com.example.MigrosBackend.entity.user.OrderGroupEntity;
 import com.example.MigrosBackend.exception.admin.OrderNotFoundException;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
+import com.example.MigrosBackend.repository.user.AdminOrderRow;
 import com.example.MigrosBackend.repository.user.OrderEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderGroupEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
-import com.example.MigrosBackend.service.global.TokenService;
+import com.example.MigrosBackend.service.user.supply.OrderStockRestocker;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class UserOrderServiceTest {
-    @Mock
-    private TokenService tokenService;
-
+class AdminOrderServiceTest {
     @Mock
     private UserEntityRepository userEntityRepository;
 
@@ -46,8 +53,16 @@ class UserOrderServiceTest {
     @Mock
     private ProductEntityRepository productEntityRepository;
 
-    @InjectMocks
-    private UserOrderService userOrderService;
+    private AdminOrderService adminOrderService;
+
+    @BeforeEach
+    void setUp() {
+        adminOrderService = new AdminOrderService(
+                userEntityRepository,
+                orderEntityRepository,
+                orderGroupEntityRepository,
+                new OrderStockRestocker(productEntityRepository));
+    }
 
     @Test
     void deleteOrder_LocksTheGroupBeforeReadingItsStatusAndRestocksAtomically() {
@@ -66,7 +81,7 @@ class UserOrderServiceTest {
         when(orderGroupEntityRepository.findByIdForUpdate(200L)).thenReturn(Optional.of(group));
         when(orderEntityRepository.findByOrderGroup_Id(200L)).thenReturn(List.of(itemB, itemA));
 
-        userOrderService.deleteOrder(200L);
+        adminOrderService.deleteOrder(200L);
 
         // One atomic statement per product, applied in ascending product id so
         // overlapping orders always take the same lock order.
@@ -92,7 +107,7 @@ class UserOrderServiceTest {
         when(orderGroupEntityRepository.findByIdForUpdate(201L)).thenReturn(Optional.of(group));
         when(orderEntityRepository.findByOrderGroup_Id(201L)).thenReturn(List.of(itemA));
 
-        userOrderService.deleteOrder(201L);
+        adminOrderService.deleteOrder(201L);
 
         verify(productEntityRepository, never()).incrementStock(any(), anyInt());
         verify(productEntityRepository, never()).save(any());
@@ -111,7 +126,7 @@ class UserOrderServiceTest {
         when(orderGroupEntityRepository.findByIdForUpdate(300L)).thenReturn(Optional.empty());
         when(orderEntityRepository.findByIdAndOrderGroupIsNullForUpdate(300L)).thenReturn(Optional.of(legacyOrder));
 
-        userOrderService.deleteOrder(300L);
+        adminOrderService.deleteOrder(300L);
 
         verify(productEntityRepository).incrementStock(31L, 4);
         verify(orderEntityRepository, times(1)).delete(legacyOrder);
@@ -128,7 +143,7 @@ class UserOrderServiceTest {
         when(orderGroupEntityRepository.findByIdForUpdate(301L)).thenReturn(Optional.empty());
         when(orderEntityRepository.findByIdAndOrderGroupIsNullForUpdate(301L)).thenReturn(Optional.of(legacyOrder));
 
-        userOrderService.deleteOrder(301L);
+        adminOrderService.deleteOrder(301L);
 
         verify(productEntityRepository, never()).incrementStock(any(), anyInt());
         verify(productEntityRepository, never()).findById(any());
@@ -141,7 +156,7 @@ class UserOrderServiceTest {
         when(orderGroupEntityRepository.findByIdForUpdate(999L)).thenReturn(Optional.empty());
         when(orderEntityRepository.findByIdAndOrderGroupIsNullForUpdate(999L)).thenReturn(Optional.empty());
 
-        assertThrows(OrderNotFoundException.class, () -> userOrderService.deleteOrder(999L));
+        assertThrows(OrderNotFoundException.class, () -> adminOrderService.deleteOrder(999L));
     }
 
     @Test
@@ -160,7 +175,7 @@ class UserOrderServiceTest {
         when(orderGroupEntityRepository.findByIdForUpdate(202L)).thenReturn(Optional.of(group));
         when(orderEntityRepository.findByOrderGroup_Id(202L)).thenReturn(List.of(first, second));
 
-        userOrderService.deleteOrder(202L);
+        adminOrderService.deleteOrder(202L);
 
         verify(productEntityRepository, times(1)).incrementStock(11L, 5);
     }
@@ -180,7 +195,7 @@ class UserOrderServiceTest {
         when(orderGroupEntityRepository.findByIdForUpdate(203L)).thenReturn(Optional.of(group));
         when(orderEntityRepository.findByOrderGroup_Id(203L)).thenReturn(List.of(nullCount, zeroCount));
 
-        userOrderService.deleteOrder(203L);
+        adminOrderService.deleteOrder(203L);
 
         verify(productEntityRepository, never()).incrementStock(any(), anyInt());
     }
@@ -198,7 +213,7 @@ class UserOrderServiceTest {
         when(orderGroupEntityRepository.findByIdForUpdate(300L)).thenReturn(Optional.of(group));
         when(orderEntityRepository.findByOrderGroup_Id(300L)).thenReturn(List.of(line));
 
-        userOrderService.updateOrderStatus(300L, "Shipped");
+        adminOrderService.updateOrderStatus(300L, "Shipped");
 
         assertEquals("Shipped", group.getStatus());
         assertEquals("Shipped", line.getStatus());
@@ -216,7 +231,7 @@ class UserOrderServiceTest {
         when(orderGroupEntityRepository.findByIdForUpdate(400L)).thenReturn(Optional.empty());
         when(orderEntityRepository.findByIdAndOrderGroupIsNullForUpdate(400L)).thenReturn(Optional.of(legacyOrder));
 
-        userOrderService.updateOrderStatus(400L, "Delivered");
+        adminOrderService.updateOrderStatus(400L, "Delivered");
 
         assertEquals("Delivered", legacyOrder.getStatus());
         verify(orderEntityRepository).save(legacyOrder);
@@ -228,7 +243,7 @@ class UserOrderServiceTest {
         when(orderGroupEntityRepository.findByIdForUpdate(500L)).thenReturn(Optional.empty());
         when(orderEntityRepository.findByIdAndOrderGroupIsNullForUpdate(500L)).thenReturn(Optional.empty());
 
-        assertThrows(OrderNotFoundException.class, () -> userOrderService.updateOrderStatus(500L, "Shipped"));
+        assertThrows(OrderNotFoundException.class, () -> adminOrderService.updateOrderStatus(500L, "Shipped"));
     }
 
     @Test
@@ -240,7 +255,7 @@ class UserOrderServiceTest {
         when(orderGroupEntityRepository.findByIdForUpdate(301L)).thenReturn(Optional.of(group));
         when(orderEntityRepository.findByOrderGroup_Id(301L)).thenReturn(List.of());
 
-        userOrderService.updateOrderStatus(301L, "any-status-string");
+        adminOrderService.updateOrderStatus(301L, "any-status-string");
 
         assertEquals("any-status-string", group.getStatus());
         verify(orderEntityRepository, never()).deleteAll(any());
@@ -261,8 +276,84 @@ class UserOrderServiceTest {
         when(orderGroupEntityRepository.findByIdForUpdate(302L)).thenReturn(Optional.of(group));
         when(orderEntityRepository.findByOrderGroup_Id(302L)).thenReturn(List.of(line));
 
-        userOrderService.deleteOrder(302L);
+        adminOrderService.deleteOrder(302L);
 
         verify(productEntityRepository, never()).incrementStock(eq(11L), anyInt());
+    }
+
+    @Test
+    void getAllOrders_LoadsOnlyTheRequestedPageAndNeverTheWholeTable() {
+        AdminOrderRow firstRow = row(5, 5, "2.50", "L5");
+        AdminOrderRow secondRow = row(3, 3, "0", "B");
+        when(orderGroupEntityRepository.findAdminOrderPage(any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(firstRow, secondRow), PageRequest.of(0, 2), 5));
+
+        OrderPageDto result = adminOrderService.getAllOrders(0, 2);
+
+        assertEquals(5L, result.getTotal());
+        assertEquals(2, result.getItems().size());
+        assertRow(result.getItems().get(0), 5, 5, "2.50", "L5");
+        assertRow(result.getItems().get(1), 3, 3, "0", "B");
+
+        ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+        verify(orderGroupEntityRepository).findAdminOrderPage(pageable.capture());
+        assertEquals(0, pageable.getValue().getPageNumber());
+        assertEquals(2, pageable.getValue().getPageSize());
+
+        // The old N+1 path must be gone: no findAll and no per-page line queries.
+        verify(orderGroupEntityRepository, never()).findAll();
+        verify(orderEntityRepository, never()).findByOrderGroupIsNull();
+        verify(orderEntityRepository, never()).findByOrderGroup_Id(any());
+    }
+
+    @Test
+    void getAllOrders_ClampsANegativePageToTheFirstPage() {
+        when(orderGroupEntityRepository.findAdminOrderPage(any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 2), 0));
+
+        adminOrderService.getAllOrders(-3, 2);
+
+        ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
+        verify(orderGroupEntityRepository).findAdminOrderPage(pageable.capture());
+        assertEquals(0, pageable.getValue().getPageNumber());
+    }
+
+    @Test
+    void getAllOrders_ReportsTheTotalButNoItemsBeyondTheLastPage() {
+        when(orderGroupEntityRepository.findAdminOrderPage(any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(9, 2), 5));
+
+        OrderPageDto result = adminOrderService.getAllOrders(9, 2);
+
+        assertEquals(5L, result.getTotal());
+        assertTrue(result.getItems().isEmpty());
+        verify(orderGroupEntityRepository, never()).findAll();
+    }
+
+    @Test
+    void getAllOrders_WithANonPositiveRangeReportsTheTotalWithoutFetchingAPage() {
+        when(orderGroupEntityRepository.countAdminOrders()).thenReturn(5L);
+
+        OrderPageDto result = adminOrderService.getAllOrders(0, 0);
+
+        assertEquals(5L, result.getTotal());
+        assertTrue(result.getItems().isEmpty());
+        verify(orderGroupEntityRepository, never()).findAdminOrderPage(any());
+    }
+
+    private AdminOrderRow row(long orderId, long orderGroupId, String total, String status) {
+        AdminOrderRow row = mock(AdminOrderRow.class);
+        when(row.getOrderId()).thenReturn(orderId);
+        when(row.getOrderGroupId()).thenReturn(orderGroupId);
+        when(row.getTotalPrice()).thenReturn(new BigDecimal(total));
+        when(row.getStatus()).thenReturn(status);
+        return row;
+    }
+
+    private void assertRow(OrderDto dto, long orderId, long orderGroupId, String total, String status) {
+        assertEquals(orderId, dto.getOrderId());
+        assertEquals(orderGroupId, dto.getOrderGroupId());
+        assertEquals(0, new BigDecimal(total).compareTo(dto.getTotalPrice()));
+        assertEquals(status, dto.getStatus());
     }
 }

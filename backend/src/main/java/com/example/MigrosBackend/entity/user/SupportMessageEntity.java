@@ -5,17 +5,19 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 @Entity
 @Table(name = "support_messages")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class SupportMessageEntity {
@@ -49,10 +51,35 @@ public class SupportMessageEntity {
         this.createdAt = createdAt;
     }
 
-    @PrePersist
-    public void prePersist() {
-        if (createdAt == null) {
-            createdAt = LocalDateTime.now();
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
         }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        SupportMessageEntity other = (SupportMessageEntity) o;
+        return id != null && id.equals(other.id);
+    }
+
+    @Override
+    public int hashCode() {
+        if (id == null) {
+            return System.identityHashCode(this);
+        }
+        return Objects.hash(getClass(), id);
+    }
+
+    @Override
+    public String toString() {
+        return "SupportMessageEntity{" +
+                "id=" + id +
+                ", userMail='" + userMail + '\'' +
+                ", sender='" + sender + '\'' +
+                ", externalMessageId='" + externalMessageId + '\'' +
+                ", createdAt=" + createdAt +
+                ", editedAt=" + editedAt +
+                '}';
     }
 }

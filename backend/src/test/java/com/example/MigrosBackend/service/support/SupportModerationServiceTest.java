@@ -6,13 +6,11 @@ import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.exception.shared.SupportSyncConflictException;
 import com.example.MigrosBackend.repository.user.SupportMessageEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
-import com.example.MigrosBackend.service.global.TokenService;
 import com.example.MigrosBackend.websocket.SupportChatWebSocketHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -22,26 +20,26 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class SupportChatServiceEditMessageTest {
+class SupportModerationServiceTest {
 
     @Mock
     private SupportMessageEntityRepository supportMessageEntityRepository;
     @Mock
     private UserEntityRepository userEntityRepository;
     @Mock
-    private TokenService tokenService;
-    @Mock
     private SupportChatWebSocketHandler supportChatWebSocketHandler;
     @Mock
     private SupportInternalEventService supportInternalEventService;
 
-    @InjectMocks
-    private SupportChatService supportChatService;
+    private SupportModerationService supportModerationService;
 
     private UserEntity user;
 
@@ -51,6 +49,12 @@ class SupportChatServiceEditMessageTest {
         user.setId(1L);
         user.setUserMail("user@mail.com");
         user.setBanned(false);
+
+        supportModerationService = new SupportModerationService(
+                userEntityRepository,
+                supportMessageEntityRepository,
+                new SupportChatNotificationCoordinator(supportChatWebSocketHandler, supportInternalEventService),
+                new SupportChatGuards(userEntityRepository));
     }
 
     @Test
@@ -67,7 +71,7 @@ class SupportChatServiceEditMessageTest {
         when(supportMessageEntityRepository.findByUserMailAndExternalMessageId("user@mail.com", "agent-10"))
                 .thenReturn(Optional.of(entity));
 
-        supportChatService.editManagementMessage("user@mail.com", "agent-10", "  new text  ");
+        supportModerationService.editManagementMessage("user@mail.com", "agent-10", "  new text  ");
 
         assertEquals("new text", entity.getMessage());
         assertNotNull(entity.getEditedAt());
@@ -81,7 +85,7 @@ class SupportChatServiceEditMessageTest {
 
         GeneralException error = assertThrows(
                 GeneralException.class,
-                () -> supportChatService.editManagementMessage("user@mail.com", "  ", "updated")
+                () -> supportModerationService.editManagementMessage("user@mail.com", "  ", "updated")
         );
 
         assertEquals("externalMessageId is required", error.getMessage());
@@ -93,7 +97,7 @@ class SupportChatServiceEditMessageTest {
 
         GeneralException error = assertThrows(
                 GeneralException.class,
-                () -> supportChatService.editManagementMessage("user@mail.com", "agent-10", "  ")
+                () -> supportModerationService.editManagementMessage("user@mail.com", "agent-10", "  ")
         );
 
         assertEquals("Message cannot be empty", error.getMessage());
@@ -112,7 +116,7 @@ class SupportChatServiceEditMessageTest {
 
         GeneralException error = assertThrows(
                 GeneralException.class,
-                () -> supportChatService.editManagementMessage("user@mail.com", "agent-10", "updated")
+                () -> supportModerationService.editManagementMessage("user@mail.com", "agent-10", "updated")
         );
 
         assertEquals("Only management messages can be edited", error.getMessage());
@@ -126,7 +130,7 @@ class SupportChatServiceEditMessageTest {
 
         GeneralException error = assertThrows(
                 GeneralException.class,
-                () -> supportChatService.editManagementMessage("user@mail.com", "missing-id", "updated")
+                () -> supportModerationService.editManagementMessage("user@mail.com", "missing-id", "updated")
         );
 
         assertEquals("Editable support message not found", error.getMessage());
@@ -144,7 +148,7 @@ class SupportChatServiceEditMessageTest {
         when(supportMessageEntityRepository.findByUserMailAndExternalMessageId("user@mail.com", "agent-10"))
                 .thenReturn(Optional.of(entity));
 
-        supportChatService.deleteManagementMessage("user@mail.com", "agent-10");
+        supportModerationService.deleteManagementMessage("user@mail.com", "agent-10");
 
         verify(supportMessageEntityRepository).delete(entity);
         verify(supportChatWebSocketHandler).broadcastSupportUpdate("user@mail.com");
@@ -156,7 +160,7 @@ class SupportChatServiceEditMessageTest {
 
         GeneralException error = assertThrows(
                 GeneralException.class,
-                () -> supportChatService.deleteManagementMessage("user@mail.com", "   ")
+                () -> supportModerationService.deleteManagementMessage("user@mail.com", "   ")
         );
 
         assertEquals("externalMessageId is required", error.getMessage());
@@ -175,7 +179,7 @@ class SupportChatServiceEditMessageTest {
 
         GeneralException error = assertThrows(
                 GeneralException.class,
-                () -> supportChatService.deleteManagementMessage("user@mail.com", "agent-10")
+                () -> supportModerationService.deleteManagementMessage("user@mail.com", "agent-10")
         );
 
         assertEquals("Only management messages can be deleted", error.getMessage());
@@ -189,7 +193,7 @@ class SupportChatServiceEditMessageTest {
 
         GeneralException error = assertThrows(
                 GeneralException.class,
-                () -> supportChatService.deleteManagementMessage("user@mail.com", "missing-id")
+                () -> supportModerationService.deleteManagementMessage("user@mail.com", "missing-id")
         );
 
         assertEquals("Deletable support message not found", error.getMessage());
@@ -207,7 +211,7 @@ class SupportChatServiceEditMessageTest {
         when(supportMessageEntityRepository.findByIdAndUserMail(22L, "user@mail.com"))
                 .thenReturn(Optional.of(entity));
 
-        supportChatService.editMessageForAdmin("user@mail.com", 22L, "  updated user text ");
+        supportModerationService.editMessageForAdmin("user@mail.com", 22L, "  updated user text ");
 
         assertEquals("updated user text", entity.getMessage());
         assertNotNull(entity.getEditedAt());
@@ -235,7 +239,7 @@ class SupportChatServiceEditMessageTest {
         when(supportMessageEntityRepository.findByIdAndUserMail(33L, "user@mail.com"))
                 .thenReturn(Optional.of(entity));
 
-        supportChatService.editMessageForAdmin("user@mail.com", 33L, "new text");
+        supportModerationService.editMessageForAdmin("user@mail.com", 33L, "new text");
 
         verify(supportInternalEventService).publishSupportMessageEdited("user@mail.com", "agent-33", "new text");
     }
@@ -254,8 +258,24 @@ class SupportChatServiceEditMessageTest {
 
         assertThrows(
                 SupportSyncConflictException.class,
-                () -> supportChatService.editMessageForAdmin("user@mail.com", 34L, "updated")
+                () -> supportModerationService.editMessageForAdmin("user@mail.com", 34L, "updated")
         );
+    }
+
+    @Test
+    void editMessageForAdmin_shouldRejectMessagesOwnedByAnotherUser() {
+        when(userEntityRepository.findByUserMail("user@mail.com")).thenReturn(user);
+        when(supportMessageEntityRepository.findByIdAndUserMail(99L, "user@mail.com"))
+                .thenReturn(Optional.empty());
+
+        GeneralException error = assertThrows(
+                GeneralException.class,
+                () -> supportModerationService.editMessageForAdmin("user@mail.com", 99L, "hijacked")
+        );
+
+        assertEquals("Support message not found", error.getMessage());
+        verify(supportMessageEntityRepository, never()).save(any());
+        verifyNoInteractions(supportInternalEventService);
     }
 
     @Test
@@ -269,7 +289,7 @@ class SupportChatServiceEditMessageTest {
         when(supportMessageEntityRepository.findByIdAndUserMail(41L, "user@mail.com"))
                 .thenReturn(Optional.of(entity));
 
-        supportChatService.deleteMessageForAdmin("user@mail.com", 41L);
+        supportModerationService.deleteMessageForAdmin("user@mail.com", 41L);
 
         InOrder notificationOrder = inOrder(
                 supportMessageEntityRepository,
@@ -295,7 +315,23 @@ class SupportChatServiceEditMessageTest {
 
         assertThrows(
                 SupportSyncConflictException.class,
-                () -> supportChatService.deleteMessageForAdmin("user@mail.com", 42L)
+                () -> supportModerationService.deleteMessageForAdmin("user@mail.com", 42L)
         );
+    }
+
+    @Test
+    void deleteMessageForAdmin_shouldRejectMessagesOwnedByAnotherUser() {
+        when(userEntityRepository.findByUserMail("user@mail.com")).thenReturn(user);
+        when(supportMessageEntityRepository.findByIdAndUserMail(98L, "user@mail.com"))
+                .thenReturn(Optional.empty());
+
+        GeneralException error = assertThrows(
+                GeneralException.class,
+                () -> supportModerationService.deleteMessageForAdmin("user@mail.com", 98L)
+        );
+
+        assertEquals("Support message not found", error.getMessage());
+        verify(supportMessageEntityRepository, never()).delete(any());
+        verifyNoInteractions(supportInternalEventService);
     }
 }

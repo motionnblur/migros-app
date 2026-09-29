@@ -1,16 +1,14 @@
 package com.example.MigrosBackend.entity.user;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
-import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @Entity
-@Data
 @Getter
 @Setter
 @AllArgsConstructor
@@ -27,12 +25,30 @@ public class OrderGroupEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_entity_id", referencedColumnName = "user_entity_id")
-    @JsonBackReference("user-order-groups")
     private UserEntity userEntity;
 
     @OneToMany(mappedBy = "orderGroup", cascade = CascadeType.ALL, orphanRemoval = true)
-    @JsonManagedReference("group-orders")
     private List<OrderEntity> orderItems = new ArrayList<>();
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        OrderGroupEntity other = (OrderGroupEntity) o;
+        return id != null && id.equals(other.id);
+    }
+
+    @Override
+    public int hashCode() {
+        if (id == null) {
+            return System.identityHashCode(this);
+        }
+        return Objects.hash(getClass(), id);
+    }
 }
 
 

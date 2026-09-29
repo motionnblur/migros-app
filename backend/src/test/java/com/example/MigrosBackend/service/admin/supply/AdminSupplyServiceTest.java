@@ -1,10 +1,10 @@
 package com.example.MigrosBackend.service.admin.supply;
 
 import com.example.MigrosBackend.dto.admin.panel.AdminAddItemDto;
-import com.example.MigrosBackend.dto.admin.panel.DescriptionsDto;
+import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionTabDto;
 import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionListDto;
 import com.example.MigrosBackend.dto.admin.panel.AdminProductPreviewDto;
-import com.example.MigrosBackend.dto.admin.panel.ProductDto2;
+import com.example.MigrosBackend.dto.user.product.ProductDetailDto;
 import com.example.MigrosBackend.dto.user.product.ProductDto;
 import com.example.MigrosBackend.entity.admin.AdminEntity;
 import com.example.MigrosBackend.entity.category.CategoryEntity;
@@ -22,12 +22,12 @@ import com.example.MigrosBackend.repository.product.ProductDescriptionEntityRepo
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductImageEntityRepository;
 import com.example.MigrosBackend.service.global.FileService;
+import com.example.MigrosBackend.service.user.supply.UserCatalogReadService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -69,7 +69,6 @@ class AdminSupplyServiceTest {
     @Mock
     private FileService fileService;
 
-    @InjectMocks
     private AdminSupplyService adminSupplyService;
 
     private AdminEntity admin;
@@ -84,6 +83,21 @@ class AdminSupplyServiceTest {
         category = new CategoryEntity();
         category.setId(10L);
         category.setCategoryName("Beverages");
+
+        adminSupplyService = new AdminSupplyService(
+                categoryEntityRepository,
+                productEntityRepository,
+                productImageEntityRepository,
+                adminEntityRepository,
+                fileService,
+                new AdminProductDescriptionOperations(productEntityRepository, productDescriptionEntityRepository),
+                new AdminProductImageOperations(fileService),
+                new UserCatalogReadService(
+                        categoryEntityRepository,
+                        productEntityRepository,
+                        productImageEntityRepository,
+                        productDescriptionEntityRepository,
+                        fileService));
     }
 
     @Test
@@ -491,7 +505,7 @@ class AdminSupplyServiceTest {
 
         when(productEntityRepository.findById(7L)).thenReturn(Optional.of(product));
 
-        ProductDto2 result = adminSupplyService.getProductData(7L);
+        ProductDetailDto result = adminSupplyService.getProductData(7L);
 
         assertEquals("Milk", result.getProductName());
         assertEquals("Dairy", result.getSubCategoryName());
@@ -510,6 +524,7 @@ class AdminSupplyServiceTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void addProductDescription_shouldCreateWhenNoExistingDescriptions() {
         ProductEntity product = new ProductEntity();
         product.setId(101L);
@@ -517,8 +532,8 @@ class AdminSupplyServiceTest {
         ProductDescriptionListDto dto = new ProductDescriptionListDto();
         dto.setProductId(101L);
         dto.setDescriptionList(List.of(
-                new DescriptionsDto(null, "Tab1", "Content1"),
-                new DescriptionsDto(null, "Tab2", "Content2")
+                new ProductDescriptionTabDto(null, "Tab1", "Content1"),
+                new ProductDescriptionTabDto(null, "Tab2", "Content2")
         ));
 
         when(productEntityRepository.findById(101L)).thenReturn(Optional.of(product));
@@ -526,9 +541,10 @@ class AdminSupplyServiceTest {
 
         adminSupplyService.addProductDescription(dto);
 
-        ArgumentCaptor<ProductDescriptionEntity> captor = ArgumentCaptor.forClass(ProductDescriptionEntity.class);
-        verify(productDescriptionEntityRepository, times(2)).save(captor.capture());
-        List<ProductDescriptionEntity> saved = captor.getAllValues();
+        ArgumentCaptor<List<ProductDescriptionEntity>> captor = ArgumentCaptor.forClass(List.class);
+        verify(productDescriptionEntityRepository).saveAll(captor.capture());
+        List<ProductDescriptionEntity> saved = captor.getValue();
+        assertEquals(2, saved.size());
         assertEquals("Tab1", saved.get(0).getDescriptionTabName());
         assertEquals("Content1", saved.get(0).getDescriptionTabContent());
         assertEquals(product, saved.get(0).getProductEntity());
@@ -538,6 +554,7 @@ class AdminSupplyServiceTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void addProductDescription_shouldUpdateExistingAndCreateMissing() {
         ProductEntity product = new ProductEntity();
         product.setId(102L);
@@ -549,8 +566,8 @@ class AdminSupplyServiceTest {
         ProductDescriptionListDto dto = new ProductDescriptionListDto();
         dto.setProductId(102L);
         dto.setDescriptionList(List.of(
-                new DescriptionsDto(11L, "Updated", "Updated content"),
-                new DescriptionsDto(12L, "New", "New content")
+                new ProductDescriptionTabDto(11L, "Updated", "Updated content"),
+                new ProductDescriptionTabDto(12L, "New", "New content")
         ));
 
         when(productEntityRepository.findById(102L)).thenReturn(Optional.of(product));
@@ -560,9 +577,10 @@ class AdminSupplyServiceTest {
 
         adminSupplyService.addProductDescription(dto);
 
-        ArgumentCaptor<ProductDescriptionEntity> captor = ArgumentCaptor.forClass(ProductDescriptionEntity.class);
-        verify(productDescriptionEntityRepository, times(2)).save(captor.capture());
-        List<ProductDescriptionEntity> saved = captor.getAllValues();
+        ArgumentCaptor<List<ProductDescriptionEntity>> captor = ArgumentCaptor.forClass(List.class);
+        verify(productDescriptionEntityRepository).saveAll(captor.capture());
+        List<ProductDescriptionEntity> saved = captor.getValue();
+        assertEquals(2, saved.size());
 
         ProductDescriptionEntity updated = saved.stream()
                 .filter(item -> item.getId() != null && item.getId().equals(11L))
@@ -599,9 +617,9 @@ class AdminSupplyServiceTest {
 
         assertEquals(200L, result.getProductId());
         assertEquals(2, result.getDescriptionList().size());
-        assertEquals(1L, result.getDescriptionList().get(0).getDescriptionId());
-        assertEquals("A", result.getDescriptionList().get(0).getDescriptionTabName());
-        assertEquals("A content", result.getDescriptionList().get(0).getDescriptionTabContent());
+        assertEquals(1L, result.getDescriptionList().get(0).descriptionId());
+        assertEquals("A", result.getDescriptionList().get(0).tabName());
+        assertEquals("A content", result.getDescriptionList().get(0).tabContent());
     }
 
     @Test

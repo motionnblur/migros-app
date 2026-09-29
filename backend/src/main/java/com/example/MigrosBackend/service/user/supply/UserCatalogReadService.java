@@ -1,9 +1,9 @@
 package com.example.MigrosBackend.service.user.supply;
 
-import com.example.MigrosBackend.dto.admin.panel.DescriptionsDto;
+import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionTabDto;
 import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionListDto;
-import com.example.MigrosBackend.dto.admin.panel.ProductDto2;
 import com.example.MigrosBackend.dto.user.category.SubCategoryDto;
+import com.example.MigrosBackend.dto.user.product.ProductDetailDto;
 import com.example.MigrosBackend.dto.user.product.ProductPreviewDto;
 import com.example.MigrosBackend.entity.category.CategoryEntity;
 import com.example.MigrosBackend.entity.product.ProductDescriptionEntity;
@@ -24,6 +24,7 @@ import org.springframework.core.io.UrlResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -32,14 +33,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-final class UserCatalogReadService {
+@Service
+public final class UserCatalogReadService {
     private final CategoryEntityRepository categoryEntityRepository;
     private final ProductEntityRepository productEntityRepository;
     private final ProductImageEntityRepository productImageEntityRepository;
     private final ProductDescriptionEntityRepository productDescriptionEntityRepository;
     private final FileService fileService;
 
-    UserCatalogReadService(
+    public UserCatalogReadService(
             CategoryEntityRepository categoryEntityRepository,
             ProductEntityRepository productEntityRepository,
             ProductImageEntityRepository productImageEntityRepository,
@@ -92,16 +94,18 @@ final class UserCatalogReadService {
 
         String storedPath = images.get(0).getImagePath();
 
+        Resource resource;
         try {
             Path resolvedPath = fileService.resolveImagePath(storedPath);
-            Resource resource = new UrlResource(resolvedPath.toUri());
-            if (resource.exists() && resource.isReadable()) {
-                return resource;
-            }
-            throw new FileNotFoundException();
+            resource = new UrlResource(resolvedPath.toUri());
         } catch (Exception e) {
             throw new GeneralException("Error while loading image");
         }
+
+        if (!resource.exists() || !resource.isReadable()) {
+            throw new FileNotFoundException();
+        }
+        return resource;
     }
 
     int getProductCountsFromCategory(Long categoryId) {
@@ -137,11 +141,11 @@ final class UserCatalogReadService {
         return productEntityRepository.countBySubcategoryNameAndProductCountGreaterThan(subcategoryName, 0);
     }
 
-    ProductDto2 getProductData(Long productId) {
+    public ProductDetailDto getProductData(Long productId) {
         ProductEntity productEntity = productEntityRepository.findById(productId)
                 .orElseThrow(() -> new ProductNotFoundException(productId.toString()));
 
-        ProductDto2 productDto2 = new ProductDto2();
+        ProductDetailDto productDto2 = new ProductDetailDto();
         productDto2.setProductName(productEntity.getProductName());
         productDto2.setSubCategoryName(productEntity.getSubcategoryName());
         productDto2.setProductPrice(productEntity.getProductPrice());
@@ -154,16 +158,13 @@ final class UserCatalogReadService {
 
     ProductDescriptionListDto getProductDescription(Long productId) {
         List<ProductDescriptionEntity> productDescriptionEntities = productDescriptionEntityRepository.findByProductEntityId(productId);
-        if (productDescriptionEntities == null) {
-            throw new ProductNotFoundException(productId.toString());
-        }
 
         ProductDescriptionListDto productDescriptionDto = new ProductDescriptionListDto();
         productDescriptionDto.setProductId(productId);
         productDescriptionDto.setDescriptionList(new ArrayList<>());
 
         for (ProductDescriptionEntity item : productDescriptionEntities) {
-            DescriptionsDto dto = new DescriptionsDto(item.getId(), item.getDescriptionTabName(), item.getDescriptionTabContent());
+            ProductDescriptionTabDto dto = new ProductDescriptionTabDto(item.getId(), item.getDescriptionTabName(), item.getDescriptionTabContent());
             productDescriptionDto.getDescriptionList().add(dto);
         }
 

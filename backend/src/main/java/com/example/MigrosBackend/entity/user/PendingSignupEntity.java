@@ -6,14 +6,18 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import lombok.ToString;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 @Entity
-@Data
+@Getter
+@Setter
+@ToString
 @NoArgsConstructor
 @AllArgsConstructor
 public class PendingSignupEntity {
@@ -41,4 +45,24 @@ public class PendingSignupEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "token_purpose", nullable = false, length = 32)
     private PendingTokenPurpose tokenPurpose = PendingTokenPurpose.SIGNUP;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        PendingSignupEntity other = (PendingSignupEntity) o;
+        return token != null && token.equals(other.token);
+    }
+
+    @Override
+    public int hashCode() {
+        if (token == null) {
+            return System.identityHashCode(this);
+        }
+        return Objects.hash(getClass(), token);
+    }
 }

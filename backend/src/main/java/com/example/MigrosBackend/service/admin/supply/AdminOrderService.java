@@ -1,4 +1,4 @@
-package com.example.MigrosBackend.service.user.supply;
+package com.example.MigrosBackend.service.admin.supply;
 
 import com.example.MigrosBackend.dto.order.OrderDto;
 import com.example.MigrosBackend.dto.order.OrderPageDto;
@@ -9,93 +9,82 @@ import com.example.MigrosBackend.entity.user.OrderStatus;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.exception.admin.OrderNotFoundException;
 import com.example.MigrosBackend.exception.admin.UserNotFoundException;
-import com.example.MigrosBackend.repository.product.ProductEntityRepository;
+import com.example.MigrosBackend.repository.user.AdminOrderRow;
 import com.example.MigrosBackend.repository.user.OrderEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderGroupEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
-import com.example.MigrosBackend.service.global.TokenService;
+import com.example.MigrosBackend.service.user.supply.OrderStockRestocker;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Admin-side order operations: the merged order listing, an order's owner, and
+ * the status/delete write paths.
+ *
+ * <p>Moved out of {@code service/user/supply} because only
+ * {@code AdminPanelController} serves these calls. The user-side cart clear it
+ * used to carry lives with {@code UserCartService}.
+ */
 @Service
-public class UserOrderService {
-    private final TokenService tokenService;
+public class AdminOrderService {
     private final UserEntityRepository userEntityRepository;
     private final OrderEntityRepository orderEntityRepository;
     private final OrderGroupEntityRepository orderGroupEntityRepository;
     private final OrderStockRestocker orderStockRestocker;
 
-    public UserOrderService(TokenService tokenService,
-                            UserEntityRepository userEntityRepository,
-                            OrderEntityRepository orderEntityRepository,
-                            OrderGroupEntityRepository orderGroupEntityRepository,
-                            ProductEntityRepository productEntityRepository) {
-        this.tokenService = tokenService;
+    public AdminOrderService(UserEntityRepository userEntityRepository,
+                             OrderEntityRepository orderEntityRepository,
+                             OrderGroupEntityRepository orderGroupEntityRepository,
+                             OrderStockRestocker orderStockRestocker) {
         this.userEntityRepository = userEntityRepository;
         this.orderEntityRepository = orderEntityRepository;
         this.orderGroupEntityRepository = orderGroupEntityRepository;
-        this.orderStockRestocker = new OrderStockRestocker(productEntityRepository);
+        this.orderStockRestocker = orderStockRestocker;
     }
 
-    public void clearUserCart(String userToken) {
-        UserEntity user = getValidatedUser(userToken);
-        user.setProductsIdsInCart(new ArrayList<>());
-        userEntityRepository.save(user);
-    }
-
+    /**
+     * Returns one page of the merged listing of grouped and legacy orders.
+     *
+     * <p>Ordering, the price sum, and the total are computed by the database so
+     * an admin page view only ever loads its own window. The previous version
+     * read every order group, ran one query per group for its lines, and sliced
+     * the merged result in Java.
+     */
     public OrderPageDto getAllOrders(int page, int productRange) {
-        List<OrderDto> orderDtos = new ArrayList<>();
-
-        List<OrderGroupEntity> groups = orderGroupEntityRepository.findAll();
-        for (OrderGroupEntity group : groups) {
-            List<OrderEntity> items = orderEntityRepository.findByOrderGroup_Id(group.getId());
-            BigDecimal totalPrice = BigDecimal.ZERO;
-            for (OrderEntity item : items) {
-                if (item.getTotalPrice() != null) {
-                    totalPrice = totalPrice.add(item.getTotalPrice());
-                }
-            }
-
-            OrderDto dto = new OrderDto();
-            dto.setOrderId(group.getId());
-            dto.setOrderGroupId(group.getId());
-            dto.setTotalPrice(totalPrice);
-            dto.setStatus(group.getStatus());
-            orderDtos.add(dto);
-        }
-
-        List<OrderEntity> legacyOrders = orderEntityRepository.findByOrderGroupIsNull();
-        for (OrderEntity legacy : legacyOrders) {
-            OrderDto dto = new OrderDto();
-            dto.setOrderId(legacy.getId());
-            dto.setOrderGroupId(legacy.getId());
-            dto.setTotalPrice(legacy.getTotalPrice() != null ? legacy.getTotalPrice() : BigDecimal.ZERO);
-            dto.setStatus(legacy.getStatus());
-            orderDtos.add(dto);
-        }
-
-        orderDtos.sort((a, b) -> Long.compare(b.getOrderId(), a.getOrderId()));
-        int total = orderDtos.size();
-        int fromIndex = Math.max(0, page * productRange);
         OrderPageDto pageDto = new OrderPageDto();
-        pageDto.setTotal(total);
-        if (fromIndex >= total) {
+
+        if (productRange <= 0) {
+            pageDto.setTotal(orderGroupEntityRepository.countAdminOrders());
             pageDto.setItems(new ArrayList<>());
             return pageDto;
         }
-        int toIndex = Math.min(total, fromIndex + productRange);
-        List<OrderDto> pageItems = new ArrayList<>(orderDtos.subList(fromIndex, toIndex));
-        pageDto.setItems(pageItems);
+
+        Page<AdminOrderRow> rows = orderGroupEntityRepository.findAdminOrderPage(
+                PageRequest.of(Math.max(0, page), productRange));
+
+        List<OrderDto> items = new ArrayList<>(rows.getNumberOfElements());
+        for (AdminOrderRow row : rows.getContent()) {
+            OrderDto dto = new OrderDto();
+            dto.setOrderId(row.getOrderId());
+            dto.setOrderGroupId(row.getOrderGroupId());
+            dto.setTotalPrice(row.getTotalPrice());
+            dto.setStatus(row.getStatus());
+            items.add(dto);
+        }
+
+        pageDto.setTotal(rows.getTotalElements());
+        pageDto.setItems(items);
         return pageDto;
     }
 
     /**
      * Resolves the owner of an order named by a single numeric id.
- *
+     *
      * <p>The same id may name an order group or a legacy order line, so the
      * group is looked up first. When it is absent the line fallback is
      * restricted to lines that have no group at all: group ids and line ids
@@ -205,15 +194,4 @@ public class UserOrderService {
         }
         orderEntityRepository.delete(legacyOrder);
     }
-
-
-    private UserEntity getValidatedUser(String userToken) {
-        String userName = tokenService.validateAndExtractUser(userToken);
-        UserEntity user = userEntityRepository.findByUserMail(userName);
-        if (user == null) {
-            throw new UserNotFoundException("User not found for active session");
-        }
-        return user;
-    }
 }
-

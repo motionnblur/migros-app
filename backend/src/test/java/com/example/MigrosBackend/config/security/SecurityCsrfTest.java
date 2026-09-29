@@ -9,7 +9,8 @@ import com.example.MigrosBackend.exception.user.WebhookSignatureException;
 import com.example.MigrosBackend.filter.JwtRequestFilter;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
-import com.example.MigrosBackend.service.support.SupportChatService;
+import com.example.MigrosBackend.service.support.SupportCustomerDirectoryService;
+import com.example.MigrosBackend.service.support.SupportModerationService;
 import com.example.MigrosBackend.service.user.payment.PaymentWebhookService;
 import com.example.MigrosBackend.service.user.payment.StripeWebhookVerifier;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -93,7 +94,10 @@ class SecurityCsrfTest {
     private PaymentWebhookService paymentWebhookService;
 
     @MockBean
-    private SupportChatService supportChatService;
+    private SupportCustomerDirectoryService supportCustomerDirectoryService;
+
+    @MockBean
+    private SupportModerationService supportModerationService;
 
     @Test
     void csrfEndpointReturnsTokenAndSetsRepositoryCookie() throws Exception {
@@ -249,7 +253,7 @@ class SecurityCsrfTest {
     void internalSupportPostDoesNotRequireCsrfButStillRequiresInternalKey() throws Exception {
         InternalSupportAgentMessageDto dto = new InternalSupportAgentMessageDto(
                 "user@test.com", "Hello", "agent-123");
-        doNothing().when(supportChatService)
+        doNothing().when(supportModerationService)
                 .addManagementMessage("user@test.com", "Hello", "agent-123");
 
         mockMvc.perform(post("/internal/support/agent-message")

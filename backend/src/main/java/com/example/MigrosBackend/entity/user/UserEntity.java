@@ -1,14 +1,13 @@
 package com.example.MigrosBackend.entity.user;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.util.List;
+import java.util.Objects;
 
 @Entity
-@Data
 @Getter
 @Setter
 @AllArgsConstructor
@@ -36,12 +35,30 @@ public class UserEntity {
 
     @OneToMany(cascade = CascadeType.ALL)
     @JoinColumn(name = "user_entity_id", referencedColumnName = "user_entity_id")
-    @JsonManagedReference("user-orders")
     private List<OrderEntity> orderEntities;
 
     @OneToMany(mappedBy = "userEntity", cascade = CascadeType.ALL, orphanRemoval = true)
-    @JsonManagedReference("user-order-groups")
     private List<OrderGroupEntity> orderGroupEntities;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        UserEntity other = (UserEntity) o;
+        return id != null && id.equals(other.id);
+    }
+
+    @Override
+    public int hashCode() {
+        if (id == null) {
+            return System.identityHashCode(this);
+        }
+        return Objects.hash(getClass(), id);
+    }
 
     @Override
     public String toString() {

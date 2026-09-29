@@ -9,5 +9,5 @@ import java.util.List;
 @Setter
 public class ProductDescriptionListDto {
     private Long productId;
-    private List<DescriptionsDto> descriptionList;
+    private List<ProductDescriptionTabDto> descriptionList;
 }

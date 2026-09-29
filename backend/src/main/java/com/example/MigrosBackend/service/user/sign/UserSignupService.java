@@ -13,7 +13,6 @@ import com.example.MigrosBackend.exception.user.UserMailNotFoundException;
 import com.example.MigrosBackend.exception.user.WeakPasswordException;
 import com.example.MigrosBackend.config.PublicUrlProperties;
 import com.example.MigrosBackend.helper.PasswordValidator;
-import com.example.MigrosBackend.repository.user.PendingSignupEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
 import com.example.MigrosBackend.service.global.EncryptService;
 import com.example.MigrosBackend.service.global.MailService;
@@ -25,7 +24,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.util.UriUtils;
 import org.thymeleaf.context.Context;
@@ -50,15 +48,14 @@ public class UserSignupService {
 
     @Autowired
     public UserSignupService(UserEntityRepository userEntityRepository,
-            PendingSignupEntityRepository pendingSignupEntityRepository,
+            PendingSignupStorage pendingSignupStorage,
             EncryptService encryptService,
             MailService mailService, TokenService tokenService,
             PasswordValidator passwordValidator,
             PublicUrlProperties publicUrlProperties,
-            PlatformTransactionManager transactionManager,
             @Value("${app.signup.confirmation.ttl-minutes:15}") long confirmationTokenTtlMinutes) {
         this.userEntityRepository = userEntityRepository;
-        this.pendingSignupStorage = new PendingSignupStorage(pendingSignupEntityRepository, transactionManager);
+        this.pendingSignupStorage = pendingSignupStorage;
         this.encryptService = encryptService;
         this.mailService = mailService;
         this.tokenService = tokenService;

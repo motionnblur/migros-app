@@ -6,7 +6,7 @@ import com.example.MigrosBackend.dto.user.support.SupportSendMessageDto;
 import com.example.MigrosBackend.helper.AuthTokenResolver;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
-import com.example.MigrosBackend.service.support.SupportChatService;
+import com.example.MigrosBackend.service.support.UserSupportChatService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
@@ -37,7 +37,7 @@ class UserSupportControllerTest {
     private ObjectMapper objectMapper;
 
     @MockBean
-    private SupportChatService supportChatService;
+    private UserSupportChatService userSupportChatService;
 
     @MockBean
     private AuthTokenResolver authTokenResolver;
@@ -54,7 +54,7 @@ class UserSupportControllerTest {
         dto.setMessage("Hello");
 
         when(authTokenResolver.requireToken("token")).thenReturn("token");
-        when(supportChatService.getMessagesForUser("token")).thenReturn(List.of(dto));
+        when(userSupportChatService.getMessagesForUser("token")).thenReturn(List.of(dto));
 
         mockMvc.perform(get("/user/support/messages")
                         .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "token")))
@@ -68,7 +68,7 @@ class UserSupportControllerTest {
         dto.setMessage("Need help");
 
         when(authTokenResolver.requireToken("token")).thenReturn("token");
-        doNothing().when(supportChatService).addUserMessage("token", "Need help");
+        doNothing().when(userSupportChatService).addUserMessage("token", "Need help");
 
         mockMvc.perform(post("/user/support/send")
                         .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "token"))
@@ -76,7 +76,7 @@ class UserSupportControllerTest {
                         .content(objectMapper.writeValueAsString(dto)))
                 .andExpect(status().isOk());
 
-        verify(supportChatService).addUserMessage("token", "Need help");
+        verify(userSupportChatService).addUserMessage("token", "Need help");
     }
 
     @Test

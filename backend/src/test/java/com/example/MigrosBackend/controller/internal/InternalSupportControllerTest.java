@@ -5,7 +5,8 @@ import com.example.MigrosBackend.dto.support.InternalSupportDeleteAgentMessageDt
 import com.example.MigrosBackend.dto.support.InternalSupportEditAgentMessageDto;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
-import com.example.MigrosBackend.service.support.SupportChatService;
+import com.example.MigrosBackend.service.support.SupportCustomerDirectoryService;
+import com.example.MigrosBackend.service.support.SupportModerationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,7 +40,10 @@ class InternalSupportControllerTest {
     private ObjectMapper objectMapper;
 
     @MockBean
-    private SupportChatService supportChatService;
+    private SupportCustomerDirectoryService supportCustomerDirectoryService;
+
+    @MockBean
+    private SupportModerationService supportModerationService;
 
     @MockBean
     private AdminEntityRepository adminEntityRepository;
@@ -55,7 +59,7 @@ class InternalSupportControllerTest {
                 "agent-123"
         );
 
-        doNothing().when(supportChatService)
+        doNothing().when(supportModerationService)
                 .addManagementMessage("user@test.com", "Hello", "agent-123");
 
         mockMvc.perform(post("/internal/support/agent-message")
@@ -73,7 +77,7 @@ class InternalSupportControllerTest {
                 "Updated message"
         );
 
-        doNothing().when(supportChatService)
+        doNothing().when(supportModerationService)
                 .editManagementMessage("user@test.com", "agent-123", "Updated message");
 
         mockMvc.perform(post("/internal/support/edit-agent-message")
@@ -90,7 +94,7 @@ class InternalSupportControllerTest {
                 "agent-123"
         );
 
-        doNothing().when(supportChatService)
+        doNothing().when(supportModerationService)
                 .deleteManagementMessage("user@test.com", "agent-123");
 
         mockMvc.perform(post("/internal/support/delete-agent-message")

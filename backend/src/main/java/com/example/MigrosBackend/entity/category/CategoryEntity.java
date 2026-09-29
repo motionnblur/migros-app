@@ -1,14 +1,13 @@
 package com.example.MigrosBackend.entity.category;
 
 import com.example.MigrosBackend.entity.product.ProductEntity;
-import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.util.List;
+import java.util.Objects;
 
 @Entity
-@Data
 @Getter
 @Setter
 @AllArgsConstructor
@@ -23,6 +22,25 @@ public class CategoryEntity {
 
     @OneToMany(cascade = CascadeType.ALL)
     @JoinColumn(name = "category_entity_id", referencedColumnName = "category_entity_id")
-    @JsonManagedReference
     private List<ProductEntity> itemEntities;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        CategoryEntity other = (CategoryEntity) o;
+        return id != null && id.equals(other.id);
+    }
+
+    @Override
+    public int hashCode() {
+        if (id == null) {
+            return System.identityHashCode(this);
+        }
+        return Objects.hash(getClass(), id);
+    }
 }

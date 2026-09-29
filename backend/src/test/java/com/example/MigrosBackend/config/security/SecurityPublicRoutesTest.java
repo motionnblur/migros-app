@@ -12,10 +12,12 @@ import com.example.MigrosBackend.helper.AuthTokenResolver;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.service.admin.sign.AdminSignupService;
 import com.example.MigrosBackend.service.global.TokenService;
-import com.example.MigrosBackend.service.support.SupportChatService;
+import com.example.MigrosBackend.service.support.SupportCustomerDirectoryService;
+import com.example.MigrosBackend.service.support.SupportModerationService;
 import com.example.MigrosBackend.service.user.payment.PaymentWebhookService;
 import com.example.MigrosBackend.service.user.payment.StripeWebhookVerifier;
 import com.example.MigrosBackend.service.user.sign.UserSignupService;
+import com.example.MigrosBackend.service.user.supply.UserCartService;
 import com.example.MigrosBackend.service.user.supply.UserSupplyService;
 import com.stripe.model.Event;
 import org.junit.jupiter.api.Test;
@@ -73,7 +75,13 @@ class SecurityPublicRoutesTest {
     private UserSupplyService userSupplyService;
 
     @MockBean
-    private SupportChatService supportChatService;
+    private UserCartService userCartService;
+
+    @MockBean
+    private SupportCustomerDirectoryService supportCustomerDirectoryService;
+
+    @MockBean
+    private SupportModerationService supportModerationService;
 
     @MockBean
     private StripeWebhookVerifier stripeWebhookVerifier;

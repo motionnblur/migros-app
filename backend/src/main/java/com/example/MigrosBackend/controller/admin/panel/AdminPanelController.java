@@ -3,8 +3,9 @@ package com.example.MigrosBackend.controller.admin.panel;
 import com.example.MigrosBackend.dto.admin.panel.*;
 import com.example.MigrosBackend.dto.order.OrderPageDto;
 import com.example.MigrosBackend.dto.user.UserProfileTableDto;
+import com.example.MigrosBackend.dto.user.product.ProductDetailDto;
+import com.example.MigrosBackend.service.admin.supply.AdminOrderService;
 import com.example.MigrosBackend.service.admin.supply.AdminSupplyService;
-import com.example.MigrosBackend.service.user.supply.UserOrderService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -20,12 +21,12 @@ import java.util.List;
 @RequestMapping("admin/panel")
 public class AdminPanelController {
     private final AdminSupplyService adminSupplyService;
-    private final UserOrderService userOrderService;
+    private final AdminOrderService adminOrderService;
 
     @Autowired
-    public AdminPanelController(AdminSupplyService adminSupplyService, UserOrderService userOrderService) {
+    public AdminPanelController(AdminSupplyService adminSupplyService, AdminOrderService adminOrderService) {
         this.adminSupplyService = adminSupplyService;
-        this.userOrderService = userOrderService;
+        this.adminOrderService = adminOrderService;
     }
 
     @PostMapping("addProductDescription")
@@ -51,7 +52,7 @@ public class AdminPanelController {
     }
 
     @GetMapping("getProductData")
-    private ResponseEntity<ProductDto2> getProductData(@RequestParam Long productId) {
+    private ResponseEntity<ProductDetailDto> getProductData(@RequestParam Long productId) {
         return ResponseEntity.ok(adminSupplyService.getProductData(productId));
     }
 
@@ -101,23 +102,23 @@ public class AdminPanelController {
 
     @GetMapping("getAllOrders")
     public ResponseEntity<OrderPageDto> getOrder(@RequestParam int page, @RequestParam int productRange) {
-        return ResponseEntity.ok(userOrderService.getAllOrders(page, productRange));
+        return ResponseEntity.ok(adminOrderService.getAllOrders(page, productRange));
     }
 
     @GetMapping("getUserProfileData")
     public ResponseEntity<UserProfileTableDto> getUserProfileData(@RequestParam Long orderId) {
-        return ResponseEntity.ok(userOrderService.getUserProfileData(orderId));
+        return ResponseEntity.ok(adminOrderService.getUserProfileData(orderId));
     }
 
     @PostMapping("updateOrderStatus")
     public ResponseEntity<Void> updateOrderStatus(@RequestParam Long orderId, @RequestParam String status) {
-        userOrderService.updateOrderStatus(orderId, status);
+        adminOrderService.updateOrderStatus(orderId, status);
         return ResponseEntity.ok().build();
     }
 
     @DeleteMapping("deleteOrder")
     public ResponseEntity<Void> deleteOrder(@RequestParam Long orderId) {
-        userOrderService.deleteOrder(orderId);
+        adminOrderService.deleteOrder(orderId);
         return ResponseEntity.ok().build();
     }
 }

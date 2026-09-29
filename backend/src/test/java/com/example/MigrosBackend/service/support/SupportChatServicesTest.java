@@ -14,7 +14,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -30,7 +29,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class SupportChatServiceTest {
+class SupportChatServicesTest {
     private static final String TOKEN = "token";
     private static final String USER_MAIL = "user@mail.com";
 
@@ -45,8 +44,9 @@ class SupportChatServiceTest {
     @Mock
     private SupportInternalEventService supportInternalEventService;
 
-    @InjectMocks
-    private SupportChatService supportChatService;
+    private UserSupportChatService userSupportChatService;
+    private SupportModerationService supportModerationService;
+    private SupportCustomerDirectoryService supportCustomerDirectoryService;
 
     private UserEntity user;
 
@@ -56,6 +56,25 @@ class SupportChatServiceTest {
         user.setId(1L);
         user.setUserMail(USER_MAIL);
         user.setBanned(false);
+
+        SupportChatGuards guards = new SupportChatGuards(userEntityRepository);
+        SupportChatNotificationCoordinator notificationCoordinator = new SupportChatNotificationCoordinator(
+                supportChatWebSocketHandler, supportInternalEventService);
+        userSupportChatService = new UserSupportChatService(
+                supportMessageEntityRepository,
+                tokenService,
+                notificationCoordinator,
+                guards);
+        supportModerationService = new SupportModerationService(
+                userEntityRepository,
+                supportMessageEntityRepository,
+                notificationCoordinator,
+                guards);
+        supportCustomerDirectoryService = new SupportCustomerDirectoryService(
+                userEntityRepository,
+                supportMessageEntityRepository,
+                supportChatWebSocketHandler,
+                guards);
     }
 
     @Test
@@ -68,7 +87,7 @@ class SupportChatServiceTest {
         when(supportMessageEntityRepository.findByUserMailOrderByCreatedAtAscIdAsc(USER_MAIL))
                 .thenReturn(Arrays.asList(first, second));
 
-        List<SupportMessageDto> result = supportChatService.getMessagesForUser(TOKEN);
+        List<SupportMessageDto> result = userSupportChatService.getMessagesForUser(TOKEN);
 
         assertEquals(2, result.size());
         assertEquals(1L, result.get(0).getId());
@@ -82,7 +101,7 @@ class SupportChatServiceTest {
     void getMessagesForUser_shouldThrowInvalidToken_whenTokenInvalid() {
         when(tokenService.validateAndExtractUser(TOKEN)).thenThrow(new InvalidTokenException());
 
-        assertThrows(InvalidTokenException.class, () -> supportChatService.getMessagesForUser(TOKEN));
+        assertThrows(InvalidTokenException.class, () -> userSupportChatService.getMessagesForUser(TOKEN));
     }
 
     @Test
@@ -91,7 +110,7 @@ class SupportChatServiceTest {
         when(tokenService.validateAndExtractUser(TOKEN)).thenReturn(USER_MAIL);
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(user);
 
-        GeneralException ex = assertThrows(GeneralException.class, () -> supportChatService.getMessagesForUser(TOKEN));
+        GeneralException ex = assertThrows(GeneralException.class, () -> userSupportChatService.getMessagesForUser(TOKEN));
         assertEquals("You are banned from live support.", ex.getMessage());
     }
 
@@ -100,7 +119,7 @@ class SupportChatServiceTest {
         when(tokenService.validateAndExtractUser(TOKEN)).thenReturn(USER_MAIL);
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(user);
 
-        assertThrows(GeneralException.class, () -> supportChatService.addUserMessage(TOKEN, "   "));
+        assertThrows(GeneralException.class, () -> userSupportChatService.addUserMessage(TOKEN, "   "));
         verify(supportMessageEntityRepository, never()).save(any());
         verify(supportChatWebSocketHandler, never()).broadcastSupportUpdate(any());
     }
@@ -110,7 +129,7 @@ class SupportChatServiceTest {
         when(tokenService.validateAndExtractUser(TOKEN)).thenReturn(USER_MAIL);
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(user);
 
-        supportChatService.addUserMessage(TOKEN, "  hello  ");
+        userSupportChatService.addUserMessage(TOKEN, "  hello  ");
 
         ArgumentCaptor<SupportMessageEntity> captor = ArgumentCaptor.forClass(SupportMessageEntity.class);
         verify(supportMessageEntityRepository).save(captor.capture());
@@ -133,7 +152,7 @@ class SupportChatServiceTest {
             return saved;
         });
 
-        supportChatService.addUserMessage(TOKEN, "  hello  ");
+        userSupportChatService.addUserMessage(TOKEN, "  hello  ");
 
         ArgumentCaptor<SupportMessageEntity> savedMessage = ArgumentCaptor.forClass(SupportMessageEntity.class);
         InOrder sideEffects = inOrder(supportMessageEntityRepository, supportInternalEventService, supportChatWebSocketHandler);
@@ -154,7 +173,7 @@ class SupportChatServiceTest {
 
         IllegalStateException thrown = assertThrows(
                 IllegalStateException.class,
-                () -> supportChatService.addUserMessage(TOKEN, "hello")
+                () -> userSupportChatService.addUserMessage(TOKEN, "hello")
         );
 
         assertSame(persistenceFailure, thrown);
@@ -166,14 +185,14 @@ class SupportChatServiceTest {
         when(tokenService.validateAndExtractUser(TOKEN)).thenReturn(USER_MAIL);
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(null);
 
-        assertThrows(UserNotFoundException.class, () -> supportChatService.addUserMessage(TOKEN, "msg"));
+        assertThrows(UserNotFoundException.class, () -> userSupportChatService.addUserMessage(TOKEN, "msg"));
     }
 
     @Test
     void addManagementMessage_shouldThrowUserNotFound_whenUserMissing() {
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(null);
 
-        assertThrows(UserNotFoundException.class, () -> supportChatService.addManagementMessage(USER_MAIL, "hello"));
+        assertThrows(UserNotFoundException.class, () -> supportModerationService.addManagementMessage(USER_MAIL, "hello"));
         verify(supportMessageEntityRepository, never()).save(any());
         verify(supportChatWebSocketHandler, never()).broadcastSupportUpdate(any());
     }
@@ -182,7 +201,7 @@ class SupportChatServiceTest {
     void addManagementMessage_shouldThrowGeneralException_whenMessageBlank() {
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(user);
 
-        assertThrows(GeneralException.class, () -> supportChatService.addManagementMessage(USER_MAIL, "   "));
+        assertThrows(GeneralException.class, () -> supportModerationService.addManagementMessage(USER_MAIL, "   "));
         verify(supportMessageEntityRepository, never()).save(any());
         verify(supportChatWebSocketHandler, never()).broadcastSupportUpdate(any());
     }
@@ -196,7 +215,7 @@ class SupportChatServiceTest {
             return saved;
         });
 
-        supportChatService.addManagementMessage(USER_MAIL, " hi ", " external-43 ");
+        supportModerationService.addManagementMessage(USER_MAIL, " hi ", " external-43 ");
 
         ArgumentCaptor<SupportMessageEntity> captor = ArgumentCaptor.forClass(SupportMessageEntity.class);
         verify(supportMessageEntityRepository).save(captor.capture());
@@ -214,7 +233,7 @@ class SupportChatServiceTest {
     void getMessagesForUserMail_shouldThrowUserNotFound_whenMissing() {
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(null);
 
-        assertThrows(UserNotFoundException.class, () -> supportChatService.getMessagesForUserMail(USER_MAIL));
+        assertThrows(UserNotFoundException.class, () -> userSupportChatService.getMessagesForUserMail(USER_MAIL));
     }
 
     @Test
@@ -227,7 +246,7 @@ class SupportChatServiceTest {
         when(supportMessageEntityRepository.findByUserMailOrderByCreatedAtAscIdAsc(USER_MAIL))
                 .thenReturn(Collections.singletonList(message));
 
-        List<SupportMessageDto> result = supportChatService.getMessagesForUserMail(USER_MAIL);
+        List<SupportMessageDto> result = userSupportChatService.getMessagesForUserMail(USER_MAIL);
 
         assertEquals(1, result.size());
         assertEquals("USER", result.get(0).getSender());
@@ -241,7 +260,7 @@ class SupportChatServiceTest {
     void getSupportUserMails_shouldReturnDistinctUserMails() {
         when(supportMessageEntityRepository.findDistinctUserMails()).thenReturn(Arrays.asList("a@mail.com", "b@mail.com"));
 
-        List<String> result = supportChatService.getSupportUserMails();
+        List<String> result = supportCustomerDirectoryService.getSupportUserMails();
 
         assertEquals(2, result.size());
         assertEquals("a@mail.com", result.get(0));
@@ -257,7 +276,7 @@ class SupportChatServiceTest {
 
         when(userEntityRepository.findByBannedTrueOrderByUserMailAsc()).thenReturn(Arrays.asList(first, second));
 
-        List<String> result = supportChatService.getBannedUserMails();
+        List<String> result = supportCustomerDirectoryService.getBannedUserMails();
 
         assertEquals(Arrays.asList("a@mail.com", "b@mail.com"), result);
     }
@@ -266,7 +285,7 @@ class SupportChatServiceTest {
     void closeChat_shouldThrowUserNotFound_whenMissing() {
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(null);
 
-        assertThrows(UserNotFoundException.class, () -> supportChatService.closeChat(USER_MAIL));
+        assertThrows(UserNotFoundException.class, () -> supportModerationService.closeChat(USER_MAIL));
     }
 
     @Test
@@ -275,7 +294,7 @@ class SupportChatServiceTest {
         when(supportMessageEntityRepository.findByUserMailOrderByCreatedAtAscIdAsc(USER_MAIL))
                 .thenReturn(Collections.emptyList());
 
-        supportChatService.closeChat(USER_MAIL);
+        supportModerationService.closeChat(USER_MAIL);
 
         verify(supportMessageEntityRepository, never()).deleteAllInBatch(any());
         verify(supportChatWebSocketHandler, never()).broadcastSupportUpdate(any());
@@ -288,7 +307,7 @@ class SupportChatServiceTest {
         when(supportMessageEntityRepository.findByUserMailOrderByCreatedAtAscIdAsc(USER_MAIL))
                 .thenReturn(Collections.singletonList(message));
 
-        supportChatService.closeChat(USER_MAIL);
+        supportModerationService.closeChat(USER_MAIL);
 
         verify(supportMessageEntityRepository).deleteAllInBatch(eq(Collections.singletonList(message)));
         verify(supportChatWebSocketHandler).broadcastSupportUpdate(USER_MAIL);
@@ -298,14 +317,14 @@ class SupportChatServiceTest {
     void banUser_shouldThrowUserNotFound_whenMissing() {
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(null);
 
-        assertThrows(UserNotFoundException.class, () -> supportChatService.banUser(USER_MAIL));
+        assertThrows(UserNotFoundException.class, () -> supportModerationService.banUser(USER_MAIL));
     }
 
     @Test
     void banUser_shouldSetBannedTrueAndBroadcast() {
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(user);
 
-        supportChatService.banUser(USER_MAIL);
+        supportModerationService.banUser(USER_MAIL);
 
         assertTrue(user.getBanned());
         verify(userEntityRepository).save(user);
@@ -316,7 +335,7 @@ class SupportChatServiceTest {
     void unbanUser_shouldThrowUserNotFound_whenMissing() {
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(null);
 
-        assertThrows(UserNotFoundException.class, () -> supportChatService.unbanUser(USER_MAIL));
+        assertThrows(UserNotFoundException.class, () -> supportModerationService.unbanUser(USER_MAIL));
     }
 
     @Test
@@ -324,7 +343,7 @@ class SupportChatServiceTest {
         user.setBanned(true);
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(user);
 
-        supportChatService.unbanUser(USER_MAIL);
+        supportModerationService.unbanUser(USER_MAIL);
 
         assertFalse(user.getBanned());
         verify(userEntityRepository).save(user);

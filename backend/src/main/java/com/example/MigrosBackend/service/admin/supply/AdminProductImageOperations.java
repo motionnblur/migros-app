@@ -3,6 +3,7 @@ package com.example.MigrosBackend.service.admin.supply;
 import com.example.MigrosBackend.exception.admin.FileUploadFailedException;
 import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.service.global.FileService;
+import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -10,6 +11,7 @@ import java.nio.file.Path;
 import java.util.Objects;
 import java.util.UUID;
 
+@Component
 final class AdminProductImageOperations {
     private final FileService fileService;
 

@@ -1,4 +1,4 @@
-package com.example.MigrosBackend.dto.admin.panel;
+package com.example.MigrosBackend.dto.user.product;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -7,7 +7,7 @@ import java.math.BigDecimal;
 
 @Getter
 @Setter
-public class ProductDto2 {
+public class ProductDetailDto {
     private String productName;
     private String subCategoryName;
     private BigDecimal productPrice;

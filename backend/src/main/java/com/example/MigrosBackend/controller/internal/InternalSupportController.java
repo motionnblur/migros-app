@@ -6,7 +6,8 @@ import com.example.MigrosBackend.dto.support.InternalSupportEditAgentMessageDto;
 import com.example.MigrosBackend.dto.support.InternalSupportUserActionDto;
 import com.example.MigrosBackend.dto.support.SupportCustomerStatusDto;
 import com.example.MigrosBackend.dto.support.SupportCustomerSummaryDto;
-import com.example.MigrosBackend.service.support.SupportChatService;
+import com.example.MigrosBackend.service.support.SupportCustomerDirectoryService;
+import com.example.MigrosBackend.service.support.SupportModerationService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,10 +27,13 @@ import java.util.List;
 @RestController
 @RequestMapping("internal/support")
 public class InternalSupportController {
-    private final SupportChatService supportChatService;
+    private final SupportCustomerDirectoryService supportCustomerDirectoryService;
+    private final SupportModerationService supportModerationService;
 
-    public InternalSupportController(SupportChatService supportChatService) {
-        this.supportChatService = supportChatService;
+    public InternalSupportController(SupportCustomerDirectoryService supportCustomerDirectoryService,
+                                     SupportModerationService supportModerationService) {
+        this.supportCustomerDirectoryService = supportCustomerDirectoryService;
+        this.supportModerationService = supportModerationService;
     }
 
     @GetMapping("customers")
@@ -37,19 +41,19 @@ public class InternalSupportController {
             @RequestParam(name = "query", required = false) String query,
             @RequestParam(name = "limit", required = false) Integer limit
     ) {
-        return ResponseEntity.ok(supportChatService.searchSupportCustomers(query, limit));
+        return ResponseEntity.ok(supportCustomerDirectoryService.searchSupportCustomers(query, limit));
     }
 
     @GetMapping("customer-status")
     public ResponseEntity<SupportCustomerStatusDto> getCustomerStatus(
             @RequestParam(name = "userMail") String userMail
     ) {
-        return ResponseEntity.ok(supportChatService.getCustomerStatus(userMail));
+        return ResponseEntity.ok(supportCustomerDirectoryService.getCustomerStatus(userMail));
     }
 
     @PostMapping("agent-message")
     public ResponseEntity<Void> receiveAgentMessage(@Valid @RequestBody InternalSupportAgentMessageDto dto) {
-        supportChatService.addManagementMessage(
+        supportModerationService.addManagementMessage(
                 dto.getUserMail().trim(),
                 dto.getMessage().trim(),
                 dto.getExternalMessageId() == null ? null : dto.getExternalMessageId().trim());
@@ -58,7 +62,7 @@ public class InternalSupportController {
 
     @PostMapping("edit-agent-message")
     public ResponseEntity<Void> editAgentMessage(@Valid @RequestBody InternalSupportEditAgentMessageDto dto) {
-        supportChatService.editManagementMessage(
+        supportModerationService.editManagementMessage(
                 dto.getUserMail().trim(),
                 dto.getExternalMessageId().trim(),
                 dto.getMessage().trim());
@@ -67,7 +71,7 @@ public class InternalSupportController {
 
     @PostMapping("delete-agent-message")
     public ResponseEntity<Void> deleteAgentMessage(@Valid @RequestBody InternalSupportDeleteAgentMessageDto dto) {
-        supportChatService.deleteManagementMessage(
+        supportModerationService.deleteManagementMessage(
                 dto.getUserMail().trim(),
                 dto.getExternalMessageId().trim());
         return ResponseEntity.accepted().build();
@@ -75,19 +79,19 @@ public class InternalSupportController {
 
     @PostMapping("ban-user")
     public ResponseEntity<Void> banUser(@Valid @RequestBody InternalSupportUserActionDto dto) {
-        supportChatService.banUser(dto.getUserMail().trim());
+        supportModerationService.banUser(dto.getUserMail().trim());
         return ResponseEntity.accepted().build();
     }
 
     @PostMapping("clear-chat")
     public ResponseEntity<Void> clearChat(@Valid @RequestBody InternalSupportUserActionDto dto) {
-        supportChatService.closeChat(dto.getUserMail().trim());
+        supportModerationService.closeChat(dto.getUserMail().trim());
         return ResponseEntity.accepted().build();
     }
 
     @PostMapping("unban-user")
     public ResponseEntity<Void> unbanUser(@Valid @RequestBody InternalSupportUserActionDto dto) {
-        supportChatService.unbanUser(dto.getUserMail().trim());
+        supportModerationService.unbanUser(dto.getUserMail().trim());
         return ResponseEntity.accepted().build();
     }
 }

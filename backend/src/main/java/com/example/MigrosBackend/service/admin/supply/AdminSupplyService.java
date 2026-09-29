@@ -1,6 +1,7 @@
 package com.example.MigrosBackend.service.admin.supply;
 
 import com.example.MigrosBackend.dto.admin.panel.*;
+import com.example.MigrosBackend.dto.user.product.ProductDetailDto;
 import com.example.MigrosBackend.entity.admin.AdminEntity;
 import com.example.MigrosBackend.entity.category.CategoryEntity;
 import com.example.MigrosBackend.entity.product.ProductEntity;
@@ -11,10 +12,10 @@ import com.example.MigrosBackend.exception.admin.ProductNotFoundException;
 import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.repository.category.CategoryEntityRepository;
-import com.example.MigrosBackend.repository.product.ProductDescriptionEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductImageEntityRepository;
 import com.example.MigrosBackend.service.global.FileService;
+import com.example.MigrosBackend.service.user.supply.UserCatalogReadService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -39,17 +40,18 @@ public class AdminSupplyService {
     private final AdminProductDescriptionOperations productDescriptionOperations;
     private final AdminProductImageOperations productImageOperations;
     private final FileService fileService;
+    private final UserCatalogReadService catalogReadService;
 
     @Autowired
-    public AdminSupplyService(CategoryEntityRepository categoryEntityRepository, ProductEntityRepository productEntityRepository, ProductImageEntityRepository productImageEntityRepository, AdminEntityRepository adminEntityRepository, ProductDescriptionEntityRepository productDescriptionEntityRepository, FileService fileService) {
+    public AdminSupplyService(CategoryEntityRepository categoryEntityRepository, ProductEntityRepository productEntityRepository, ProductImageEntityRepository productImageEntityRepository, AdminEntityRepository adminEntityRepository, FileService fileService, AdminProductDescriptionOperations productDescriptionOperations, AdminProductImageOperations productImageOperations, UserCatalogReadService catalogReadService) {
         this.categoryEntityRepository = categoryEntityRepository;
         this.productEntityRepository = productEntityRepository;
         this.productImageEntityRepository = productImageEntityRepository;
         this.adminEntityRepository = adminEntityRepository;
         this.fileService = fileService;
-        this.productDescriptionOperations = new AdminProductDescriptionOperations(
-                productEntityRepository, productDescriptionEntityRepository);
-        this.productImageOperations = new AdminProductImageOperations(fileService);
+        this.productDescriptionOperations = productDescriptionOperations;
+        this.productImageOperations = productImageOperations;
+        this.catalogReadService = catalogReadService;
     }
 
     /**
@@ -243,19 +245,8 @@ public void addProduct(AdminAddItemDto adminAddItemDto) {
         productEntityRepository.deleteById(productId);
     }
 
-    public ProductDto2 getProductData(Long productId) {
-        ProductEntity productEntity = productEntityRepository.findById(productId).orElseThrow(() -> new ProductNotFoundException(productId.toString()));
-
-        ProductDto2 productDto2 = new ProductDto2();
-        productDto2.setProductName(productEntity.getProductName());
-        productDto2.setSubCategoryName(productEntity.getSubcategoryName());
-        productDto2.setProductPrice(productEntity.getProductPrice());
-        productDto2.setProductCount(productEntity.getProductCount());
-        productDto2.setProductDiscount(productEntity.getProductDiscount());
-        productDto2.setProductDescription(productEntity.getProductDescription());
-        productDto2.setProductCategoryId(Math.toIntExact(productEntity.getCategoryEntity().getId()));
-
-        return productDto2;
+    public ProductDetailDto getProductData(Long productId) {
+        return catalogReadService.getProductData(productId);
     }
 
     public void addProductDescription(ProductDescriptionListDto productDescriptions) {

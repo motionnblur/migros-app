@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class SupportReplyDto {
+public class SupportAdminMessageDto {
     @NotBlank
     private String userMail;
     @NotBlank

@@ -1,18 +1,21 @@
 package com.example.MigrosBackend.service.admin.supply;
 
-import com.example.MigrosBackend.dto.admin.panel.DescriptionsDto;
+import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionTabDto;
 import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionListDto;
 import com.example.MigrosBackend.entity.product.ProductDescriptionEntity;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.exception.admin.ProductNotFoundException;
 import com.example.MigrosBackend.repository.product.ProductDescriptionEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-final class AdminProductDescriptionOperations {
+@Service
+public class AdminProductDescriptionOperations {
     private final ProductEntityRepository productEntityRepository;
     private final ProductDescriptionEntityRepository productDescriptionEntityRepository;
 
@@ -22,49 +25,48 @@ final class AdminProductDescriptionOperations {
         this.productDescriptionEntityRepository = productDescriptionEntityRepository;
     }
 
-    void addProductDescription(ProductDescriptionListDto productDescriptions) {
+    @Transactional
+    public void addProductDescription(ProductDescriptionListDto productDescriptions) {
         ProductEntity productEntity = productEntityRepository.findById(productDescriptions.getProductId())
                 .orElseThrow(() -> new ProductNotFoundException(productDescriptions.getProductId().toString()));
 
-        List<ProductDescriptionEntity> productDescriptionEntities =
+        List<ProductDescriptionEntity> existingEntities =
                 productDescriptionEntityRepository.findByProductEntityId(productEntity.getId());
-        if (productDescriptionEntities.isEmpty()) {
-            for (DescriptionsDto item : productDescriptions.getDescriptionList()) {
-                ProductDescriptionEntity productDescriptionEntity = new ProductDescriptionEntity();
-                productDescriptionEntity.setDescriptionTabName(item.getDescriptionTabName());
-                productDescriptionEntity.setDescriptionTabContent(item.getDescriptionTabContent());
-                productDescriptionEntity.setProductEntity(productEntity);
+        boolean productHasDescriptions = !existingEntities.isEmpty();
 
-                productDescriptionEntityRepository.save(productDescriptionEntity);
-            }
-            return;
+        List<ProductDescriptionEntity> entitiesToSave = new ArrayList<>();
+        for (ProductDescriptionTabDto item : productDescriptions.getDescriptionList()) {
+            entitiesToSave.add(resolveDescription(item, productHasDescriptions, productEntity));
         }
 
-        List<DescriptionsDto> descriptionsDtoList = productDescriptions.getDescriptionList();
-        for (int i = 0; i < descriptionsDtoList.size(); i++) {
-            Optional<ProductDescriptionEntity> pE =
-                    productDescriptionEntityRepository.findById(descriptionsDtoList.get(i).getDescriptionId());
-            if (pE.isPresent()) {
-                ProductDescriptionEntity productDescriptionEntity = pE.get();
-                productDescriptionEntity.setDescriptionTabName(descriptionsDtoList.get(i).getDescriptionTabName());
-                productDescriptionEntity.setDescriptionTabContent(descriptionsDtoList.get(i).getDescriptionTabContent());
+        productDescriptionEntityRepository.saveAll(entitiesToSave);
+    }
 
-                productDescriptionEntityRepository.save(productDescriptionEntity);
-            } else {
-                ProductDescriptionEntity productDescriptionEntity = new ProductDescriptionEntity();
-                productDescriptionEntity.setDescriptionTabName(descriptionsDtoList.get(i).getDescriptionTabName());
-                productDescriptionEntity.setDescriptionTabContent(descriptionsDtoList.get(i).getDescriptionTabContent());
-                productDescriptionEntity.setProductEntity(productEntity);
-
-                productDescriptionEntityRepository.save(productDescriptionEntity);
+    private ProductDescriptionEntity resolveDescription(ProductDescriptionTabDto item,
+                                                        boolean productHasDescriptions,
+                                                        ProductEntity productEntity) {
+        if (productHasDescriptions) {
+            Optional<ProductDescriptionEntity> existingEntity =
+                    productDescriptionEntityRepository.findById(item.descriptionId());
+            if (existingEntity.isPresent()) {
+                ProductDescriptionEntity productDescriptionEntity = existingEntity.get();
+                productDescriptionEntity.setDescriptionTabName(item.tabName());
+                productDescriptionEntity.setDescriptionTabContent(item.tabContent());
+                return productDescriptionEntity;
             }
         }
+
+        ProductDescriptionEntity productDescriptionEntity = new ProductDescriptionEntity();
+        productDescriptionEntity.setDescriptionTabName(item.tabName());
+        productDescriptionEntity.setDescriptionTabContent(item.tabContent());
+        productDescriptionEntity.setProductEntity(productEntity);
+        return productDescriptionEntity;
     }
 
     ProductDescriptionListDto getProductDescription(Long productId) {
         List<ProductDescriptionEntity> productDescriptionEntities =
                 productDescriptionEntityRepository.findByProductEntityId(productId);
-        if (productDescriptionEntities == null || productDescriptionEntities.isEmpty())
+        if (productDescriptionEntities.isEmpty())
             throw new ProductNotFoundException(productId.toString());
 
         ProductDescriptionListDto productDescriptionDto = new ProductDescriptionListDto();
@@ -72,7 +74,7 @@ final class AdminProductDescriptionOperations {
         productDescriptionDto.setDescriptionList(new ArrayList<>());
 
         for (ProductDescriptionEntity item : productDescriptionEntities) {
-            DescriptionsDto dto = new DescriptionsDto(
+            ProductDescriptionTabDto dto = new ProductDescriptionTabDto(
                     item.getId(),
                     item.getDescriptionTabName(),
                     item.getDescriptionTabContent()

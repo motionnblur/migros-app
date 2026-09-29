@@ -2,13 +2,14 @@ package com.example.MigrosBackend.controller.user.supply;
 
 import com.example.MigrosBackend.config.security.AuthCookies;
 import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionListDto;
-import com.example.MigrosBackend.dto.admin.panel.ProductDto2;
 import com.example.MigrosBackend.dto.user.category.SubCategoryDto;
 import com.example.MigrosBackend.dto.user.order.UserOrderDetailDto;
 import com.example.MigrosBackend.dto.user.order.UserOrderGroupDto;
+import com.example.MigrosBackend.dto.user.product.ProductDetailDto;
 import com.example.MigrosBackend.dto.user.product.ProductPreviewDto;
 import com.example.MigrosBackend.dto.user.product.UserCartItemDto;
 import com.example.MigrosBackend.helper.AuthTokenResolver;
+import com.example.MigrosBackend.service.user.supply.UserCartService;
 import com.example.MigrosBackend.service.user.supply.UserSupplyService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
@@ -28,11 +29,15 @@ import java.util.List;
 @RequestMapping("user/supply")
 public class UserSupplyController {
     private final UserSupplyService userSupplyService;
+    private final UserCartService userCartService;
     private final AuthTokenResolver authTokenResolver;
 
     @Autowired
-    public UserSupplyController(UserSupplyService userSupplyService, AuthTokenResolver authTokenResolver) {
+    public UserSupplyController(UserSupplyService userSupplyService,
+                                UserCartService userCartService,
+                                AuthTokenResolver authTokenResolver) {
         this.userSupplyService = userSupplyService;
+        this.userCartService = userCartService;
         this.authTokenResolver = authTokenResolver;
     }
 
@@ -86,18 +91,18 @@ public class UserSupplyController {
     @PostMapping("addProductToUserCart")
     public ResponseEntity<Void> addProductToUserCart(@RequestParam Long productId,
                                                      @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
-        userSupplyService.addProductToInventory(productId, authTokenResolver.requireToken(token));
+        userCartService.addProductToCart(productId, authTokenResolver.requireToken(token));
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("getProductData")
     public ResponseEntity<List<UserCartItemDto>> getProductData(
             @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
-        return ResponseEntity.ok(userSupplyService.getProductData(authTokenResolver.requireToken(token)));
+        return ResponseEntity.ok(userCartService.getCartData(authTokenResolver.requireToken(token)));
     }
 
     @GetMapping("getProductDataWithProductId")
-    private ResponseEntity<ProductDto2> getProductData(@RequestParam Long productId) {
+    private ResponseEntity<ProductDetailDto> getProductData(@RequestParam Long productId) {
         return ResponseEntity.ok(userSupplyService.getProductData(productId));
     }
 
@@ -109,7 +114,7 @@ public class UserSupplyController {
     @DeleteMapping("removeProductFromUserCart")
     public ResponseEntity<Void> removeProductFromUserCart(@RequestParam Long productId,
                                                           @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
-        userSupplyService.removeProductFromInventory(productId, authTokenResolver.requireToken(token));
+        userCartService.removeProductFromCart(productId, authTokenResolver.requireToken(token));
         return ResponseEntity.ok().build();
     }
 
@@ -117,7 +122,7 @@ public class UserSupplyController {
     public ResponseEntity<Void> updateProductCountInUserCart(@RequestParam Long productId,
                                                              @RequestParam int count,
                                                              @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
-        userSupplyService.updateProductCountInInventory(productId, count, authTokenResolver.requireToken(token));
+        userCartService.updateProductCountInCart(productId, count, authTokenResolver.requireToken(token));
         return ResponseEntity.ok().build();
     }
 

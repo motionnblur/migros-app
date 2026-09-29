@@ -10,22 +10,16 @@ import com.example.MigrosBackend.entity.checkout.CheckoutStatus;
 import com.example.MigrosBackend.entity.payment.PaymentAttemptEntity;
 import com.example.MigrosBackend.entity.payment.PaymentAttemptStatus;
 import com.example.MigrosBackend.entity.user.UserEntity;
-import com.example.MigrosBackend.exception.admin.UserNotFoundException;
 import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.exception.user.CheckoutNotFoundException;
 import com.example.MigrosBackend.exception.user.PaymentAttemptNotFoundException;
 import com.example.MigrosBackend.exception.user.PaymentStateException;
-import com.example.MigrosBackend.exception.user.StalePaymentLeaseException;
 import com.example.MigrosBackend.repository.user.CheckoutEntityRepository;
 import com.example.MigrosBackend.repository.user.PaymentAttemptEntityRepository;
-import com.example.MigrosBackend.repository.user.UserEntityRepository;
-import com.example.MigrosBackend.service.global.TokenService;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -44,7 +38,8 @@ import java.util.UUID;
  * lock — never as a read-then-write sequence. Fencing is by token ownership,
  * not wall-clock expiry: a result that began before expiry still commits while
  * its token is current; once another claim replaces the token, every result
- * from the older worker is rejected with {@link StalePaymentLeaseException}
+ * from the older worker is rejected with {@link PaymentStateException}
+ * (specifically {@link com.example.MigrosBackend.exception.user.StalePaymentLeaseException})
  * without changing attempt, checkout, order, stock, lease, or refund state.
  *
  * <p>Stripe webhooks and reconciliation never possess a worker token. They use
@@ -61,25 +56,23 @@ import java.util.UUID;
 @Service
 public class PaymentAttemptService {
 
-    private final TokenService tokenService;
-    private final UserEntityRepository userEntityRepository;
     private final CheckoutEntityRepository checkoutEntityRepository;
     private final PaymentAttemptEntityRepository paymentAttemptEntityRepository;
     private final CheckoutService checkoutService;
-    private final long leaseSeconds;
+    private final PaymentAttemptLeases leases;
+    private final PaymentUserResolver userResolver;
 
-    public PaymentAttemptService(TokenService tokenService,
-                                 UserEntityRepository userEntityRepository,
-                                 CheckoutEntityRepository checkoutEntityRepository,
+    @Autowired
+    public PaymentAttemptService(CheckoutEntityRepository checkoutEntityRepository,
                                  PaymentAttemptEntityRepository paymentAttemptEntityRepository,
                                  CheckoutService checkoutService,
-                                 @Value("${payment.attempt.lease-seconds:120}") long leaseSeconds) {
-        this.tokenService = tokenService;
-        this.userEntityRepository = userEntityRepository;
+                                 PaymentAttemptLeases leases,
+                                 PaymentUserResolver userResolver) {
         this.checkoutEntityRepository = checkoutEntityRepository;
         this.paymentAttemptEntityRepository = paymentAttemptEntityRepository;
         this.checkoutService = checkoutService;
-        this.leaseSeconds = leaseSeconds;
+        this.leases = leases;
+        this.userResolver = userResolver;
     }
 
     /**
@@ -90,7 +83,7 @@ public class PaymentAttemptService {
      */
     @Transactional
     public PaymentClaim claim(String userToken, UUID checkoutId, String idempotencyKey) {
-        UserEntity user = authenticatedUser(userToken);
+        UserEntity user = userResolver.requireUser(userToken);
         CheckoutEntity checkout = checkoutEntityRepository
                 .findOwnedByIdForUpdate(checkoutId, user.getId())
                 .orElseThrow(CheckoutNotFoundException::new);
@@ -114,40 +107,40 @@ public class PaymentAttemptService {
         PaymentAttemptStatus state = attempt.getStatus();
 
         if (state.isFinalized()) {
-            return describe(attempt, PaymentClaimDecision.FINALIZED, null);
+            return PaymentAttemptMapper.describe(attempt, PaymentClaimDecision.FINALIZED, null);
         }
         if (state == PaymentAttemptStatus.CHARGE_SUCCEEDED) {
             if (PaymentAttemptDecisionPolicy.hasValidLease(attempt, now)) {
                 // Another worker owns the finalization window; report FINALIZE
                 // without stealing its lease.
-                return describe(attempt, PaymentClaimDecision.FINALIZE, null);
+                return PaymentAttemptMapper.describe(attempt, PaymentClaimDecision.FINALIZE, null);
             }
-            String leaseOwner = acquireLease(attempt, now);
+            String leaseOwner = leases.acquireLease(attempt, now);
             save(attempt);
-            return describe(attempt, PaymentClaimDecision.FINALIZE, leaseOwner);
+            return PaymentAttemptMapper.describe(attempt, PaymentClaimDecision.FINALIZE, leaseOwner);
         }
         if (state == PaymentAttemptStatus.PROCESSING) {
             if (PaymentAttemptDecisionPolicy.hasValidLease(attempt, now)) {
-                return describe(attempt, PaymentClaimDecision.PENDING, null);
+                return PaymentAttemptMapper.describe(attempt, PaymentClaimDecision.PENDING, null);
             }
-            String leaseOwner = acquireLease(attempt, now);
+            String leaseOwner = leases.acquireLease(attempt, now);
             save(attempt);
-            return describe(attempt, PaymentClaimDecision.PROCEED, leaseOwner);
+            return PaymentAttemptMapper.describe(attempt, PaymentClaimDecision.PROCEED, leaseOwner);
         }
         if (state == PaymentAttemptStatus.CREATED) {
             transition(attempt, PaymentAttemptStatus.PROCESSING);
-            String leaseOwner = acquireLease(attempt, now);
+            String leaseOwner = leases.acquireLease(attempt, now);
             save(attempt);
-            return describe(attempt, PaymentClaimDecision.PROCEED, leaseOwner);
+            return PaymentAttemptMapper.describe(attempt, PaymentClaimDecision.PROCEED, leaseOwner);
         }
-        return describe(attempt, PaymentClaimDecision.TERMINAL, null);
+        return PaymentAttemptMapper.describe(attempt, PaymentClaimDecision.TERMINAL, null);
     }
 
     @Transactional
     public PaymentClaim describeAttempt(UUID attemptId) {
         PaymentAttemptEntity attempt = paymentAttemptEntityRepository.findByIdForUpdate(attemptId)
                 .orElseThrow(PaymentAttemptNotFoundException::new);
-        return describe(attempt, PaymentAttemptDecisionPolicy.forStatus(
+        return PaymentAttemptMapper.describe(attempt, PaymentAttemptDecisionPolicy.forStatus(
                 attempt.getStatus(), attempt, LocalDateTime.now()), null);
     }
 
@@ -178,10 +171,10 @@ public class PaymentAttemptService {
                 && chargeId.equals(attempt.getStripeChargeId())) {
             // Idempotent replay of the already-durable success: no attempt,
             // lease, checkout, stock, or order change.
-            return toStatus(attempt);
+            return PaymentAttemptMapper.toStatus(attempt);
         }
 
-        requireCurrentLease(attempt, leaseOwner);
+        leases.requireCurrentLease(attempt, leaseOwner);
 
         if (attempt.getStripeChargeId() != null && !attempt.getStripeChargeId().equals(chargeId)) {
             reject(attempt, PaymentAttemptStatus.MANUAL_REVIEW,
@@ -195,9 +188,9 @@ public class PaymentAttemptService {
         attempt.setStripeChargeId(chargeId);
         attempt.setProviderStatus("succeeded");
         transition(attempt, PaymentAttemptStatus.CHARGE_SUCCEEDED);
-        extendLease(attempt, LocalDateTime.now());
+        leases.extendLease(attempt, LocalDateTime.now());
         save(attempt);
-        return toStatus(attempt);
+        return PaymentAttemptMapper.toStatus(attempt);
     }
 
     /**
@@ -249,7 +242,7 @@ public class PaymentAttemptService {
             // the original errorCode would be overwritten.
             attachConflictEvidence(attempt, chargeId);
             save(attempt);
-            return toStatus(attempt);
+            return PaymentAttemptMapper.toStatus(attempt);
         }
         if (!checkoutId.equals(attempt.getCheckoutId())) {
             reject(attempt, PaymentAttemptStatus.MANUAL_REVIEW,
@@ -276,7 +269,7 @@ public class PaymentAttemptService {
                 attempt.setProviderStatus("succeeded");
             }
             save(attempt);
-            return toStatus(attempt);
+            return PaymentAttemptMapper.toStatus(attempt);
         }
         if (state == PaymentAttemptStatus.REFUNDED) {
             // Historical success for an already-refunded charge: preserve the
@@ -290,7 +283,7 @@ public class PaymentAttemptService {
                 attempt.setProviderStatus("succeeded");
             }
             save(attempt);
-            return toStatus(attempt);
+            return PaymentAttemptMapper.toStatus(attempt);
         }
         if (state == PaymentAttemptStatus.FAILED_FINAL) {
             // Contradictory provider evidence: money may have moved after the
@@ -314,7 +307,7 @@ public class PaymentAttemptService {
                 attempt.setProviderStatus("succeeded");
             }
             save(attempt);
-            return toStatus(attempt);
+            return PaymentAttemptMapper.toStatus(attempt);
         }
         if (state != PaymentAttemptStatus.PROCESSING && state != PaymentAttemptStatus.CREATED) {
             throw new PaymentStateException("Cannot record a provider charge from state " + state);
@@ -322,10 +315,10 @@ public class PaymentAttemptService {
 
         attempt.setStripeChargeId(chargeId);
         attempt.setProviderStatus("succeeded");
-        clearLease(attempt);
+        leases.clearLease(attempt);
         transition(attempt, PaymentAttemptStatus.CHARGE_SUCCEEDED);
         save(attempt);
-        return toStatus(attempt);
+        return PaymentAttemptMapper.toStatus(attempt);
     }
 
     /**
@@ -340,12 +333,12 @@ public class PaymentAttemptService {
         if (attempt.getStatus() == PaymentAttemptStatus.ORDER_FINALIZED) {
             return;
         }
-        requireCurrentLease(attempt, leaseOwner);
+        leases.requireCurrentLease(attempt, leaseOwner);
         if (attempt.getStatus() != PaymentAttemptStatus.CHARGE_SUCCEEDED) {
             throw new PaymentStateException(
                     "Cannot finalize an order from state " + attempt.getStatus());
         }
-        clearLease(attempt);
+        leases.clearLease(attempt);
         transition(attempt, PaymentAttemptStatus.ORDER_FINALIZED);
         save(attempt);
     }
@@ -375,7 +368,7 @@ public class PaymentAttemptService {
         if (attempt.getStripeChargeId() == null && chargeId != null) {
             attempt.setStripeChargeId(chargeId);
         }
-        clearLease(attempt);
+        leases.clearLease(attempt);
         transition(attempt, PaymentAttemptStatus.ORDER_FINALIZED);
         save(attempt);
     }
@@ -393,15 +386,15 @@ public class PaymentAttemptService {
         if (attempt.getStatus() == PaymentAttemptStatus.FAILED_FINAL) {
             return;
         }
-        requireCurrentLease(attempt, leaseOwner);
+        leases.requireCurrentLease(attempt, leaseOwner);
         if (attempt.getStatus() != PaymentAttemptStatus.PROCESSING
                 && attempt.getStatus() != PaymentAttemptStatus.CREATED) {
             // A charge may already exist; never overwrite a durable success.
             throw new PaymentStateException(
                     "Cannot record a decline from state " + attempt.getStatus());
         }
-        attempt.setErrorCode(sanitizeCode(errorCode));
-        clearLease(attempt);
+        attempt.setErrorCode(StripePayloadCodec.sanitizeCode(errorCode));
+        leases.clearLease(attempt);
         transition(attempt, PaymentAttemptStatus.FAILED_FINAL);
         save(attempt);
         checkoutService.failPayment(attempt.getCheckoutId());
@@ -426,8 +419,8 @@ public class PaymentAttemptService {
             throw new PaymentStateException(
                     "Cannot record a provider decline from state " + attempt.getStatus());
         }
-        attempt.setErrorCode(sanitizeCode(errorCode));
-        clearLease(attempt);
+        attempt.setErrorCode(StripePayloadCodec.sanitizeCode(errorCode));
+        leases.clearLease(attempt);
         transition(attempt, PaymentAttemptStatus.FAILED_FINAL);
         save(attempt);
         checkoutService.failPayment(attempt.getCheckoutId());
@@ -439,7 +432,8 @@ public class PaymentAttemptService {
             return null;
         }
         return paymentAttemptEntityRepository.findByStripeChargeId(chargeId)
-                .map(attempt -> describe(attempt, PaymentClaimDecision.PENDING, null))
+                .map(attempt -> PaymentAttemptMapper.describe(
+                        attempt, PaymentClaimDecision.PENDING, null))
                 .orElse(null);
     }
 
@@ -449,7 +443,8 @@ public class PaymentAttemptService {
             return null;
         }
         return paymentAttemptEntityRepository.findByCheckoutId(checkoutId)
-                .map(attempt -> describe(attempt, PaymentClaimDecision.PENDING, null))
+                .map(attempt -> PaymentAttemptMapper.describe(
+                        attempt, PaymentClaimDecision.PENDING, null))
                 .orElse(null);
     }
 
@@ -460,8 +455,8 @@ public class PaymentAttemptService {
         if (attempt.getStatus() == PaymentAttemptStatus.MANUAL_REVIEW) {
             return;
         }
-        attempt.setErrorCode(sanitizeCode(reason));
-        clearLease(attempt);
+        attempt.setErrorCode(StripePayloadCodec.sanitizeCode(reason));
+        leases.clearLease(attempt);
         transition(attempt, PaymentAttemptStatus.MANUAL_REVIEW);
         save(attempt);
     }
@@ -502,8 +497,8 @@ public class PaymentAttemptService {
         if (attempt.getStripeChargeId() == null || !attempt.getStatus().hasDurableCharge()) {
             throw new PaymentStateException("Cannot refund an attempt without a captured charge");
         }
-        attempt.setErrorCode(sanitizeCode(reason));
-        clearLease(attempt);
+        attempt.setErrorCode(StripePayloadCodec.sanitizeCode(reason));
+        leases.clearLease(attempt);
         transition(attempt, PaymentAttemptStatus.REFUND_PENDING);
         save(attempt);
         return true;
@@ -524,14 +519,14 @@ public class PaymentAttemptService {
                     "Cannot record a refund from state " + attempt.getStatus());
         }
         attempt.setRefundId(refundId);
-        clearLease(attempt);
+        leases.clearLease(attempt);
         transition(attempt, PaymentAttemptStatus.REFUNDED);
         save(attempt);
     }
 
     @Transactional
     public PaymentStatusDto getStatus(String userToken, UUID checkoutId) {
-        UserEntity user = authenticatedUser(userToken);
+        UserEntity user = userResolver.requireUser(userToken);
         CheckoutEntity checkout = checkoutEntityRepository
                 .findOwnedByIdForUpdate(checkoutId, user.getId())
                 .orElseThrow(CheckoutNotFoundException::new);
@@ -543,30 +538,10 @@ public class PaymentAttemptService {
 
         if (attempt == null) {
             CheckoutStatus checkoutState = checkout.getStatus();
-            return new PaymentStatusDto(
-                    checkoutId.toString(), null, checkoutState.name(), null,
-                    checkout.getStripeChargeId(), checkout.getTotalAmount(), checkout.getAmountMinor(),
-                    checkout.getCurrency(), checkout.getOrderGroupEntityId(),
-                    checkoutState == CheckoutStatus.CONSUMED, false, false);
+            return PaymentAttemptMapper.statusWithoutAttempt(checkoutId, checkout, checkoutState);
         }
 
-        boolean finalized = attempt.getStatus().isFinalized();
-        boolean pending = attempt.getStatus() == PaymentAttemptStatus.PROCESSING
-                || attempt.getStatus() == PaymentAttemptStatus.CHARGE_SUCCEEDED;
-        boolean refunded = attempt.getStatus() == PaymentAttemptStatus.REFUNDED;
-        return new PaymentStatusDto(
-                checkoutId.toString(),
-                attempt.getId().toString(),
-                checkoutStatus.status(),
-                attempt.getStatus().name(),
-                attempt.getStripeChargeId(),
-                checkout.getTotalAmount(),
-                attempt.getAmountMinor(),
-                attempt.getCurrency(),
-                checkout.getOrderGroupEntityId(),
-                finalized,
-                pending,
-                refunded);
+        return PaymentAttemptMapper.statusWithAttempt(checkoutId, checkoutStatus, attempt, checkout);
     }
 
     @Transactional(readOnly = true)
@@ -575,7 +550,7 @@ public class PaymentAttemptService {
         if (attempt == null) {
             return null;
         }
-        return describe(attempt, PaymentAttemptDecisionPolicy.forStatus(
+        return PaymentAttemptMapper.describe(attempt, PaymentAttemptDecisionPolicy.forStatus(
                 attempt.getStatus(), attempt, LocalDateTime.now()), null);
     }
 
@@ -613,46 +588,6 @@ public class PaymentAttemptService {
         }
     }
 
-    private String acquireLease(PaymentAttemptEntity attempt, LocalDateTime now) {
-        String owner = UUID.randomUUID().toString();
-        attempt.setLeaseOwner(owner);
-        attempt.setLeaseExpiresAt(now.plusSeconds(leaseSeconds));
-        attempt.setUpdatedAt(now);
-        return owner;
-    }
-
-    /**
-     * Extends the expiry of the currently held lease without rotating the
-     * token, so the worker that just recorded success keeps authority over the
-     * finalization window.
-     */
-    private void extendLease(PaymentAttemptEntity attempt, LocalDateTime now) {
-        attempt.setLeaseExpiresAt(now.plusSeconds(leaseSeconds));
-        attempt.setUpdatedAt(now);
-    }
-
-    /**
-     * Fencing check run inside the row-locked transaction before any worker
-     * state change. Ownership is by token equality only — an expired but
-     * unreplaced token still commits — because replacement (not the wall
-     * clock) is what revokes a worker. Comparison is constant-time so lease
-     * tokens are not subject to timing probing.
-     */
-    private void requireCurrentLease(PaymentAttemptEntity attempt, String leaseOwner) {
-        if (leaseOwner == null || leaseOwner.isBlank()
-                || attempt.getLeaseOwner() == null
-                || !constantTimeEquals(attempt.getLeaseOwner(), leaseOwner)) {
-            throw new StalePaymentLeaseException(
-                    "Stale payment lease: the attempt is owned by another worker");
-        }
-    }
-
-    private boolean constantTimeEquals(String stored, String presented) {
-        return MessageDigest.isEqual(
-                stored.getBytes(StandardCharsets.UTF_8),
-                presented.getBytes(StandardCharsets.UTF_8));
-    }
-
     /**
      * Loads the attempt for a decline path with locks acquired checkout-first,
      * matching the claim path order (checkout, then attempt, then product
@@ -671,12 +606,6 @@ public class PaymentAttemptService {
                 .orElseThrow(PaymentAttemptNotFoundException::new);
     }
 
-    private void clearLease(PaymentAttemptEntity attempt) {
-        attempt.setLeaseOwner(null);
-        attempt.setLeaseExpiresAt(null);
-        attempt.setUpdatedAt(LocalDateTime.now());
-    }
-
     private void transition(PaymentAttemptEntity attempt, PaymentAttemptStatus next) {
         if (!attempt.getStatus().canTransitionTo(next)) {
             throw new PaymentStateException(
@@ -687,8 +616,8 @@ public class PaymentAttemptService {
     }
 
     private void reject(PaymentAttemptEntity attempt, PaymentAttemptStatus next, String reason) {
-        attempt.setErrorCode(sanitizeCode(reason));
-        clearLease(attempt);
+        attempt.setErrorCode(StripePayloadCodec.sanitizeCode(reason));
+        leases.clearLease(attempt);
         transition(attempt, next);
         save(attempt);
         throw new PaymentStateException(reason);
@@ -717,7 +646,7 @@ public class PaymentAttemptService {
             }
             return false;
         }
-        String conflict = sanitizeCode("conflict:" + chargeId.trim());
+        String conflict = StripePayloadCodec.sanitizeCode("conflict:" + chargeId.trim());
         if (!conflict.equals(attempt.getProviderStatus())) {
             attempt.setProviderStatus(conflict);
             return true;
@@ -727,50 +656,5 @@ public class PaymentAttemptService {
 
     private void save(PaymentAttemptEntity attempt) {
         paymentAttemptEntityRepository.save(attempt);
-    }
-
-    private PaymentClaim describe(PaymentAttemptEntity attempt,
-                                  PaymentClaimDecision decision,
-                                  String leaseOwner) {
-        return new PaymentClaim(
-                decision,
-                attempt.getId(),
-                attempt.getCheckoutId(),
-                attempt.getIdempotencyKey(),
-                attempt.getAmountMinor(),
-                attempt.getCurrency(),
-                leaseOwner,
-                attempt.getStripeChargeId(),
-                attempt.getStatus());
-    }
-
-    private CheckoutStatusDto toStatus(PaymentAttemptEntity attempt) {
-        return new CheckoutStatusDto(
-                attempt.getCheckoutId().toString(),
-                attempt.getStatus().name(),
-                null,
-                attempt.getAmountMinor(),
-                attempt.getCurrency(),
-                null,
-                null,
-                null,
-                attempt.getStripeChargeId());
-    }
-
-    private String sanitizeCode(String value) {
-        if (value == null) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.length() <= 64 ? trimmed : trimmed.substring(0, 64);
-    }
-
-    private UserEntity authenticatedUser(String userToken) {
-        String userMail = tokenService.validateAndExtractUser(userToken);
-        UserEntity user = userEntityRepository.findByUserMail(userMail);
-        if (user == null) {
-            throw new UserNotFoundException(userMail);
-        }
-        return user;
     }
 }

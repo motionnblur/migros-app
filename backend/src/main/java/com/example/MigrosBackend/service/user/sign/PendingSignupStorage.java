@@ -3,6 +3,7 @@ package com.example.MigrosBackend.service.user.sign;
 import com.example.MigrosBackend.entity.user.PendingSignupEntity;
 import com.example.MigrosBackend.entity.user.PendingTokenPurpose;
 import com.example.MigrosBackend.repository.user.PendingSignupEntityRepository;
+import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -22,6 +23,7 @@ import java.time.LocalDateTime;
  * removed when it is presented, so no scheduler is needed to keep the table
  * correct.
  */
+@Component
 final class PendingSignupStorage {
 
     private final PendingSignupEntityRepository repository;

@@ -81,13 +81,12 @@ class UserSignupServiceTest {
         publicUrlProperties.setFrontendBaseUrl(frontendBaseUrl);
         return new UserSignupService(
                 userEntityRepository,
-                pendingSignupEntityRepository,
+                new PendingSignupStorage(pendingSignupEntityRepository, transactionManager),
                 encryptService,
                 mailService,
                 tokenService,
                 passwordValidator,
                 publicUrlProperties,
-                transactionManager,
                 15
         );
     }

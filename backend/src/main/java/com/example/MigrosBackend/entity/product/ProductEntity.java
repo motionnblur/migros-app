@@ -2,16 +2,14 @@ package com.example.MigrosBackend.entity.product;
 
 import com.example.MigrosBackend.entity.admin.AdminEntity;
 import com.example.MigrosBackend.entity.category.CategoryEntity;
-import com.fasterxml.jackson.annotation.JsonBackReference;
-import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Objects;
 
 @Entity
-@Data
 @Getter
 @Setter
 @AllArgsConstructor
@@ -42,23 +40,39 @@ public class ProductEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "admin_entity_id", referencedColumnName = "admin_entity_id")
-    @JsonBackReference
     private AdminEntity adminEntity;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_entity_id", referencedColumnName = "category_entity_id")
-    @JsonBackReference
     private CategoryEntity categoryEntity;
 
     @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @JoinColumn(name = "product_entity_id", referencedColumnName = "product_entity_id")
-    @JsonManagedReference
     private List<ProductImageEntity> productImageEntities;
 
     @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @JoinColumn(name = "product_entity_id", referencedColumnName = "product_entity_id")
-    @JsonManagedReference
     private List<ProductDescriptionEntity> descriptionEntities;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        ProductEntity other = (ProductEntity) o;
+        return id != null && id.equals(other.id);
+    }
+
+    @Override
+    public int hashCode() {
+        if (id == null) {
+            return System.identityHashCode(this);
+        }
+        return Objects.hash(getClass(), id);
+    }
 
     @Override
     public String toString() {

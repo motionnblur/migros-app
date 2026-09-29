@@ -11,6 +11,7 @@ import com.example.MigrosBackend.repository.product.ProductEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderGroupEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
+import com.example.MigrosBackend.service.admin.supply.AdminOrderService;
 import com.example.MigrosBackend.service.global.TokenService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -78,7 +79,7 @@ class OrderStatusConcurrencyPostgresTest {
     @Autowired
     private UserSupplyService userSupplyService;
     @Autowired
-    private UserOrderService userOrderService;
+    private AdminOrderService adminOrderService;
     @Autowired
     private UserEntityRepository userEntityRepository;
     @Autowired
@@ -120,7 +121,7 @@ class OrderStatusConcurrencyPostgresTest {
      * {@code DELETE} of the same row blocks too. Only the read itself is
      * observable, and only a {@code SELECT ... FOR UPDATE} blocks while another
      * connection holds the row. The companion unit tests
-     * ({@code UserSupplyServiceTest}, {@code UserOrderServiceTest}) prove the
+     * ({@code UserSupplyServiceTest}, {@code AdminOrderServiceTest}) prove the
      * services call these locking methods, so the two together establish that
      * the status is read under the lock.
      */
@@ -260,7 +261,7 @@ class OrderStatusConcurrencyPostgresTest {
         ProductEntity second = createProduct("StatusB", "10.00", 5);
         OrderGroupEntity group = createPendingGroup(user, first, 1, second, 2);
 
-        userOrderService.updateOrderStatus(group.getId(), "Shipped");
+        adminOrderService.updateOrderStatus(group.getId(), "Shipped");
 
         OrderGroupEntity reloadedGroup = orderGroupEntityRepository.findById(group.getId()).orElseThrow();
         assertEquals("Shipped", reloadedGroup.getStatus());
@@ -278,7 +279,7 @@ class OrderStatusConcurrencyPostgresTest {
         ProductEntity product = createProduct("Verbatim", "10.00", 5);
         OrderGroupEntity group = createPendingGroup(user, product, 1);
 
-        userOrderService.updateOrderStatus(group.getId(), "any-status-string");
+        adminOrderService.updateOrderStatus(group.getId(), "any-status-string");
 
         assertEquals("any-status-string",
                 orderGroupEntityRepository.findById(group.getId()).orElseThrow().getStatus());
@@ -289,9 +290,9 @@ class OrderStatusConcurrencyPostgresTest {
         UserEntity user = createUser("shipped@migros.com");
         ProductEntity product = createProduct("Shipped", "10.00", 1);
         OrderGroupEntity group = createPendingGroup(user, product, 1);
-        userOrderService.updateOrderStatus(group.getId(), "Shipped");
+        adminOrderService.updateOrderStatus(group.getId(), "Shipped");
 
-        userOrderService.deleteOrder(group.getId());
+        adminOrderService.deleteOrder(group.getId());
 
         assertEquals(1, productEntityRepository.findById(product.getId()).orElseThrow().getProductCount(),
                 "stock reserved by a shipped order must not return to the shelf");
@@ -302,7 +303,7 @@ class OrderStatusConcurrencyPostgresTest {
         UserEntity user = createUser("late-cancel@migros.com");
         ProductEntity product = createProduct("LateCancel", "10.00", 5);
         OrderGroupEntity group = createPendingGroup(user, product, 1);
-        userOrderService.updateOrderStatus(group.getId(), "Shipped");
+        adminOrderService.updateOrderStatus(group.getId(), "Shipped");
         String token = tokenService.generateUserToken(user.getUserMail());
 
         assertThrows(GeneralException.class,
@@ -371,9 +372,9 @@ class OrderStatusConcurrencyPostgresTest {
         UserEntity user = createUser("listing@migros.com");
         ProductEntity product = createProduct("Listing", "10.00", 5);
         OrderGroupEntity group = createPendingGroup(user, product, 2);
-        userOrderService.updateOrderStatus(group.getId(), "Shipped");
+        adminOrderService.updateOrderStatus(group.getId(), "Shipped");
 
-        OrderPageDto page = userOrderService.getAllOrders(0, 10);
+        OrderPageDto page = adminOrderService.getAllOrders(0, 10);
 
         assertEquals(1, page.getItems().size());
         assertEquals("Shipped", page.getItems().get(0).getStatus());
@@ -383,7 +384,7 @@ class OrderStatusConcurrencyPostgresTest {
 @Test
     void deletingAnUnknownOrderReportsNotFound() {
         assertThrows(OrderNotFoundException.class,
-                () -> userOrderService.deleteOrder(987654L));
+                () -> adminOrderService.deleteOrder(987654L));
     }
 
     /**
@@ -421,13 +422,13 @@ class OrderStatusConcurrencyPostgresTest {
 
         // An administrator status change must not reach the other group's line.
         assertThrows(OrderNotFoundException.class,
-                () -> userOrderService.updateOrderStatus(doomedGroupId, "Shipped"));
+                () -> adminOrderService.updateOrderStatus(doomedGroupId, "Shipped"));
         assertEquals("Pending",
                 orderEntityRepository.findById(collidingLineId).orElseThrow().getStatus());
 
         // Nor may a deletion restock and remove it.
         assertThrows(OrderNotFoundException.class,
-                () -> userOrderService.deleteOrder(doomedGroupId));
+                () -> adminOrderService.deleteOrder(doomedGroupId));
         assertTrue(orderEntityRepository.findById(collidingLineId).isPresent());
         assertEquals(1, productEntityRepository.findById(product.getId()).orElseThrow().getProductCount());
 
@@ -441,7 +442,7 @@ class OrderStatusConcurrencyPostgresTest {
         assertThrows(GeneralException.class, () -> userSupplyService.getOrderStatusByOrderId(
                 doomedGroupId, tokenService.generateUserToken(owner.getUserMail())));
         assertThrows(OrderNotFoundException.class,
-                () -> userOrderService.getUserProfileData(doomedGroupId));
+                () -> adminOrderService.getUserProfileData(doomedGroupId));
 
         assertEquals(1, productEntityRepository.findById(product.getId()).orElseThrow().getProductCount(),
                 "nothing about an order that does not exist may change live stock");
@@ -456,11 +457,11 @@ class OrderStatusConcurrencyPostgresTest {
 
         assertEquals("Pending", userSupplyService.getOrderStatusByOrderId(legacy.getId(), token));
 
-        userOrderService.updateOrderStatus(legacy.getId(), "Shipped");
+        adminOrderService.updateOrderStatus(legacy.getId(), "Shipped");
         assertEquals("Shipped", orderEntityRepository.findById(legacy.getId()).orElseThrow().getStatus());
 
         assertEquals("Tester",
-                userOrderService.getUserProfileData(legacy.getId()).getUserFirstName(),
+                adminOrderService.getUserProfileData(legacy.getId()).getUserFirstName(),
                 "restricting the fallback must not stop real legacy orders from resolving");
     }
 

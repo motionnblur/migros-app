@@ -1,11 +1,12 @@
 package com.example.MigrosBackend.controller.admin.panel;
 
-import com.example.MigrosBackend.dto.admin.panel.SupportAdminEditMessageDto;
-import com.example.MigrosBackend.dto.admin.panel.SupportReplyDto;
+import com.example.MigrosBackend.dto.admin.panel.SupportAdminMessageDto;
 import com.example.MigrosBackend.dto.user.support.SupportMessageDto;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
-import com.example.MigrosBackend.service.support.SupportChatService;
+import com.example.MigrosBackend.service.support.SupportCustomerDirectoryService;
+import com.example.MigrosBackend.service.support.SupportModerationService;
+import com.example.MigrosBackend.service.support.UserSupportChatService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,7 +18,11 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -37,7 +42,13 @@ class AdminSupportControllerTest {
     private ObjectMapper objectMapper;
 
     @MockBean
-    private SupportChatService supportChatService;
+    private UserSupportChatService userSupportChatService;
+
+    @MockBean
+    private SupportCustomerDirectoryService supportCustomerDirectoryService;
+
+    @MockBean
+    private SupportModerationService supportModerationService;
 
     @MockBean
     private AdminEntityRepository adminEntityRepository;
@@ -48,7 +59,7 @@ class AdminSupportControllerTest {
     @Test
     void getSupportUsers_shouldReturnList() throws Exception {
         List<String> users = List.of("user1@test.com", "user2@test.com");
-        when(supportChatService.getSupportUserMails()).thenReturn(users);
+        when(supportCustomerDirectoryService.getSupportUserMails()).thenReturn(users);
 
         mockMvc.perform(get("/admin/panel/support/users"))
                 .andExpect(status().isOk())
@@ -58,7 +69,7 @@ class AdminSupportControllerTest {
     @Test
     void getBannedUsers_shouldReturnList() throws Exception {
         List<String> users = List.of("banned@test.com");
-        when(supportChatService.getBannedUserMails()).thenReturn(users);
+        when(supportCustomerDirectoryService.getBannedUserMails()).thenReturn(users);
 
         mockMvc.perform(get("/admin/panel/support/banned-users"))
                 .andExpect(status().isOk())
@@ -69,7 +80,7 @@ class AdminSupportControllerTest {
     void getSupportMessages_shouldReturnList() throws Exception {
         SupportMessageDto dto = new SupportMessageDto();
         dto.setMessage("Hello");
-        when(supportChatService.getMessagesForUserMail("user@test.com")).thenReturn(List.of(dto));
+        when(userSupportChatService.getMessagesForUserMail("user@test.com")).thenReturn(List.of(dto));
 
         mockMvc.perform(get("/admin/panel/support/messages")
                         .param("userMail", "user@test.com"))
@@ -79,11 +90,11 @@ class AdminSupportControllerTest {
 
     @Test
     void sendSupportReply_shouldReturnOk() throws Exception {
-        SupportReplyDto reply = new SupportReplyDto();
+        SupportAdminMessageDto reply = new SupportAdminMessageDto();
         reply.setUserMail("user@test.com");
         reply.setMessage("We will help");
 
-        doNothing().when(supportChatService).addManagementMessage("user@test.com", "We will help");
+        doNothing().when(supportModerationService).addManagementMessage("user@test.com", "We will help");
 
         mockMvc.perform(post("/admin/panel/support/reply")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -93,9 +104,9 @@ class AdminSupportControllerTest {
 
     @Test
     void editSupportMessage_shouldReturnOk() throws Exception {
-        SupportAdminEditMessageDto dto = new SupportAdminEditMessageDto("user@test.com", "updated");
+        SupportAdminMessageDto dto = new SupportAdminMessageDto("user@test.com", "updated");
 
-        doNothing().when(supportChatService).editMessageForAdmin("user@test.com", 10L, "updated");
+        doNothing().when(supportModerationService).editMessageForAdmin("user@test.com", 10L, "updated");
 
         mockMvc.perform(patch("/admin/panel/support/messages/10")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -105,7 +116,7 @@ class AdminSupportControllerTest {
 
     @Test
     void deleteSupportMessage_shouldReturnOk() throws Exception {
-        doNothing().when(supportChatService).deleteMessageForAdmin("user@test.com", 10L);
+        doNothing().when(supportModerationService).deleteMessageForAdmin("user@test.com", 10L);
 
         mockMvc.perform(delete("/admin/panel/support/messages/10")
                         .param("userMail", "user@test.com"))
@@ -114,7 +125,7 @@ class AdminSupportControllerTest {
 
     @Test
     void closeSupportChatDelete_shouldReturnOk() throws Exception {
-        doNothing().when(supportChatService).closeChat("user@test.com");
+        doNothing().when(supportModerationService).closeChat("user@test.com");
 
         mockMvc.perform(delete("/admin/panel/support/close")
                         .param("userMail", "user@test.com"))
@@ -123,7 +134,7 @@ class AdminSupportControllerTest {
 
     @Test
     void closeSupportChatPost_shouldReturnOk() throws Exception {
-        doNothing().when(supportChatService).closeChat("user@test.com");
+        doNothing().when(supportModerationService).closeChat("user@test.com");
 
         mockMvc.perform(post("/admin/panel/support/close")
                         .param("userMail", "user@test.com"))
@@ -132,7 +143,7 @@ class AdminSupportControllerTest {
 
     @Test
     void banSupportUser_shouldReturnOk() throws Exception {
-        doNothing().when(supportChatService).banUser("user@test.com");
+        doNothing().when(supportModerationService).banUser("user@test.com");
 
         mockMvc.perform(post("/admin/panel/support/ban")
                         .param("userMail", "user@test.com"))
@@ -141,10 +152,54 @@ class AdminSupportControllerTest {
 
     @Test
     void unbanSupportUser_shouldReturnOk() throws Exception {
-        doNothing().when(supportChatService).unbanUser("user@test.com");
+        doNothing().when(supportModerationService).unbanUser("user@test.com");
 
         mockMvc.perform(post("/admin/panel/support/unban")
                         .param("userMail", "user@test.com"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void sendSupportReply_requestShapeIsFrozen() throws Exception {
+        doNothing().when(supportModerationService).addManagementMessage("user@test.com", "We will help");
+
+        mockMvc.perform(post("/admin/panel/support/reply")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userMail\":\"user@test.com\",\"message\":\"We will help\"}"))
+                .andExpect(status().isOk());
+
+        verify(supportModerationService).addManagementMessage("user@test.com", "We will help");
+    }
+
+    @Test
+    void editSupportMessage_requestShapeIsFrozen() throws Exception {
+        doNothing().when(supportModerationService).editMessageForAdmin("user@test.com", 10L, "updated");
+
+        mockMvc.perform(patch("/admin/panel/support/messages/10")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userMail\":\"user@test.com\",\"message\":\"updated\"}"))
+                .andExpect(status().isOk());
+
+        verify(supportModerationService).editMessageForAdmin("user@test.com", 10L, "updated");
+    }
+
+    @Test
+    void sendSupportReply_shouldRejectBlankMessage() throws Exception {
+        mockMvc.perform(post("/admin/panel/support/reply")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userMail\":\"user@test.com\",\"message\":\"\"}"))
+                .andExpect(status().isBadRequest());
+
+        verify(supportModerationService, never()).addManagementMessage(anyString(), anyString());
+    }
+
+    @Test
+    void editSupportMessage_shouldRejectBlankMessage() throws Exception {
+        mockMvc.perform(patch("/admin/panel/support/messages/10")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userMail\":\"user@test.com\",\"message\":\"\"}"))
+                .andExpect(status().isBadRequest());
+
+        verify(supportModerationService, never()).editMessageForAdmin(anyString(), anyLong(), anyString());
     }
 }

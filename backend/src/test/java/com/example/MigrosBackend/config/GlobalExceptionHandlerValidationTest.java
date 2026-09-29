@@ -1,10 +1,17 @@
 package com.example.MigrosBackend.config;
 
 import com.example.MigrosBackend.dto.error.ValidationErrorDto;
+import com.example.MigrosBackend.exception.shared.WrongPasswordException;
+import com.example.MigrosBackend.exception.user.MailSendingFailedException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Path;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +30,45 @@ import static org.mockito.Mockito.when;
 
 class GlobalExceptionHandlerValidationTest {
     private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
+
+    @Test
+    void serverErrorHandlerLogsTheExceptionAtError() {
+        Logger logger = (Logger) LoggerFactory.getLogger(GlobalExceptionHandler.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            handler.handleMailSendingFailed(new MailSendingFailedException());
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+
+        assertEquals(1, appender.list.size());
+        ILoggingEvent event = appender.list.get(0);
+        assertEquals(Level.ERROR, event.getLevel());
+        assertNotNull(event.getThrowableProxy(),
+                "5xx handlers must log the exception so its stack trace is recorded");
+    }
+
+    @Test
+    void clientAuthErrorHandlerLogsAtWarnWithoutAStackTrace() {
+        Logger logger = (Logger) LoggerFactory.getLogger(GlobalExceptionHandler.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            handler.handleWrongPassword(new WrongPasswordException());
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+
+        assertEquals(1, appender.list.size());
+        ILoggingEvent event = appender.list.get(0);
+        assertEquals(Level.WARN, event.getLevel());
+        assertNull(event.getThrowableProxy(), "client errors must stay one line, without a stack trace");
+    }
 
     @Test
     void dataIntegrityViolationIsGenericConflictWithoutConstraintText() {
