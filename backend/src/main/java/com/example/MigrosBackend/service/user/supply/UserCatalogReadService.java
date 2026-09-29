@@ -13,6 +13,8 @@ import com.example.MigrosBackend.exception.admin.ProductNotFoundException;
 import com.example.MigrosBackend.exception.shared.FileNotFoundException;
 import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.exception.user.CategoryNotFoundException;
+import com.example.MigrosBackend.helper.PageRequestPolicy;
+import com.example.MigrosBackend.helper.ProductPricingPolicy;
 import com.example.MigrosBackend.repository.category.CategoryEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductDescriptionEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
@@ -21,12 +23,10 @@ import com.example.MigrosBackend.service.global.FileService;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -59,9 +59,10 @@ public final class UserCatalogReadService {
     }
 
     List<ProductPreviewDto> getProductsFromCategory(Long categoryId, int page, int itemRange) {
+        // The bound is applied before any query runs, so an out-of-range page
+        // costs no database access and cannot be masked by a category lookup.
+        Pageable pageable = PageRequestPolicy.ofProductIdAscending(page, itemRange);
         ensureCategoryExists(categoryId);
-
-        Pageable pageable = PageRequest.of(page, itemRange);
         Page<ProductEntity> entities = productEntityRepository.findByCategoryEntityIdAndProductCountGreaterThan(categoryId, 0, pageable);
         // An existing category with no in-stock rows, or a page past the last
         // one, is an empty page rather than an error: the client sizes and
@@ -72,7 +73,7 @@ public final class UserCatalogReadService {
     }
 
     List<ProductPreviewDto> getAllProducts(int page, int itemRange) {
-        Pageable pageable = PageRequest.of(page, itemRange);
+        Pageable pageable = PageRequestPolicy.ofProductIdAscending(page, itemRange);
         Page<ProductEntity> entities = productEntityRepository.findByProductCountGreaterThan(0, pageable);
         return entities.stream().map(this::toProductPreviewDto).collect(Collectors.toList());
     }
@@ -128,7 +129,7 @@ public final class UserCatalogReadService {
     }
 
     List<ProductPreviewDto> getProductsFromSubcategory(String subcategoryName, int page, int productRange) {
-        Pageable pageable = PageRequest.of(page, productRange);
+        Pageable pageable = PageRequestPolicy.ofProductIdAscending(page, productRange);
         Page<ProductEntity> entities = productEntityRepository.findBySubcategoryNameAndProductCountGreaterThan(subcategoryName, 0, pageable);
         return entities.stream().map(this::toProductPreviewDto).collect(Collectors.toList());
     }
@@ -149,6 +150,7 @@ public final class UserCatalogReadService {
         productDto2.setProductDiscount(productEntity.getProductDiscount());
         productDto2.setProductDescription(productEntity.getProductDescription());
         productDto2.setProductCategoryId(Math.toIntExact(productEntity.getCategoryEntity().getId()));
+        productDto2.setProductVersion(productEntity.getVersion());
         return productDto2;
     }
 
@@ -167,15 +169,41 @@ public final class UserCatalogReadService {
         return productDescriptionDto;
     }
 
+    /**
+     * The price a listing shows, and the one the cart line is built from.
+     *
+     * <p>The discount arithmetic is {@link ProductPricingPolicy}'s, so this is
+     * the same number checkout charges rather than a second copy of it that can
+     * drift. What is left here is the catalog's own tolerance for a row that is
+     * not a valid product, which lives in
+     * {@link #legacyListingPrice(ProductEntity)} so the decision is visible at
+     * the boundary instead of being the policy's default.
+     */
     BigDecimal getEffectivePrice(ProductEntity product) {
-        BigDecimal discount = product.getProductDiscount() == null ? BigDecimal.ZERO : product.getProductDiscount();
+        return legacyListingPrice(product);
+    }
+
+    /**
+     * The catalog's explicit boundary adaptation: a missing price or discount
+     * reads as zero, and a price that is finer than the money scale is rounded
+     * rather than refused.
+     *
+     * <p>This is deliberately <em>not</em> the checkout rule, and it is a display
+     * decision only. A product page renders a list, so one damaged row must not
+     * turn the whole page into a 500; and a product row that is missing its price
+     * or discount predates the {@code NOT NULL} migration that now prevents it.
+     * Rounding instead of rejecting a display price is the reading that keeps an
+     * over-precise row visible, which is also the only way to see it and fix it.
+     *
+     * <p>None of this can make a price payable: the strictness
+     * {@link ProductPricingPolicy#requireValidPrice} enforces is unchanged, so
+     * any row catalog renders leniently is still refused at checkout rather than
+     * being charged as zero.
+     */
+    private BigDecimal legacyListingPrice(ProductEntity product) {
         BigDecimal price = product.getProductPrice() == null ? BigDecimal.ZERO : product.getProductPrice();
-        BigDecimal normalizedPrice = price.setScale(2, RoundingMode.HALF_UP);
-        if (discount.signum() <= 0) {
-            return normalizedPrice;
-        }
-        BigDecimal factor = BigDecimal.ONE.subtract(discount.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP));
-        return normalizedPrice.multiply(factor).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal discount = product.getProductDiscount() == null ? BigDecimal.ZERO : product.getProductDiscount();
+        return ProductPricingPolicy.effectivePrice(price, discount);
     }
 
     private ProductPreviewDto toProductPreviewDto(ProductEntity itemEntity) {

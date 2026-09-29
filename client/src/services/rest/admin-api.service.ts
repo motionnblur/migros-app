@@ -60,6 +60,10 @@ export class AdminApiService {
     formData.append('productDescription', this.normalizeOptionalStringField(productData.productDescription));
     if (productData.selectedImage) formData.append('selectedImage', productData.selectedImage);
     formData.append('categoryValue', productData.categoryValue.toString());
+    // Sent unconditionally: the backend requires it and rejects a stale value
+    // with 409. There is no "omit when absent" path, because a request without
+    // a version is exactly the unguarded absolute-count write this guards.
+    formData.append('expectedVersion', productData.expectedVersion.toString());
     return this.http.post(`${API_BASE_URL}/admin/panel/updateProduct`, formData, { responseType: 'text', observe: 'response' }).pipe(map((response) => response.status === 200));
   }
 

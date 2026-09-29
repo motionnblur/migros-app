@@ -401,10 +401,27 @@ public class CheckoutService {
         }
     }
 
+    /**
+     * Resolves the caller's mailbox from the token, then takes the user row's
+     * write lock by that mailbox.
+     *
+     * <p>Only the scalar mailbox is resolved before the lock; the row itself is
+     * first read by {@code findByUserMailForUpdate}. The previous shape loaded
+     * the {@link UserEntity} through {@link #authenticatedUser} and then ran a
+     * locking query by id, which is not permission to assume a refresh happened:
+     * once an instance is managed, a further load returns that same instance, so
+     * the cart read below could come from a snapshot taken before a concurrent
+     * add, remove or count update committed. Starting from the mailbox means the
+     * locked load is the first read of the row in this transaction and is
+     * therefore fresh.
+     *
+     * <p>Lock ordering is unchanged: the user row is still locked before any
+     * product row, and products are still locked in ascending id order.
+     */
     private UserEntity lockAuthenticatedUser(String userToken) {
-        UserEntity user = authenticatedUser(userToken);
-        return userEntityRepository.findByIdForUpdate(user.getId())
-                .orElseThrow(() -> new UserNotFoundException(user.getUserMail()));
+        String userMail = tokenService.validateAndExtractUser(userToken);
+        return userEntityRepository.findByUserMailForUpdate(userMail)
+                .orElseThrow(() -> new UserNotFoundException(userMail));
     }
 
     private UserEntity authenticatedUser(String userToken) {

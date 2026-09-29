@@ -18,8 +18,18 @@ public interface ProductEntityRepository extends JpaRepository<ProductEntity, Lo
     @Query("SELECT p FROM ProductEntity p WHERE p.id = :id")
     Optional<ProductEntity> findByIdForUpdate(@Param("id") Long id);
 
+    /**
+     * Atomically raises stock for one product.
+     *
+     * <p>{@code version} is incremented in the <em>same</em> statement, which is
+     * load-bearing: a bulk JPQL update bypasses the persistence context, so the
+     * entity's {@code @Version} is never consulted and Hibernate would not
+     * advance it. Leaving it out here would make every restock invisible to an
+     * open admin edit form, and the form could then write its stale absolute
+     * count straight over the restocked one.
+     */
     @Modifying(flushAutomatically = true)
-    @Query("UPDATE ProductEntity p SET p.productCount = p.productCount + :quantity WHERE p.id = :id")
+    @Query("UPDATE ProductEntity p SET p.productCount = p.productCount + :quantity, p.version = p.version + 1 WHERE p.id = :id")
     int incrementStock(@Param("id") Long id, @Param("quantity") int quantity);
 
     Page<ProductEntity> findByCategoryEntityIdAndProductCountGreaterThan(Long categoryId, int productCount, Pageable pageable);

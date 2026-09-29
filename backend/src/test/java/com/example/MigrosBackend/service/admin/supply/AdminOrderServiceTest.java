@@ -5,6 +5,7 @@ import com.example.MigrosBackend.dto.order.OrderPageDto;
 import com.example.MigrosBackend.entity.user.OrderEntity;
 import com.example.MigrosBackend.entity.user.OrderGroupEntity;
 import com.example.MigrosBackend.exception.admin.OrderNotFoundException;
+import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
 import com.example.MigrosBackend.repository.user.AdminOrderRow;
 import com.example.MigrosBackend.repository.user.OrderEntityRepository;
@@ -307,15 +308,37 @@ class AdminOrderServiceTest {
     }
 
     @Test
-    void getAllOrders_ClampsANegativePageToTheFirstPage() {
-        when(orderGroupEntityRepository.findAdminOrderPage(any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 2), 0));
+    void getAllOrders_RejectsANegativePageInsteadOfClampingItToTheFirstPage() {
+        assertThrows(GeneralException.class, () -> adminOrderService.getAllOrders(-1, 2));
+        assertThrows(GeneralException.class, () -> adminOrderService.getAllOrders(-3, 2));
 
-        adminOrderService.getAllOrders(-3, 2);
+        verify(orderGroupEntityRepository, never()).findAdminOrderPage(any());
+    }
+
+    @Test
+    void getAllOrders_RejectsANonPositiveOrOversizedRangeInsteadOfCountingOnly() {
+        assertThrows(GeneralException.class, () -> adminOrderService.getAllOrders(0, 0));
+        assertThrows(GeneralException.class, () -> adminOrderService.getAllOrders(0, -1));
+        assertThrows(GeneralException.class, () -> adminOrderService.getAllOrders(0, 101));
+        assertThrows(GeneralException.class, () -> adminOrderService.getAllOrders(0, Integer.MAX_VALUE));
+
+        // Nothing is fetched at all: the bound is checked before the page query,
+        // and the count the page response already carries is what a client sizes
+        // its paginator from.
+        verify(orderGroupEntityRepository, never()).findAdminOrderPage(any());
+    }
+
+    @Test
+    void getAllOrders_LeavesTheNativeUnionOrderingAlone() {
+        when(orderGroupEntityRepository.findAdminOrderPage(any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 2), 5));
+
+        adminOrderService.getAllOrders(0, 2);
 
         ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
         verify(orderGroupEntityRepository).findAdminOrderPage(pageable.capture());
-        assertEquals(0, pageable.getValue().getPageNumber());
+        assertTrue(pageable.getValue().getSort().isUnsorted(),
+                "the union query orders by order_id DESC, source_rank ASC itself; a generated sort would replace it");
     }
 
     @Test
@@ -328,17 +351,6 @@ class AdminOrderServiceTest {
         assertEquals(5L, result.getTotal());
         assertTrue(result.getItems().isEmpty());
         verify(orderGroupEntityRepository, never()).findAll();
-    }
-
-    @Test
-    void getAllOrders_WithANonPositiveRangeReportsTheTotalWithoutFetchingAPage() {
-        when(orderGroupEntityRepository.countAdminOrders()).thenReturn(5L);
-
-        OrderPageDto result = adminOrderService.getAllOrders(0, 0);
-
-        assertEquals(5L, result.getTotal());
-        assertTrue(result.getItems().isEmpty());
-        verify(orderGroupEntityRepository, never()).findAdminOrderPage(any());
     }
 
     private AdminOrderRow row(long orderId, long orderGroupId, String total, String status) {

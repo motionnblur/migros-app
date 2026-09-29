@@ -306,11 +306,11 @@ class SupportChatServicesTest {
     @Test
     void banUser_shouldSetBannedTrueAndBroadcast() {
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(user);
+        when(userEntityRepository.updateBannedByUserMail(USER_MAIL, true)).thenReturn(1);
 
         supportModerationService.banUser(USER_MAIL);
 
-        assertTrue(user.getBanned());
-        verify(userEntityRepository).save(user);
+        verify(userEntityRepository).updateBannedByUserMail(USER_MAIL, true);
         verify(supportChatWebSocketHandler).broadcastSupportUpdate(USER_MAIL);
     }
 
@@ -325,11 +325,11 @@ class SupportChatServicesTest {
     void unbanUser_shouldSetBannedFalseAndBroadcast() {
         user.setBanned(true);
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(user);
+        when(userEntityRepository.updateBannedByUserMail(USER_MAIL, false)).thenReturn(1);
 
         supportModerationService.unbanUser(USER_MAIL);
 
-        assertFalse(user.getBanned());
-        verify(userEntityRepository).save(user);
+        verify(userEntityRepository).updateBannedByUserMail(USER_MAIL, false);
         verify(supportChatWebSocketHandler).broadcastSupportUpdate(USER_MAIL);
     }
 }

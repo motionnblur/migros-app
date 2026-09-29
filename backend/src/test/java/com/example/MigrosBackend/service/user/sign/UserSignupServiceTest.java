@@ -10,6 +10,7 @@ import com.example.MigrosBackend.exception.shared.TokenNotFoundException;
 import com.example.MigrosBackend.exception.shared.WrongPasswordException;
 import com.example.MigrosBackend.exception.user.MailSendingFailedException;
 import com.example.MigrosBackend.exception.user.UserAlreadyExistsException;
+import com.example.MigrosBackend.exception.user.UserMailNotFoundException;
 import com.example.MigrosBackend.exception.user.WeakPasswordException;
 import com.example.MigrosBackend.helper.PasswordValidator;
 import com.example.MigrosBackend.repository.user.PendingSignupEntityRepository;
@@ -219,6 +220,11 @@ class UserSignupServiceTest {
         verify(pendingSignupEntityRepository, never()).deleteById(anyString());
     }
 
+    /**
+     * The rotation writes the password column alone. A whole-entity save would
+     * also put back the cart, the profile and the ban flag as they were read
+     * before any concurrent change to them.
+     */
     @Test
     void resetPassword_ReplacesThePasswordForAResetToken() {
         when(pendingSignupEntityRepository.findById("reset-token"))
@@ -226,7 +232,8 @@ class UserSignupServiceTest {
                         "reset-token", PendingTokenPurpose.PASSWORD_RESET, LocalDateTime.now().plusMinutes(10))));
         when(pendingSignupEntityRepository.deleteByTokenAndPurpose(
                 "reset-token", PendingTokenPurpose.PASSWORD_RESET)).thenReturn(1);
-        when(userEntityRepository.findByUserMail("test@mail.com")).thenReturn(existingUser());
+        when(userEntityRepository.existsByUserMail("test@mail.com")).thenReturn(true);
+        when(userEntityRepository.updatePasswordByUserMail("test@mail.com", "new_hash")).thenReturn(1);
         when(passwordValidator.isPasswordStrongEnough("AnotherStrong123!")).thenReturn(true);
         when(encryptService.getEncryptedPassword("AnotherStrong123!")).thenReturn("new_hash");
 
@@ -236,9 +243,68 @@ class UserSignupServiceTest {
 
         userSignupService.resetPassword(dto);
 
-        verify(userEntityRepository).save(argThat(user -> "new_hash".equals(user.getUserPassword())));
+        verify(userEntityRepository).updatePasswordByUserMail("test@mail.com", "new_hash");
+        verify(userEntityRepository, never()).save(any(UserEntity.class));
         verify(pendingSignupEntityRepository)
                 .deleteByTokenAndPurpose("reset-token", PendingTokenPurpose.PASSWORD_RESET);
+    }
+
+    /**
+     * A redemption for an account that no longer exists must fail with the same
+     * exception as before, must not be reported as a successful reset, and must
+     * not write a whole entity.
+     *
+     * <p>Two ways to get there, both covered: the account is already gone when
+     * the request arrives (the existence probe fails, and notably the password is
+     * never hashed - BCrypt is expensive and this endpoint is unauthenticated),
+     * and the account disappears between the probe and the update.
+     */
+    @Test
+    void resetPassword_ReportsAMissingAccountWithTheExistingException() {
+        when(pendingSignupEntityRepository.findById("reset-token"))
+                .thenReturn(Optional.of(pendingToken(
+                        "reset-token", PendingTokenPurpose.PASSWORD_RESET, LocalDateTime.now().plusMinutes(10))));
+        when(pendingSignupEntityRepository.deleteByTokenAndPurpose(
+                "reset-token", PendingTokenPurpose.PASSWORD_RESET)).thenReturn(1);
+        when(userEntityRepository.existsByUserMail("test@mail.com")).thenReturn(false);
+        when(passwordValidator.isPasswordStrongEnough("AnotherStrong123!")).thenReturn(true);
+
+        ResetPasswordDto dto = new ResetPasswordDto();
+        dto.setToken("reset-token");
+        dto.setUserPassword("AnotherStrong123!");
+
+        UserMailNotFoundException failure = assertThrows(
+                UserMailNotFoundException.class, () -> userSignupService.resetPassword(dto));
+
+        assertEquals("User with that email: test@mail.com could not be found.", failure.getMessage());
+        verify(userEntityRepository, never()).updatePasswordByUserMail(anyString(), anyString());
+        verify(userEntityRepository, never()).save(any(UserEntity.class));
+        verify(encryptService, never()).getEncryptedPassword(anyString());
+    }
+
+    /**
+     * The row can also vanish between the existence probe and the update, which
+     * is what the affected-row check is for.
+     */
+    @Test
+    void resetPassword_ReportsAMissingAccountWhenTheRowDisappearsMidUpdate() {
+        when(pendingSignupEntityRepository.findById("reset-token"))
+                .thenReturn(Optional.of(pendingToken(
+                        "reset-token", PendingTokenPurpose.PASSWORD_RESET, LocalDateTime.now().plusMinutes(10))));
+        when(pendingSignupEntityRepository.deleteByTokenAndPurpose(
+                "reset-token", PendingTokenPurpose.PASSWORD_RESET)).thenReturn(1);
+        when(userEntityRepository.existsByUserMail("test@mail.com")).thenReturn(true);
+        when(userEntityRepository.updatePasswordByUserMail(anyString(), anyString())).thenReturn(0);
+        when(passwordValidator.isPasswordStrongEnough("AnotherStrong123!")).thenReturn(true);
+        when(encryptService.getEncryptedPassword("AnotherStrong123!")).thenReturn("new_hash");
+
+        ResetPasswordDto dto = new ResetPasswordDto();
+        dto.setToken("reset-token");
+        dto.setUserPassword("AnotherStrong123!");
+
+        assertThrows(UserMailNotFoundException.class, () -> userSignupService.resetPassword(dto));
+
+        verify(userEntityRepository, never()).save(any(UserEntity.class));
     }
 
     @Test

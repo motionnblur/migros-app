@@ -8,8 +8,12 @@ import com.example.MigrosBackend.dto.user.product.ProductDetailDto;
 import com.example.MigrosBackend.dto.user.product.ProductPreviewDto;
 import com.example.MigrosBackend.dto.user.product.UserCartItemDto;
 import com.example.MigrosBackend.helper.AuthTokenResolver;
+import com.example.MigrosBackend.helper.PageRequestPolicy;
 import com.example.MigrosBackend.service.user.supply.UserCartService;
 import com.example.MigrosBackend.service.user.supply.UserSupplyService;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.PositiveOrZero;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -23,6 +27,18 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/**
+ * Anonymous catalogue browsing and the authenticated user order/cart endpoints.
+ *
+ * <p>Every {@code page}/{@code productRange} pair here is bounded by
+ * {@link PageRequestPolicy}. The constraints on the request parameters are the
+ * same bound expressed for the HTTP layer: they reject an out-of-range value
+ * before the handler runs and reach the caller as a structured
+ * {@code ValidationErrorDto} naming the parameter, which
+ * {@code GlobalExceptionHandler} already maps to 400. A value that is not an
+ * integer at all, or one that overflows {@code int}, fails request-parameter
+ * conversion and is answered with 400 by Spring's own type-mismatch handling.
+ */
 @RestController
 @RequestMapping("/user/supply")
 public class UserSupplyController {
@@ -46,15 +62,19 @@ public class UserSupplyController {
 
     @GetMapping("getProductsFromCategory")
     public ResponseEntity<List<ProductPreviewDto>> getProductsFromCategory(@RequestParam Long categoryId,
-                                                                           @RequestParam int page,
+                                                                           @PositiveOrZero @RequestParam int page,
+                                                                           @Min(PageRequestPolicy.MIN_PAGE_SIZE)
+                                                                           @Max(PageRequestPolicy.MAX_PAGE_SIZE)
                                                                            @RequestParam int productRange) {
         return ResponseEntity.ok(userSupplyService.getProductsFromCategory(categoryId, page, productRange));
     }
 
     @GetMapping("getProductsFromSubcategory")
     public ResponseEntity<List<ProductPreviewDto>> getProductsFromSubcategory(@RequestParam String subcategoryName,
-                                                                              @RequestParam int page,
-                                                                              @RequestParam int productRange) {
+                                                                               @PositiveOrZero @RequestParam int page,
+                                                                               @Min(PageRequestPolicy.MIN_PAGE_SIZE)
+                                                                               @Max(PageRequestPolicy.MAX_PAGE_SIZE)
+                                                                               @RequestParam int productRange) {
         return ResponseEntity.ok(userSupplyService.getProductsFromSubcategory(subcategoryName, page, productRange));
     }
 

@@ -9,13 +9,13 @@ import com.example.MigrosBackend.entity.user.OrderStatus;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.exception.admin.OrderNotFoundException;
 import com.example.MigrosBackend.exception.admin.UserNotFoundException;
+import com.example.MigrosBackend.helper.PageRequestPolicy;
 import com.example.MigrosBackend.repository.user.AdminOrderRow;
 import com.example.MigrosBackend.repository.user.OrderEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderGroupEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
 import com.example.MigrosBackend.service.user.supply.OrderStockRestocker;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,18 +54,26 @@ public class AdminOrderService {
      * an admin page view only ever loads its own window. The previous version
      * read every order group, ran one query per group for its lines, and sliced
      * the merged result in Java.
+     *
+     * <p>The page request goes through {@link PageRequestPolicy}, so a negative
+     * page is rejected instead of being clamped to the first page and the size
+     * is bounded. The request is deliberately left unsorted: the native union
+     * query already orders by {@code order_id DESC, source_rank ASC}, which is
+     * what puts an order group before a legacy line that shares its id, and
+     * appending an entity {@code Sort} would sort the union's projected columns
+     * and replace that order.
+     *
+     * <p>A nonpositive size used to mean "count only": it returned the total
+     * with an empty item list. No caller used that contract - the admin client
+     * always asks for a real page - so it is gone rather than preserved, and
+     * the separate total the page response already carries is the way to ask
+     * for a count.
      */
     public OrderPageDto getAllOrders(int page, int productRange) {
         OrderPageDto pageDto = new OrderPageDto();
 
-        if (productRange <= 0) {
-            pageDto.setTotal(orderGroupEntityRepository.countAdminOrders());
-            pageDto.setItems(new ArrayList<>());
-            return pageDto;
-        }
-
         Page<AdminOrderRow> rows = orderGroupEntityRepository.findAdminOrderPage(
-                PageRequest.of(Math.max(0, page), productRange));
+                PageRequestPolicy.of(page, productRange));
 
         List<OrderDto> items = new ArrayList<>(rows.getNumberOfElements());
         for (AdminOrderRow row : rows.getContent()) {

@@ -21,6 +21,7 @@ import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.List;
 
@@ -216,6 +217,29 @@ public class GlobalExceptionHandler {
                 "Missing required parameter: " + ex.getParameterName(),
                 HttpStatus.BAD_REQUEST.value(),
                 null);
+        return ResponseEntity.badRequest().body(body);
+    }
+
+    /**
+     * A request parameter that could not be converted, for example a
+     * non-numeric {@code page} or {@code expectedVersion}.
+     *
+     * <p>Spring's own resolver answers this with a 400 and an empty body. The
+     * client needs the same structured contract every other request error uses,
+     * and the offending value is echoed nowhere - an arbitrary client-supplied
+     * string is not something to reflect back into a JSON response. Only the
+     * parameter name and a fixed message are returned.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ValidationErrorDto> handleMethodArgumentTypeMismatch(
+            MethodArgumentTypeMismatchException ex) {
+        String parameterName = ex.getName() == null ? "" : ex.getName();
+        ValidationErrorDto body = new ValidationErrorDto(
+                "VALIDATION_FAILED",
+                "Request validation failed",
+                HttpStatus.BAD_REQUEST.value(),
+                List.of(new ValidationErrorDto.FieldViolation(parameterName,
+                        "must be a valid value of the expected type")));
         return ResponseEntity.badRequest().body(body);
     }
 

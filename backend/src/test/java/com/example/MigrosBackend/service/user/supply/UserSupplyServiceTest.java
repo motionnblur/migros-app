@@ -15,6 +15,7 @@ import com.example.MigrosBackend.entity.user.OrderGroupEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.exception.shared.FileNotFoundException;
 import com.example.MigrosBackend.exception.shared.GeneralException;
+import com.example.MigrosBackend.helper.PageRequestPolicy;
 import com.example.MigrosBackend.repository.category.CategoryEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductDescriptionEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
@@ -32,6 +33,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -47,10 +49,20 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class UserSupplyServiceTest {
+
+    /**
+     * The exact page request the catalogue read now builds for the first page of
+     * ten rows: the same window, plus the product id order that makes the
+     * listing repeatable.
+     */
+    private static final Pageable ID_ASCENDING_PAGE_0_10 =
+            PageRequest.of(0, 10, PageRequestPolicy.PRODUCT_ID_ASCENDING);
+
     @Mock
     private CategoryEntityRepository categoryEntityRepository;
 
@@ -120,7 +132,7 @@ class UserSupplyServiceTest {
         product.setProductCount(4);
 
         when(categoryEntityRepository.existsById(1L)).thenReturn(true);
-        when(productEntityRepository.findByCategoryEntityIdAndProductCountGreaterThan(1L, 0, PageRequest.of(0, 10)))
+        when(productEntityRepository.findByCategoryEntityIdAndProductCountGreaterThan(1L, 0, ID_ASCENDING_PAGE_0_10))
                 .thenReturn(new PageImpl<>(List.of(product)));
 
         List<ProductPreviewDto> results = userSupplyService.getProductsFromCategory(1L, 0, 10);
@@ -170,7 +182,7 @@ class UserSupplyServiceTest {
         product.setProductDiscount(new BigDecimal("10"));
         product.setProductCount(4);
 
-        when(productEntityRepository.findByProductCountGreaterThan(0, PageRequest.of(0, 10)))
+        when(productEntityRepository.findByProductCountGreaterThan(0, ID_ASCENDING_PAGE_0_10))
                 .thenReturn(new PageImpl<>(List.of(product)));
 
         List<ProductPreviewDto> results = userSupplyService.getAllProducts(0, 10);
@@ -187,6 +199,23 @@ class UserSupplyServiceTest {
         int result = userSupplyService.getAllProductCounts();
 
         assertEquals(7, result);
+    }
+
+    @Test
+    void paginatedCatalogueReads_RejectPagesAndRangesOutsideTheBound() {
+        assertThrows(GeneralException.class, () -> userSupplyService.getProductsFromCategory(1L, -1, 10));
+        assertThrows(GeneralException.class, () -> userSupplyService.getProductsFromCategory(1L, 0, 0));
+        assertThrows(GeneralException.class, () -> userSupplyService.getProductsFromCategory(1L, 0, 101));
+
+        assertThrows(GeneralException.class, () -> userSupplyService.getAllProducts(-1, 10));
+        assertThrows(GeneralException.class, () -> userSupplyService.getAllProducts(0, 101));
+
+        assertThrows(GeneralException.class, () -> userSupplyService.getProductsFromSubcategory("Fruits", -1, 10));
+        assertThrows(GeneralException.class, () -> userSupplyService.getProductsFromSubcategory("Fruits", 0, 0));
+        assertThrows(GeneralException.class, () -> userSupplyService.getProductsFromSubcategory("Fruits", 0, 101));
+
+        verifyNoInteractions(productEntityRepository);
+        verifyNoInteractions(categoryEntityRepository);
     }
 
     @Test

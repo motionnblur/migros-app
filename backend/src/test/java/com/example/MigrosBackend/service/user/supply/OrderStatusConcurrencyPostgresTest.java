@@ -1,17 +1,23 @@
 package com.example.MigrosBackend.service.user.supply;
 
 import com.example.MigrosBackend.dto.order.OrderPageDto;
+import com.example.MigrosBackend.entity.admin.AdminEntity;
+import com.example.MigrosBackend.entity.category.CategoryEntity;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.user.OrderEntity;
 import com.example.MigrosBackend.entity.user.OrderGroupEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.exception.admin.OrderNotFoundException;
+import com.example.MigrosBackend.exception.admin.ProductEditConflictException;
 import com.example.MigrosBackend.exception.shared.GeneralException;
+import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
+import com.example.MigrosBackend.repository.category.CategoryEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderGroupEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
 import com.example.MigrosBackend.service.admin.supply.AdminOrderService;
+import com.example.MigrosBackend.service.admin.supply.AdminSupplyService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -80,6 +86,12 @@ class OrderStatusConcurrencyPostgresTest {
     @Autowired
     private AdminOrderService adminOrderService;
     @Autowired
+    private AdminSupplyService adminSupplyService;
+    @Autowired
+    private AdminEntityRepository adminEntityRepository;
+    @Autowired
+    private CategoryEntityRepository categoryEntityRepository;
+    @Autowired
     private UserEntityRepository userEntityRepository;
     @Autowired
     private ProductEntityRepository productEntityRepository;
@@ -105,7 +117,8 @@ class OrderStatusConcurrencyPostgresTest {
     @BeforeEach
     void cleanDatabase() {
         jdbcTemplate.execute("TRUNCATE TABLE checkout_item_entity, checkout_entity, order_entity, "
-                + "order_group_entity, product_entity, user_entity RESTART IDENTITY CASCADE");
+                + "order_group_entity, product_entity, product_image_entity, category_entity, "
+                + "admin_entity, user_entity RESTART IDENTITY CASCADE");
     }
 
     /**
@@ -469,6 +482,100 @@ class OrderStatusConcurrencyPostgresTest {
         } catch (RuntimeException ex) {
             return false;
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // Restocking is the other product-row writer, and the only one that goes
+    // through a bulk JPQL statement rather than a managed entity. A bulk update
+    // bypasses the persistence context entirely, so it cannot inherit the
+    // entity's @Version handling and has to advance the column itself. If it did
+    // not, an admin form opened before the cancellation could still consider the
+    // product unchanged and would be allowed to write its stale count back.
+    // -------------------------------------------------------------------------
+
+    @Test
+    void cancellingAnOrderAdvancesTheProductEditVersion() {
+        UserEntity user = createUser("restock-version@migros.com");
+        ProductEntity product = createProduct("RestockVersion", "10.00", 1);
+        OrderGroupEntity group = createPendingGroup(user, product, 1);
+        AdminEntity admin = createAdmin("restock-editor");
+        CategoryEntity category = createCategory(41);
+
+        long versionSeenByTheEditor = jdbcTemplate.queryForObject(
+                "SELECT version FROM product_entity WHERE product_entity_id = ?", Long.class,
+                product.getId());
+
+        userSupplyService.cancelOrder(group.getId(), user.getUserMail());
+
+        assertEquals(2, productEntityRepository.findById(product.getId()).orElseThrow().getProductCount());
+        assertTrue(versionAfter(product.getId()) > versionSeenByTheEditor,
+                "an atomic restock must advance the edit version in the same statement");
+
+        assertThrows(ProductEditConflictException.class, () ->
+                adminSupplyService.updateProduct(admin.getId(), product.getId(), "Stale", "general",
+                        new BigDecimal("10.00"), 1, BigDecimal.ZERO, "stale", category.getCategoryId(),
+                        null, versionSeenByTheEditor),
+                "an edit form that predates the restock must be rejected, not allowed to "
+                        + "put the returned unit back under an order that no longer exists");
+        assertEquals(2, productEntityRepository.findById(product.getId()).orElseThrow().getProductCount());
+    }
+
+    @Test
+    void deletingAnOrderAdvancesTheProductEditVersion() {
+        UserEntity user = createUser("delete-version@migros.com");
+        ProductEntity product = createProduct("DeleteVersion", "10.00", 3);
+        OrderGroupEntity group = createPendingGroup(user, product, 2);
+
+        long versionSeenByTheEditor = jdbcTemplate.queryForObject(
+                "SELECT version FROM product_entity WHERE product_entity_id = ?", Long.class,
+                product.getId());
+
+        adminOrderService.deleteOrder(group.getId());
+
+        assertEquals(5, productEntityRepository.findById(product.getId()).orElseThrow().getProductCount());
+        assertTrue(versionAfter(product.getId()) > versionSeenByTheEditor,
+                "a restock on the admin deletion path must advance the edit version too");
+    }
+
+    /**
+     * The repository statement itself, so the guarantee is pinned where it is
+     * written rather than only through whichever service happens to call it.
+     */
+    @Test
+    void theBulkIncrementStatementAdvancesTheVersionItself() {
+        UserEntity user = createUser("bulk-version@migros.com");
+        ProductEntity product = createProduct("BulkVersion", "10.00", 1);
+        OrderGroupEntity group = createPendingGroup(user, product, 1);
+        String userMail = user.getUserMail();
+
+        long before = jdbcTemplate.queryForObject(
+                "SELECT version FROM product_entity WHERE product_entity_id = ?", Long.class,
+                product.getId());
+        userSupplyService.cancelOrder(group.getId(), userMail);
+
+        assertEquals(before + 1, versionAfter(product.getId()),
+                "each bulk increment advances the version exactly once, in the same statement "
+                        + "that changes stock");
+        assertEquals(2, productEntityRepository.findById(product.getId()).orElseThrow().getProductCount());
+    }
+
+    private long versionAfter(Long productId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT version FROM product_entity WHERE product_entity_id = ?", Long.class, productId);
+    }
+
+    private AdminEntity createAdmin(String name) {
+        AdminEntity admin = new AdminEntity();
+        admin.setAdminName(name);
+        admin.setItemEntities(new ArrayList<>());
+        return adminEntityRepository.saveAndFlush(admin);
+    }
+
+    private CategoryEntity createCategory(int categoryId) {
+        CategoryEntity category = new CategoryEntity();
+        category.setCategoryId(categoryId);
+        category.setCategoryName("race-category-" + categoryId);
+        return categoryEntityRepository.saveAndFlush(category);
     }
 
     private static boolean nonNull(Object value) {

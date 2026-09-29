@@ -8,6 +8,7 @@ import { IDescription } from '../../../../interfaces/IDescription';
 import { IProductData } from '../../../../interfaces/IProductData';
 import { IProductDescription } from '../../../../interfaces/IProductDescription';
 import { IProductUpdater } from '../../../../interfaces/IProductUpdater';
+import { isProductEditConflict } from '../../../../services/rest/product-edit-conflict';
 import { categories } from '../../../../memory/global-data';
 import { ToastService } from '../../services/toast.service';
 
@@ -40,6 +41,19 @@ export class ProductEditComponent extends ProductBuyBase {
   isSavingDescriptions = false;
   validationError = '';
   saveError = '';
+
+  /**
+   * The product version this form was loaded at, submitted back as
+   * `expectedVersion`. `null` until the detail read lands, and a null version is
+   * never replaced with a guess.
+   */
+  productVersion: number | null = null;
+  /**
+   * True after the backend rejected this edit with 409. The draft fields are
+   * left exactly as typed; recovery is a deliberate reload, never an automatic
+   * retry against a freshly fetched version.
+   */
+  editConflict = false;
 
   private boundKeyDownEvent!: (event: KeyboardEvent) => void;
 
@@ -78,6 +92,7 @@ export class ProductEditComponent extends ProductBuyBase {
     this.discount = data.productDiscount ?? 0;
     this.description = data.productDescription ?? '';
     this.categoryValue = data.productCategoryId ?? null;
+    this.productVersion = data.productVersion ?? null;
   }
 
   private keyDownEvent(event: KeyboardEvent) {
@@ -167,6 +182,13 @@ export class ProductEditComponent extends ProductBuyBase {
       return;
     }
 
+    // Without a known version there is nothing safe to send: a guess would be
+    // indistinguishable from an unguarded write.
+    if (this.productVersion === null) {
+      this.validationError = 'Ürün sürümü yüklenmedi. Ürünü yeniden yükleyip tekrar deneyin.';
+      return;
+    }
+
     this.validationError = '';
     this.saveError = '';
     this.isSavingProduct = true;
@@ -182,23 +204,82 @@ export class ProductEditComponent extends ProductBuyBase {
       productDescription: this.description.trim(),
       selectedImage: this.selectedImage,
       categoryValue: this.categoryValue,
+      expectedVersion: this.productVersion,
     };
 
     this.requests.add(this.restService.updateProductData(productData).subscribe({
       next: (status: boolean) => {
         this.isSavingProduct = false;
+        this.editConflict = false;
         if (status) {
           this.eventManager.trigger('productAdded');
           this.toastService.success('Ürün kaydedildi.');
+          this.refreshProductVersion();
         }
       },
       error: (error) => {
         this.isSavingProduct = false;
+        if (isProductEditConflict(error)) {
+          // The draft is left untouched on purpose. Resubmitting it against a
+          // freshly fetched version would silently overwrite whatever moved
+          // stock in the meantime, which is the failure this guard exists for.
+          this.editConflict = true;
+          this.saveError = '';
+          this.toastService.error('Ürün kaydedilemedi.');
+          return;
+        }
+        this.editConflict = false;
         this.saveError =
           error?.error ?? 'Ürün kaydedilemedi. Lütfen alanları kontrol edin.';
         this.toastService.error('Ürün kaydedilemedi.');
       },
     }));
+  }
+
+  /**
+   * Re-reads the product and replaces the form with the server's current values.
+   *
+   * This is the only way out of a conflict, and it is deliberately manual: the
+   * rejected draft is discarded only because the administrator asked for it, and
+   * the save that follows is a fresh, reviewed one.
+   */
+  reloadProduct(): void {
+    this.saveError = '';
+    this.validationError = '';
+    this.requests.add(
+      this.restService.getProductData(this.productId).subscribe({
+        next: (data: IProductData) => {
+          this.onProductDataUpdate(data);
+          this.editConflict = false;
+        },
+        error: () => {
+          this.saveError = 'Ürün yeniden yüklenemedi.';
+        },
+      })
+    );
+  }
+
+  /**
+   * Re-reads only the version after a successful save.
+   *
+   * The modal stays open, so the next save from this editor must not carry the
+   * version it just superseded - otherwise the component would conflict against
+   * its own successful write. Only the version is taken from the response; the
+   * fields keep what the administrator just saved.
+   */
+  private refreshProductVersion(): void {
+    this.requests.add(
+      this.restService.getProductData(this.productId).subscribe({
+        next: (data: IProductData) => {
+          this.productVersion = data.productVersion ?? null;
+        },
+        error: () => {
+          // The save succeeded; an unreadable refresh only means the next save
+          // from this open editor will be rejected and reloaded on purpose.
+          this.productVersion = null;
+        },
+      })
+    );
   }
 
   saveDescriptions(): void {

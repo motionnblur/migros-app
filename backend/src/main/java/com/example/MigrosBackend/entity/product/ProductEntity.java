@@ -54,6 +54,24 @@ public class ProductEntity {
     @JoinColumn(name = "product_entity_id", referencedColumnName = "product_entity_id")
     private List<ProductDescriptionEntity> descriptionEntities;
 
+    /**
+     * Optimistic edit version for admin updates.
+     *
+     * <p>An admin edit form submits the version it loaded. Without it, the
+     * update is a blind absolute-count write: a form opened before a checkout
+     * reservation can write its stale count back and resurrect sold stock.
+     *
+     * <p>Every writer of this row must advance the column. JPA-managed writers
+     * (the admin update, the locked checkout decrement) do so through this
+     * mapping; the bulk stock increment advances it explicitly in the same
+     * statement, because a bulk JPQL update bypasses entity version handling.
+     * Adding the field to {@code toString} would put a mutable version in
+     * every log line that prints a product, so it is deliberately omitted.
+     */
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {

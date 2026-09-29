@@ -6,7 +6,7 @@ It documents architecture, constraints, and safe change patterns so edits stay c
 
 ## Monorepo Layout
 - `client/`: Angular 19 standalone SPA.
-- `backend/`: Spring Boot 3.4 API (Java 21, JPA, Security, WebSocket).
+- `backend/`: Spring Boot 3.5 API (Java 21, JPA, Security, WebSocket).
 - `configs/nginx/`: Reverse proxy and rate limiting config.
 - `compose.yaml`: Local multi-service orchestration (client, backend, nginx, postgres).
 
@@ -123,10 +123,12 @@ Backend packages follow a mostly standard layered layout:
       never expose them through the API. Retention deletes `DELIVERED` rows
       only.
 - Security config
-  - `SecurityConfiguration` defines open/authenticated/admin-only routes.
+  - `SecurityConfiguration` defines open/authenticated/admin-only routes. The
+    catch-all is `denyAll`, so a route that is not explicitly opened is denied
+    rather than open.
   - CORS and WebSocket allowed origins are driven by `app.allowed-origins` and `app.allowed-origin-patterns`.
   - Only `/actuator/health` and its subpaths are public; `/actuator/**` is
-    explicitly denied before the catch-all `permitAll`. Actuator exposes only
+    explicitly denied before the catch-all `denyAll`. Actuator exposes only
     `health` over HTTP with details/components never public; the readiness group
     includes the database and liveness does not.
 - Public URLs
@@ -157,8 +159,92 @@ Backend packages follow a mostly standard layered layout:
     aggregates per product, applies one atomic `productCount = productCount + n`
     statement, and always applies products in ascending id order so overlapping
     orders take the same lock order.
-  - `entity/user/OrderStatus` owns the status strings. Admin-supplied values
-    are stored verbatim, so API compatibility is preserved.
+- `entity/user/OrderStatus` owns the status strings. Admin-supplied values
+  are stored verbatim, so API compatibility is preserved.
+- Shared user writes
+  - The user row owns several independent concerns: the cart list, the profile
+    columns, the password hash and the moderation ban flag. Writers therefore
+    name the columns they own (`UserEntityRepository.updateProfileColumnsByUserMail`,
+    `updatePasswordByUserMail`, `updateBannedByUserMail`) instead of saving a
+    whole entity. A `save` of a previously loaded `UserEntity` rewrites every
+    column and would silently revert whatever a concurrent cart change, password
+    reset or moderation did in between.
+  - Every cart writer (`addProductToCart`, `removeProductFromCart`,
+    `updateProductCountInCart`, `clearUserCart`, `prepareCheckout`) takes the same
+    `PESSIMISTIC_WRITE` lock on the user row and reads the cart only from that
+    locked state. `prepareCheckout` resolves only the scalar mailbox first and
+    locks by `findByUserMailForUpdate`: loading the entity and then running a
+    locking query by id returns the already-managed instance without refreshing
+    it, so the cart could be read from a pre-lock snapshot.
+  - `UserCartService.getCartData` is a pure read. It never saves and never dirties
+    the stored list; it only clamps quantities to current stock and omits
+    deleted/out-of-stock products. Do not reintroduce a write here.
+  - A missing profile user raises `UserNotFoundException` rather than an NPE.
+- Product edit version
+  - `product_entity.version` is a JPA `@Version` column (V11). **Every writer of a
+    product row must advance it.** JPA-managed writers (the admin update, the
+    locked checkout decrement) do so automatically; the bulk JPQL
+    `ProductEntityRepository.incrementStock` advances it explicitly in the same
+    statement, because a bulk update bypasses entity version handling. Without
+    that, every restock is invisible to an open admin edit form.
+  - `POST /admin/panel/updateProduct` **requires** `expectedVersion`. This is an
+    intentional tightening of the request contract: backend and frontend ship
+    together. Missing/invalid gives 400; stale gives 409 `PRODUCT_EDIT_CONFLICT`
+    (`ProductEditConflictExceptionHandler`, deliberately a separate advice so
+    `GlobalExceptionHandler`'s existing mappings and tests cannot drift).
+  - The row lock serializes an edit with checkout/restock; `expectedVersion`
+    detects a browser that has held the form since before that. Both are needed:
+    the lock alone does not stop a form opened minutes ago from restoring its
+    stale absolute stock count.
+  - A rejected edit writes no file and creates no cleanup work, because the
+    version comparison runs before any mutation.
+- Product creation
+  - `service/admin/supply/ProductCreationPolicy` is the single owner of product
+    normalization/validation for JSON creation, multipart upload and edit.
+    `ProductDetails` is the transport-independent value object; the policy takes no
+    multipart or DTO types. Length and scale bounds are derived from the real
+    schema (`VARCHAR(255)`, `NUMERIC(19,2)`) so bad input is a 400 rather than a
+    driver error mid-insert.
+  - `addProduct` resolves its category by **name** and refuses a name matching no
+    row or more than one (`category_name` has no unique constraint). It never
+    falls back to a default category. The multipart path keeps resolving
+    `categoryValue` by id.
+  - `ProductEntity.adminEntity` and `categoryEntity` are set explicitly on the
+    saved product. The admin's `itemEntities` collection is the inverse side and is
+    deliberately not appended to.
+  - An absent description normalizes to `""` and an absent discount to `0`, since
+    both columns are `NOT NULL` with no default.
+- Pagination
+  - `helper/PageRequestPolicy` is the single bound for the product and order
+    listings: `page >= 0`, size `1..100` inclusive, validated **before**
+    `PageRequest` construction so an invalid page costs no database access.
+    Oversized requests are rejected with 400, never clamped. The native
+    admin-order union query stays unsorted so its `order_id DESC, source_rank ASC`
+    ordering survives. Support customer search has its own `limit` contract
+    (`SupportCustomerDirectoryService`) and is deliberately not routed through
+    this policy.
+- Image cleanup queue
+  - Replaced images and deleted products enqueue a row in
+    `product_image_cleanup_entity` (V12) **in the same transaction** as the
+    product/image change. A crash after commit therefore cannot lose the only
+    reference to an obsolete file, which an in-memory after-commit callback would.
+  - `ProductImageCleanupWorker` claims due work with a bounded lease, re-checks
+    that nothing still references the canonical file identity, deletes outside any
+    transaction, and fences completion on the lease token, so a stale worker
+    changes nothing. Already-absent files count as success, which makes
+    at-least-once delivery free.
+  - This is **not** the support outbox and shares nothing with it: no payloads, no
+    HTTP delivery, no ordering, no event ids.
+  - There is deliberately no terminal failure state. A permanently undeletable
+    file stays visible as pending work; `alert-after-attempts` only raises the log.
+    A terminal state would abandon the work silently.
+  - `FileService.canonicalFileIdentity` is shared by the reference check and path
+    resolution so the two cannot drift. Deletion is confined to `APP_UPLOAD_DIR`;
+    traversal or outside-directory paths are never deleted.
+  - New uploads always draw a fresh UUID name and no endpoint accepts a
+    client-supplied path, which is what makes the check-then-unlink window safe.
+  - No automatic broad filesystem sweep exists. Pre-existing orphan reconciliation
+    is a separate operational task requiring a reference inventory and a dry run.
 - Product images
   - `service/global/FileService` writes with `CREATE_NEW`: a colliding name
     fails loudly instead of truncating another product's image.
@@ -179,6 +265,16 @@ Backend packages follow a mostly standard layered layout:
   - Product and order money uses `BigDecimal` / `NUMERIC(19, 2)` major units.
     The backend calculates checkout totals and converts them to Stripe minor
     units; the client never sends an amount or currency for a charge.
+  - `helper/ProductPricingPolicy` is the single owner of the effective
+    (discounted) unit price. The discount factor is rounded to 6 decimals before
+    the multiply and the result to 2, both `HALF_UP`, so catalog display and the
+    checkout charge agree for every valid product.
+  - The two callers differ only in invalid-data handling, and that is explicit:
+    checkout uses `requireValidPrice`/`requireValidDiscount` and rejects, while
+    the catalog listing keeps a documented legacy null-to-zero fallback in
+    `UserCatalogReadService.legacyListingPrice`. An invalid payable price is never
+    silently treated as zero. Stripe minor-unit conversion and its limits stay in
+    `PaymentAmountConverter`.
 - CSRF
   - `GET /csrf` returns the token and header name for the cross-origin SPA;
     Spring also sets the CSRF cookie. Mutating API requests require the header.
@@ -315,6 +411,23 @@ Backend packages follow a mostly standard layered layout:
   http://localhost:8080/payment/webhook`, put the printed `whsec_...` value in
   `STRIPE_WEBHOOK_SECRET` (or `configs/spring.env`) and restart the backend.
   Unsigned or invalidly signed payloads are always rejected.
+
+## Deferred Architectural Options
+
+Documented deliberately rather than half-implemented. Neither is part of the
+current fixes, and neither should be started without a plan of its own.
+
+- **Payment services accept raw JWT strings.** Unlike the cart, profile and
+  support flows, which resolve an authenticated principal, the payment package
+  takes the caller's token and validates it inside the service. A future
+  coordinated controller/service refactor can pass authenticated identity
+  instead, but it must preserve role checks, checkout ownership, cookie/CSRF
+  behavior and every recovery path. Do not remove token validation from a
+  service while leaving its caller unauthenticated.
+- **`StripePaymentGateway` exposes Stripe SDK types.** It is already an
+  interface, so provider-neutral results are worthwhile if a second provider or
+  SDK isolation is ever actually required. A full payment-provider abstraction
+  rewrite is not part of these fixes and should not be started speculatively.
 
 ## Change Guidelines For Agents
 - Keep backend layering intact:

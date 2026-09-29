@@ -101,7 +101,11 @@ class CategorySeedMigrationPostgresTest {
         execute("INSERT INTO category_entity (category_id, category_name) VALUES (77, 'Custom Category')");
 
         MigrateResult result = migrate();
-        assertEquals(1, result.migrationsExecuted, "only V10 should still be pending");
+        // V10 (the seed) and V11 (the product edit version) are both still
+        // pending after V9. Derived from the script count so a future migration
+        // does not turn this into a tripwire to update.
+        assertEquals(MigrationTestSupport.versionedMigrationCount() - 9, result.migrationsExecuted,
+                "only V10 and V11 should still be pending");
 
         assertEquals(1, countByName("Elektronik"), "an already-present name must not be inserted twice");
         assertEquals(99, categoryIdByName("Elektronik"), "a pre-existing category_id must be preserved");

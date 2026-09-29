@@ -2,13 +2,16 @@ package com.example.MigrosBackend.service.admin.supply;
 
 import com.example.MigrosBackend.dto.admin.panel.*;
 import com.example.MigrosBackend.dto.user.product.ProductDetailDto;
+import com.example.MigrosBackend.dto.user.product.ProductDto;
 import com.example.MigrosBackend.entity.admin.AdminEntity;
 import com.example.MigrosBackend.entity.category.CategoryEntity;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.product.ProductImageEntity;
 import com.example.MigrosBackend.exception.admin.AdminNotFoundException;
+import com.example.MigrosBackend.exception.admin.ProductEditConflictException;
 import com.example.MigrosBackend.exception.admin.ProductNotFoundException;
 import com.example.MigrosBackend.exception.shared.GeneralException;
+import com.example.MigrosBackend.helper.PageRequestPolicy;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.repository.category.CategoryEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
@@ -17,7 +20,6 @@ import com.example.MigrosBackend.service.global.FileService;
 import com.example.MigrosBackend.service.user.supply.UserCatalogReadService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +30,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -38,11 +41,13 @@ public class AdminSupplyService {
     private final AdminEntityRepository adminEntityRepository;
     private final AdminProductDescriptionOperations productDescriptionOperations;
     private final AdminProductImageOperations productImageOperations;
+    private final ProductCreationPolicy productCreationPolicy;
+    private final ProductImageCleanupQueue imageCleanupQueue;
     private final FileService fileService;
     private final UserCatalogReadService catalogReadService;
 
     @Autowired
-    public AdminSupplyService(CategoryEntityRepository categoryEntityRepository, ProductEntityRepository productEntityRepository, ProductImageEntityRepository productImageEntityRepository, AdminEntityRepository adminEntityRepository, FileService fileService, AdminProductDescriptionOperations productDescriptionOperations, AdminProductImageOperations productImageOperations, UserCatalogReadService catalogReadService) {
+    public AdminSupplyService(CategoryEntityRepository categoryEntityRepository, ProductEntityRepository productEntityRepository, ProductImageEntityRepository productImageEntityRepository, AdminEntityRepository adminEntityRepository, FileService fileService, AdminProductDescriptionOperations productDescriptionOperations, AdminProductImageOperations productImageOperations, ProductCreationPolicy productCreationPolicy, ProductImageCleanupQueue imageCleanupQueue, UserCatalogReadService catalogReadService) {
         this.categoryEntityRepository = categoryEntityRepository;
         this.productEntityRepository = productEntityRepository;
         this.productImageEntityRepository = productImageEntityRepository;
@@ -50,35 +55,61 @@ public class AdminSupplyService {
         this.fileService = fileService;
         this.productDescriptionOperations = productDescriptionOperations;
         this.productImageOperations = productImageOperations;
+        this.productCreationPolicy = productCreationPolicy;
+        this.imageCleanupQueue = imageCleanupQueue;
         this.catalogReadService = catalogReadService;
     }
 
     /**
-     * Registers a product and links it to its administrator.
- *
-     * <p>Both writes are one transaction: the product row and the admin's
-     * back-reference either both exist or neither does. As separate commits a
-     * failure between them leaves a product no administrator can list or edit.
+     * Registers a product from a JSON request and links it to its administrator.
+     *
+     * <p>This path used to copy four fields onto a new entity and insert it, which
+     * could not produce a row the schema accepts: {@code product_description} and
+     * {@code product_discount} are {@code NOT NULL} and were left null, and the
+     * category foreign key was never set, so a product created here had no
+     * category to be listed under. It now runs through exactly the same
+     * {@link ProductCreationPolicy} as the multipart upload, and the one insert
+     * carries both foreign keys.
+     *
+     * <p>The category arrives as a name rather than an id, so it is resolved
+     * before the insert and an unknown or ambiguous name is refused. There is no
+     * default category: silently filing a product somewhere the administrator
+     * did not choose is worse than refusing, and the request carries the name for
+     * exactly this purpose.
+     *
+     * <p>The admin's {@code itemEntities} collection is deliberately not touched.
+     * That collection is the inverse side of the product's own
+     * {@code admin_entity_id} column, so appending to it and re-saving the admin
+     * would be a second, cascading write whose only effect is to make the
+     * association the first write already made.
      */
-@Transactional
-public void addProduct(AdminAddItemDto adminAddItemDto) {
-        AdminEntity currentAdminEntity = adminEntityRepository.findById(adminAddItemDto.getAdminId()).orElseThrow(() -> new AdminNotFoundException(adminAddItemDto.getAdminId().toString()));
+    @Transactional
+    public void addProduct(AdminAddItemDto adminAddItemDto) {
+        ProductDto productDto = adminAddItemDto.getProductDto();
+
+        // Everything that can be judged from the request alone is judged first,
+        // so a malformed body is reported as such rather than surfacing as a
+        // failed lookup for a reference the request never got to specify. Only
+        // then does anything touch the database.
+        String categoryName = productCreationPolicy.normalizeCategoryName(productDto.getCategoryName());
+        ProductDetails details = productCreationPolicy.normalize(ProductDetails.of(
+                productDto.getProductName(),
+                productDto.getSubCategoryName(),
+                productDto.getProductPrice(),
+                productDto.getProductCount(),
+                productDto.getProductDiscount(),
+                productDto.getProductDescription()));
+
+        AdminEntity currentAdminEntity = adminEntityRepository.findById(adminAddItemDto.getAdminId())
+                .orElseThrow(() -> new AdminNotFoundException(adminAddItemDto.getAdminId().toString()));
+        CategoryEntity categoryEntity = resolveCategoryByName(categoryName);
 
         ProductEntity newProductEntity = new ProductEntity();
-        newProductEntity.setProductName(adminAddItemDto.getProductDto().getProductName());
-        newProductEntity.setSubcategoryName(adminAddItemDto.getProductDto().getSubCategoryName());
-        newProductEntity.setProductCount(adminAddItemDto.getProductDto().getProductCount());
-        newProductEntity.setProductPrice(adminAddItemDto.getProductDto().getProductPrice());
-        newProductEntity.setProductDiscount(adminAddItemDto.getProductDto().getProductDiscount());
+        productCreationPolicy.applyTo(newProductEntity, details, currentAdminEntity, categoryEntity);
 
-        ProductEntity s = productEntityRepository.save(newProductEntity);
-        List<ProductEntity> itemEntities = currentAdminEntity.getItemEntities();
-        itemEntities.add(s);
-
-        currentAdminEntity.setItemEntities(itemEntities);
-
-        adminEntityRepository.save(currentAdminEntity);
+        productEntityRepository.save(newProductEntity);
     }
+
 
     public void addCategory(String categoryName) {
         CategoryEntity ce = categoryEntityRepository.findByCategoryName(categoryName);
@@ -109,22 +140,19 @@ public void addProduct(AdminAddItemDto adminAddItemDto) {
                               int productCount, BigDecimal productDiscount,
                               String productDescription, int categoryValue,
                               MultipartFile selectedImage) {
-        NormalizedProductDetails details = normalizeProductDetails(
-                productName, subCategoryName, productPrice, productCount, productDiscount, productDescription);
+        ProductDetails details = productCreationPolicy.normalize(ProductDetails.of(
+                productName, subCategoryName, productPrice, productCount,
+                productDiscount, productDescription));
         productImageOperations.validateProductImage(selectedImage);
 
-        CategoryEntity categoryEntity = categoryEntityRepository.findByCategoryId(categoryValue);
-        if (categoryEntity == null) {
-            throw new GeneralException("Invalid category value: " + categoryValue);
-        }
+        CategoryEntity categoryEntity = resolveCategoryById(categoryValue);
         AdminEntity adminEntity = adminEntityRepository.findById(adminId)
                 .orElseThrow(() -> new AdminNotFoundException(adminId.toString()));
 
         Path savedFilePath = writeImageForRollbackCleanup(selectedImage);
         try {
             ProductEntity productEntity = new ProductEntity();
-            applyProductDetails(productEntity, adminEntity, categoryEntity, details,
-                    productPrice, productCount, productDiscount);
+            productCreationPolicy.applyTo(productEntity, details, adminEntity, categoryEntity);
             productEntityRepository.save(productEntity);
 
             saveProductImage(productEntity, savedFilePath);
@@ -149,25 +177,47 @@ public void addProduct(AdminAddItemDto adminAddItemDto) {
      * or one whose image row was removed - gets one created here. Skipping the
      * update because there was nothing to update would leave the freshly uploaded
      * file on disk with nothing referencing it.
+     *
+     * <p>Two separate staleness guards, and both are needed:
+     *
+     * <ul>
+     *   <li>The row lock ({@code findByIdForUpdate}) serialises this edit against
+     *       a concurrent checkout reservation or restock, so the comparison below
+     *       runs against a value no other stock writer can change underneath it.</li>
+     *   <li>The {@code expectedVersion} the editor submitted detects a browser
+     *       that has been holding the form since before that lock was taken. The
+     *       lock alone does not: an edit form opened minutes ago acquires the
+     *       lock instantly and would then overwrite current stock with the count
+     *       it displayed when it loaded.</li>
+     * </ul>
+     *
+     * <p>The comparison runs before any field is mutated and before any byte of
+     * image is written, so a rejected edit leaves the row, the image reference
+     * and the upload directory exactly as they were.
      */
     @Transactional
     public void updateProduct(Long adminId, Long productId, String productName,
                               String subCategoryName, BigDecimal productPrice,
                               int productCount, BigDecimal productDiscount,
                               String productDescription, int categoryValue,
-                              MultipartFile selectedImage) {
-        NormalizedProductDetails details = normalizeProductDetails(
-                productName, subCategoryName, productPrice, productCount, productDiscount, productDescription);
+                              MultipartFile selectedImage, Long expectedVersion) {
+        ProductDetails details = productCreationPolicy.normalize(ProductDetails.of(
+                productName, subCategoryName, productPrice, productCount,
+                productDiscount, productDescription));
 
-        CategoryEntity categoryEntity = categoryEntityRepository.findByCategoryId(categoryValue);
-        if (categoryEntity == null) {
-            throw new GeneralException("Invalid category value: " + categoryValue);
-        }
+        CategoryEntity categoryEntity = resolveCategoryById(categoryValue);
         AdminEntity adminEntity = adminEntityRepository.findById(adminId).orElseThrow(() -> new AdminNotFoundException(adminId.toString()));
 
-        ProductEntity productEntity = productEntityRepository.findById(productId).orElseThrow(() -> new ProductNotFoundException(productId.toString()));
-        applyProductDetails(productEntity, adminEntity, categoryEntity, details,
-                productPrice, productCount, productDiscount);
+        // Every reference is resolved before this point, so a missing admin or
+        // category still leaves no orphan image behind.
+        ProductEntity productEntity = productEntityRepository.findByIdForUpdate(productId)
+                .orElseThrow(() -> new ProductNotFoundException(productId.toString()));
+
+        if (expectedVersion == null || !expectedVersion.equals(productEntity.getVersion())) {
+            throw ProductEditConflictException.staleVersion();
+        }
+
+        productCreationPolicy.applyTo(productEntity, details, adminEntity, categoryEntity);
         productEntityRepository.save(productEntity);
 
         if (selectedImage != null && !selectedImage.isEmpty()) {
@@ -194,8 +244,53 @@ public void addProduct(AdminAddItemDto adminAddItemDto) {
         } else {
             productImageEntity = images.get(0);
         }
+
+        // Captured before the row changes, and enqueued in this same transaction.
+        // After the write the old value is simply gone, and a rollback would take
+        // the enqueue with it - which is the correct outcome, because a rolled
+        // back replacement never stopped referencing the old file.
+        String previousStoredPath = productImageEntity.getImagePath();
+
         productImageEntity.setImagePath(savedFilePath.toString());
         productImageEntityRepository.save(productImageEntity);
+
+        enqueueObsoleteImage(previousStoredPath, savedFilePath.toString());
+    }
+
+    /**
+     * Records that {@code previousStoredPath} has become unreferenced, unless
+     * it names the same file as the reference that replaced it.
+     *
+     * <p>Only the replaced row is enqueued, and that is not an oversight. Any
+     * other image row the product owns still points at its own file, so that
+     * file is not obsolete - and the cleanup worker's reference check would defer
+     * it anyway, which is the safety net for a product that somehow grew a
+     * second row.
+     *
+     * <p>The new path is never enqueued. It is the one file the product is
+     * being pointed at; a queue entry for it would delete the image a successful
+     * edit had just committed.
+     */
+    private void enqueueObsoleteImage(String previousStoredPath, String newStoredPath) {
+        if (previousStoredPath == null || previousStoredPath.isBlank()) {
+            // Nothing was referenced, so nothing became obsolete. This is the
+            // ordinary first-upload case.
+            return;
+        }
+        String previousIdentity = fileService.canonicalFileIdentity(previousStoredPath);
+        String newIdentity = fileService.canonicalFileIdentity(newStoredPath);
+        if (previousIdentity == null) {
+            // A reference that names no file inside the upload directory cannot
+            // be deleted, so there is no obligation to record.
+            return;
+        }
+        if (previousIdentity.equals(newIdentity)) {
+            // The same file, re-pointed at itself: nothing is obsolete. A fresh
+            // upload always gets a fresh UUID name, so this can only happen for a
+            // pre-existing row, and enqueueing it anyway would delete a live image.
+            return;
+        }
+        imageCleanupQueue.enqueueObsoleteReference(previousStoredPath);
     }
 
     /**
@@ -227,7 +322,7 @@ public void addProduct(AdminAddItemDto adminAddItemDto) {
     }
 
     public List<AdminProductPreviewDto> getAllAdminProducts(Long adminId, int page, int productRange) {
-        Pageable pageable = PageRequest.of(page, productRange);
+        Pageable pageable = PageRequestPolicy.ofProductIdAscending(page, productRange);
         Page<ProductEntity> entities = productEntityRepository.findByAdminEntityId(adminId, pageable);
         // An empty page is a valid result. The admin client sizes its paginator
         // from the separate product-count endpoint, so it never uses an error as
@@ -242,8 +337,58 @@ public void addProduct(AdminAddItemDto adminAddItemDto) {
         }).collect(Collectors.toList());
     }
 
+    /**
+     * Deletes a product, its image rows, and its files in one transaction.
+     *
+     * <p>Deleting the product alone left every image it owned on disk forever,
+     * with no record anywhere that they were unreferenced. The file cannot be
+     * removed before the commit that stops referencing it, and it cannot be
+     * removed from an after-commit callback without a crash in between losing
+     * the obligation, so the obligation is what gets written: one durable row
+     * per file identity, inside the same transaction as the delete.
+     *
+     * <p>Atomic in both directions, which is the point:
+     *
+     * <ul>
+     *   <li>If the product delete fails - a checkout still references it, so the
+     *       foreign key refuses - the whole transaction rolls back and no cleanup
+     *       work commits. A queue entry for a product that still exists would
+     *       delete the image of a product that is still being sold.</li>
+     *   <li>If the commit succeeds, every file the product owned is durably owed,
+     *       including the ones on rows other than the first. A product that
+     *       somehow carries several image rows has several files, and taking only
+     *       the displayed one would leak the rest.</li>
+     * </ul>
+     *
+     * <p>Checkout and order behaviour is unchanged: the product is still removed
+     * under the same foreign key, so a product with orders is still refused, and
+     * nothing here cascades into or out of checkout data.
+     *
+     * <p>The row is taken with the same {@code PESSIMISTIC_WRITE} lock the edit
+     * path uses, so a replacement in flight cannot interleave: it cannot rewrite
+     * an image row between the moment this method decided which files are
+     * obsolete and the moment those rows are deleted.
+     *
+     * <p>A product that is not there is still a no-op, as it was before this
+     * method became transactional. Whether a missing product is a 404 is a
+     * question about the delete-product contract, not about image cleanup, and
+     * changing it here would alter a client-visible response as a side effect
+     * of adding a queue.
+     */
+    @Transactional
     public void deleteProduct(Long productId) {
-        productEntityRepository.deleteById(productId);
+        Optional<ProductEntity> locked = productEntityRepository.findByIdForUpdate(productId);
+        if (locked.isEmpty()) {
+            return;
+        }
+
+        // Every row, not only the one the catalog happens to display first.
+        List<ProductImageEntity> images = productImageEntityRepository.findByProductEntityId(productId);
+        imageCleanupQueue.enqueueObsoleteReferences(
+                images.stream().map(ProductImageEntity::getImagePath).toList());
+
+        productImageEntityRepository.deleteAll(images);
+        productEntityRepository.delete(locked.get());
     }
 
     public ProductDetailDto getProductData(Long productId) {
@@ -262,77 +407,41 @@ public void addProduct(AdminAddItemDto adminAddItemDto) {
         productDescriptionOperations.deleteProductDescription(descriptionId);
     }
 
-    private NormalizedProductDetails normalizeProductDetails(String productName, String subCategoryName,
-                                                              BigDecimal productPrice, int productCount,
-                                                              BigDecimal productDiscount, String productDescription) {
-        String normalizedProductName = normalizeRequiredText("Product name", productName);
-        String normalizedSubCategoryName = normalizeRequiredText("Subcategory name", subCategoryName);
-        String normalizedDescription = normalizeOptionalText(productDescription);
-        validateProductNumbers(productPrice, productCount, productDiscount);
-        return new NormalizedProductDetails(normalizedProductName, normalizedSubCategoryName, normalizedDescription);
+    /**
+     * Resolves the category a multipart caller named by its numeric id.
+     *
+     * <p>Keeps the message the multipart path has always returned, so a client
+     * that shows it to an administrator does not change meaning when creation is
+     * refactored.
+     */
+    private CategoryEntity resolveCategoryById(int categoryValue) {
+        CategoryEntity categoryEntity = categoryEntityRepository.findByCategoryId(categoryValue);
+        if (categoryEntity == null) {
+            throw new GeneralException("Invalid category value: " + categoryValue);
+        }
+        return categoryEntity;
     }
 
-    private void applyProductDetails(ProductEntity productEntity, AdminEntity adminEntity,
-                                     CategoryEntity categoryEntity, NormalizedProductDetails details,
-                                     BigDecimal productPrice, int productCount, BigDecimal productDiscount) {
-        productEntity.setAdminEntity(adminEntity);
-        productEntity.setProductName(details.productName());
-        productEntity.setSubcategoryName(details.subCategoryName());
-        productEntity.setProductCount(productCount);
-        productEntity.setProductPrice(productPrice);
-        productEntity.setProductDiscount(productDiscount);
-        productEntity.setCategoryEntity(categoryEntity);
-        productEntity.setProductDescription(details.productDescription());
-    }
-
-    private void validateProductNumbers(BigDecimal productPrice, int productCount, BigDecimal productDiscount) {
-        if (productPrice == null || productPrice.signum() < 0) {
-            throw new GeneralException("Product price cannot be negative");
+    /**
+     * Resolves the category a JSON caller named by name, refusing a name that
+     * does not identify exactly one row.
+     *
+     * <p>{@code category_name} carries no unique constraint, so a name can match
+     * nothing or several rows. Asking for the single-entity finder would let the
+     * duplicate case surface as a persistence exception, which the client sees
+     * as a 500 with a message about row counts. Both outcomes are the
+     * administrator's problem to fix, so both are reported here as the 400s they
+     * are - and neither invents a category to fall back on, because filing a
+     * product under one the administrator did not choose is not a repair.
+     */
+    private CategoryEntity resolveCategoryByName(String categoryName) {
+        List<CategoryEntity> matches = categoryEntityRepository.findAllByCategoryName(categoryName);
+        if (matches.isEmpty()) {
+            throw new GeneralException("Unknown category name: " + categoryName);
         }
-
-        if (productPrice.stripTrailingZeros().scale() > 2) {
-            throw new GeneralException("Product price must not exceed two decimal places");
+        if (matches.size() > 1) {
+            throw new GeneralException("Category name matches more than one category: " + categoryName);
         }
-
-        if (productCount < 0) {
-            throw new GeneralException("Product count cannot be negative");
-        }
-
-        if (productDiscount == null || productDiscount.signum() < 0 || productDiscount.compareTo(BigDecimal.valueOf(100)) > 0) {
-            throw new GeneralException("Product discount must be between 0 and 100");
-        }
-
-        if (productDiscount.stripTrailingZeros().scale() > 2) {
-            throw new GeneralException("Product discount must not exceed two decimal places");
-        }
-    }
-
-    private String normalizeRequiredText(String fieldName, String value) {
-        if (value == null) {
-            throw new GeneralException(fieldName + " is required");
-        }
-
-        String normalized = value.trim();
-        if (normalized.isEmpty() || "undefined".equalsIgnoreCase(normalized) || "null".equalsIgnoreCase(normalized)) {
-            throw new GeneralException(fieldName + " is required");
-        }
-
-        return normalized;
-    }
-
-    private String normalizeOptionalText(String value) {
-        if (value == null) {
-            return "";
-        }
-
-        String normalized = value.trim();
-        if ("undefined".equalsIgnoreCase(normalized) || "null".equalsIgnoreCase(normalized)) {
-            return "";
-        }
-
-        return normalized;
-    }
-
-    private record NormalizedProductDetails(String productName, String subCategoryName, String productDescription) {
+        return matches.get(0);
     }
 }

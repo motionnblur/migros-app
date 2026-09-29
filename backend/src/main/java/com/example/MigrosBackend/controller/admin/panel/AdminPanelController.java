@@ -6,7 +6,10 @@ import com.example.MigrosBackend.dto.user.UserProfileTableDto;
 import com.example.MigrosBackend.dto.user.product.ProductDetailDto;
 import com.example.MigrosBackend.service.admin.supply.AdminOrderService;
 import com.example.MigrosBackend.service.admin.supply.AdminSupplyService;
+import com.example.MigrosBackend.helper.PageRequestPolicy;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,8 +49,21 @@ public class AdminPanelController {
         return ResponseEntity.ok(adminSupplyService.getProductDescription(productId));
     }
 
+    /**
+     * Admin product listing.
+     *
+     * <p>The page bounds are the same {@link PageRequestPolicy} the anonymous
+     * {@code /admin/supply} listing uses, and are declared here so an
+     * out-of-range window comes back as a structured {@code VALIDATION_FAILED}
+     * naming the offending parameter instead of a 500 from
+     * {@code PageRequest.of}, or - worse - a silently oversized {@code LIMIT}.
+     */
     @GetMapping("getAllAdminProducts")
-    public ResponseEntity<List<AdminProductPreviewDto>> getAllAdminProducts(@RequestParam Long adminId, @RequestParam int page, @RequestParam int productRange) {
+    public ResponseEntity<List<AdminProductPreviewDto>> getAllAdminProducts(@RequestParam Long adminId,
+                                                                            @PositiveOrZero @RequestParam int page,
+                                                                            @Min(PageRequestPolicy.MIN_PAGE_SIZE)
+                                                                            @Max(PageRequestPolicy.MAX_PAGE_SIZE)
+                                                                            @RequestParam int productRange) {
         return ResponseEntity.ok(adminSupplyService.getAllAdminProducts(adminId, page, productRange));
     }
 
@@ -56,12 +72,33 @@ public class AdminPanelController {
         return ResponseEntity.ok(adminSupplyService.getProductData(productId));
     }
 
+    /**
+     * Creates a product from a JSON body, with no image.
+     *
+     * <p>Field names are unchanged. The body is validated by the same policy the
+     * multipart upload is, so a product created here is as complete as one
+     * created with a picture: the description is stored (the empty string when
+     * the field is absent) and the category named by {@code categoryName} is
+     * resolved to a real category rather than left null.
+     *
+     * <p>Creating a product without an image is legitimate - the edit path adds
+     * the first image to a product that has none, and a version-checked edit can
+     * do it - so the absence of {@code selectedImage} here is not an error.
+     */
     @PostMapping("addProduct")
     public ResponseEntity<Void> addProduct(@Valid @RequestBody AdminAddItemDto adminAddItemDto) {
         adminSupplyService.addProduct(adminAddItemDto);
         return ResponseEntity.ok().build();
     }
 
+    /**
+     * Creates a product together with its image.
+     *
+     * <p>The {@code @PositiveOrZero} annotations are the request-boundary half of
+     * the shared creation policy; the scale, capacity and length rules are applied
+     * once, in the service, so the two creation endpoints cannot disagree about
+     * them.
+     */
     @PostMapping("uploadProduct")
     public ResponseEntity<String> uploadProduct(@NotNull @RequestParam("adminId") Long adminId,
                                                  @RequestParam("productName") String productName,
@@ -79,6 +116,22 @@ public class AdminPanelController {
         return ResponseEntity.ok("File uploaded successfully");
     }
 
+    /**
+     * Edits an existing product.
+     *
+     * <p>{@code expectedVersion} is required, and required is the point: the
+     * editor submits the version it loaded, so a form that has been open since
+     * before a checkout reserved stock is rejected with 409 instead of writing
+     * its stale absolute count over the current one. There is deliberately no
+     * default and no inference from a missing value - silently accepting a
+     * missing version would make the guard optional exactly when a caller is
+     * too old to send it.
+     *
+     * <p>Absent gives 400 {@code MISSING_PARAMETER}, non-numeric gives 400
+     * {@code VALIDATION_FAILED}, negative gives 400 {@code VALIDATION_FAILED},
+     * and stale gives 409 {@code PRODUCT_EDIT_CONFLICT}. The path, the method
+     * and the success body are unchanged.
+     */
     @PostMapping("updateProduct")
     public ResponseEntity<String> updateProduct(@NotNull @RequestParam("adminId") Long adminId,
                                                  @NotNull @RequestParam("productId") Long productId,
@@ -89,8 +142,9 @@ public class AdminPanelController {
                                                  @RequestParam("productDiscount") BigDecimal productDiscount,
                                                  @RequestParam("productDescription") String productDescription,
                                                  @RequestParam(value = "selectedImage", required = false) MultipartFile selectedImage,
-                                                 @RequestParam("categoryValue") int categoryValue) {
-        adminSupplyService.updateProduct(adminId, productId, productName, subCategoryName, productPrice, productCount, productDiscount, productDescription, categoryValue, selectedImage);
+                                                 @RequestParam("categoryValue") int categoryValue,
+                                                 @NotNull @PositiveOrZero @RequestParam("expectedVersion") Long expectedVersion) {
+        adminSupplyService.updateProduct(adminId, productId, productName, subCategoryName, productPrice, productCount, productDiscount, productDescription, categoryValue, selectedImage, expectedVersion);
         return ResponseEntity.ok("File uploaded successfully");
     }
 
@@ -101,7 +155,10 @@ public class AdminPanelController {
     }
 
     @GetMapping("getAllOrders")
-    public ResponseEntity<OrderPageDto> getAllOrders(@RequestParam int page, @RequestParam int productRange) {
+    public ResponseEntity<OrderPageDto> getAllOrders(@PositiveOrZero @RequestParam int page,
+                                                      @Min(PageRequestPolicy.MIN_PAGE_SIZE)
+                                                      @Max(PageRequestPolicy.MAX_PAGE_SIZE)
+                                                      @RequestParam int productRange) {
         return ResponseEntity.ok(adminOrderService.getAllOrders(page, productRange));
     }
 

@@ -3,6 +3,7 @@ package com.example.MigrosBackend.service.support;
 import com.example.MigrosBackend.entity.user.SupportMessageEntity;
 import com.example.MigrosBackend.entity.user.SupportMessageSender;
 import com.example.MigrosBackend.entity.user.UserEntity;
+import com.example.MigrosBackend.exception.admin.UserNotFoundException;
 import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.exception.shared.SupportSyncConflictException;
 import com.example.MigrosBackend.exception.shared.SupportUserBannedException;
@@ -175,19 +176,39 @@ public class SupportModerationService {
         }
     }
 
+    /**
+     * Bans the customer by writing the ban flag alone.
+     *
+     * <p>The user row also carries the cart list, the profile and the password
+     * hash. Loading it and saving it back would write every one of those columns
+     * as they were read, so a ban issued while the customer was checking out or
+     * editing their profile would quietly undo that work. Naming the single
+     * column makes an unrelated update impossible to clobber.
+     *
+     * <p>The broadcast stays after the write and inside the transaction, as
+     * before: listeners only ever see a support-state change, and the ban flag
+     * itself is read by the send guard on the next request either way.
+     */
+    @Transactional
     public void banUser(String userMail) {
-        UserEntity user = guards.requireUser(userMail);
-
-        user.setBanned(true);
-        userEntityRepository.save(user);
-        notificationCoordinator.broadcastSupportUpdate(userMail);
+        setBanned(userMail, true);
     }
 
+    @Transactional
     public void unbanUser(String userMail) {
-        UserEntity user = guards.requireUser(userMail);
+        setBanned(userMail, false);
+    }
 
-        user.setBanned(false);
-        userEntityRepository.save(user);
+    private void setBanned(String userMail, boolean banned) {
+        guards.requireUser(userMail);
+
+        int updated = userEntityRepository.updateBannedByUserMail(userMail, banned);
+        if (updated == 0) {
+            // The row vanished between the guard's read and this update. The
+            // existing not-found error is the accurate report.
+            throw new UserNotFoundException(userMail);
+        }
+
         notificationCoordinator.broadcastSupportUpdate(userMail);
     }
 

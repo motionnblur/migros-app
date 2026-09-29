@@ -70,6 +70,19 @@
           {{ saveError }}
         </div>
 
+        <div *ngIf="editConflict" class="alert alert-warning py-3 mt-3 mb-0" role="alert" data-testid="edit-conflict">
+          <p class="mb-2">
+            <strong>Bu ürün sizin formu açtığınızdan beri değişti.</strong>
+            Yazdığınız değerler korunuyor, ancak stok başka bir işlem
+            (sepet rezervasyonu, iptal, başka bir yönetici) tarafından
+            değişmiş olabilir. Kaydetme işlemi uygulanmadı.
+          </p>
+          <button type="button" class="btn btn-sm btn-brand-outline" data-testid="reload-and-review" (click)="reloadProduct()">
+            <i class="bi bi-arrow-clockwise me-1"></i>
+            Ürünü Yeniden Yükle ve Kontrol Et
+          </button>
+        </div>
+
         <div class="product-edit__actions">
           <button type="button" class="btn btn-ghost" (click)="hasEscapePressed.emit(true)">Kapat</button>
           <button type="button" class="btn btn-brand" [disabled]="isSavingProduct" (click)="saveProduct()">

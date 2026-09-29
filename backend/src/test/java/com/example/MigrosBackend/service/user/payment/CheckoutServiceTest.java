@@ -106,8 +106,12 @@ class CheckoutServiceTest {
     }
 
     private void stubLockedUser() {
-        stubAuthenticatedUser();
-        when(userEntityRepository.findByIdForUpdate(42L)).thenReturn(Optional.of(user));
+        // Preparation locks the user row by mailbox. Resolving only the scalar
+        // mailbox first and then locking means the row's first read in the
+        // transaction is the locking one, so the cart cannot come from a
+        // snapshot taken before a concurrent cart mutation committed.
+        when(tokenService.validateAndExtractUser(TOKEN)).thenReturn(EMAIL);
+        when(userEntityRepository.findByUserMailForUpdate(EMAIL)).thenReturn(Optional.of(user));
     }
 
     private ProductEntity product(long id, String name, String price, String discount, int stock) {
@@ -596,7 +600,7 @@ class CheckoutServiceTest {
     @Test
     void missingUserIsRejected() {
         when(tokenService.validateAndExtractUser(TOKEN)).thenReturn(EMAIL);
-        when(userEntityRepository.findByUserMail(EMAIL)).thenReturn(null);
+        when(userEntityRepository.findByUserMailForUpdate(EMAIL)).thenReturn(Optional.empty());
 
         assertThrows(UserNotFoundException.class, () -> checkoutService.prepareCheckout(TOKEN));
     }

@@ -18,6 +18,8 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -129,5 +131,66 @@ class AdminSupplyControllerTest {
     void addCategory_shouldReturnBadRequest_whenParamMissing() throws Exception {
         mockMvc.perform(post("/admin/supply/addCategory"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getProductsFromCategory_shouldRejectPagesAndRangesOutsideTheBound() throws Exception {
+        for (String page : List.of("-1", "-100")) {
+            mockMvc.perform(get("/admin/supply/getProductsFromCategory")
+                            .param("categoryId", "1")
+                            .param("page", page)
+                            .param("productRange", "10"))
+                    .andExpect(status().isBadRequest());
+        }
+
+        for (String range : List.of("-1", "0", "101", "2147483647", "999999999999", "not-a-number")) {
+            mockMvc.perform(get("/admin/supply/getProductsFromCategory")
+                            .param("categoryId", "1")
+                            .param("page", "0")
+                            .param("productRange", range))
+                    .andExpect(status().isBadRequest());
+        }
+
+        verify(userSupplyService, never()).getProductsFromCategory(anyLong(), anyInt(), anyInt());
+    }
+
+    @Test
+    void getAllProducts_shouldRejectPagesAndRangesOutsideTheBound() throws Exception {
+        for (String page : List.of("-1", "-100")) {
+            mockMvc.perform(get("/admin/supply/getAllProducts")
+                            .param("page", page)
+                            .param("productRange", "10"))
+                    .andExpect(status().isBadRequest());
+        }
+
+        for (String range : List.of("-1", "0", "101", "2147483647", "999999999999", "not-a-number")) {
+            mockMvc.perform(get("/admin/supply/getAllProducts")
+                            .param("page", "0")
+                            .param("productRange", range))
+                    .andExpect(status().isBadRequest());
+        }
+
+        verify(userSupplyService, never()).getAllProducts(anyInt(), anyInt());
+    }
+
+    @Test
+    void paginatedReads_shouldAcceptPageZeroAndBothSizeBounds() throws Exception {
+        when(userSupplyService.getProductsFromCategory(anyLong(), anyInt(), anyInt())).thenReturn(List.of());
+        when(userSupplyService.getAllProducts(anyInt(), anyInt())).thenReturn(List.of());
+
+        for (String range : List.of("1", "100")) {
+            mockMvc.perform(get("/admin/supply/getProductsFromCategory")
+                            .param("categoryId", "1")
+                            .param("page", "0")
+                            .param("productRange", range))
+                    .andExpect(status().isOk())
+                    .andExpect(content().json("[]"));
+
+            mockMvc.perform(get("/admin/supply/getAllProducts")
+                            .param("page", "0")
+                            .param("productRange", range))
+                    .andExpect(status().isOk())
+                    .andExpect(content().json("[]"));
+        }
     }
 }

@@ -2,6 +2,7 @@ package com.example.MigrosBackend.controller.user.profile;
 
 import com.example.MigrosBackend.config.security.AuthCookies;
 import com.example.MigrosBackend.dto.user.UserProfileTableDto;
+import com.example.MigrosBackend.exception.admin.UserNotFoundException;
 import com.example.MigrosBackend.exception.shared.TokenNotFoundException;
 import com.example.MigrosBackend.helper.AuthTokenResolver;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
@@ -19,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -105,6 +107,41 @@ class UserProfileControllerTest {
         when(authTokenResolver.requireAuthenticatedUserMail()).thenThrow(new TokenNotFoundException());
 
         mockMvc.perform(get("/user/profile/getUserProfileTable"))
+                .andExpect(status().isNotFound());
+    }
+
+    /**
+     * A missing account used to be dereferenced in the service, so the client
+     * received a 500 instead of the documented not-found response.
+     */
+    @Test
+    void getUserProfileTable_shouldReturnNotFound_whenTheAccountNoLongerExists() throws Exception {
+        when(authTokenResolver.requireAuthenticatedUserMail()).thenReturn("user@example.com");
+        when(userProfileService.getUserProfileTable("user@example.com"))
+                .thenThrow(new UserNotFoundException("user@example.com"));
+
+        mockMvc.perform(get("/user/profile/getUserProfileTable")
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "sample-token")))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void uploadUserProfileTable_shouldReturnNotFound_whenTheAccountNoLongerExists() throws Exception {
+        when(authTokenResolver.requireAuthenticatedUserMail()).thenReturn("user@example.com");
+        doThrow(new UserNotFoundException("user@example.com")).when(userProfileService).uploadUserProfileTable(
+                anyString(), anyString(), anyString(), anyString(),
+                anyString(), anyString(), anyString(), anyString());
+
+        mockMvc.perform(post("/user/profile/uploadUserProfileTable")
+                        .param("userFirstName", "John")
+                        .param("userLastName", "Doe")
+                        .param("userAddress", "123 Main St")
+                        .param("userAddress2", "Apt 4B")
+                        .param("userTown", "Townsville")
+                        .param("userCountry", "Countryland")
+                        .param("userPostalCode", "12345")
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "sample-token"))
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED))
                 .andExpect(status().isNotFound());
     }
 }

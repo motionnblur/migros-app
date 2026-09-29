@@ -1,0 +1,124 @@
+<!--
+  Update-mode variant of `product-adder.component.html`.
+
+  Kept as a separate file rather than one shared template because the conflict
+  recovery state (`editConflict`, `reloadProduct`) only exists on the updater.
+  `ProductAdderComponent` renders the same markup and, under `strictTemplates`,
+  a template that binds updater-only members would fail its compilation.
+
+  The two files must otherwise stay in step: the layout below is a copy of
+  `product-adder.component.html` plus the conflict block.
+-->
+<div class="product-adder-container h-100 d-flex flex-column">
+  <header class="product-adder__header">
+    <h2 class="product-adder__title">
+      <i class="bi bi-box-seam me-2 text-brand"></i>
+      {{ isUpdateMode ? 'Ürün Güncelle' : 'Yeni Ürün Ekle' }}
+    </h2>
+    <button type="button" class="btn-close" (click)="cancel()" aria-label="Kapat"></button>
+  </header>
+
+  <div class="product-adder-main p-4 overflow-auto admin-scroll">
+    <div class="mb-4 d-flex justify-content-center">
+      <div class="image-upload-wrapper" (click)="openImageUploader()">
+        <div
+          *ngIf="!imageUrl"
+          class="upload-placeholder d-flex flex-column align-items-center justify-content-center"
+        >
+          <i class="bi bi-camera fs-2"></i>
+          <span class="small fw-medium">Resim Ekle</span>
+        </div>
+        <img *ngIf="imageUrl" [src]="imageUrl" class="upload-preview" alt="Ürün görseli" />
+        <div class="upload-hover-overlay">
+          <i class="bi bi-pencil-square text-white fs-4"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-12">
+        <label class="form-label small fw-bold text-uppercase">Ürün Adı</label>
+        <input type="text" class="form-control" placeholder="Örn: Süt 1L" [(ngModel)]="productName" />
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label small fw-bold text-uppercase">Kategori</label>
+        <select class="form-select" [formControl]="categoryControl">
+          <option *ngFor="let category of categories" [value]="category.value">
+            {{ category.name }}
+          </option>
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label small fw-bold text-uppercase">Alt Kategori</label>
+        <input type="text" class="form-control" placeholder="Örn: Günlük Süt" [(ngModel)]="subCategoryName" />
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label small fw-bold text-uppercase">Fiyat (TL)</label>
+        <div class="input-group">
+          <input type="number" class="form-control" [(ngModel)]="price" step="0.01" min="0" />
+          <span class="input-group-text text-muted">TL</span>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small fw-bold text-uppercase">Miktar</label>
+        <input type="number" class="form-control" [(ngModel)]="count" min="0" />
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small fw-bold text-uppercase">İndirim</label>
+        <div class="input-group">
+          <input type="number" class="form-control" [(ngModel)]="discount" min="0" max="100" />
+          <span class="input-group-text text-muted">%</span>
+        </div>
+      </div>
+
+      <div class="col-12">
+        <label class="form-label small fw-bold text-uppercase">Açıklama</label>
+        <textarea
+          class="form-control"
+          rows="3"
+          placeholder="Ürün detaylarını girin..."
+          [(ngModel)]="description"
+        ></textarea>
+      </div>
+    </div>
+  </div>
+
+  <footer class="product-adder__footer">
+    <div *ngIf="validationError" class="alert alert-danger py-2 mb-3" role="alert">
+      {{ validationError }}
+    </div>
+
+    <div *ngIf="editConflict" class="alert alert-warning py-3 mb-3" role="alert" data-testid="edit-conflict">
+      <p class="mb-2">
+        <strong>Bu ürün sizin formu açtığınızdan beri değişti.</strong>
+        Yazdığınız değerler korunuyor, ancak stok başka bir işlem
+        (sepet rezervasyonu, iptal, başka bir yönetici) tarafından
+        değişmiş olabilir. Kaydetme işlemi uygulanmadı.
+      </p>
+      <button type="button" class="btn btn-sm btn-brand-outline" data-testid="reload-and-review" (click)="reloadProduct()">
+        <i class="bi bi-arrow-clockwise me-1"></i>
+        Ürünü Yeniden Yükle ve Kontrol Et
+      </button>
+    </div>
+
+    <div class="d-flex gap-2">
+      <button class="btn btn-brand flex-grow-1 py-2 fw-bold" (click)="uploadProductData()">
+        <i class="bi bi-cloud-arrow-up-fill me-2"></i>{{ buttonString }}
+      </button>
+      <button class="btn btn-ghost py-2 px-4 fw-bold" *ngIf="isUpdateMode" (click)="openEditor!()">
+        Açıklamaları Düzenle
+      </button>
+    </div>
+  </footer>
+</div>
+
+<input
+  type="file"
+  name="file"
+  accept="image/png, image/jpeg"
+  class="d-none"
+  #imageUploaderRef
+  (change)="onImageSelected($event)"
+/>

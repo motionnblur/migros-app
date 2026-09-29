@@ -65,9 +65,6 @@ public interface OrderGroupEntityRepository extends JpaRepository<OrderGroupEnti
     @Query(value = ADMIN_ORDER_PAGE_QUERY, countQuery = ADMIN_ORDER_COUNT_QUERY, nativeQuery = true)
     Page<AdminOrderRow> findAdminOrderPage(Pageable pageable);
 
-    @Query(value = ADMIN_ORDER_COUNT_QUERY, nativeQuery = true)
-    long countAdminOrders();
-
     List<OrderGroupEntity> findByUserId(Long userId);
     Optional<OrderGroupEntity> findByIdAndUserId(Long id, Long userId);
 

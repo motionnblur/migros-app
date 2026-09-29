@@ -2,6 +2,7 @@ package com.example.MigrosBackend.service.admin.supply;
 
 import com.example.MigrosBackend.dto.order.OrderDto;
 import com.example.MigrosBackend.dto.order.OrderPageDto;
+import com.example.MigrosBackend.exception.shared.GeneralException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,8 +17,14 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Characterization of {@code GET /admin/panel/getAllOrders} paging.
@@ -124,6 +131,89 @@ class AdminOrderServicePostgresTest {
         assertRow(whole.getItems().get(2), 2, 2, "0", "L2");
         assertRow(whole.getItems().get(3), 1, 1, "15.00", "A");
         assertRow(whole.getItems().get(4), 1, 1, "7.00", "L1");
+    }
+
+    /**
+     * The colliding pair must stay in the same order no matter where the window
+     * boundary falls between the two rows that share id 1. Paging one row at a
+     * time puts a boundary between the group and the legacy line, which is the
+     * only case where an unstable or re-sorted window could flip them or repeat
+     * one of them.
+     */
+    @Test
+    void collidingGroupAndLegacyIdsKeepTheirOrderAcrossEveryPageBoundary() {
+        long[] expectedOrderIds = {5, 3, 2, 1, 1};
+        String[] expectedStatuses = {"L5", "B", "L2", "A", "L1"};
+
+        Set<String> seen = new LinkedHashSet<>();
+        for (int page = 0; page < expectedOrderIds.length; page++) {
+            OrderPageDto dto = adminOrderService.getAllOrders(page, 1);
+            assertEquals(5L, dto.getTotal(), "page " + page);
+            assertEquals(1, dto.getItems().size(), "page " + page);
+
+            OrderDto row = dto.getItems().get(0);
+            assertEquals(expectedOrderIds[page], row.getOrderId(), "page " + page);
+            assertEquals(expectedStatuses[page], row.getStatus(), "page " + page);
+            assertTrue(seen.add(row.getOrderId() + "|" + row.getStatus()),
+                    "row " + row.getOrderId() + "|" + row.getStatus() + " appeared on more than one page");
+        }
+        assertEquals(5, seen.size());
+    }
+
+    /**
+     * More than two pages of unchanged rows, read in windows: the windows must
+     * concatenate into the single ordered listing and must not share a row.
+     */
+    @Test
+    void moreThanTwoPagesOfUnchangedOrdersConcatenateWithoutOverlap() {
+        seedMoreOrders();
+
+        List<String> first = keys(adminOrderService.getAllOrders(0, 4));
+        List<String> second = keys(adminOrderService.getAllOrders(1, 4));
+        List<String> third = keys(adminOrderService.getAllOrders(2, 4));
+
+        assertEquals(11L, adminOrderService.getAllOrders(0, 4).getTotal());
+        assertEquals(List.of("23|L23", "22|L22", "21|L21", "20|L20"), first);
+        assertEquals(List.of("11|G11", "10|G10", "5|L5", "3|B"), second);
+        assertEquals(List.of("2|L2", "1|A", "1|L1"), third);
+
+        Set<String> seen = new LinkedHashSet<>();
+        Stream.of(first, second, third)
+                .flatMap(List::stream)
+                .forEach(key -> assertTrue(seen.add(key), "row " + key + " appeared on more than one page"));
+        assertEquals(11, seen.size());
+
+        // Re-reading the same unchanged data must return the same windows.
+        assertEquals(first, keys(adminOrderService.getAllOrders(0, 4)));
+        assertEquals(second, keys(adminOrderService.getAllOrders(1, 4)));
+        assertEquals(third, keys(adminOrderService.getAllOrders(2, 4)));
+    }
+
+    @Test
+    void anOutOfRangePageOrRangeIsRejectedRatherThanClamped() {
+        assertThrows(GeneralException.class, () -> adminOrderService.getAllOrders(-1, 2));
+        assertThrows(GeneralException.class, () -> adminOrderService.getAllOrders(0, 0));
+        assertThrows(GeneralException.class, () -> adminOrderService.getAllOrders(0, -1));
+        assertThrows(GeneralException.class, () -> adminOrderService.getAllOrders(0, 101));
+        assertThrows(GeneralException.class, () -> adminOrderService.getAllOrders(0, Integer.MAX_VALUE));
+    }
+
+    private void seedMoreOrders() {
+        jdbcTemplate.update("INSERT INTO order_group_entity "
+                + "(order_group_entity_id, created_at, status, user_id) VALUES "
+                + "(10, now(), 'G10', 1), (11, now(), 'G11', 1)");
+        jdbcTemplate.update("INSERT INTO order_entity "
+                + "(order_entity_id, count, item_id, price, status, total_price, user_id, order_group_entity_id) VALUES "
+                + "(20, 1, 104, 1.00, 'L20', 1.00, 1, NULL), "
+                + "(21, 1, 105, 1.00, 'L21', 1.00, 1, NULL), "
+                + "(22, 1, 106, 1.00, 'L22', 1.00, 1, NULL), "
+                + "(23, 1, 107, 1.00, 'L23', 1.00, 1, NULL)");
+    }
+
+    private List<String> keys(OrderPageDto page) {
+        return page.getItems().stream()
+                .map(item -> item.getOrderId() + "|" + item.getStatus())
+                .toList();
     }
 
     private void assertRow(OrderDto dto, long orderId, long orderGroupId, String total, String status) {

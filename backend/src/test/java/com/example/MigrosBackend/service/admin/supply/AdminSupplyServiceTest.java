@@ -13,6 +13,7 @@ import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.product.ProductImageEntity;
 import com.example.MigrosBackend.exception.admin.AdminNotFoundException;
 import com.example.MigrosBackend.exception.admin.FileUploadFailedException;
+import com.example.MigrosBackend.exception.admin.ProductEditConflictException;
 import com.example.MigrosBackend.exception.admin.ProductNotFoundException;
 import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
@@ -34,6 +35,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.io.IOException;
@@ -66,6 +68,8 @@ class AdminSupplyServiceTest {
     @Mock
     private ProductDescriptionEntityRepository productDescriptionEntityRepository;
     @Mock
+    private ProductImageCleanupQueue imageCleanupQueue;
+    @Mock
     private FileService fileService;
 
     private AdminSupplyService adminSupplyService;
@@ -91,6 +95,8 @@ class AdminSupplyServiceTest {
                 fileService,
                 new AdminProductDescriptionOperations(productEntityRepository, productDescriptionEntityRepository),
                 new AdminProductImageOperations(fileService),
+                new ProductCreationPolicy(),
+                imageCleanupQueue,
                 new UserCatalogReadService(
                         categoryEntityRepository,
                         productEntityRepository,
@@ -99,22 +105,210 @@ class AdminSupplyServiceTest {
                         fileService));
     }
 
+    /**
+     * The JSON creation path used to be asserted by a mocked {@code save} that
+     * accepted whatever it was handed, which is how an entity with a null
+     * description, a null discount and no category was able to pass as a
+     * success. The row it describes cannot be inserted - the description and the
+     * discount are {@code NOT NULL} and the category key has no default - so
+     * what is asserted here is the entity that is actually handed to the
+     * repository, and {@code ProductCreationPostgresTest} asserts the insert.
+     */
     @Test
-    void addProduct_Success() {
-        AdminAddItemDto dto = new AdminAddItemDto();
-        dto.setAdminId(1L);
-        ProductDto pDto = new ProductDto();
-        pDto.setProductName("Coke");
-        dto.setProductDto(pDto);
+    void addProduct_SavesAProductCarryingEveryNotNullColumnAndBothReferences() {
+        givenAdminAndCategory();
+        when(productEntityRepository.save(any(ProductEntity.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
-        when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(admin));
-        when(productEntityRepository.save(any(ProductEntity.class))).thenAnswer(i -> i.getArguments()[0]);
+        adminSupplyService.addProduct(addItemDto("Coke", "Cola", "1.50", 12, "0.10", "Iced cola",
+                "Beverages"));
 
+        ArgumentCaptor<ProductEntity> captor = ArgumentCaptor.forClass(ProductEntity.class);
+        verify(productEntityRepository).save(captor.capture());
+        ProductEntity saved = captor.getValue();
+
+        assertEquals("Coke", saved.getProductName());
+        assertEquals("Cola", saved.getSubcategoryName());
+        assertEquals(12, saved.getProductCount());
+        assertEquals(0, new BigDecimal("1.50").compareTo(saved.getProductPrice()));
+        assertEquals(0, new BigDecimal("0.10").compareTo(saved.getProductDiscount()));
+        assertEquals("Iced cola", saved.getProductDescription(),
+                "product_description is NOT NULL: leaving it null made this endpoint uninsertable");
+        assertSame(admin, saved.getAdminEntity());
+        assertSame(category, saved.getCategoryEntity(),
+                "a product with no category key is a row nothing can list it under");
+    }
+
+    /**
+     * The one insert already carries the admin key, so the extra cascading write
+     * through the admin's inverse collection - which could persist a
+     * partially-initialised product a second time - has no reason to exist.
+     */
+    @Test
+    void addProduct_DoesNotWriteTheAdminASecondTime() {
+        givenAdminAndCategory();
+
+        adminSupplyService.addProduct(addItemDto("Coke", "Cola", "1.50", 12, "0.10", "Iced cola",
+                "Beverages"));
+
+        verify(adminEntityRepository, never()).save(any());
+    }
+
+    /**
+     * An omitted description and an omitted discount both mean "none", matching
+     * what the multipart path has always stored. Neither is an error, and neither
+     * may reach the database as null.
+     */
+    @Test
+    void addProduct_TreatsAnAbsentDescriptionAndDiscountAsNone() {
+        givenAdminAndCategory();
+
+        AdminAddItemDto dto = addItemDto("Coke", "Cola", "1.50", 12, null, null, "Beverages");
         adminSupplyService.addProduct(dto);
 
-        verify(adminEntityRepository).save(admin);
-        assertEquals(1, admin.getItemEntities().size());
-        assertEquals("Coke", admin.getItemEntities().get(0).getProductName());
+        ArgumentCaptor<ProductEntity> captor = ArgumentCaptor.forClass(ProductEntity.class);
+        verify(productEntityRepository).save(captor.capture());
+        ProductEntity saved = captor.getValue();
+
+        assertEquals("", saved.getProductDescription());
+        assertEquals(0, BigDecimal.ZERO.compareTo(saved.getProductDiscount()));
+    }
+
+    /**
+     * A name matching no category is the administrator's mistake, and the
+     * response has to say which name failed. Inventing a category to file it
+     * under would be a worse outcome than refusing.
+     */
+    @Test
+    void addProduct_RejectsAnUnknownCategoryName() {
+        when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(categoryEntityRepository.findAllByCategoryName("Nonexistent")).thenReturn(List.of());
+
+        GeneralException ex = assertThrows(GeneralException.class, () -> adminSupplyService.addProduct(
+                addItemDto("Coke", "Cola", "1.50", 12, "0.10", "Iced cola", "Nonexistent")));
+
+        assertEquals("Unknown category name: Nonexistent", ex.getMessage());
+        verify(productEntityRepository, never()).save(any());
+    }
+
+    /**
+     * {@code category_name} has no unique constraint, so a name that matches two
+     * rows is a real state this database can be in. Choosing one of them would
+     * file the product under a category the administrator did not pick.
+     */
+    @Test
+    void addProduct_RejectsACategoryNameThatMatchesMoreThanOneCategory() {
+        when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(admin));
+        CategoryEntity duplicate = new CategoryEntity();
+        duplicate.setId(11L);
+        when(categoryEntityRepository.findAllByCategoryName("Beverages")).thenReturn(List.of(category, duplicate));
+
+        GeneralException ex = assertThrows(GeneralException.class, () -> adminSupplyService.addProduct(
+                addItemDto("Coke", "Cola", "1.50", 12, "0.10", "Iced cola", "Beverages")));
+
+        assertEquals("Category name matches more than one category: Beverages", ex.getMessage());
+        verify(productEntityRepository, never()).save(any());
+    }
+
+    @Test
+    void addProduct_RejectsABlankCategoryName() {
+        assertThrows(GeneralException.class, () -> adminSupplyService.addProduct(
+                addItemDto("Coke", "Cola", "1.50", 12, "0.10", "Iced cola", "   ")));
+
+        verify(productEntityRepository, never()).save(any());
+        verify(categoryEntityRepository, never()).findAllByCategoryName(any());
+    }
+
+    @Test
+    void addProduct_RejectsAnUnknownAdmin() {
+        when(adminEntityRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(AdminNotFoundException.class, () -> adminSupplyService.addProduct(
+                addItemDto("Coke", "Cola", "1.50", 12, "0.10", "Iced cola", "Beverages")));
+
+        verify(productEntityRepository, never()).save(any());
+    }
+
+    /**
+     * A value longer than the column is a 400 naming the field, not an integrity
+     * error raised by the driver during the insert.
+     */
+    @Test
+    void addProduct_RejectsAProductNameLongerThanTheColumn() {
+        String tooLong = "x".repeat(256);
+
+        GeneralException ex = assertThrows(GeneralException.class, () -> adminSupplyService.addProduct(
+                addItemDto(tooLong, "Cola", "1.50", 12, "0.10", "Iced cola", "Beverages")));
+
+        assertEquals("Product name must not exceed 255 characters", ex.getMessage());
+        verify(productEntityRepository, never()).save(any());
+    }
+
+    @Test
+    void addProduct_RejectsADescriptionLongerThanTheColumn() {
+
+        GeneralException ex = assertThrows(GeneralException.class, () -> adminSupplyService.addProduct(
+                addItemDto("Coke", "Cola", "1.50", 12, "0.10", "x".repeat(256), "Beverages")));
+
+        assertEquals("Product description must not exceed 255 characters", ex.getMessage());
+        verify(productEntityRepository, never()).save(any());
+    }
+
+    /**
+     * {@code NUMERIC(19, 2)} holds seventeen integer digits. Beyond that the
+     * insert either fails or - worse - the value is accepted and rounded.
+     */
+    @Test
+    void addProduct_RejectsAPriceTheMoneyColumnCannotHold() {
+
+        GeneralException ex = assertThrows(GeneralException.class, () -> adminSupplyService.addProduct(
+                addItemDto("Coke", "Cola", "100000000000000000.00", 12, "0.10", "Iced cola", "Beverages")));
+
+        assertEquals("Product price must not exceed 99999999999999999.99", ex.getMessage());
+        verify(productEntityRepository, never()).save(any());
+    }
+
+    @Test
+    void addProduct_RejectsANegativeCount() {
+
+        GeneralException ex = assertThrows(GeneralException.class, () -> adminSupplyService.addProduct(
+                addItemDto("Coke", "Cola", "1.50", -1, "0.10", "Iced cola", "Beverages")));
+
+        assertEquals("Product count cannot be negative", ex.getMessage());
+        verify(productEntityRepository, never()).save(any());
+    }
+
+    @Test
+    void addProduct_RejectsADiscountAboveOneHundred() {
+
+        GeneralException ex = assertThrows(GeneralException.class, () -> adminSupplyService.addProduct(
+                addItemDto("Coke", "Cola", "1.50", 12, "100.01", "Iced cola", "Beverages")));
+
+        assertEquals("Product discount must be between 0 and 100", ex.getMessage());
+        verify(productEntityRepository, never()).save(any());
+    }
+
+    private void givenAdminAndCategory() {
+        when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(categoryEntityRepository.findAllByCategoryName("Beverages")).thenReturn(List.of(category));
+    }
+
+    private AdminAddItemDto addItemDto(String productName, String subCategoryName, String price,
+                                       int count, String discount, String description,
+                                       String categoryName) {
+        ProductDto productDto = new ProductDto();
+        productDto.setProductName(productName);
+        productDto.setSubCategoryName(subCategoryName);
+        productDto.setProductPrice(price == null ? null : new BigDecimal(price));
+        productDto.setProductCount(count);
+        productDto.setProductDiscount(discount == null ? null : new BigDecimal(discount));
+        productDto.setProductDescription(description);
+        productDto.setCategoryName(categoryName);
+
+        AdminAddItemDto dto = new AdminAddItemDto();
+        dto.setAdminId(1L);
+        dto.setProductDto(productDto);
+        return dto;
     }
 
     @Test
@@ -268,7 +462,7 @@ class AdminSupplyServiceTest {
                 "selectedImage", "test.png", "image/png", "data".getBytes());
 
         GeneralException ex = assertThrows(GeneralException.class, () ->
-                adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10.001"), 5, BigDecimal.ZERO, "Desc", 1, file)
+                adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10.001"), 5, BigDecimal.ZERO, "Desc", 1, file, 0L)
         );
 
         assertEquals("Product price must not exceed two decimal places", ex.getMessage());
@@ -337,6 +531,7 @@ class AdminSupplyServiceTest {
 
         ProductEntity existingProduct = new ProductEntity();
         existingProduct.setId(productId);
+        existingProduct.setVersion(4L);
 
         ProductImageEntity existingImage = new ProductImageEntity();
         existingImage.setId(500L);
@@ -346,11 +541,11 @@ class AdminSupplyServiceTest {
         when(fileService.writeFileToDisk(any(), anyString())).thenReturn(mockPath);
         when(categoryEntityRepository.findByCategoryId(categoryId)).thenReturn(localCategory);
         when(adminEntityRepository.findById(adminId)).thenReturn(Optional.of(localAdmin));
-        when(productEntityRepository.findById(productId)).thenReturn(Optional.of(existingProduct));
+        when(productEntityRepository.findByIdForUpdate(productId)).thenReturn(Optional.of(existingProduct));
         when(productImageEntityRepository.findByProductEntityId(productId)).thenReturn(List.of(existingImage));
 
         adminSupplyService.updateProduct(adminId, productId, "Updated Name", "SubCat",
-                new BigDecimal("10.0"), 50, new BigDecimal("0.2"), "New Desc", categoryId, file);
+                new BigDecimal("10.0"), 50, new BigDecimal("0.2"), "New Desc", categoryId, file, 4L);
 
         verify(productEntityRepository).save(existingProduct);
         assertEquals("Updated Name", existingProduct.getProductName());
@@ -366,9 +561,10 @@ class AdminSupplyServiceTest {
         when(categoryEntityRepository.findByCategoryId(1)).thenReturn(new CategoryEntity());
         ProductEntity product = new ProductEntity();
         product.setId(100L);
-        when(productEntityRepository.findById(100L)).thenReturn(Optional.of(product));
+        product.setVersion(0L);
+        when(productEntityRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(product));
 
-        adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10"), 5, BigDecimal.ZERO, "Desc", 1, null);
+        adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10"), 5, BigDecimal.ZERO, "Desc", 1, null, 0L);
 
         verify(fileService, never()).writeFileToDisk(any(), anyString());
         verify(productImageEntityRepository, never()).findByProductEntityId(anyLong());
@@ -382,7 +578,7 @@ class AdminSupplyServiceTest {
         when(adminEntityRepository.findById(anyLong())).thenReturn(Optional.empty());
 
         assertThrows(AdminNotFoundException.class, () ->
-                adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10"), 5, BigDecimal.ZERO, "Desc", 1, file)
+                adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10"), 5, BigDecimal.ZERO, "Desc", 1, file, 0L)
         );
     }
 
@@ -392,10 +588,10 @@ class AdminSupplyServiceTest {
 
         when(categoryEntityRepository.findByCategoryId(1)).thenReturn(new CategoryEntity());
         when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(new AdminEntity()));
-        when(productEntityRepository.findById(100L)).thenReturn(Optional.empty());
+        when(productEntityRepository.findByIdForUpdate(100L)).thenReturn(Optional.empty());
 
         assertThrows(ProductNotFoundException.class, () ->
-                adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10"), 5, BigDecimal.ZERO, "Desc", 1, file)
+                adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10"), 5, BigDecimal.ZERO, "Desc", 1, file, 0L)
         );
     }
 
@@ -407,13 +603,14 @@ class AdminSupplyServiceTest {
         CategoryEntity updatedCategory = new CategoryEntity();
         ProductEntity product = new ProductEntity();
         product.setId(100L);
+        product.setVersion(0L);
         when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(updatedAdmin));
         when(categoryEntityRepository.findByCategoryId(1)).thenReturn(updatedCategory);
-        when(productEntityRepository.findById(100L)).thenReturn(Optional.of(product));
+        when(productEntityRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(product));
         when(fileService.writeFileToDisk(any(), anyString())).thenThrow(new IOException());
 
         assertThrows(FileUploadFailedException.class, () ->
-                adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10"), 5, BigDecimal.ZERO, "Desc", 1, file)
+                adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10"), 5, BigDecimal.ZERO, "Desc", 1, file, 0L)
         );
 
         InOrder order = inOrder(productEntityRepository, fileService);
@@ -431,12 +628,13 @@ class AdminSupplyServiceTest {
         Path mockPath = Paths.get("UploadFolder/new_image.png");
         ProductEntity product = new ProductEntity();
         product.setId(100L);
+        product.setVersion(0L);
         ProductImageEntity existingImage = new ProductImageEntity();
         existingImage.setId(500L);
 
         when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(new AdminEntity()));
         when(categoryEntityRepository.findByCategoryId(1)).thenReturn(new CategoryEntity());
-        when(productEntityRepository.findById(100L)).thenReturn(Optional.of(product));
+        when(productEntityRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(product));
         when(productImageEntityRepository.findByProductEntityId(100L)).thenReturn(List.of(existingImage));
         when(fileService.writeFileToDisk(any(), anyString())).thenReturn(mockPath);
         when(productImageEntityRepository.save(any(ProductImageEntity.class)))
@@ -444,9 +642,174 @@ class AdminSupplyServiceTest {
 
         assertThrows(DataIntegrityViolationException.class, () ->
                 adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10"),
-                        5, BigDecimal.ZERO, "Desc", 1, file));
+                        5, BigDecimal.ZERO, "Desc", 1, file, 0L));
 
         verify(fileService).deleteFileIfExists(mockPath);
+    }
+
+    /**
+     * A replacement has to record the file it stopped pointing at, in the same
+     * transaction, and only that file. Enqueuing the new path would delete the
+     * image the edit had just committed; enqueuing an old and new path that
+     * canonicalize to the same file would do the same, which is why the
+     * comparison is on the canonical identity rather than on the raw string.
+     */
+    @Test
+    void updateProduct_shouldEnqueueOnlyTheReplacedFile() throws IOException {
+        MockMultipartFile file = new MockMultipartFile(
+                "selectedImage", "test.png", "image/png", "data".getBytes());
+        Path newPath = Paths.get("UploadFolder/image_new.png");
+        ProductEntity product = new ProductEntity();
+        product.setId(100L);
+        product.setVersion(0L);
+        ProductImageEntity existingImage = new ProductImageEntity();
+        existingImage.setId(500L);
+        String previousStoredPath = Paths.get("UploadFolder/image_old.png").toString();
+        existingImage.setImagePath(previousStoredPath);
+
+        when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(new AdminEntity()));
+        when(categoryEntityRepository.findByCategoryId(1)).thenReturn(new CategoryEntity());
+        when(productEntityRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(product));
+        when(productImageEntityRepository.findByProductEntityId(100L)).thenReturn(List.of(existingImage));
+        when(fileService.writeFileToDisk(any(), anyString())).thenReturn(newPath);
+        when(fileService.canonicalFileIdentity(anyString()))
+                .thenAnswer(invocation -> Paths.get(invocation.<String>getArgument(0)).getFileName().toString());
+
+        adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10"),
+                5, BigDecimal.ZERO, "Desc", 1, file, 0L);
+
+        verify(imageCleanupQueue).enqueueObsoleteReference(previousStoredPath);
+    }
+
+    /**
+     * A re-point at the same file makes nothing obsolete. Fresh uploads always
+     * get a fresh UUID name, so this is only reachable for a pre-existing row,
+     * and enqueueing it anyway would delete a live image.
+     */
+    @Test
+    void updateProduct_shouldEnqueueNothingWhenTheIdentityIsUnchanged() throws IOException {
+        MockMultipartFile file = new MockMultipartFile(
+                "selectedImage", "test.png", "image/png", "data".getBytes());
+        Path newPath = Paths.get("UploadFolder/image_same.png");
+        ProductEntity product = new ProductEntity();
+        product.setId(100L);
+        product.setVersion(0L);
+        ProductImageEntity existingImage = new ProductImageEntity();
+        existingImage.setId(500L);
+        // Same file, spelled the way a legacy row spells it.
+        existingImage.setImagePath(Paths.get("UploadFolder/nested/image_same.png").toString());
+
+        when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(new AdminEntity()));
+        when(categoryEntityRepository.findByCategoryId(1)).thenReturn(new CategoryEntity());
+        when(productEntityRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(product));
+        when(productImageEntityRepository.findByProductEntityId(100L)).thenReturn(List.of(existingImage));
+        when(fileService.writeFileToDisk(any(), anyString())).thenReturn(newPath);
+        when(fileService.canonicalFileIdentity(anyString()))
+                .thenReturn("image_same.png");
+
+        adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10"),
+                5, BigDecimal.ZERO, "Desc", 1, file, 0L);
+
+        verify(imageCleanupQueue, never()).enqueueObsoleteReference(anyString());
+    }
+
+    /**
+     * The browser holds a form open across a checkout reservation or a restock.
+     *
+     * <p>Rejecting this is the whole feature: accepting it would write the
+     * editor's stale absolute count over stock that has since moved. The
+     * comparison has to happen before anything is mutated, so the product still
+     * holds its old name, price and count after the rejection - a check that ran
+     * after {@code applyProductDetails} would be useless.
+     */
+    @Test
+    void updateProduct_RejectsAStaleVersionBeforeMutatingAnything() {
+        ProductEntity product = new ProductEntity();
+        product.setId(100L);
+        product.setVersion(7L);
+        product.setProductName("Original");
+        product.setProductCount(10);
+        product.setProductPrice(new BigDecimal("10.00"));
+
+        when(categoryEntityRepository.findByCategoryId(1)).thenReturn(new CategoryEntity());
+        when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(new AdminEntity()));
+        when(productEntityRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(product));
+
+        assertThrows(ProductEditConflictException.class, () ->
+                adminSupplyService.updateProduct(1L, 100L, "Stale Edit", "Sub",
+                        new BigDecimal("99.00"), 999, BigDecimal.ZERO, "Desc", 1, null, 6L));
+
+        assertEquals("Original", product.getProductName());
+        assertEquals(10, product.getProductCount());
+        assertEquals(0, new BigDecimal("10.00").compareTo(product.getProductPrice()));
+        verify(productEntityRepository, never()).save(any());
+        verify(productImageEntityRepository, never()).save(any());
+    }
+
+    /**
+     * The file is the one part of an edit a database rollback cannot undo, so a
+     * rejected edit must not reach disk at all - not even to be deleted again
+     * afterwards.
+     */
+    @Test
+    void updateProduct_RejectsAStaleVersionWithoutWritingTheUploadedFile() throws IOException {
+        ProductEntity product = new ProductEntity();
+        product.setId(100L);
+        product.setVersion(7L);
+        product.setProductName("Original");
+        product.setProductCount(10);
+
+        when(categoryEntityRepository.findByCategoryId(1)).thenReturn(new CategoryEntity());
+        when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(new AdminEntity()));
+        when(productEntityRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(product));
+
+        assertThrows(ProductEditConflictException.class, () ->
+                adminSupplyService.updateProduct(1L, 100L, "Stale Edit", "Sub",
+                        new BigDecimal("10.00"), 999, BigDecimal.ZERO, "Desc", 1, png(), 6L));
+
+        verify(fileService, never()).writeFileToDisk(any(), anyString());
+        verify(productEntityRepository, never()).save(any());
+        verify(productImageEntityRepository, never()).save(any());
+    }
+
+    /**
+     * A version the product never had is not "close enough". Only an exact match
+     * may proceed, so a client that fabricates or rounds a version is rejected.
+     */
+    @Test
+    void updateProduct_RejectsAVersionTheProductNeverHad() {
+        ProductEntity product = new ProductEntity();
+        product.setId(100L);
+        product.setVersion(7L);
+
+        when(categoryEntityRepository.findByCategoryId(1)).thenReturn(new CategoryEntity());
+        when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(new AdminEntity()));
+        when(productEntityRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(product));
+
+        assertThrows(ProductEditConflictException.class, () ->
+                adminSupplyService.updateProduct(1L, 100L, "Name", "Sub",
+                        new BigDecimal("10.00"), 5, BigDecimal.ZERO, "Desc", 1, null, 8L));
+
+        verify(productEntityRepository, never()).save(any());
+    }
+
+    /**
+     * Every database reference is resolved before the version is compared, so an
+     * invalid category still fails with its own error rather than being masked
+     * as a conflict - and still leaves no orphan image.
+     */
+    @Test
+    void updateProduct_ReportsAnInvalidCategoryBeforeTheVersionCheck() throws IOException {
+        ProductEntity product = new ProductEntity();
+        product.setId(100L);
+        product.setVersion(7L);
+
+        assertThrows(GeneralException.class, () ->
+                adminSupplyService.updateProduct(1L, 100L, "Name", "Sub",
+                        new BigDecimal("10.00"), 5, BigDecimal.ZERO, "Desc", 1, png(), 6L));
+
+        verify(fileService, never()).writeFileToDisk(any(), anyString());
+        verify(productEntityRepository, never()).findByIdForUpdate(anyLong());
     }
 
     @Test
@@ -469,7 +832,21 @@ class AdminSupplyServiceTest {
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
         verify(productEntityRepository).findByAdminEntityId(eq(10L), pageableCaptor.capture());
-        assertEquals(PageRequest.of(0, 2), pageableCaptor.getValue());
+        assertEquals(PageRequest.of(0, 2, Sort.by(Sort.Direction.ASC, "id")), pageableCaptor.getValue(),
+                "an admin page with no ORDER BY can repeat or skip a row between two reads of unchanged data");
+    }
+
+    /**
+     * The bounds are applied before the query, so an out-of-range window costs no
+     * database access and cannot be turned into an unbounded LIMIT.
+     */
+    @Test
+    void getAllAdminProducts_rejectsAnOutOfRangePageWindow() {
+        assertThrows(GeneralException.class, () -> adminSupplyService.getAllAdminProducts(1L, -1, 10));
+        assertThrows(GeneralException.class, () -> adminSupplyService.getAllAdminProducts(1L, 0, 0));
+        assertThrows(GeneralException.class, () -> adminSupplyService.getAllAdminProducts(1L, 0, 101));
+
+        verify(productEntityRepository, never()).findByAdminEntityId(anyLong(), any(Pageable.class));
     }
 
     @Test
@@ -480,11 +857,51 @@ class AdminSupplyServiceTest {
         assertTrue(adminSupplyService.getAllAdminProducts(1L, 0, 5).isEmpty());
     }
 
+    /**
+     * Deleting a product has to lock its row first, capture every image it owns
+     * and delete it, so the queue can record the files that are about to become
+     * unreferenced - all in the same transaction, so a failed delete owes
+     * nothing.
+     */
     @Test
-    void deleteProduct_shouldDeleteById() {
+    void deleteProduct_shouldEnqueueEveryImageBeforeDeletingTheProduct() {
+        ProductEntity product = new ProductEntity();
+        product.setId(55L);
+        product.setVersion(0L);
+        ProductImageEntity first = new ProductImageEntity();
+        first.setId(1L);
+        first.setImagePath("image_first.png");
+        ProductImageEntity second = new ProductImageEntity();
+        second.setId(2L);
+        second.setImagePath("image_second.png");
+
+        when(productEntityRepository.findByIdForUpdate(55L)).thenReturn(Optional.of(product));
+        when(productImageEntityRepository.findByProductEntityId(55L)).thenReturn(List.of(first, second));
+
         adminSupplyService.deleteProduct(55L);
 
-        verify(productEntityRepository).deleteById(55L);
+        verify(imageCleanupQueue).enqueueObsoleteReferences(List.of("image_first.png", "image_second.png"));
+        verify(productImageEntityRepository).deleteAll(List.of(first, second));
+        verify(productEntityRepository).delete(product);
+        verify(productEntityRepository, never()).deleteById(anyLong());
+    }
+
+    /**
+     * A product that is not there stays a no-op, exactly as it was before this
+     * method became transactional. Whether a missing product should be a 404 is
+     * a question about the delete contract, and changing it as a side effect of
+     * adding a cleanup queue would alter a client-visible response for an
+     * unrelated reason.
+     */
+    @Test
+    void deleteProduct_shouldLeaveAnAbsentProductAlone() {
+        when(productEntityRepository.findByIdForUpdate(55L)).thenReturn(Optional.empty());
+
+        adminSupplyService.deleteProduct(55L);
+
+        verify(imageCleanupQueue, never()).enqueueObsoleteReferences(any());
+        verify(productImageEntityRepository, never()).deleteAll(any());
+        verify(productEntityRepository, never()).delete(any(ProductEntity.class));
     }
 
     @Test
@@ -501,6 +918,7 @@ class AdminSupplyServiceTest {
         product.setProductDiscount(new BigDecimal("0.1"));
         product.setProductDescription("Fresh milk");
         product.setCategoryEntity(categoryEntity);
+        product.setVersion(3L);
 
         when(productEntityRepository.findById(7L)).thenReturn(Optional.of(product));
 
@@ -513,6 +931,8 @@ class AdminSupplyServiceTest {
         assertEquals(0, new BigDecimal("0.1").compareTo(result.getProductDiscount()));
         assertEquals("Fresh milk", result.getProductDescription());
         assertEquals(9, result.getProductCategoryId());
+        assertEquals(3L, result.getProductVersion(),
+                "an editor must be able to learn the version it has to submit");
     }
 
     @Test
@@ -633,6 +1053,10 @@ class AdminSupplyServiceTest {
         adminSupplyService.deleteProductDescription(88L);
 
         verify(productDescriptionEntityRepository).deleteById(88L);
+    }
+
+    private MockMultipartFile png() {
+        return new MockMultipartFile("selectedImage", "image.png", "image/png", "data".getBytes());
     }
 }
 

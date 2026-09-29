@@ -8,6 +8,7 @@ import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.exception.shared.TokenNotFoundException;
 import com.example.MigrosBackend.exception.user.MailSendingFailedException;
 import com.example.MigrosBackend.exception.user.UserMailNotFoundException;
+import com.example.MigrosBackend.exception.user.WeakPasswordException;
 import com.example.MigrosBackend.repository.user.PendingSignupEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
 import com.example.MigrosBackend.service.global.EncryptService;
@@ -351,6 +352,57 @@ class PendingTokenPostgresTest {
                 "SELECT count(*) FROM pending_signup_entity WHERE token_purpose IS NULL", Integer.class));
     }
 
+    @Test
+    void aResetTokenIsSingleUse() {
+        seedUserWithPassword("original-hash");
+        seedToken("reset-token", PendingTokenPurpose.PASSWORD_RESET);
+        when(encryptService.getEncryptedPassword("AnotherStrong123!")).thenReturn("rotated-hash");
+
+        userSignupService.resetPassword(resetDto("reset-token", "AnotherStrong123!"));
+
+        assertEquals("rotated-hash", storedPassword());
+        assertFalse(pendingSignupEntityRepository.findById("reset-token").isPresent(),
+                "a successful reset must consume its token");
+
+        assertThrows(TokenNotFoundException.class,
+                () -> userSignupService.resetPassword(resetDto("reset-token", "YetAnother789!")));
+
+        assertEquals("rotated-hash", storedPassword(),
+                "a replayed token must never rotate the password a second time");
+    }
+
+    /**
+     * The redemption and the password write share one transaction, so a password
+     * write that does not happen must not leave the token spent. The account is
+     * missing here, which is the production path's own failure: it reports the
+     * existing not-found error and rolls the DELETE back with it.
+     */
+    @Test
+    void aFailedPasswordUpdateRollsBackTheTokenConsumption() {
+        seedToken("reset-token", PendingTokenPurpose.PASSWORD_RESET);
+        when(encryptService.getEncryptedPassword("AnotherStrong123!")).thenReturn("rotated-hash");
+
+        assertThrows(UserMailNotFoundException.class,
+                () -> userSignupService.resetPassword(resetDto("reset-token", "AnotherStrong123!")));
+
+        assertTrue(pendingSignupEntityRepository.findById("reset-token").isPresent(),
+                "the token must stay redeemable when the password was never written");
+    }
+
+    /** The strength check runs before the write, and also rolls the redemption back. */
+    @Test
+    void aRejectedPasswordRollsBackTheTokenConsumption() {
+        seedUserWithPassword("original-hash");
+        seedToken("reset-token", PendingTokenPurpose.PASSWORD_RESET);
+
+        assertThrows(WeakPasswordException.class,
+                () -> userSignupService.resetPassword(resetDto("reset-token", "weak")));
+
+        assertTrue(pendingSignupEntityRepository.findById("reset-token").isPresent(),
+                "a password the validator refused must not burn the token");
+        assertEquals("original-hash", storedPassword());
+    }
+
     /**
      * Two callers must not be able to redeem one token into two accounts.
      *
@@ -436,6 +488,13 @@ class PendingTokenPostgresTest {
         UserSignDto dto = new UserSignDto();
         dto.setUserMail(mail);
         dto.setUserPassword(STRONG_PASSWORD);
+        return dto;
+    }
+
+    private ResetPasswordDto resetDto(String token, String password) {
+        ResetPasswordDto dto = new ResetPasswordDto();
+        dto.setToken(token);
+        dto.setUserPassword(password);
         return dto;
     }
 

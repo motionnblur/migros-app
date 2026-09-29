@@ -94,6 +94,24 @@ class EmptyDatabaseStartupPostgresTest {
             assertNumeric19Scale2(statement, "checkout_item_entity", "unit_price");
             assertIndexExists(statement, "uq_checkout_live_per_user");
             assertIndexExists(statement, "idx_payment_attempt_status_updated");
+
+            // V11: the product edit version must exist on a schema built entirely
+            // by the migrations, not only on an upgraded one, or the entity's
+            // @Version mapping fails ddl-auto=validate at startup.
+            assertBigIntNotNullDefaultZero(statement, "product_entity", "version");
+            assertTrue(versionedMigrationsAllApplied(),
+                    "every versioned script must be recorded after a first migrate");
+        }
+    }
+
+    private boolean versionedMigrationsAllApplied() throws SQLException {
+        try (Connection connection = dataSource.getConnection();
+             Statement statement = connection.createStatement();
+             ResultSet rs = statement.executeQuery(
+                     "SELECT COUNT(*) FROM flyway_schema_history "
+                             + "WHERE version IS NOT NULL AND success")) {
+            assertTrue(rs.next());
+            return rs.getInt(1) == MigrationTestSupport.versionedMigrationCount();
         }
     }
 
@@ -373,6 +391,20 @@ class EmptyDatabaseStartupPostgresTest {
             assertEquals("numeric", rs.getString("data_type"));
             assertEquals(19, rs.getInt("numeric_precision"));
             assertEquals(2, rs.getInt("numeric_scale"));
+        }
+    }
+
+    private void assertBigIntNotNullDefaultZero(Statement statement, String tableName, String columnName)
+            throws SQLException {
+        try (ResultSet rs = statement.executeQuery(
+                "SELECT data_type, is_nullable, column_default FROM information_schema.columns "
+                        + "WHERE table_schema = 'public' AND table_name = '" + tableName + "' "
+                        + "AND column_name = '" + columnName + "'")) {
+            assertTrue(rs.next(), "column " + tableName + "." + columnName + " must exist");
+            assertEquals("bigint", rs.getString("data_type"));
+            assertEquals("NO", rs.getString("is_nullable"));
+            assertTrue(String.valueOf(rs.getString("column_default")).contains("0"),
+                    "column " + tableName + "." + columnName + " must default to 0");
         }
     }
 }

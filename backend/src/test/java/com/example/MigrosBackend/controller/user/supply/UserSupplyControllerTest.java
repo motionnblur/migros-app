@@ -32,6 +32,7 @@ import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -474,12 +475,16 @@ class UserSupplyControllerTest {
         product.setProductDiscount(new BigDecimal("10.0"));
         product.setProductDescription("Pure natural honey.");
         product.setProductCategoryId(5);
+        product.setProductVersion(11L);
 
         when(userSupplyService.getProductData(productId)).thenReturn(product);
 
+        // productVersion is additive for catalog readers; existing fields and
+        // their meaning are unchanged.
         String expectedJson = "{\"productName\":\"Organic Honey\",\"subCategoryName\":\"Sweeteners\","
                 + "\"productPrice\":15.50,\"productCount\":100,\"productDiscount\":10.0,"
-                + "\"productDescription\":\"Pure natural honey.\",\"productCategoryId\":5}";
+                + "\"productDescription\":\"Pure natural honey.\",\"productCategoryId\":5,"
+                + "\"productVersion\":11}";
 
         mockMvc.perform(get("/user/supply/getProductDataWithProductId")
                         .param("productId", productId.toString())
@@ -512,6 +517,128 @@ class UserSupplyControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(content().json(expectedJson, true));
+    }
+
+    @Test
+    void getProductsFromCategory_rejectsAPageBelowZero() throws Exception {
+        mockMvc.perform(get("/user/supply/getProductsFromCategory")
+                        .param("categoryId", "1")
+                        .param("page", "-1")
+                        .param("productRange", "10"))
+                .andExpect(status().isBadRequest());
+
+        verify(userSupplyService, never()).getProductsFromCategory(anyLong(), anyInt(), anyInt());
+    }
+
+    @Test
+    void getProductsFromCategory_rejectsARangeOutsideOneToOneHundred() throws Exception {
+        for (String range : List.of("-1", "0", "101", "2147483647")) {
+            mockMvc.perform(get("/user/supply/getProductsFromCategory")
+                            .param("categoryId", "1")
+                            .param("page", "0")
+                            .param("productRange", range))
+                    .andExpect(status().isBadRequest());
+        }
+
+        verify(userSupplyService, never()).getProductsFromCategory(anyLong(), anyInt(), anyInt());
+    }
+
+    @Test
+    void getProductsFromCategory_rejectsAValueThatIsNotAnInteger() throws Exception {
+        // Surrounding whitespace and hex literals are deliberately absent:
+        // Spring's number converter trims whitespace and parses a "0x" prefix,
+        // so " 1", "1 " and "0x10" are valid encodings of 1, 1 and 16 rather
+        // than malformed input. Rejecting them would mean rejecting values the
+        // rest of the stack already accepts.
+        for (String malformed : List.of("abc", "1.5", "", "999999999999", "2147483648")) {
+            int status = mockMvc.perform(get("/user/supply/getProductsFromCategory")
+                            .param("categoryId", "1")
+                            .param("page", "0")
+                            .param("productRange", malformed))
+                    .andReturn().getResponse().getStatus();
+            assertEquals(400, status, "expected productRange=" + malformed + " to be rejected");
+        }
+
+        mockMvc.perform(get("/user/supply/getProductsFromCategory")
+                        .param("categoryId", "1")
+                        .param("page", "not-a-page")
+                        .param("productRange", "10"))
+                .andExpect(status().isBadRequest());
+
+        verify(userSupplyService, never()).getProductsFromCategory(anyLong(), anyInt(), anyInt());
+    }
+
+    @Test
+    void getProductsFromCategory_acceptsPageZeroAndBothSizeBounds() throws Exception {
+        when(userSupplyService.getProductsFromCategory(1L, 0, 1)).thenReturn(List.of());
+        when(userSupplyService.getProductsFromCategory(1L, 0, 100)).thenReturn(List.of());
+
+        mockMvc.perform(get("/user/supply/getProductsFromCategory")
+                        .param("categoryId", "1")
+                        .param("page", "0")
+                        .param("productRange", "1"))
+                .andExpect(status().isOk())
+                .andExpect(content().json("[]"));
+
+        mockMvc.perform(get("/user/supply/getProductsFromCategory")
+                        .param("categoryId", "1")
+                        .param("page", "0")
+                        .param("productRange", "100"))
+                .andExpect(status().isOk())
+                .andExpect(content().json("[]"));
+    }
+
+    @Test
+    void getProductsFromCategory_aPageBeyondTheLastOneIsAnEmptySuccess() throws Exception {
+        when(userSupplyService.getProductsFromCategory(1L, 99, 10)).thenReturn(List.of());
+
+        mockMvc.perform(get("/user/supply/getProductsFromCategory")
+                        .param("categoryId", "1")
+                        .param("page", "99")
+                        .param("productRange", "10"))
+                .andExpect(status().isOk())
+                .andExpect(content().json("[]"));
+    }
+
+    @Test
+    void getProductsFromSubcategory_rejectsPagesAndRangesOutsideTheBound() throws Exception {
+        for (String page : List.of("-1", "-100")) {
+            mockMvc.perform(get("/user/supply/getProductsFromSubcategory")
+                            .param("subcategoryName", "Fruits")
+                            .param("page", page)
+                            .param("productRange", "10"))
+                    .andExpect(status().isBadRequest());
+        }
+
+        for (String range : List.of("-1", "0", "101", "999999999999", "not-a-number")) {
+            mockMvc.perform(get("/user/supply/getProductsFromSubcategory")
+                            .param("subcategoryName", "Fruits")
+                            .param("page", "0")
+                            .param("productRange", range))
+                    .andExpect(status().isBadRequest());
+        }
+
+        verify(userSupplyService, never()).getProductsFromSubcategory(anyString(), anyInt(), anyInt());
+    }
+
+    @Test
+    void getProductsFromSubcategory_acceptsPageZeroAndBothSizeBounds() throws Exception {
+        when(userSupplyService.getProductsFromSubcategory("Fruits", 0, 1)).thenReturn(List.of());
+        when(userSupplyService.getProductsFromSubcategory("Fruits", 0, 100)).thenReturn(List.of());
+
+        mockMvc.perform(get("/user/supply/getProductsFromSubcategory")
+                        .param("subcategoryName", "Fruits")
+                        .param("page", "0")
+                        .param("productRange", "1"))
+                .andExpect(status().isOk())
+                .andExpect(content().json("[]"));
+
+        mockMvc.perform(get("/user/supply/getProductsFromSubcategory")
+                        .param("subcategoryName", "Fruits")
+                        .param("page", "0")
+                        .param("productRange", "100"))
+                .andExpect(status().isOk())
+                .andExpect(content().json("[]"));
     }
 }
 

@@ -43,6 +43,17 @@ final class AdminProductImageOperations {
      * ended up serving one image. A UUID has no such collision window, and
      * {@code FileService} additionally refuses to overwrite an existing name, so
      * a collision can no longer destroy data even in principle.
+     *
+     * <p>The name is also the file's <em>identity</em>, and that is a load-bearing
+     * property, not just an anti-collision trick. The cleanup worker deletes a
+     * file once no image row resolves to its name, and it performs that check
+     * and the unlink as two separate steps. The window between them is only
+     * safe because a new upload can never be handed the name of a file that has
+     * just been declared obsolete: the name is drawn fresh here, and nothing
+     * accepts a client-supplied path. Replacing this with a derived or
+     * client-supplied name would let a reference appear between the check and
+     * the delete, and a live image would be removed under a product still
+     * serving it.
      */
     Path writeProductImage(MultipartFile selectedImage) {
         validateProductImage(selectedImage);

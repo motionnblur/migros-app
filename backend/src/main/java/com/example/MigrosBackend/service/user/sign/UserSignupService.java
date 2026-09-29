@@ -155,6 +155,11 @@ public class UserSignupService {
      * <p>As in {@link #confirm(String)}, the token is redeemed first and the
      * password change happens in the same transaction, so a weak password or a
      * missing account rolls the redemption back instead of burning the token.
+     *
+     * <p>Only the password column is written. The account being reset is
+     * otherwise a live row that the customer may be editing or checking out at
+     * the same moment, and writing a whole entity read before that would put
+     * back the cart, the profile and the ban flag exactly as they were read.
      */
     @Transactional
     public void resetPassword(ResetPasswordDto resetPasswordDto) {
@@ -175,13 +180,27 @@ public class UserSignupService {
             throw new WeakPasswordException();
         }
 
-        UserEntity userEntity = userEntityRepository.findByUserMail(pendingSignup.getUserMail());
-        if (userEntity == null) {
-            throw new UserMailNotFoundException(pendingSignup.getUserMail());
+        String userMail = pendingSignup.getUserMail();
+
+        // Confirm the account still exists before hashing. BCrypt is deliberately
+        // expensive, and this endpoint is unauthenticated: a token whose account
+        // was deleted would otherwise make every request pay a full hash for
+        // nothing, which is a cheap way to burn CPU. The existence probe is a
+        // single indexed read; the hash below is only computed once the update
+        // is known to be aimed at a real row.
+        if (!userEntityRepository.existsByUserMail(userMail)) {
+            // Same exception as before for an account that no longer exists, and
+            // it rolls the redemption back with it, so the token stays usable.
+            throw new UserMailNotFoundException(userMail);
         }
 
-        userEntity.setUserPassword(encryptService.getEncryptedPassword(resetPasswordDto.getUserPassword()));
-        userEntityRepository.save(userEntity);
+        int updated = userEntityRepository.updatePasswordByUserMail(
+                userMail, encryptService.getEncryptedPassword(resetPasswordDto.getUserPassword()));
+        if (updated == 0) {
+            // The row was deleted between the probe and the update. Same
+            // exception, same rollback.
+            throw new UserMailNotFoundException(userMail);
+        }
     }
 
     /**

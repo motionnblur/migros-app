@@ -43,7 +43,7 @@ This application provides a basic platform for users to browse products, add the
     * [HTML](https://developer.mozilla.org/en-US/docs/Web/HTML)
     * [CSS](https://developer.mozilla.org/en-US/docs/Web/CSS)
 * **Backend:**
-    * [Spring Boot](https://spring.io/projects/spring-boot) (3.4.0)
+    * [Spring Boot](https://spring.io/projects/spring-boot) (3.5.16)
     * [Java](https://www.java.com/) (21)
     * [Maven](https://maven.apache.org/)
 * **Database:**
@@ -108,11 +108,20 @@ every customer-facing currency label; the UI is informational and never sends an
 amount or currency. The 8-digit Stripe limit for TRY is enforced before the
 gateway is called, and invalid payment amounts return HTTP `400`.
 
+The effective (discounted) unit price has a single owner,
+`helper/ProductPricingPolicy`: the discount factor is rounded to 6 decimals
+before the multiply and the result to 2, both half-up. Catalog display and the
+checkout charge therefore agree for every valid product. The two callers differ
+only in how they treat invalid stored data, and that difference is explicit
+rather than averaged away: checkout rejects an invalid price or discount, while
+the catalog listing keeps a documented null-to-zero fallback for display. An
+invalid payable price is never silently treated as zero.
+
 Legacy `REAL` money columns are converted to `NUMERIC(19, 2)` by Flyway on
 startup. Migrations live in `backend/src/main/resources/db/migration` and are
 applied to both an existing populated schema and a fresh empty database.
 
-Two security-relevant schema changes ship with this release:
+Four schema and contract changes ship with this release:
 
 * **Pending tokens record their purpose.** Signup-confirmation tokens and
   password-reset tokens share one table and are both opaque random strings, so
@@ -137,6 +146,33 @@ Two security-relevant schema changes ship with this release:
   its image row are written in one transaction. A file written for a transaction
   that does not commit is deleted again, including when the rollback only
   happens after the request has already returned.
+* **A product update must carry the version it was loaded at.** An admin edit
+  form is an absolute-stock write, so a form opened before a checkout reserved
+  stock or an order was restocked could write its stale count back and hand out
+  stock that is already sold. `product_entity.version` is a JPA `@Version` column
+  that every writer of a product row advances, including the bulk stock
+  increment, and `POST /admin/panel/updateProduct` now requires the
+  `expectedVersion` the editor observed. A missing or invalid value is `400`; a
+  stale one is `409` with the stable code `PRODUCT_EDIT_CONFLICT`. **This is an
+  intentional tightening of the request contract: the backend and the Angular
+  client must be deployed together.** A rejected edit is refused before any field
+  or file is touched, so it leaves inventory, metadata and the image untouched,
+  and the client keeps the administrator's draft and requires a deliberate
+  reload-and-review rather than resubmitting it against a fresh version.
+* **Obsolete product images are cleaned up durably.** Replacing an image or
+  deleting a product used to leave the old file on disk forever. The transaction
+  that stops referencing a file now writes a row to
+  `product_image_cleanup_entity`, and a scheduled worker claims due rows with a
+  bounded lease, re-checks that nothing still references the file, deletes it
+  outside any database transaction, and records the outcome. This is a local
+  filesystem effect, not the support outbox: no payloads, no HTTP delivery, no
+  ordering, no event ids. A file that is still referenced is deferred rather than
+  deleted, a crashed worker's row is picked up once its lease expires, an
+  already-missing file counts as success, and pending work is retained
+  indefinitely rather than being given a terminal failure state that would
+  abandon it silently. Deletion is confined to `APP_UPLOAD_DIR`. This cleans
+  newly obsolete references only — no broad filesystem sweep is performed, and
+  reconciling pre-existing orphan files remains a separate operational task.
 
 * Local development credentials (only created when the active profile set is exactly `local`): admin / admin
 

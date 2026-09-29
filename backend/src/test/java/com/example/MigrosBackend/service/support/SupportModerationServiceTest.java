@@ -2,8 +2,10 @@ package com.example.MigrosBackend.service.support;
 
 import com.example.MigrosBackend.entity.user.SupportMessageEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
+import com.example.MigrosBackend.exception.admin.UserNotFoundException;
 import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.exception.shared.SupportSyncConflictException;
+import com.example.MigrosBackend.exception.shared.SupportUserBannedException;
 import com.example.MigrosBackend.repository.user.SupportMessageEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
 import com.example.MigrosBackend.websocket.SupportChatWebSocketHandler;
@@ -22,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -335,5 +339,85 @@ class SupportModerationServiceTest {
         assertEquals("Support message not found", error.getMessage());
         verify(supportMessageEntityRepository, never()).delete(any());
         verifyNoInteractions(supportInternalEventService);
+    }
+
+    /**
+     * The ban is written as the single column it owns. A whole-entity save would
+     * also put back the cart, the profile and the password hash as they were
+     * read, silently undoing work the customer did at the same moment.
+     */
+    @Test
+    void banUser_shouldWriteOnlyTheBanFlagAndBroadcast() {
+        when(userEntityRepository.findByUserMail("user@mail.com")).thenReturn(user);
+        when(userEntityRepository.updateBannedByUserMail("user@mail.com", true)).thenReturn(1);
+
+        supportModerationService.banUser("user@mail.com");
+
+        verify(userEntityRepository).updateBannedByUserMail("user@mail.com", true);
+        verify(userEntityRepository, never()).save(any());
+        verify(supportChatWebSocketHandler).broadcastSupportUpdate("user@mail.com");
+    }
+
+    @Test
+    void unbanUser_shouldWriteOnlyTheBanFlagAndBroadcast() {
+        user.setBanned(true);
+        when(userEntityRepository.findByUserMail("user@mail.com")).thenReturn(user);
+        when(userEntityRepository.updateBannedByUserMail("user@mail.com", false)).thenReturn(1);
+
+        supportModerationService.unbanUser("user@mail.com");
+
+        verify(userEntityRepository).updateBannedByUserMail("user@mail.com", false);
+        verify(userEntityRepository, never()).save(any());
+        verify(supportChatWebSocketHandler).broadcastSupportUpdate("user@mail.com");
+    }
+
+    /** The guard already rejects an unknown mailbox before any write is issued. */
+    @Test
+    void banUser_shouldThrowUserNotFound_whenMissing() {
+        when(userEntityRepository.findByUserMail("user@mail.com")).thenReturn(null);
+
+        assertThrows(UserNotFoundException.class, () -> supportModerationService.banUser("user@mail.com"));
+
+        verify(userEntityRepository, never()).updateBannedByUserMail(anyString(), anyBoolean());
+        verifyNoInteractions(supportChatWebSocketHandler);
+    }
+
+    @Test
+    void unbanUser_shouldThrowUserNotFound_whenMissing() {
+        when(userEntityRepository.findByUserMail("user@mail.com")).thenReturn(null);
+
+        assertThrows(UserNotFoundException.class, () -> supportModerationService.unbanUser("user@mail.com"));
+
+        verify(userEntityRepository, never()).updateBannedByUserMail(anyString(), anyBoolean());
+        verifyNoInteractions(supportChatWebSocketHandler);
+    }
+
+    /**
+     * The row can disappear between the guard's read and the update. That is
+     * reported as the same not-found error instead of a silent success with no
+     * ban applied.
+     */
+    @Test
+    void banUser_shouldReportNotFound_whenTheUpdateAffectsNoRow() {
+        when(userEntityRepository.findByUserMail("user@mail.com")).thenReturn(user);
+        when(userEntityRepository.updateBannedByUserMail("user@mail.com", true)).thenReturn(0);
+
+        assertThrows(UserNotFoundException.class, () -> supportModerationService.banUser("user@mail.com"));
+
+        verifyNoInteractions(supportChatWebSocketHandler);
+    }
+
+    /** The pre-existing send-time ban check is unchanged by the field-specific write. */
+    @Test
+    void addManagementMessage_shouldStillRefuseABannedCustomer() {
+        user.setBanned(true);
+        when(userEntityRepository.findByUserMail("user@mail.com")).thenReturn(user);
+
+        SupportUserBannedException failure = assertThrows(
+                SupportUserBannedException.class,
+                () -> supportModerationService.addManagementMessage("user@mail.com", "hello"));
+
+        assertEquals("User is banned. Sending messages is disabled.", failure.getMessage());
+        verify(supportMessageEntityRepository, never()).save(any());
     }
 }

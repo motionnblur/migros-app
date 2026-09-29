@@ -4,16 +4,23 @@ import com.example.MigrosBackend.dto.payment.CheckoutResponseDto;
 import com.example.MigrosBackend.dto.payment.CheckoutStatusDto;
 import com.example.MigrosBackend.entity.checkout.CheckoutEntity;
 import com.example.MigrosBackend.entity.checkout.CheckoutStatus;
+import com.example.MigrosBackend.entity.admin.AdminEntity;
+import com.example.MigrosBackend.entity.category.CategoryEntity;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.user.OrderEntity;
 import com.example.MigrosBackend.entity.user.OrderGroupEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
+import com.example.MigrosBackend.exception.admin.ProductEditConflictException;
 import com.example.MigrosBackend.exception.user.CheckoutStateException;
+import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
+import com.example.MigrosBackend.repository.category.CategoryEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
 import com.example.MigrosBackend.repository.user.CheckoutEntityRepository;
+import com.example.MigrosBackend.repository.user.CheckoutItemEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderEntityRepository;
 import com.example.MigrosBackend.repository.user.OrderGroupEntityRepository;
 import com.example.MigrosBackend.repository.user.UserEntityRepository;
+import com.example.MigrosBackend.service.admin.supply.AdminSupplyService;
 import com.example.MigrosBackend.service.global.TokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -74,11 +81,21 @@ class CheckoutConcurrencyPostgresTest {
     @Autowired
     private TokenService tokenService;
     @Autowired
+    private com.example.MigrosBackend.service.user.supply.UserCartService userCartService;
+    @Autowired
+    private AdminSupplyService adminSupplyService;
+    @Autowired
+    private AdminEntityRepository adminEntityRepository;
+    @Autowired
+    private CategoryEntityRepository categoryEntityRepository;
+    @Autowired
     private UserEntityRepository userEntityRepository;
     @Autowired
     private ProductEntityRepository productEntityRepository;
     @Autowired
     private CheckoutEntityRepository checkoutEntityRepository;
+    @Autowired
+    private CheckoutItemEntityRepository checkoutItemEntityRepository;
     @Autowired
     private OrderGroupEntityRepository orderGroupEntityRepository;
     @Autowired
@@ -89,7 +106,8 @@ class CheckoutConcurrencyPostgresTest {
     @BeforeEach
     void cleanDatabase() {
         jdbcTemplate.execute("TRUNCATE TABLE checkout_item_entity, checkout_entity, order_entity, "
-                + "order_group_entity, product_entity, user_entity RESTART IDENTITY CASCADE");
+                + "order_group_entity, product_entity, product_image_entity, category_entity, "
+                + "admin_entity, user_entity RESTART IDENTITY CASCADE");
     }
 
     @Test
@@ -252,6 +270,64 @@ class CheckoutConcurrencyPostgresTest {
         assertEquals(1, orderGroupEntityRepository.findByUserId(user.getId()).size());
     }
 
+    /**
+     * The reservation and a cart addition are both read-modify-write on the same
+     * user row, so they have to serialize on that row's write lock.
+     *
+     * <p>Note what is <em>not</em> asserted: that only one of the two may
+     * succeed. Both succeeding is a legitimate serial order - the preparation
+     * reserves the cart it found and empties it, then the addition adds to the
+     * now-empty cart - and rejecting either outcome would be inventing an
+     * exclusion the domain does not have. What must hold is that the
+     * interleaving is indistinguishable from <em>some</em> serial order: exactly
+     * one reservation exists, the reserved quantity is exactly the cart the
+     * preparation observed, and that quantity is deducted from stock exactly
+     * once with no unit lost or double-counted.
+     */
+    @Test
+    void preparationRacingACartAdditionProducesExactlyOneReservation() throws Exception {
+        ProductEntity product = createProduct("Raced", "10.00", 5);
+        UserEntity user = createUser("prepare-add@migros.com", product.getId());
+        String userToken = token(user);
+
+        List<Boolean> results = runConcurrently(
+                () -> attemptPrepare(userToken),
+                () -> attemptAdd(product.getId(), user.getUserMail()));
+
+        // The add only fails if the preparation took the last unit, which needs
+        // five cart entries and this race can produce at most two.
+        assertTrue(results.get(1), "adding to a cart that holds at most two units of five "
+                + "stock must succeed regardless of the interleaving");
+
+        assertEquals(1, checkoutEntityRepository.findAll().size(), "one reservation at most");
+
+        // The preparation observed either the one pre-seeded unit (addition landed
+        // after it emptied the cart) or two (addition landed first). Both are
+        // valid serial orders; any other number means an item was lost or a
+        // unit was counted twice.
+        int reserved = checkoutItemEntityRepository
+                .findByCheckout_IdOrderByProductIdAsc(checkoutEntityRepository.findAll().get(0).getId())
+                .stream()
+                .mapToInt(item -> item.getQuantity())
+                .sum();
+        assertTrue(reserved == 1 || reserved == 2,
+                "the reservation must cover exactly the cart the preparation observed, "
+                        + "but reserved " + reserved + " units");
+
+        assertEquals(5 - reserved,
+                productEntityRepository.findById(product.getId()).orElseThrow().getProductCount(),
+                "stock must be deducted exactly once per reserved unit");
+    }
+
+    private boolean attemptAdd(Long productId, String userMail) {
+        try {
+            userCartService.addProductToCart(productId, userMail);
+            return true;
+        } catch (RuntimeException ex) {
+            return false;
+        }
+    }
+
     private boolean attemptPrepare(String userToken) {
         try {
             checkoutService.prepareCheckout(userToken);
@@ -320,5 +396,129 @@ class CheckoutConcurrencyPostgresTest {
 
     private String token(UserEntity user) {
         return tokenService.generateUserToken(user.getUserMail());
+    }
+
+    // -------------------------------------------------------------------------
+    // Product edit version vs. stock reservation
+    //
+    // A checkout decrement is a stock writer, so it has to advance the product's
+    // edit version too. If it did not, an admin form loaded before the reservation
+    // would still consider the product unchanged and would be allowed to write
+    // back the pre-reservation count - handing out stock that is already sold.
+    // -------------------------------------------------------------------------
+
+    @Test
+    void reservingStockAdvancesTheProductEditVersion() {
+        ProductEntity product = createProduct("Versioned", "10.00", 5);
+        UserEntity user = createUser("versioned@migros.com", product.getId());
+
+        long before = jdbcTemplate.queryForObject(
+                "SELECT version FROM product_entity WHERE product_entity_id = ?", Long.class,
+                product.getId());
+
+        checkoutService.prepareCheckout(token(user));
+
+        long after = jdbcTemplate.queryForObject(
+                "SELECT version FROM product_entity WHERE product_entity_id = ?", Long.class,
+                product.getId());
+        assertEquals(1L, after - before,
+                "a JPA-managed decrement must advance the version like any other product write");
+        assertEquals(4, productEntityRepository.findById(product.getId()).orElseThrow().getProductCount());
+    }
+
+    @Test
+    void aStaleEditCannotReplaceStockThatACheckoutAlreadyReserved() {
+        ProductEntity product = createProduct("Reserved", "10.00", 10);
+        UserEntity user = createUser("stale@migros.com", product.getId());
+        String userToken = token(user);
+
+        long versionSeenByTheEditor = jdbcTemplate.queryForObject(
+                "SELECT version FROM product_entity WHERE product_entity_id = ?", Long.class,
+                product.getId());
+        AdminEntity admin = createAdmin("stale-editor");
+        CategoryEntity category = createCategory(31);
+
+        // The editor loaded the form while the shelf still showed ten units.
+        checkoutService.prepareCheckout(userToken);
+        assertEquals(9, productEntityRepository.findById(product.getId()).orElseThrow().getProductCount());
+
+        assertThrows(ProductEditConflictException.class, () ->
+                adminSupplyService.updateProduct(admin.getId(), product.getId(), "Stale", "general",
+                        new BigDecimal("10.00"), 10, BigDecimal.ZERO, "stale", category.getCategoryId(),
+                        null, versionSeenByTheEditor));
+
+        assertEquals(9, productEntityRepository.findById(product.getId()).orElseThrow().getProductCount(),
+                "a rejected edit must leave the reservation exactly as it reserved it");
+    }
+
+    /**
+     * The transaction-boundary race this whole feature exists for.
+     *
+     * <p>Asserted order-independently. Whichever of the two wins, the result must
+     * be indistinguishable from some serial order:
+     *
+     * <ul>
+     *   <li>edit first - it succeeds (the version still matches), then the
+     *       reservation takes the shelf to 9;</li>
+     *   <li>reservation first - it takes the shelf to 9 and advances the version,
+     *       so the edit's stale count of 10 is rejected.</li>
+     * </ul>
+     *
+     * <p>What must never happen is 10. That is the reservation being overwritten
+     * back onto the shelf by a form that was opened before it, which is exactly
+     * the oversell this prevents.
+     */
+    @Test
+    void anEditRacingACheckoutPreparationNeverLosesTheReservation() throws Exception {
+        ProductEntity product = createProduct("RacedEdit", "10.00", 10);
+        UserEntity user = createUser("race-edit@migros.com", product.getId());
+        String userToken = token(user);
+
+        long versionSeenByTheEditor = jdbcTemplate.queryForObject(
+                "SELECT version FROM product_entity WHERE product_entity_id = ?", Long.class,
+                product.getId());
+        AdminEntity admin = createAdmin("racing-editor");
+        CategoryEntity category = createCategory(32);
+
+        List<Boolean> results = runConcurrently(
+                () -> attemptPrepare(userToken),
+                () -> attemptStaleEdit(admin.getId(), product.getId(), category.getCategoryId(),
+                        versionSeenByTheEditor, 10));
+
+        assertTrue(results.get(0), "the reservation must succeed: stock is sufficient for either order");
+        assertEquals(9, productEntityRepository.findById(product.getId()).orElseThrow().getProductCount(),
+                "the reserved unit must stay reserved no matter which transaction won the race");
+
+        long versionAfter = jdbcTemplate.queryForObject(
+                "SELECT version FROM product_entity WHERE product_entity_id = ?", Long.class,
+                product.getId());
+        assertTrue(versionAfter > versionSeenByTheEditor,
+                "at least one of the two writers must have advanced the version");
+    }
+
+    private boolean attemptStaleEdit(Long adminId, Long productId, int categoryId,
+                                     long expectedVersion, int absoluteCount) {
+        try {
+            adminSupplyService.updateProduct(adminId, productId, "Raced", "general",
+                    new BigDecimal("10.00"), absoluteCount, BigDecimal.ZERO, "raced", categoryId,
+                    null, expectedVersion);
+            return true;
+        } catch (RuntimeException ex) {
+            return false;
+        }
+    }
+
+    private AdminEntity createAdmin(String name) {
+        AdminEntity admin = new AdminEntity();
+        admin.setAdminName(name);
+        admin.setItemEntities(new ArrayList<>());
+        return adminEntityRepository.saveAndFlush(admin);
+    }
+
+    private CategoryEntity createCategory(int categoryId) {
+        CategoryEntity category = new CategoryEntity();
+        category.setCategoryId(categoryId);
+        category.setCategoryName("race-category-" + categoryId);
+        return categoryEntityRepository.saveAndFlush(category);
     }
 }

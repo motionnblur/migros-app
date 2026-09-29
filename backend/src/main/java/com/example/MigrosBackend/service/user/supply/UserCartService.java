@@ -23,11 +23,16 @@ import java.util.stream.Collectors;
  * the stored product-id list to the cart DTOs the API returns.
  *
  * <p>Every mutation runs in its own transaction and first takes a pessimistic
- * write lock on the user row. The cart is a single list column on that row, so
- * two concurrent read-modify-write mutations would otherwise both observe the
- * same starting list and the second would overwrite the first's change. The
- * lock serializes them, mirroring the {@code ForUpdate} finder convention the
- * order code uses.
+ * write lock on the user row, and reads the cart only from that locked state.
+ * The cart is a single list column on that row, so two concurrent
+ * read-modify-write mutations would otherwise both observe the same starting
+ * list and the second would overwrite the first's change. The lock serializes
+ * them, mirroring the {@code ForUpdate} finder convention the order code uses.
+ *
+ * <p>{@link #getCartData(String)} is deliberately the odd one out: it is a pure
+ * read. It used to persist the normalized cart as a side effect, which meant a
+ * display request could overwrite a concurrent add, remove or count change with
+ * the list it had read before that change landed.
  */
 @Service
 public class UserCartService {
@@ -45,7 +50,7 @@ public class UserCartService {
 
     @Transactional
     public void clearUserCart(String userMail) {
-        UserEntity user = requireUserByMail(userMail);
+        UserEntity user = requireUserByMailForUpdate(userMail);
         user.setProductsIdsInCart(new ArrayList<>());
         userEntityRepository.save(user);
     }
@@ -72,10 +77,16 @@ public class UserCartService {
         userEntityRepository.save(user);
     }
 
-    // TODO(HI-2): this read still persists the normalized cart because an
-    // existing test locks that write in. The response is identical either way;
-    // a follow-up can make the read pure once no caller relies on the write.
-    @Transactional
+    /**
+     * Renders the cart. The stored list is never written and never even dirtied:
+     * the managed entity is not touched, so a display request can neither lose
+     * a concurrent mutation nor be lost by one.
+     *
+     * <p>Deleted and out-of-stock products are still omitted and quantities are
+     * still clamped to the currently available stock, so the response a client
+     * sees is unchanged; only the write that used to accompany it is gone.
+     */
+    @Transactional(readOnly = true)
     public List<UserCartItemDto> getCartData(String userMail) {
         UserEntity user = requireUserByMail(userMail);
 
@@ -83,6 +94,7 @@ public class UserCartService {
             return new ArrayList<>();
         }
 
+        // A copy, so mapping can never mutate the list Hibernate manages.
         List<Long> originalProductIds = new ArrayList<>(user.getProductsIdsInCart());
         Map<Long, Long> productIdCounts = originalProductIds.stream()
                 .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
@@ -91,7 +103,6 @@ public class UserCartService {
         Map<Long, ProductEntity> productEntityMap = productEntities.stream()
                 .collect(Collectors.toMap(ProductEntity::getId, Function.identity()));
 
-        List<Long> normalizedCart = new ArrayList<>();
         List<UserCartItemDto> cartItems = new ArrayList<>();
 
         for (Map.Entry<Long, Long> entry : productIdCounts.entrySet()) {
@@ -106,10 +117,6 @@ public class UserCartService {
                 continue;
             }
 
-            for (int i = 0; i < allowedCount; i++) {
-                normalizedCart.add(productEntity.getId());
-            }
-
             UserCartItemDto dto = new UserCartItemDto();
             dto.setProductId(productEntity.getId());
             dto.setProductName(productEntity.getProductName());
@@ -117,11 +124,6 @@ public class UserCartService {
             dto.setProductCount(allowedCount);
             dto.setAvailableStock(productEntity.getProductCount());
             cartItems.add(dto);
-        }
-
-        if (!normalizedCart.equals(originalProductIds)) {
-            user.setProductsIdsInCart(normalizedCart);
-            userEntityRepository.save(user);
         }
 
         return cartItems;
