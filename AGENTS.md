@@ -47,15 +47,24 @@ Backend packages follow a mostly standard layered layout:
     `app.trusted-proxies` (comma-separated addresses/CIDR blocks, parsed by
     `helper/TrustedProxyList`). Empty is the default and means trust nothing, so
     a forged forwarding header cannot spoof the address recorded next to a
-    failure. Forwarded values must also be IP literals, are length-capped, and
-    hostnames are never resolved.
+    failure. Proxies *append* to the header, so the chain is walked from the
+    right and the first entry that is not itself a trusted proxy wins; taking
+    the left-most entry records an address the caller chose. Every hop between
+    the client and the backend therefore has to be listed. Forwarded values must
+    also be IP literals, are length-capped, and hostnames are never resolved;
+    anything malformed falls back to the peer address.
 - Signup and reset tokens
   - The database is the only store (`PendingSignupStorage`). There is no
     in-memory fallback and no expiry scheduler: a fallback would let a request
     report success for a token that only exists in one process's heap.
   - Storage failures propagate so the request fails instead of reporting success.
-  - The token is committed before the mail is sent; a mail failure aborts the
-    whole transaction, so no undeliverable token is left behind.
+  - The token is **committed before** the mail is sent, so a delivered link can
+    never reference a token that a later rollback or crash removes. The issuing
+    methods (`signup`, `verifyUserMail`) are therefore deliberately **not**
+    transactional and `PendingSignupStorage.store` commits on its own. A mail
+    failure revokes the already-committed token with `deleteCommitted` and still
+    reports `MailSendingFailedException`; a failing cleanup is logged, never the
+    token, and never replaces the reported failure.
   - `PendingTokenPurpose` binds each token to one flow. `confirm` and
     `confirmUserMail` accept only `SIGNUP`; `resetPassword` accepts only
     `PASSWORD_RESET`. A mismatch is reported as "token not found" so a caller
@@ -84,6 +93,19 @@ Backend packages follow a mostly standard layered layout:
       same `user_mail` is still `PENDING`/`PROCESSING`. Do not "optimize" the
       claim scan by dropping that predicate; it is what keeps a retry from
       overtaking a conversation's earlier event.
+    - Ordering that predicate depends on is only meaningful if `sequence_no` is
+      *commit* order. A sequence is handed out at INSERT time, so
+      `SupportOutboxStore.enqueue` first takes a `pg_advisory_xact_lock` keyed on
+      the mailbox, which is held until the caller's transaction ends. Never
+      replace it with a plain insert: an uncommitted earlier row is invisible to
+      the claim scan, so a later event would be delivered first.
+    - Delivery never terminates. There is no `FAILED` status and no give-up
+      threshold; `support.outbox.alert-after-attempts` only raises the log to
+      ERROR. A terminal state would both lose the event and unblock the
+      customer's queue behind it. V8 re-arms rows an earlier schema parked.
+    - The outbound HTTP call has finite connect/read timeouts that must stay
+      below the delivery lease; startup fails otherwise, because a delivery that
+      outlives its lease is delivered twice concurrently.
     - Stored payloads may contain customer message text: never log them and
       never expose them through the API. Retention deletes `DELIVERED` rows
       only.
@@ -113,6 +135,11 @@ Backend packages follow a mostly standard layered layout:
     each takes a `PESSIMISTIC_WRITE` lock on the order group (or the legacy
     order) first. Without that lock two transactions both observe `Pending` and
     both restock. Read-only display paths must keep using the non-locking finders.
+  - An `orderId` may name an order group or a legacy order line, and those id
+    spaces have independent sequences. Every fallback from the group lookup to
+    the line lookup must therefore be restricted to `orderGroup IS NULL`
+    (`findByIdAndOrderGroupIsNull*`). An unrestricted fallback resolves an id
+    that names no order to a line inside somebody else's group.
   - Restocking goes through `service/user/supply/OrderStockRestocker`, which
     aggregates per product, applies one atomic `productCount = productCount + n`
     statement, and always applies products in ascending id order so overlapping
@@ -124,8 +151,15 @@ Backend packages follow a mostly standard layered layout:
     fails loudly instead of truncating another product's image.
   - `AdminProductImageOperations` names files from a UUID, never a timestamp.
   - `AdminSupplyService` resolves every database reference (category, admin,
-    product) before writing any file, and deletes a newly written file when the
-    related insert fails, so an invalid reference cannot leave an orphan image.
+    product) before writing any file, so an invalid reference cannot leave an
+    orphan image.
+  - The product row and its image row are written in one transaction
+    (`uploadProduct`, `updateProduct`, `addProduct`). A newly written file is
+    registered with a `TransactionSynchronization` and deleted whenever the
+    transaction does not commit, which covers a rollback that happens after the
+    method has already returned.
+  - `updateProduct` creates the image row when the product has none. Skipping the
+    write because there is "nothing to update" leaves the new file unreachable.
 - Persistence and money
   - Flyway migrations live in `backend/src/main/resources/db/migration` and
     run against both existing and fresh databases.

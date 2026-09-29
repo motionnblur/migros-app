@@ -19,6 +19,8 @@ import com.example.MigrosBackend.service.global.EncryptService;
 import com.example.MigrosBackend.service.global.MailService;
 import com.example.MigrosBackend.service.global.TokenService;
 import jakarta.mail.MessagingException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -33,6 +35,8 @@ import java.util.UUID;
 
 @Service
 public class UserSignupService {
+
+    private static final Logger LOG = LoggerFactory.getLogger(UserSignupService.class);
 
     private final UserEntityRepository userEntityRepository;
     private final PendingSignupStorage pendingSignupStorage;
@@ -65,13 +69,16 @@ public class UserSignupService {
     /**
      * Registers a pending signup.
      *
-     * <p>Ordering is load-bearing: the token is committed to the database
-     * before the mail is sent, so a delivered link can never reference a token
-     * that was never stored. If the mail cannot be sent the whole transaction
-     * rolls back, which both preserves the existing failure response and
-     * guarantees no undeliverable token is left behind.
+     * <p>Ordering is load-bearing. The token is committed to the database
+     * <em>before</em> the mail is sent, so a delivered link can never reference a
+     * token that was never stored or that a later failure removed. This method
+     * is deliberately not transactional: a caller-managed transaction would hold
+     * the insert open across the send, which is exactly the window this ordering
+     * exists to close.
+     *
+     * <p>A mail failure is reported exactly as before, and the token is revoked
+     * explicitly so no undeliverable credential is left behind.
      */
-    @Transactional
     public void signup(UserSignDto userSignDto) {
         if (userEntityRepository.existsByUserMail(userSignDto.getUserMail())) {
             throw new UserAlreadyExistsException(userSignDto.getUserMail());
@@ -96,7 +103,7 @@ public class UserSignupService {
                 PendingTokenPurpose.SIGNUP
         ));
 
-        sendLink(userSignDto.getUserMail(), confirmationLink);
+        sendLinkOrRevoke(userSignDto.getUserMail(), confirmationLink, key);
     }
 
     public String login(UserSignDto userSignDto) {
@@ -166,10 +173,9 @@ public class UserSignupService {
     }
 
     /**
-     * Issues a password-reset token. As with signup, the token is stored before
-     * the mail is sent, and a mail failure aborts the whole operation.
+     * Issues a password-reset token. As with signup, the token is committed
+     * before the mail is sent and revoked when the mail cannot be delivered.
      */
-    @Transactional
     public void verifyUserMail(String userMail) {
         UserEntity userEntity = userEntityRepository.findByUserMail(userMail);
         if (userEntity == null) {
@@ -188,7 +194,7 @@ public class UserSignupService {
                 PendingTokenPurpose.PASSWORD_RESET
         ));
 
-        sendLink(userMail, confirmationLink);
+        sendLinkOrRevoke(userMail, confirmationLink, key);
     }
 
     private PendingSignupEntity requireToken(String token, PendingTokenPurpose purpose) {
@@ -197,6 +203,31 @@ public class UserSignupService {
             throw new TokenNotFoundException();
         }
         return pendingSignup;
+    }
+
+    /**
+     * Sends the link and, when the send fails, revokes the token that was
+     * already committed for it.
+     *
+     * <p>The token can no longer be rolled back with the rest of the operation,
+     * because it was deliberately committed first. It therefore has to be
+     * deleted explicitly, otherwise an undeliverable credential would stay
+     * redeemable for its whole lifetime. The reported failure is always the mail
+     * failure: a cleanup problem is logged - never the token itself - and must
+     * not replace the response the caller has to report.
+     */
+    private void sendLinkOrRevoke(String userMail, String link, String issuedToken) {
+        try {
+            sendLink(userMail, link);
+        } catch (MailSendingFailedException ex) {
+            try {
+                pendingSignupStorage.deleteCommitted(issuedToken);
+            } catch (RuntimeException cleanupFailure) {
+                LOG.warn("Failed to revoke a pending token whose mail could not be delivered: {}",
+                        cleanupFailure.getClass().getSimpleName());
+            }
+            throw ex;
+        }
     }
 
     private void sendLink(String userMail, String link) {

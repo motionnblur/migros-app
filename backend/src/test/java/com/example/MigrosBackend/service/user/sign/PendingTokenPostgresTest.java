@@ -29,8 +29,14 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+
+import javax.sql.DataSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -39,6 +45,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -92,6 +99,8 @@ class PendingTokenPostgresTest {
     private UserEntityRepository userEntityRepository;
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private DataSource dataSource;
     @Autowired
     private UserSignupService userSignupService;
 
@@ -208,6 +217,90 @@ class PendingTokenPostgresTest {
 
         assertEquals(0, pendingSignupEntityRepository.count(),
                 "a token nobody was ever told about must not be left in the table");
+    }
+
+    /**
+     * The token must be durable <em>before</em> the mail leaves.
+     *
+     * <p>The read is taken over its own JDBC connection in autocommit mode, so
+     * it observes committed rows only. Anything routed through the repository
+     * would join the transaction that is open on this thread and would happily
+     * see a row that is merely staged - which is exactly the state the test
+     * exists to rule out. A delivered link must reference a token that a later
+     * rollback, or a crash, cannot remove.
+     */
+    @Test
+    void theSignupTokenIsAlreadyCommittedWhenTheConfirmationMailIsSent() throws Exception {
+        when(encryptService.getEncryptedPassword(STRONG_PASSWORD)).thenReturn("hashed");
+
+        List<String> visibleWhenMailWasSent = new ArrayList<>();
+        doAnswer(invocation -> {
+            visibleWhenMailWasSent.addAll(committedTokensOnAnIndependentConnection());
+            return null;
+        }).when(mailService).sendMimeMessage(anyString(), anyString(), anyString(), any(Context.class));
+
+        userSignupService.signup(signupDto(MAIL));
+
+        assertEquals(1, visibleWhenMailWasSent.size(),
+                "the mail went out before the token was committed, so the link could reference nothing");
+        assertTrue(visibleWhenMailWasSent.get(0).contains("SIGNUP"), visibleWhenMailWasSent.get(0));
+    }
+
+    @Test
+    void theResetTokenIsAlreadyCommittedWhenTheResetMailIsSent() throws Exception {
+        seedUserWithPassword("original-hash");
+
+        List<String> visibleWhenMailWasSent = new ArrayList<>();
+        doAnswer(invocation -> {
+            visibleWhenMailWasSent.addAll(committedTokensOnAnIndependentConnection());
+            return null;
+        }).when(mailService).sendMimeMessage(anyString(), anyString(), anyString(), any(Context.class));
+
+        userSignupService.verifyUserMail(MAIL);
+
+        assertEquals(1, visibleWhenMailWasSent.size());
+        assertTrue(visibleWhenMailWasSent.get(0).contains("PASSWORD_RESET"), visibleWhenMailWasSent.get(0));
+    }
+
+    /** Tokens another transaction could see, read over a connection of its own. */
+    private List<String> committedTokensOnAnIndependentConnection() throws Exception {
+        List<String> tokens = new ArrayList<>();
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "SELECT token || ':' || token_purpose FROM pending_signup_entity")) {
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    tokens.add(resultSet.getString(1));
+                }
+            }
+        }
+        return tokens;
+    }
+
+    @Test
+    void aRevokedTokenStaysRevokedAfterItsIssuingRequestReturned() throws Exception {
+        when(encryptService.getEncryptedPassword(STRONG_PASSWORD)).thenReturn("hashed");
+        doThrow(new jakarta.mail.MessagingException("SMTP down")).when(mailService)
+                .sendMimeMessage(anyString(), anyString(), anyString(), any(Context.class));
+
+        assertThrows(MailSendingFailedException.class, () -> userSignupService.signup(signupDto(MAIL)));
+
+        // Read from a fresh transaction: the revocation has to be committed too,
+        // or it disappears with whatever request happened to carry it.
+        assertEquals(0, pendingSignupEntityRepository.count());
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM pending_signup_entity", Integer.class));
+    }
+
+    @Test
+    void aRevokedResetTokenIsRemovedForLaterRequestsAsWell() throws Exception {
+        seedUserWithPassword("original-hash");
+        doThrow(new jakarta.mail.MessagingException("SMTP down")).when(mailService)
+                .sendMimeMessage(anyString(), anyString(), anyString(), any(Context.class));
+
+        assertThrows(MailSendingFailedException.class, () -> userSignupService.verifyUserMail(MAIL));
+
+        assertEquals(0, pendingSignupEntityRepository.count());
     }
 
     @Test

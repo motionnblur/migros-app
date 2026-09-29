@@ -1,9 +1,13 @@
 package com.example.MigrosBackend.service.support;
 
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -69,6 +73,10 @@ public class SupportOutboxStore {
         }
     };
 
+    /** {@code pg_advisory_xact_lock} returns void, so there is no row to map. */
+    private static final RowCallbackHandler IGNORE_ROW = resultSet -> {
+    };
+
     private final JdbcTemplate jdbcTemplate;
 
     public SupportOutboxStore(JdbcTemplate jdbcTemplate) {
@@ -83,12 +91,22 @@ public class SupportOutboxStore {
      * <p>{@code eventId} is also the {@code eventId} field inside the payload
      * and is never regenerated, so a retry after a failure is byte-identical
      * and the receiver can deduplicate it.
+     *
+     * <p>The row is inserted under a per-customer transaction advisory lock, so
+     * that {@code sequence_no} order is <em>commit</em> order for one customer.
+     * A sequence is handed out at insert time, which is not the same thing: two
+     * concurrent chat writes for the same customer can take sequence numbers in
+     * one order and commit in the other, and the later-committing row with the
+     * smaller number would then be delivered after it. Serializing the insert
+     * behind a lock held until commit removes that window, and it is scoped per
+     * customer so unrelated conversations never wait on each other.
      */
     public void enqueue(String eventId, String eventType, String userMail,
                         String payload, LocalDateTime now) {
         if (eventId == null || eventId.isBlank()) {
             throw new IllegalArgumentException("an outbox event requires a stable event id");
         }
+        lockCustomerQueue(userMail);
         jdbcTemplate.update(
                 "INSERT INTO support_outbox_entity "
                         + "(event_id, event_type, user_mail, payload, status, attempt_count, "
@@ -96,6 +114,45 @@ public class SupportOutboxStore {
                         + "VALUES (?, ?, ?, ?, 'PENDING', 0, ?, ?)",
                 eventId, eventType, userMail, payload,
                 Timestamp.valueOf(now), Timestamp.valueOf(now));
+    }
+
+    /**
+     * Blocks until this transaction owns {@code userMail}'s queue, and keeps
+     * owning it until it commits or rolls back.
+     *
+     * <p>{@code pg_advisory_xact_lock} is released by the transaction boundary
+     * itself, so there is no lease to expire and no way to end up holding a lock
+     * for a queue that is not ours. The key is derived here rather than in SQL
+     * with {@code hashtext()} so it is a stable, documented function of the
+     * mailbox rather than an internal one whose definition may change between
+     * PostgreSQL versions.
+     */
+    private void lockCustomerQueue(String userMail) {
+        if (userMail == null || userMail.isBlank()) {
+            throw new IllegalArgumentException("an outbox event requires a customer mailbox");
+        }
+        jdbcTemplate.query("SELECT pg_advisory_xact_lock(?)", IGNORE_ROW, customerQueueLockKey(userMail));
+    }
+
+    /**
+     * Deterministic 64-bit advisory-lock key for one customer's queue.
+     *
+     * <p>Exposed for tests that need to hold the lock from an independent
+     * connection. Must stay stable across processes and restarts, so it is a
+     * truncated SHA-256 of the mailbox rather than {@link String#hashCode()}.
+     */
+    static long customerQueueLockKey(String userMail) {
+        byte[] digest;
+        try {
+            digest = MessageDigest.getInstance("SHA-256").digest(userMail.getBytes(StandardCharsets.UTF_8));
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 is required to derive support outbox lock keys", ex);
+        }
+        long key = 0L;
+        for (int i = 0; i < Long.BYTES; i++) {
+            key = (key << 8) | (digest[i] & 0xFFL);
+        }
+        return key;
     }
 
     /**
@@ -149,6 +206,13 @@ public class SupportOutboxStore {
     /**
      * Parks a failed attempt for a bounded retry with the given backoff. Fenced
      * on the lease token like every other worker transition.
+     *
+     * <p>There is no terminal counterpart to this method. A support event is
+     * owed for as long as the receiver has not acknowledged it, and stopping
+     * would both lose the event and let the customer's later events overtake it:
+     * {@link #findDue} only holds back a queue behind rows that are still
+     * {@code PENDING} or {@code PROCESSING}, so a permanently failed row would
+     * quietly unblock the queue and reorder the conversation.
      */
     public Transition scheduleRetry(String eventId, String leaseOwner, String errorCode,
                                     LocalDateTime nextAttemptAt) {
@@ -165,29 +229,6 @@ public class SupportOutboxStore {
     }
 
     /**
-     * Terminal failure after the attempt budget is spent. The row is kept (not
-     * deleted) so the owed event stays visible to an operator; it is no longer
-     * claimable, so it also stops consuming the per-customer queue head.
-     *
-     * <p>{@code next_attempt_at} is deliberately left as-is rather than
-     * nulled: the column is {@code NOT NULL}, and a terminal row is excluded
-     * from the claim scan by its status, so clearing the timestamp would only
-     * trade a stored value for a constraint violation.
-     */
-    public Transition markExhausted(String eventId, String leaseOwner, String errorCode) {
-        if (leaseOwner == null || leaseOwner.isBlank()) {
-            return Transition.STALE_CLAIM;
-        }
-        return jdbcTemplate.update(
-                "UPDATE support_outbox_entity SET status = 'FAILED', last_error = ?, "
-                        + "lease_owner = NULL, lease_expires_at = NULL "
-                        + "WHERE event_id = ? AND status = 'PROCESSING' AND lease_owner = ?",
-                errorCode, eventId, leaseOwner) == 1
-                ? Transition.APPLIED
-                : Transition.STALE_CLAIM;
-    }
-
-    /**
      * Bounded page of deliverable events, oldest first.
      *
      * <p>A row is only offered when no <em>earlier</em> row for the same
@@ -196,6 +237,13 @@ public class SupportOutboxStore {
      * reach the support service in the order the backend committed them, even
      * when an earlier delivery failed and is waiting out its backoff. Different
      * customers are unaffected and stay fully parallel.
+     *
+     * <p>"Earlier" means a lower {@code sequence_no}, and {@link #enqueue}
+     * serializes those per customer under a transaction advisory lock so that
+     * lower number really does mean earlier commit. Without that serialization
+     * this predicate is unsound: a row that is not yet committed is invisible
+     * here, so a later event could be claimed and delivered while an earlier one
+     * is still in flight.
      *
      * <p>Retries of different customers are therefore independent; only one
      * customer can be blocked at a time.

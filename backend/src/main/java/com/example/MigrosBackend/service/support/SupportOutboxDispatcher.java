@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -32,6 +33,19 @@ import java.util.UUID;
  * the payload is stable across retries — the receiver deduplicates on it. The
  * alternative (at-most-once) would drop events instead, which for a support
  * conversation is the worse failure.
+ *
+ * <p>Delivery also never gives up. A failed attempt is rescheduled with capped
+ * exponential backoff no matter how many have already happened, because an event
+ * that stops being retried is both lost and - since {@code findDue} only holds
+ * back a queue behind rows that are still {@code PENDING} or {@code PROCESSING}
+ * - a hole that lets every later event for that customer jump the queue. The
+ * configured attempt count is therefore a logging threshold for operator
+ * attention, not a delivery budget.
+ *
+ * <p>The HTTP client has finite connect and read timeouts, themselves shorter
+ * than the delivery lease. Without them a single hung connection would keep the
+ * lease far longer than intended, and the row would be reclaimed and delivered
+ * again by another worker while the first request was still in flight.
  */
 @Service
 public class SupportOutboxDispatcher {
@@ -43,7 +57,9 @@ public class SupportOutboxDispatcher {
     private final String internalKey;
     private final Clock clock;
     private final long leaseSeconds;
-    private final int maxAttempts;
+    private final int escalationThreshold;
+    private final Duration connectTimeout;
+    private final Duration readTimeout;
     private final long backoffBaseSeconds;
     private final long backoffMaxSeconds;
     private final int pageSize;
@@ -55,22 +71,66 @@ public class SupportOutboxDispatcher {
             @Value("${support.service.base-url:}") String supportServiceBaseUrl,
             @Value("${support.service.internal-key:}") String internalKey,
             @Value("${support.outbox.lease-seconds:120}") long leaseSeconds,
-            @Value("${support.outbox.max-attempts:8}") int maxAttempts,
+            @Value("${support.outbox.alert-after-attempts:8}") int escalationThreshold,
+            @Value("${support.service.connect-timeout-ms:2000}") long connectTimeoutMillis,
+            @Value("${support.service.read-timeout-ms:10000}") long readTimeoutMillis,
             @Value("${support.outbox.backoff-base-seconds:30}") long backoffBaseSeconds,
             @Value("${support.outbox.backoff-max-seconds:1800}") long backoffMaxSeconds,
             @Value("${support.outbox.page-size:20}") int pageSize
     ) {
         this.outboxStore = outboxStore;
         this.clock = clock;
+        this.leaseSeconds = requirePositive(leaseSeconds, "support.outbox.lease-seconds");
+        this.connectTimeout = boundedTimeout(connectTimeoutMillis, "support.service.connect-timeout-ms");
+        this.readTimeout = boundedTimeout(readTimeoutMillis, "support.service.read-timeout-ms");
+        this.escalationThreshold = Math.max(1, escalationThreshold);
         this.restTemplate = supportServiceBaseUrl == null || supportServiceBaseUrl.isBlank()
                 ? null
-                : restTemplateBuilder.rootUri(supportServiceBaseUrl).build();
+                : restTemplateBuilder
+                .rootUri(supportServiceBaseUrl)
+                .connectTimeout(this.connectTimeout)
+                .readTimeout(this.readTimeout)
+                .build();
         this.internalKey = internalKey;
-        this.leaseSeconds = leaseSeconds;
-        this.maxAttempts = Math.max(1, maxAttempts);
         this.backoffBaseSeconds = Math.max(1, backoffBaseSeconds);
         this.backoffMaxSeconds = Math.max(backoffBaseSeconds, backoffMaxSeconds);
         this.pageSize = Math.max(1, pageSize);
+    }
+
+    private long requirePositive(long value, String property) {
+        if (value <= 0) {
+            throw new IllegalStateException(property + " must be a positive number of seconds");
+        }
+        return value;
+    }
+
+    /**
+     * A delivery attempt has to finish, or fail, inside the lease it holds.
+     *
+     * <p>A timeout at or above the lease is not merely slow: the lease expires
+     * while the request is still in flight, another worker reclaims the row, and
+     * the same event is delivered concurrently by both. Rejecting the
+     * misconfiguration at startup is the only way to keep that from silently
+     * becoming the delivery guarantee.
+     */
+    private Duration boundedTimeout(long millis, String property) {
+        if (millis <= 0) {
+            throw new IllegalStateException(property + " must be a positive number of milliseconds");
+        }
+        Duration timeout = Duration.ofMillis(millis);
+        if (timeout.compareTo(Duration.ofSeconds(leaseSeconds)) >= 0) {
+            throw new IllegalStateException(property + " must be shorter than support.outbox.lease-seconds ("
+                    + leaseSeconds + "s), otherwise a delivery lease can expire while a request is still in flight");
+        }
+        return timeout;
+    }
+
+    long connectTimeoutMillis() {
+        return connectTimeout.toMillis();
+    }
+
+    long readTimeoutMillis() {
+        return readTimeout.toMillis();
     }
 
     /**
@@ -134,16 +194,19 @@ public class SupportOutboxDispatcher {
     private void recordFailure(SupportOutboxStore.ClaimedEvent event, String leaseOwner,
                                LocalDateTime now, RuntimeException failure) {
         String errorCode = SupportOutboxStore.sanitizeError(failure);
-        if (event.attemptCount() >= maxAttempts) {
-            outboxStore.markExhausted(event.eventId(), leaseOwner, errorCode);
-            LOG.error("Support outbox event {} exhausted {} attempts and needs operator attention",
-                    event.eventId(), event.attemptCount());
-            return;
-        }
-
         LocalDateTime nextAttemptAt = now.plusSeconds(backoffSeconds(event.attemptCount()));
         outboxStore.scheduleRetry(event.eventId(), leaseOwner, errorCode, nextAttemptAt);
+
         // Event ids and error types only: the payload holds customer text.
+        if (event.attemptCount() >= escalationThreshold) {
+            // Still retrying, but a receiver that has refused this many times is
+            // an incident an operator has to see rather than a blip to retry
+            // quietly. This is a logging threshold, never a give-up point.
+            LOG.error("Support outbox event {} has failed {} times in a row ({}); still retrying at {}, "
+                            + "the receiver is refusing delivery",
+                    event.eventId(), event.attemptCount(), errorCode, nextAttemptAt);
+            return;
+        }
         LOG.warn("Support outbox delivery failed for event {} ({}), retrying at {}",
                 event.eventId(), errorCode, nextAttemptAt);
     }

@@ -123,11 +123,20 @@ Two security-relevant schema changes ship with this release:
   guessing would re-open the replay this closes. Tokens are short-lived and
   single-use, so an in-flight signup or reset just fails with the existing
   "token not found" response and the user repeats the request.
+* **The support outbox has no terminal failure state.** An earlier revision
+  parked an event as `FAILED` once it spent its attempt budget. That both lost
+  the event and reordered the conversation, because per-customer ordering only
+  holds back later events while an earlier one is still owed — a `FAILED` row
+  satisfies neither and quietly unblocked the queue. `FAILED` is now rejected by
+  the schema, rows parked by the previous version are re-armed, and delivery
+  retries indefinitely.
 * **Product images are named from a UUID and never overwritten.** The previous
   millisecond-resolution timestamp name collided, and the second upload
   silently replaced the first, leaving two products serving one image. Uploads
-  are now written with `CREATE_NEW`, and a file whose related database insert
-  fails is deleted so no orphan image is left on disk.
+  are now written with `CREATE_NEW`, and the product row, its references, and
+  its image row are written in one transaction. A file written for a transaction
+  that does not commit is deleted again, including when the rollback only
+  happens after the request has already returned.
 
 * Local development credentials (only created when the active profile set is exactly `local`): admin / admin
 
@@ -278,11 +287,25 @@ commit the populated copy. The template is enforced by
   scheduled worker claims due records with a bounded lease, delivers them
   outside any transaction, and retries failures with exponential backoff. The
   optional `SUPPORT_OUTBOX_*` values tune the worker.
-* Delivery is **at least once**: a request that succeeded on the receiver but
-  whose response was lost is retried. The `eventId` in the payload is stable
-  across every retry, so the support service must deduplicate on it. Events for
-  one customer are delivered in commit order and never reordered by a retry.
-  Stored payloads may contain customer message text: they are never logged and
+* Delivery is **at least once** and never gives up: a request that succeeded on
+  the receiver but whose response was lost is retried, and a receiver that keeps
+  refusing is retried indefinitely. The `eventId` in the payload is stable across
+  every retry, so the support service must deduplicate on it.
+  `SUPPORT_OUTBOX_ALERT_AFTER_ATTEMPTS` only raises the failure log to ERROR for
+  operator attention; it is not a delivery budget. Giving up would both lose the
+  event and let that customer's later events overtake it, because per-customer
+  ordering only holds back later events while an earlier one is still owed.
+* Events for one customer are delivered in commit order. A sequence number
+  alone is not enough: it is handed out at insert time, so two concurrent chat
+  writes could take sequence numbers in one order and commit in the other.
+  Enqueue therefore takes a per-customer transaction lock held until commit, so
+  sequence order really is commit order and a retry can never overtake an
+  earlier undelivered event.
+* The outbound call uses finite connect and read timeouts
+  (`SUPPORT_SERVICE_CONNECT_TIMEOUT_MS`, `SUPPORT_SERVICE_READ_TIMEOUT_MS`) that
+  must stay below `SUPPORT_OUTBOX_LEASE_SECONDS`; startup fails otherwise,
+  because a delivery that outlives its lease is delivered twice at once.
+* Stored payloads may contain customer message text: they are never logged and
   never exposed through the API.
 
 ### Verification gate
@@ -312,6 +335,15 @@ you control is guaranteed to overwrite the header; an empty value means a forged
 forwarding header can never spoof the address recorded next to a failure.
 Forwarded values must be IP literals and are length-capped; hostnames are never
 resolved.
+
+When the header *is* consulted, the chain is walked **from the right** and the
+first entry that is not itself a trusted proxy wins. Every proxy *appends* to
+`X-Forwarded-For` — the bundled Nginx config uses `$proxy_add_x_forwarded_for` —
+so the entries on the left are whatever the caller sent, and taking the
+left-most one records an address the attacker chose. List every hop between the
+client and the backend: a hop you omit is indistinguishable from the client, and
+its value becomes the one that gets logged. A malformed entry, an over-long
+header, or a chain of nothing but trusted proxies falls back to the peer address.
 
 ## Administrator provisioning
 

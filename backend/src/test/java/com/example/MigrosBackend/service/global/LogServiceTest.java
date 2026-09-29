@@ -9,6 +9,57 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class LogServiceTest {
 
     @Test
+    void getClientIp_ignoresAForgedLeftMostValue_fromAnAppendingProxy() {
+        // Nginx uses $proxy_add_x_forwarded_for, so an honest proxy appends the
+        // real peer to whatever the client already sent. Everything on the left of
+        // that append is caller-supplied and must never reach the audit log.
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("X-Forwarded-For", "198.51.100.7, 203.0.113.9");
+        request.setRemoteAddr("192.168.1.1");
+
+        assertEquals("203.0.113.9", service("192.168.1.1").getClientIp(request),
+                "taking the left-most entry records an address the caller chose");
+    }
+
+    @Test
+    void getClientIp_ignoresForgedValuesInFrontOfSeveralProxies() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("X-Forwarded-For", "198.51.100.7, 203.0.113.9, 10.0.0.7");
+        request.setRemoteAddr("10.0.0.7");
+
+        assertEquals("203.0.113.9", service("10.0.0.0/8").getClientIp(request));
+    }
+
+    @Test
+    void getClientIp_fallsBackToRemoteAddr_whenEveryHopIsATrustedProxy() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("X-Forwarded-For", "10.0.0.7, 10.0.0.8");
+        request.setRemoteAddr("10.0.0.7");
+
+        assertEquals("10.0.0.7", service("10.0.0.0/8").getClientIp(request),
+                "an all-proxy chain attests nothing beyond the peer itself");
+    }
+
+    @Test
+    void getClientIp_fallsBackToRemoteAddr_whenALaterHopIsMalformed() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("X-Forwarded-For", "203.0.113.9, not-an-address");
+        request.setRemoteAddr("192.168.1.1");
+
+        assertEquals("192.168.1.1", service("192.168.1.1").getClientIp(request),
+                "a chain that cannot be walked with confidence must not be walked with a guess");
+    }
+
+    @Test
+    void getClientIp_toleratesWhitespaceOnlySeparators() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("X-Forwarded-For", "203.0.113.9,   10.0.0.7");
+        request.setRemoteAddr("10.0.0.7");
+
+        assertEquals("203.0.113.9", service("10.0.0.0/8").getClientIp(request));
+    }
+
+    @Test
     void getClientIp_ignoresForwardedHeader_whenNoTrustedProxyIsConfigured() {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("X-Forwarded-For", "203.0.113.9");

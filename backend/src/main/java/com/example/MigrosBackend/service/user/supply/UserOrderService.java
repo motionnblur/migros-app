@@ -93,6 +93,15 @@ public class UserOrderService {
         return pageDto;
     }
 
+    /**
+     * Resolves the owner of an order named by a single numeric id.
+ *
+     * <p>The same id may name an order group or a legacy order line, so the
+     * group is looked up first. When it is absent the line fallback is
+     * restricted to lines that have no group at all: group ids and line ids
+     * come from independent sequences, so an unrestricted fallback could
+     * resolve to another customer's order line and disclose their profile.
+     */
     public UserProfileTableDto getUserProfileData(Long orderId) {
         UserEntity userEntity;
 
@@ -101,7 +110,7 @@ public class UserOrderService {
             userEntity = userEntityRepository.findById(orderGroup.getUserId())
                     .orElseThrow(() -> new UserNotFoundException(orderGroup.getUserId().toString()));
         } else {
-            OrderEntity legacyOrder = orderEntityRepository.findById(orderId)
+            OrderEntity legacyOrder = orderEntityRepository.findByIdAndOrderGroupIsNull(orderId)
                     .orElseThrow(() -> new OrderNotFoundException(orderId.toString()));
             userEntity = userEntityRepository.findById(legacyOrder.getUserId())
                     .orElseThrow(() -> new UserNotFoundException(legacyOrder.getUserId().toString()));
@@ -132,6 +141,12 @@ public class UserOrderService {
      *
      * <p>Status values are passed through unchanged, so existing API and status
      * string compatibility is preserved.
+     *
+     * <p>The legacy fallback is restricted to lines with no order group. Group
+     * ids and line ids are independent sequences, so falling back to "the order
+     * line with this id" without that restriction would apply an administrator's
+     * status change - and possibly a restock - to a line belonging to a
+     * different order.
      */
     @Transactional
     public void updateOrderStatus(Long orderId, String status) {
@@ -148,7 +163,7 @@ public class UserOrderService {
             return;
         }
 
-        OrderEntity legacyOrder = orderEntityRepository.findByIdForUpdate(orderId)
+        OrderEntity legacyOrder = orderEntityRepository.findByIdAndOrderGroupIsNullForUpdate(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId.toString()));
         legacyOrder.setStatus(status);
         orderEntityRepository.save(legacyOrder);
@@ -163,6 +178,11 @@ public class UserOrderService {
      * both restock. The status read, the restock, and the delete share one
      * transaction, so a failure anywhere in the sequence leaves the order and
      * its stock untouched.
+     *
+     * <p>The legacy fallback only considers lines that have no order group:
+     * group ids and line ids are independent sequences, so an unrestricted
+     * fallback could delete - and restock - a line from an unrelated order
+     * group.
      */
     @Transactional
     public void deleteOrder(Long orderId) {
@@ -177,7 +197,7 @@ public class UserOrderService {
             return;
         }
 
-        OrderEntity legacyOrder = orderEntityRepository.findByIdForUpdate(orderId)
+        OrderEntity legacyOrder = orderEntityRepository.findByIdAndOrderGroupIsNullForUpdate(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId.toString()));
         if (OrderStatus.isPending(legacyOrder.getStatus())) {
             orderStockRestocker.restore(legacyOrder.getItemId(),

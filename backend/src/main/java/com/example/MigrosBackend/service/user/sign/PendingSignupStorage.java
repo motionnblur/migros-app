@@ -37,14 +37,42 @@ final class PendingSignupStorage {
 
     /**
      * Persists a pending token, replacing any earlier token with the same
-     * purpose for the same mailbox. The write must be committed before the
-     * confirmation mail is sent, otherwise the mail can reference a token that
-     * no longer exists.
+     * purpose for the same mailbox.
+     *
+     * <p>The write runs in its own transaction and is <em>committed</em> before
+     * this method returns. That ordering is the whole point: the issuing method
+     * sends the confirmation mail only after the token is durable, so a
+     * delivered link can never reference a token that a later rollback - or a
+     * crash - removed. Sharing the caller's transaction instead would send the
+     * mail first and leave a window in which the link is live and the token is
+     * not.
+     *
+     * <p>Because the commit already happened, an issuance whose mail cannot be
+     * delivered must revoke the token explicitly with {@link
+     * #deleteCommitted(String)}.
      */
     void store(PendingSignupEntity pendingSignup) {
         PendingTokenPurpose purpose = requirePurpose(pendingSignup);
-        repository.deleteByUserMailAndTokenPurpose(pendingSignup.getUserMail(), purpose);
-        repository.save(pendingSignup);
+        requiresNewTransaction.executeWithoutResult(status -> {
+            repository.deleteByUserMailAndTokenPurpose(pendingSignup.getUserMail(), purpose);
+            repository.save(pendingSignup);
+        });
+    }
+
+    /**
+     * Removes an already-committed token in its own transaction.
+     *
+     * <p>Used to revoke an issuance whose mail could not be delivered: the token
+     * was committed before the send precisely so the link could not outrun the
+     * database, and it has to be removed explicitly for the same reason. The
+     * caller owns the failure being reported, so a throwing cleanup is left to
+     * that caller to decide how to surface.
+     */
+    void deleteCommitted(String token) {
+        if (token == null || token.isBlank()) {
+            return;
+        }
+        requiresNewTransaction.executeWithoutResult(status -> repository.deleteById(token));
     }
 
     /**

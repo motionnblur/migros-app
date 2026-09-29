@@ -58,7 +58,12 @@ final class UserOrderHistoryReadService {
             return orderGroup.getStatus();
         }
 
-        OrderEntity legacyOrder = orderEntityRepository.findByIdAndUserId(orderId, user.getId())
+        // The legacy fallback is restricted to lines with no order group: group
+        // ids and line ids come from independent sequences, so an unrestricted
+        // lookup could report another order's status for an id that names no
+        // order of this user's at all.
+        OrderEntity legacyOrder = orderEntityRepository
+                .findByIdAndUserIdAndOrderGroupIsNull(orderId, user.getId())
                 .orElseThrow(() -> new GeneralException("Order not found"));
         return legacyOrder.getStatus();
     }

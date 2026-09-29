@@ -21,6 +21,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -36,6 +37,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -65,6 +67,7 @@ class SupportOutboxPostgresTest {
     private static final String ADMIN_SECRET = "ZmVkY2JhOTg3NjU0MzIxMGZlZGNiYTk4NzY1NDMyMTA=";
     private static final String INTERNAL_KEY = "integration-test-internal-key";
     private static final String MAIL = "chat@migros.com";
+    private static final long BLOCK_OBSERVATION_MS = 750L;
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES =
@@ -154,7 +157,7 @@ class SupportOutboxPostgresTest {
         registry.add("support.outbox.cleanup-scan-ms", () -> "3600000");
         registry.add("support.outbox.cleanup-initial-delay-ms", () -> "3600000");
         registry.add("support.outbox.lease-seconds", () -> "60");
-        registry.add("support.outbox.max-attempts", () -> "4");
+        registry.add("support.outbox.alert-after-attempts", () -> "4");
         registry.add("support.outbox.backoff-base-seconds", () -> "60");
         registry.add("support.outbox.backoff-max-seconds", () -> "3600");
     }
@@ -175,11 +178,13 @@ class SupportOutboxPostgresTest {
     private TokenService tokenService;
     @Autowired
     private ObjectMapper objectMapper;
+    @Autowired
+    private PlatformTransactionManager txManager;
 
     @Value("${support.outbox.lease-seconds}")
     private long leaseSeconds;
-    @Value("${support.outbox.max-attempts}")
-    private int maxAttempts;
+    @Value("${support.outbox.alert-after-attempts}")
+    private int alertAfterAttempts;
     @Value("${support.outbox.backoff-base-seconds}")
     private long backoffBaseSeconds;
     @Value("${support.outbox.backoff-max-seconds}")
@@ -256,24 +261,77 @@ class SupportOutboxPostgresTest {
     }
 
     @Test
-    void anEventThatExhaustsItsAttemptsIsParkedForAnOperator() {
-        sendUserMessage("give up");
+    void anEventIsStillRetryableAfterTheAlertThresholdIsPassed() {
+        sendUserMessage("outlast the threshold");
 
-        for (int attempt = 0; attempt < maxAttempts; attempt++) {
+        for (int attempt = 1; attempt <= alertAfterAttempts; attempt++) {
+            supportService.failNextDeliveries(1);
+            dispatcher.deliverDueEvents();
+            assertEquals(SupportOutboxStatus.PENDING, statusOfOnlyRow(),
+                    "attempt " + attempt + ": a support event is owed until the receiver acknowledges it");
+            makeNextAttemptDue();
+        }
+
+        // The threshold is a logging escalation, never a give-up point. Parking
+        // the event terminally would both lose it and unblock the customer's
+        // queue behind it, because per-customer ordering only holds back later
+        // events while an earlier one is still PENDING or PROCESSING.
+        assertEquals(SupportOutboxStatus.PENDING, statusOfOnlyRow());
+        assertEquals(alertAfterAttempts, attemptCountOfOnlyRow());
+        assertEquals(List.of(eventIdOfOnlyRow()), outboxStore.findDue(10, LocalDateTime.now()));
+
+        supportService.failNextDeliveries(1);
+        assertEquals(0, dispatcher.deliverDueEvents());
+        assertEquals(alertAfterAttempts + 1, attemptCountOfOnlyRow());
+        makeNextAttemptDue();
+
+        assertEquals(1, dispatcher.deliverDueEvents());
+        assertEquals(1, deliveredCount());
+    }
+
+    @Test
+    void anEventPastTheThresholdStillBlocksItsCustomersLaterEvents() {
+        sendUserMessage("first");
+        sendUserMessage("second");
+
+        for (int attempt = 1; attempt <= alertAfterAttempts + 1; attempt++) {
             supportService.failNextDeliveries(1);
             dispatcher.deliverDueEvents();
             makeNextAttemptDue();
         }
 
-        assertEquals(SupportOutboxStatus.FAILED, statusOfOnlyRow(),
-                "an event nobody can deliver must stop retrying and stay visible");
-        assertEquals(maxAttempts, attemptCountOfOnlyRow());
-        assertTrue(outboxStore.findDue(10, LocalDateTime.now()).isEmpty());
+        assertEquals(SupportOutboxStatus.PENDING, statusOfOnlyRow(),
+                "the earliest event of the pair must still be the one holding the queue");
 
-        // A terminal event must also stop blocking its customer's queue.
-        sendUserMessage("next");
-        assertEquals(1, dispatcher.deliverDueEvents(),
-                "an exhausted event must not hold up the customer's later events forever");
+        List<String> due = outboxStore.findDue(50, LocalDateTime.now());
+        assertEquals(1, due.size(), "a repeatedly failing event must keep holding its queue");
+        assertEquals("first", eventField(storedPayloadOf(due.get(0)), "text"));
+
+        // ...and the customer still receives both, in order.
+        supportService.reset();
+        while (!outboxStore.findDue(50, LocalDateTime.now()).isEmpty()) {
+            dispatcher.deliverDueEvents();
+            makeNextAttemptDue();
+        }
+        assertEquals(List.of("first", "second"),
+                supportService.received().stream().map(r -> eventField(r.body(), "text")).toList());
+    }
+
+    @Test
+    void theOutboxNeverStoresATerminalFailureState() {
+        sendUserMessage("no terminal state");
+
+        for (int attempt = 1; attempt <= alertAfterAttempts + 2; attempt++) {
+            supportService.failNextDeliveries(1);
+            dispatcher.deliverDueEvents();
+            makeNextAttemptDue();
+        }
+
+        assertThrows(Exception.class, () -> jdbcTemplate.update(
+                        "UPDATE support_outbox_entity SET status = 'FAILED' WHERE event_id = ?",
+                        eventIdOfOnlyRow()),
+                "the schema must not even accept a terminal state, so nothing can reintroduce one");
+        assertEquals(SupportOutboxStatus.PENDING, statusOfOnlyRow());
     }
 
     @Test
@@ -309,8 +367,6 @@ class SupportOutboxPostgresTest {
                 outboxStore.markDelivered(eventId, "first-worker", LocalDateTime.now()));
         assertEquals(SupportOutboxStore.Transition.STALE_CLAIM,
                 outboxStore.scheduleRetry(eventId, "first-worker", "boom", LocalDateTime.now()));
-        assertEquals(SupportOutboxStore.Transition.STALE_CLAIM,
-                outboxStore.markExhausted(eventId, "first-worker", "boom"));
         assertEquals(SupportOutboxStore.Transition.STALE_CLAIM,
                 outboxStore.markDelivered(eventId, null, LocalDateTime.now()));
 
@@ -463,6 +519,97 @@ class SupportOutboxPostgresTest {
                 "UPDATE support_outbox_entity SET status = 'NOT_A_STATUS'"));
     }
 
+    /**
+     * A sequence number is handed out at INSERT time, which is not commit time.
+     *
+     * <p>Two concurrent chat writes for one customer can therefore take sequence
+     * numbers in one order and commit in the other. The claim scan only sees
+     * committed rows, so the row with the higher sequence number looks like the
+     * head of that customer's queue and gets delivered first - the conversation
+     * reaches the support service backwards.
+     *
+     * <p>Enqueue therefore takes a transaction advisory lock keyed on the
+     * customer. This asserts the observable consequence: while an earlier write
+     * for the same customer is still uncommitted, a later one cannot even take
+     * its sequence number. The lock is held from an independent connection the
+     * same way the order tests hold a row lock, so the interleaving is
+     * deterministic rather than a race that usually happens to interleave.
+     */
+    @Test
+    void aLaterWriteForOneCustomerWaitsForTheEarlierOneToCommit() throws Exception {
+        ensureUser(MAIL);
+        String token = tokenService.generateUserToken(MAIL);
+        CountDownLatch firstWriteStored = new CountDownLatch(1);
+        CountDownLatch releaseFirstWrite = new CountDownLatch(1);
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        Future<?> firstWrite;
+        Future<?> secondWrite;
+        try {
+            firstWrite = pool.submit(() -> inTransaction(() -> {
+                supportChatService.addUserMessage(token, "first");
+                firstWriteStored.countDown();
+                await(releaseFirstWrite);
+                return null;
+            }));
+            assertTrue(firstWriteStored.await(30, TimeUnit.SECONDS),
+                    "the first write must insert its event before the second one starts");
+
+            secondWrite = pool.submit(() -> supportChatService.addUserMessage(token, "second"));
+            assertTrue(blocksOn(secondWrite),
+                    "a second write for the same customer must not be able to take a sequence number "
+                            + "while an earlier one is still uncommitted; that is exactly how sequence "
+                            + "order and commit order come to disagree");
+
+            releaseFirstWrite.countDown();
+            firstWrite.get(60, TimeUnit.SECONDS);
+            secondWrite.get(60, TimeUnit.SECONDS);
+        } finally {
+            releaseFirstWrite.countDown();
+            pool.shutdownNow();
+        }
+
+        long firstSequence = sequenceNoOfPayload("first");
+        long secondSequence = sequenceNoOfPayload("second");
+        assertTrue(firstSequence < secondSequence,
+                "sequence order must be commit order for one customer");
+
+        while (!outboxStore.findDue(50, LocalDateTime.now()).isEmpty()) {
+            dispatcher.deliverDueEvents();
+        }
+        assertEquals(List.of("first", "second"),
+                supportService.received().stream().map(r -> eventField(r.body(), "text")).toList(),
+                "a customer's events must reach the support service in commit order");
+    }
+
+    private <T> T inTransaction(java.util.function.Supplier<T> work) {
+        return new org.springframework.transaction.support.TransactionTemplate(txManager)
+                .execute(status -> work.get());
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            if (!latch.await(30, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("timed out waiting for the test to release the transaction");
+            }
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(ex);
+        }
+    }
+
+    /** A task that has not completed within the window is waiting on the lock. */
+    private static boolean blocksOn(Future<?> future) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(BLOCK_OBSERVATION_MS);
+        while (System.nanoTime() < deadline) {
+            if (future.isDone()) {
+                return false;
+            }
+            Thread.sleep(25);
+        }
+        return !future.isDone();
+    }
+
     private void sendUserMessage(String message) {
         sendUserMessageFor(MAIL, message);
     }
@@ -518,6 +665,12 @@ class SupportOutboxPostgresTest {
     private SupportOutboxStatus statusOfOnlyRow() {
         return SupportOutboxStatus.valueOf(jdbcTemplate.queryForObject(
                 "SELECT status FROM support_outbox_entity ORDER BY sequence_no LIMIT 1", String.class));
+    }
+
+    private long sequenceNoOfPayload(String text) {
+        return jdbcTemplate.queryForObject(
+                "SELECT sequence_no FROM support_outbox_entity WHERE payload LIKE ?",
+                Long.class, "%\"text\":\"" + text + "\"%");
     }
 
     private int attemptCountOfOnlyRow() {

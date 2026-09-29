@@ -311,7 +311,7 @@ class UserSupplyServiceTest {
 
         when(orderGroupEntityRepository.findByIdAndUserIdForUpdate(92L, user.getId()))
                 .thenReturn(Optional.empty());
-        when(orderEntityRepository.findByIdAndUserIdForUpdate(92L, user.getId()))
+        when(orderEntityRepository.findByIdAndUserIdAndOrderGroupIsNullForUpdate(92L, user.getId()))
                 .thenReturn(Optional.of(legacyOrder));
 
         userSupplyService.cancelOrder(92L, TOKEN);
@@ -326,7 +326,7 @@ class UserSupplyServiceTest {
 
         when(orderGroupEntityRepository.findByIdAndUserIdForUpdate(93L, user.getId()))
                 .thenReturn(Optional.empty());
-        when(orderEntityRepository.findByIdAndUserIdForUpdate(93L, user.getId()))
+        when(orderEntityRepository.findByIdAndUserIdAndOrderGroupIsNullForUpdate(93L, user.getId()))
                 .thenReturn(Optional.empty());
 
         assertThrows(GeneralException.class, () -> userSupplyService.cancelOrder(93L, TOKEN));
@@ -564,7 +564,7 @@ class UserSupplyServiceTest {
         String result = userSupplyService.getOrderStatusByOrderId(500L, TOKEN);
 
         assertEquals("Pending", result);
-        verify(orderEntityRepository, never()).findByIdAndUserId(any(), any());
+        verify(orderEntityRepository, never()).findByIdAndUserIdAndOrderGroupIsNull(any(), any());
     }
 
     @Test
@@ -576,7 +576,7 @@ class UserSupplyServiceTest {
         legacyOrder.setStatus("Delivered");
 
         when(orderGroupEntityRepository.findByIdAndUserId(501L, user.getId())).thenReturn(Optional.empty());
-        when(orderEntityRepository.findByIdAndUserId(501L, user.getId())).thenReturn(Optional.of(legacyOrder));
+        when(orderEntityRepository.findByIdAndUserIdAndOrderGroupIsNull(501L, user.getId())).thenReturn(Optional.of(legacyOrder));
 
         String result = userSupplyService.getOrderStatusByOrderId(501L, TOKEN);
 
@@ -588,7 +588,7 @@ class UserSupplyServiceTest {
         stubAuthenticatedUser();
 
         when(orderGroupEntityRepository.findByIdAndUserId(999L, user.getId())).thenReturn(Optional.empty());
-        when(orderEntityRepository.findByIdAndUserId(999L, user.getId())).thenReturn(Optional.empty());
+        when(orderEntityRepository.findByIdAndUserIdAndOrderGroupIsNull(999L, user.getId())).thenReturn(Optional.empty());
 
         assertThrows(GeneralException.class, () -> userSupplyService.getOrderStatusByOrderId(999L, TOKEN));
     }

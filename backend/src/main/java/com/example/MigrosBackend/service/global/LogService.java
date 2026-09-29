@@ -34,11 +34,21 @@ public class LogService {
      * {@code remoteAddr} is returned unchanged, which means a forged header can
      * never spoof the address recorded next to a login failure.
      *
-     * <p>The left-most entry of the chain is used because each trusted proxy
-     * appends to the header, so the left-most value is the original client.
-     * The right-most value (the hop closest to this application) is deliberately
-     * ignored: an untrusted hop in front of the trusted proxy could have
-     * prepended a forged value.
+     * <p>When the header <em>is</em> consulted, the chain is walked from the
+     * right and the first entry that is not itself a trusted proxy wins. Every
+     * proxy <em>appends</em> to the header - the bundled Nginx config uses
+     * {@code $proxy_add_x_forwarded_for} - so the entries on the right are the
+     * ones written by infrastructure and the entries on the left are whatever
+     * the client sent. Taking the left-most value, as this used to, therefore
+     * attributes the failure to an address the caller chose: a client that sends
+     * {@code X-Forwarded-For: 198.51.100.7} through one honest proxy produces a
+     * chain of {@code 198.51.100.7, <real client>} and the log records the
+     * forged address.
+     *
+     * <p>Everything is fail-closed: a malformed entry, an over-long header, or a
+     * chain consisting only of trusted proxies falls back to the peer address.
+     * Hostnames are never resolved, so a crafted header cannot turn this into a
+     * DNS lookup.
      */
     public String getClientIp(HttpServletRequest request) {
         if (request == null) {
@@ -58,11 +68,24 @@ public class LogService {
             return remoteAddress;
         }
 
-        String clientAddress = normalize(forwardedHeader.split(",", MAX_FORWARDED_HOPS)[0]);
-        if (clientAddress.isEmpty() || !isIpLiteral(clientAddress)) {
-            return remoteAddress;
+        String[] hops = forwardedHeader.split(",", MAX_FORWARDED_HOPS);
+        for (int i = 0; i < hops.length; i++) {
+            String hop = normalize(hops[hops.length - 1 - i]);
+            if (hop.isEmpty()) {
+                continue;
+            }
+            if (!isIpLiteral(hop)) {
+                // A hop that is not an address means the chain cannot be walked
+                // with any confidence; trusting the rest of it would be guessing.
+                return remoteAddress;
+            }
+            if (!trustedProxies.trusts(hop)) {
+                return hop;
+            }
         }
-        return clientAddress;
+        // Every hop is a trusted proxy, so the peer itself is the closest thing
+        // to an origin address this deployment can attest to.
+        return remoteAddress;
     }
 
     private static boolean isIpLiteral(String value) {

@@ -109,7 +109,7 @@ class UserOrderServiceTest {
         legacyOrder.setStatus("Pending");
 
         when(orderGroupEntityRepository.findByIdForUpdate(300L)).thenReturn(Optional.empty());
-        when(orderEntityRepository.findByIdForUpdate(300L)).thenReturn(Optional.of(legacyOrder));
+        when(orderEntityRepository.findByIdAndOrderGroupIsNullForUpdate(300L)).thenReturn(Optional.of(legacyOrder));
 
         userOrderService.deleteOrder(300L);
 
@@ -126,7 +126,7 @@ class UserOrderServiceTest {
         legacyOrder.setStatus("Delivered");
 
         when(orderGroupEntityRepository.findByIdForUpdate(301L)).thenReturn(Optional.empty());
-        when(orderEntityRepository.findByIdForUpdate(301L)).thenReturn(Optional.of(legacyOrder));
+        when(orderEntityRepository.findByIdAndOrderGroupIsNullForUpdate(301L)).thenReturn(Optional.of(legacyOrder));
 
         userOrderService.deleteOrder(301L);
 
@@ -139,7 +139,7 @@ class UserOrderServiceTest {
     @Test
     void deleteOrder_ThrowsWhenNeitherAGroupNorALegacyOrderExists() {
         when(orderGroupEntityRepository.findByIdForUpdate(999L)).thenReturn(Optional.empty());
-        when(orderEntityRepository.findByIdForUpdate(999L)).thenReturn(Optional.empty());
+        when(orderEntityRepository.findByIdAndOrderGroupIsNullForUpdate(999L)).thenReturn(Optional.empty());
 
         assertThrows(OrderNotFoundException.class, () -> userOrderService.deleteOrder(999L));
     }
@@ -214,7 +214,7 @@ class UserOrderServiceTest {
         legacyOrder.setStatus("Pending");
 
         when(orderGroupEntityRepository.findByIdForUpdate(400L)).thenReturn(Optional.empty());
-        when(orderEntityRepository.findByIdForUpdate(400L)).thenReturn(Optional.of(legacyOrder));
+        when(orderEntityRepository.findByIdAndOrderGroupIsNullForUpdate(400L)).thenReturn(Optional.of(legacyOrder));
 
         userOrderService.updateOrderStatus(400L, "Delivered");
 
@@ -226,7 +226,7 @@ class UserOrderServiceTest {
     @Test
     void updateOrderStatus_ThrowsWhenTheOrderDoesNotExist() {
         when(orderGroupEntityRepository.findByIdForUpdate(500L)).thenReturn(Optional.empty());
-        when(orderEntityRepository.findByIdForUpdate(500L)).thenReturn(Optional.empty());
+        when(orderEntityRepository.findByIdAndOrderGroupIsNullForUpdate(500L)).thenReturn(Optional.empty());
 
         assertThrows(OrderNotFoundException.class, () -> userOrderService.updateOrderStatus(500L, "Shipped"));
     }

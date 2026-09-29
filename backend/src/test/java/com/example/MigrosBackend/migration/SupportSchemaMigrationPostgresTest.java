@@ -1,6 +1,7 @@
 package com.example.MigrosBackend.migration;
 
 import org.flywaydb.core.Flyway;
+import org.flywaydb.core.api.MigrationVersion;
 import org.flywaydb.core.api.output.MigrateResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -101,6 +102,42 @@ class SupportSchemaMigrationPostgresTest {
                     "INSERT INTO support_outbox_entity (event_id, event_type, user_mail, payload, status, "
                             + "attempt_count, next_attempt_at, created_at) "
                             + "VALUES ('e', 'CUSTOMER_MESSAGE_CREATED', 'a@b.c', '{}', 'NOT_A_STATUS', 0, now(), now())"));
+
+            // V8 removed the terminal state: parking an event terminally both
+            // lost it and unblocked its customer's queue behind it.
+            assertThrows(SQLException.class, () -> execute(connection,
+                    "INSERT INTO support_outbox_entity (event_id, event_type, user_mail, payload, status, "
+                            + "attempt_count, next_attempt_at, created_at) "
+                            + "VALUES ('terminal', 'CUSTOMER_MESSAGE_CREATED', 'a@b.c', '{}', 'FAILED', 0, now(), now())"));
+        }
+    }
+
+    @Test
+    void eventsParkedAsTerminalByThePreviousSchemaBecomeRetryableAgain() throws SQLException {
+        migrateTo("7");
+
+        // The shape V7 left behind: an event the worker gave up on.
+        try (Connection connection = openConnection()) {
+            execute(connection, insertOutbox("gave-up", "FAILED"));
+        }
+
+        MigrateResult result = migrate();
+        assertEquals(1, result.migrationsExecuted, "only V8 should still be pending here");
+
+        try (Connection connection = openConnection()) {
+            try (Statement statement = connection.createStatement();
+                 ResultSet rs = statement.executeQuery(
+                         "SELECT status, next_attempt_at <= now() FROM support_outbox_entity "
+                                 + "WHERE event_id = 'gave-up'")) {
+                assertTrue(rs.next());
+                assertEquals("PENDING", rs.getString("status"),
+                        "an event the receiver never acknowledged is still owed and must be retried");
+                assertTrue(rs.getBoolean(2),
+                        "a re-armed event must not sit out a backoff nobody is waiting for");
+            }
+
+            assertThrows(SQLException.class, () -> execute(connection, insertOutbox("again", "FAILED")),
+                    "the terminal state must not be reintroducible after the upgrade");
         }
     }
 
@@ -149,9 +186,13 @@ class SupportSchemaMigrationPostgresTest {
     }
 
     private String insertOutbox(String eventId) {
+        return insertOutbox(eventId, "PENDING");
+    }
+
+    private String insertOutbox(String eventId, String status) {
         return "INSERT INTO support_outbox_entity (event_id, event_type, user_mail, payload, status, "
                 + "attempt_count, next_attempt_at, created_at) VALUES ('" + eventId
-                + "', 'CUSTOMER_MESSAGE_CREATED', 'a@b.c', '{}', 'PENDING', 0, now(), now())";
+                + "', 'CUSTOMER_MESSAGE_CREATED', 'a@b.c', '{}', '" + status + "', 0, now() + interval '1 hour', now())";
     }
 
     private void createLegacySchemaWithPendingTokens() throws SQLException {
@@ -173,6 +214,18 @@ class SupportSchemaMigrationPostgresTest {
                 .locations("classpath:db/migration")
                 .baselineOnMigrate(true)
                 .baselineVersion("0")
+                .load()
+                .migrate();
+    }
+
+    /** Stops at a given version, to reproduce the schema of a past release. */
+    private MigrateResult migrateTo(String version) {
+        return Flyway.configure()
+                .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
+                .locations("classpath:db/migration")
+                .baselineOnMigrate(true)
+                .baselineVersion("0")
+                .target(MigrationVersion.fromVersion(version))
                 .load()
                 .migrate();
     }

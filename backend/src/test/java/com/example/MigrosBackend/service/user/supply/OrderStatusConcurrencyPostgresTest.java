@@ -173,19 +173,35 @@ class OrderStatusConcurrencyPostgresTest {
     }
 
     @Test
-    void theAdminOrderLookupBlocksWhileAnotherConnectionHoldsTheRow() throws Exception {
+    void theAdminLegacyOrderLookupBlocksWhileAnotherConnectionHoldsTheRow() throws Exception {
         UserEntity user = createUser("repo-order@migros.com");
         ProductEntity product = createProduct("RepoOrder", "10.00", 5);
-        OrderGroupEntity group = createPendingGroup(user, product, 1);
-        Long orderId = firstOrderId(group);
+        // Only a legacy line is reachable through the restricted fallback, so
+        // that is what the admin status path locks.
+        OrderEntity legacy = saveLegacyOrder(user, product, 1);
 
         Future<Boolean> lookup;
-        try (Connection blocker = holdOrderEntityRowLock(orderId)) {
-            lookup = submit(() -> inTransaction(() -> nonNull(orderEntityRepository.findByIdForUpdate(orderId))));
+        try (Connection blocker = holdOrderEntityRowLock(legacy.getId())) {
+            lookup = submit(() -> inTransaction(() ->
+                    nonNull(orderEntityRepository.findByIdAndOrderGroupIsNullForUpdate(legacy.getId()))));
             assertTrue(blocksOn(lookup),
-                    "findByIdForUpdate on an order must block while the row is locked");
+                    "findByIdAndOrderGroupIsNullForUpdate on a legacy order must block while the row is locked");
         }
         assertTrue(cancellationResult(lookup));
+    }
+
+    @Test
+    void theLegacyFallbackNeverReturnsALineThatBelongsToAnOrderGroup() {
+        UserEntity user = createUser("repo-foreign@migros.com");
+        ProductEntity product = createProduct("RepoForeign", "10.00", 5);
+        OrderGroupEntity group = createPendingGroup(user, product, 1);
+        Long groupedLineId = firstOrderId(group);
+
+        assertTrue(inTransaction(() ->
+                        orderEntityRepository.findByIdAndOrderGroupIsNullForUpdate(groupedLineId).isEmpty()),
+                "a line inside a group must never be reachable through the legacy fallback");
+        assertTrue(inTransaction(() ->
+                        orderEntityRepository.findByIdAndOrderGroupIsNull(groupedLineId).isEmpty()));
     }
 
     @Test
@@ -197,7 +213,7 @@ class OrderStatusConcurrencyPostgresTest {
         Future<Boolean> lookup;
         try (Connection blocker = holdOrderEntityRowLock(legacy.getId())) {
             lookup = submit(() -> inTransaction(() ->
-                    nonNull(orderEntityRepository.findByIdAndUserIdForUpdate(legacy.getId(), user.getId()))));
+                    nonNull(orderEntityRepository.findByIdAndUserIdAndOrderGroupIsNullForUpdate(legacy.getId(), user.getId()))));
             assertTrue(blocksOn(lookup),
                     "findByIdAndUserIdForUpdate must block while the row is locked");
         }
@@ -364,10 +380,88 @@ class OrderStatusConcurrencyPostgresTest {
         assertEquals(0, new BigDecimal("20.00").compareTo(page.getItems().get(0).getTotalPrice()));
     }
 
-    @Test
+@Test
     void deletingAnUnknownOrderReportsNotFound() {
         assertThrows(OrderNotFoundException.class,
                 () -> userOrderService.deleteOrder(987654L));
+    }
+
+    /**
+     * Group ids and order-line ids come from independent sequences.
+     *
+     * <p>An {@code orderId} may name an order group or a legacy order line, so
+     * every path that falls back from the group table to the line table is only
+     * safe if the fallback is restricted to lines that have no group at all.
+     * Otherwise a request for an order id that names nothing resolves to some
+     * unrelated group's line, and the caller restocks that line's products,
+     * changes its status, or is shown its owner's profile.
+     *
+     * <p>The collision is built deterministically: line 2 is created while
+     * group 2 exists, and group 2 is then deleted. What is left is a line id
+     * that matches no group.
+     */
+    @Test
+    void anIdThatNamesNoOrderNeverResolvesToALineInsideAnotherGroup() {
+        UserEntity owner = createUser("collide@migros.com");
+        UserEntity other = createUser("collide-other@migros.com");
+        ProductEntity product = createProduct("Collide", "10.00", 1);
+
+        OrderGroupEntity liveGroup = createPendingGroup(owner, product, 1);
+        OrderGroupEntity doomedGroup = createPendingGroup(owner, product, 0);
+        OrderEntity collidingLine = saveLine(liveGroup, owner, product, 1);
+        Long collidingLineId = collidingLine.getId();
+        Long doomedGroupId = doomedGroup.getId();
+
+        orderGroupEntityRepository.delete(doomedGroup);
+        orderGroupEntityRepository.flush();
+        assertTrue(orderGroupEntityRepository.findById(doomedGroupId).isEmpty(),
+                "the colliding id must name no group for this test to mean anything");
+        assertEquals(doomedGroupId, collidingLineId,
+                "the line id has to collide with the deleted group id");
+
+        // An administrator status change must not reach the other group's line.
+        assertThrows(OrderNotFoundException.class,
+                () -> userOrderService.updateOrderStatus(doomedGroupId, "Shipped"));
+        assertEquals("Pending",
+                orderEntityRepository.findById(collidingLineId).orElseThrow().getStatus());
+
+        // Nor may a deletion restock and remove it.
+        assertThrows(OrderNotFoundException.class,
+                () -> userOrderService.deleteOrder(doomedGroupId));
+        assertTrue(orderEntityRepository.findById(collidingLineId).isPresent());
+        assertEquals(1, productEntityRepository.findById(product.getId()).orElseThrow().getProductCount());
+
+        // Nor may a customer's cancellation claim it, nor a status read expose it.
+        assertThrows(GeneralException.class, () -> userSupplyService.cancelOrder(
+                doomedGroupId, tokenService.generateUserToken(other.getUserMail())));
+        assertThrows(GeneralException.class, () -> userSupplyService.cancelOrder(
+                doomedGroupId, tokenService.generateUserToken(owner.getUserMail())));
+        assertTrue(orderEntityRepository.findById(collidingLineId).isPresent());
+
+        assertThrows(GeneralException.class, () -> userSupplyService.getOrderStatusByOrderId(
+                doomedGroupId, tokenService.generateUserToken(owner.getUserMail())));
+        assertThrows(OrderNotFoundException.class,
+                () -> userOrderService.getUserProfileData(doomedGroupId));
+
+        assertEquals(1, productEntityRepository.findById(product.getId()).orElseThrow().getProductCount(),
+                "nothing about an order that does not exist may change live stock");
+    }
+
+    @Test
+    void aGenuineLegacyOrderIsStillResolvedByTheRestrictedFallback() {
+        UserEntity user = createUser("real-legacy@migros.com");
+        ProductEntity product = createProduct("RealLegacy", "10.00", 1);
+        OrderEntity legacy = saveLegacyOrder(user, product, 1);
+        String token = tokenService.generateUserToken(user.getUserMail());
+
+        assertEquals("Pending", userSupplyService.getOrderStatusByOrderId(legacy.getId(), token));
+
+        userOrderService.updateOrderStatus(legacy.getId(), "Shipped");
+        assertEquals("Shipped", orderEntityRepository.findById(legacy.getId()).orElseThrow().getStatus());
+
+        assertEquals("Tester",
+                userOrderService.getUserProfileData(legacy.getId()).getUserFirstName(),
+                "restricting the fallback must not stop real legacy orders from resolving");
     }
 
     private boolean attempt(Runnable action) {
@@ -396,7 +490,6 @@ class OrderStatusConcurrencyPostgresTest {
         return new org.springframework.transaction.support.TransactionTemplate(txManager)
                 .execute(status -> work.get());
     }
-
 
     private static boolean cancellationResult(Future<Boolean> future) throws Exception {
         return future.get(30, TimeUnit.SECONDS);
@@ -467,10 +560,11 @@ class OrderStatusConcurrencyPostgresTest {
         return orderEntityRepository.saveAndFlush(legacy);
     }
 
-    private UserEntity createUser(String mail) {
+private UserEntity createUser(String mail) {
 
         UserEntity user = new UserEntity();
         user.setUserMail(mail);
+        user.setUserName("Tester");
         user.setBanned(false);
         user.setProductsIdsInCart(new ArrayList<>());
         return userEntityRepository.saveAndFlush(user);
@@ -509,7 +603,7 @@ class OrderStatusConcurrencyPostgresTest {
         return group;
     }
 
-    private void saveLine(OrderGroupEntity group, UserEntity user, ProductEntity product, int count) {
+private OrderEntity saveLine(OrderGroupEntity group, UserEntity user, ProductEntity product, int count) {
         OrderEntity line = new OrderEntity();
         line.setUserEntity(user);
         line.setOrderGroup(group);
@@ -519,6 +613,6 @@ class OrderStatusConcurrencyPostgresTest {
         line.setPrice(product.getProductPrice());
         line.setTotalPrice(product.getProductPrice().multiply(BigDecimal.valueOf(count)));
         line.setStatus(group.getStatus());
-        orderEntityRepository.saveAndFlush(line);
+        return orderEntityRepository.saveAndFlush(line);
     }
 }

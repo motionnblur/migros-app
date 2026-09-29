@@ -255,6 +255,11 @@ public class UserSupplyService {
      * <p>The ownership check and the lock are one statement, so ownership cannot
      * change between them. Status strings are unchanged, preserving the existing
      * API contract.
+     *
+     * <p>The legacy fallback only considers order lines that have no order
+     * group. Group ids and line ids are independent sequences, so an
+     * unrestricted "the line with this id" lookup could cancel - and restock -
+     * a line belonging to a completely different order.
      */
     @Transactional
     public void cancelOrder(Long orderId, String token) {
@@ -276,7 +281,7 @@ public class UserSupplyService {
             return;
         }
 
-        OrderEntity legacyOrder = orderEntityRepository.findByIdAndUserIdForUpdate(orderId, user.getId())
+        OrderEntity legacyOrder = orderEntityRepository.findByIdAndUserIdAndOrderGroupIsNullForUpdate(orderId, user.getId())
                 .orElseThrow(() -> new GeneralException("Order not found"));
 
         if (!OrderStatus.isPending(legacyOrder.getStatus())) {
