@@ -11,6 +11,7 @@ import com.example.MigrosBackend.websocket.SupportChatWebSocketHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -21,6 +22,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -209,9 +211,15 @@ class SupportChatServiceEditMessageTest {
 
         assertEquals("updated user text", entity.getMessage());
         assertNotNull(entity.getEditedAt());
-        verify(supportMessageEntityRepository).save(entity);
-        verify(supportInternalEventService).publishSupportMessageEdited("user@mail.com", "22", "updated user text");
-        verify(supportChatWebSocketHandler).broadcastSupportUpdate("user@mail.com");
+        InOrder notificationOrder = inOrder(
+                supportMessageEntityRepository,
+                supportInternalEventService,
+                supportChatWebSocketHandler
+        );
+        notificationOrder.verify(supportMessageEntityRepository).save(entity);
+        notificationOrder.verify(supportInternalEventService)
+                .publishSupportMessageEdited("user@mail.com", "22", "updated user text");
+        notificationOrder.verify(supportChatWebSocketHandler).broadcastSupportUpdate("user@mail.com");
     }
 
     @Test
@@ -263,9 +271,15 @@ class SupportChatServiceEditMessageTest {
 
         supportChatService.deleteMessageForAdmin("user@mail.com", 41L);
 
-        verify(supportMessageEntityRepository).delete(entity);
-        verify(supportInternalEventService).publishSupportMessageDeleted("user@mail.com", "41");
-        verify(supportChatWebSocketHandler).broadcastSupportUpdate("user@mail.com");
+        InOrder notificationOrder = inOrder(
+                supportMessageEntityRepository,
+                supportInternalEventService,
+                supportChatWebSocketHandler
+        );
+        notificationOrder.verify(supportMessageEntityRepository).delete(entity);
+        notificationOrder.verify(supportInternalEventService)
+                .publishSupportMessageDeleted("user@mail.com", "41");
+        notificationOrder.verify(supportChatWebSocketHandler).broadcastSupportUpdate("user@mail.com");
     }
 
     @Test

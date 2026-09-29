@@ -29,7 +29,7 @@ public class SupportChatService {
     private final UserEntityRepository userEntityRepository;
     private final TokenService tokenService;
     private final SupportChatWebSocketHandler supportChatWebSocketHandler;
-    private final SupportInternalEventService supportInternalEventService;
+    private final SupportChatNotificationCoordinator notificationCoordinator;
 
     @Autowired
     public SupportChatService(SupportMessageEntityRepository supportMessageEntityRepository,
@@ -41,7 +41,10 @@ public class SupportChatService {
         this.userEntityRepository = userEntityRepository;
         this.tokenService = tokenService;
         this.supportChatWebSocketHandler = supportChatWebSocketHandler;
-        this.supportInternalEventService = supportInternalEventService;
+        this.notificationCoordinator = new SupportChatNotificationCoordinator(
+                supportChatWebSocketHandler,
+                supportInternalEventService
+        );
     }
 
     public List<SupportMessageDto> getMessagesForUser(String token) {
@@ -49,10 +52,7 @@ public class SupportChatService {
         UserEntity user = userEntityRepository.findByUserMail(userMail);
         assertNotBanned(user);
 
-        return supportMessageEntityRepository.findByUserMailOrderByCreatedAtAscIdAsc(userMail)
-                .stream()
-                .map(this::mapToDto)
-                .toList();
+        return getMappedMessagesForUserMail(userMail);
     }
 
     public void addUserMessage(String token, String message) {
@@ -71,8 +71,7 @@ public class SupportChatService {
         entity.setMessage(trimmedMessage);
         entity = supportMessageEntityRepository.save(entity);
 
-        supportInternalEventService.publishCustomerMessageCreated(entity);
-        supportChatWebSocketHandler.broadcastSupportUpdate(userMail);
+        notificationCoordinator.publishCustomerMessageCreated(entity, userMail);
     }
 
     public List<SupportMessageDto> getMessagesForUserMail(String userMail) {
@@ -81,9 +80,13 @@ public class SupportChatService {
             throw new UserNotFoundException(userMail);
         }
 
+        return getMappedMessagesForUserMail(userMail);
+    }
+
+    private List<SupportMessageDto> getMappedMessagesForUserMail(String userMail) {
         return supportMessageEntityRepository.findByUserMailOrderByCreatedAtAscIdAsc(userMail)
                 .stream()
-                .map(this::mapToDto)
+                .map(SupportMessageMapper::toDto)
                 .toList();
     }
 
@@ -168,7 +171,7 @@ public class SupportChatService {
         entity.setMessage(trimmedMessage);
         entity.setExternalMessageId(safeTrimToNull(externalMessageId));
         entity = supportMessageEntityRepository.save(entity);
-        supportChatWebSocketHandler.broadcastSupportMessageCreated(userMail, "MANAGEMENT", entity.getId());
+        notificationCoordinator.broadcastSupportMessageCreated(userMail, "MANAGEMENT", entity.getId());
     }
     @Transactional
     public void editManagementMessage(String userMail, String externalMessageId, String message) {
@@ -198,7 +201,7 @@ public class SupportChatService {
         entity.setMessage(trimmedMessage);
         entity.setEditedAt(LocalDateTime.now());
         supportMessageEntityRepository.save(entity);
-        supportChatWebSocketHandler.broadcastSupportUpdate(userMail);
+        notificationCoordinator.broadcastSupportUpdate(userMail);
     }
     @Transactional
     public void deleteManagementMessage(String userMail, String externalMessageId) {
@@ -221,7 +224,7 @@ public class SupportChatService {
         }
 
         supportMessageEntityRepository.delete(entity);
-        supportChatWebSocketHandler.broadcastSupportUpdate(userMail);
+        notificationCoordinator.broadcastSupportUpdate(userMail);
     }
     @Transactional
     public void editMessageForAdmin(String userMail, Long messageId, String message) {
@@ -253,8 +256,7 @@ public class SupportChatService {
         entity.setEditedAt(LocalDateTime.now());
         supportMessageEntityRepository.save(entity);
 
-        supportInternalEventService.publishSupportMessageEdited(userMail, supportServiceMessageId, trimmedMessage);
-        supportChatWebSocketHandler.broadcastSupportUpdate(userMail);
+        notificationCoordinator.publishSupportMessageEdited(userMail, supportServiceMessageId, trimmedMessage);
     }
     @Transactional
     public void deleteMessageForAdmin(String userMail, Long messageId) {
@@ -278,8 +280,7 @@ public class SupportChatService {
         String supportServiceMessageId = resolveSupportServiceMessageId(entity, "delete");
 
         supportMessageEntityRepository.delete(entity);
-        supportInternalEventService.publishSupportMessageDeleted(userMail, supportServiceMessageId);
-        supportChatWebSocketHandler.broadcastSupportUpdate(userMail);
+        notificationCoordinator.publishSupportMessageDeleted(userMail, supportServiceMessageId);
     }
     @Transactional
     public void closeChat(String userMail) {
@@ -291,7 +292,7 @@ public class SupportChatService {
         List<SupportMessageEntity> messages = supportMessageEntityRepository.findByUserMailOrderByCreatedAtAscIdAsc(userMail);
         if (!messages.isEmpty()) {
             supportMessageEntityRepository.deleteAllInBatch(messages);
-            supportChatWebSocketHandler.broadcastSupportUpdate(userMail);
+            notificationCoordinator.broadcastSupportUpdate(userMail);
         }
     }
 
@@ -303,7 +304,7 @@ public class SupportChatService {
 
         user.setBanned(true);
         userEntityRepository.save(user);
-        supportChatWebSocketHandler.broadcastSupportUpdate(userMail);
+        notificationCoordinator.broadcastSupportUpdate(userMail);
     }
 
     public void unbanUser(String userMail) {
@@ -314,7 +315,7 @@ public class SupportChatService {
 
         user.setBanned(false);
         userEntityRepository.save(user);
-        supportChatWebSocketHandler.broadcastSupportUpdate(userMail);
+        notificationCoordinator.broadcastSupportUpdate(userMail);
     }
 
     private String getValidUserMailFromToken(String token) {
@@ -338,16 +339,6 @@ public class SupportChatService {
         if (Boolean.TRUE.equals(user.getBanned())) {
             throw new SupportUserBannedException("User is banned. Sending messages is disabled.");
         }
-    }
-
-    private SupportMessageDto mapToDto(SupportMessageEntity entity) {
-        return new SupportMessageDto(
-                entity.getId(),
-                entity.getSender(),
-                entity.getMessage(),
-                entity.getCreatedAt(),
-                entity.getEditedAt()
-        );
     }
 
     private boolean isEditableByAdmin(String sender) {

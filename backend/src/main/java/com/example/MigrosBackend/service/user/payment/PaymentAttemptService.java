@@ -117,7 +117,7 @@ public class PaymentAttemptService {
             return describe(attempt, PaymentClaimDecision.FINALIZED, null);
         }
         if (state == PaymentAttemptStatus.CHARGE_SUCCEEDED) {
-            if (hasValidLease(attempt, now)) {
+            if (PaymentAttemptDecisionPolicy.hasValidLease(attempt, now)) {
                 // Another worker owns the finalization window; report FINALIZE
                 // without stealing its lease.
                 return describe(attempt, PaymentClaimDecision.FINALIZE, null);
@@ -127,7 +127,7 @@ public class PaymentAttemptService {
             return describe(attempt, PaymentClaimDecision.FINALIZE, leaseOwner);
         }
         if (state == PaymentAttemptStatus.PROCESSING) {
-            if (hasValidLease(attempt, now)) {
+            if (PaymentAttemptDecisionPolicy.hasValidLease(attempt, now)) {
                 return describe(attempt, PaymentClaimDecision.PENDING, null);
             }
             String leaseOwner = acquireLease(attempt, now);
@@ -147,7 +147,8 @@ public class PaymentAttemptService {
     public PaymentClaim describeAttempt(UUID attemptId) {
         PaymentAttemptEntity attempt = paymentAttemptEntityRepository.findByIdForUpdate(attemptId)
                 .orElseThrow(PaymentAttemptNotFoundException::new);
-        return describe(attempt, decisionFor(attempt.getStatus(), attempt, LocalDateTime.now()), null);
+        return describe(attempt, PaymentAttemptDecisionPolicy.forStatus(
+                attempt.getStatus(), attempt, LocalDateTime.now()), null);
     }
 
     /**
@@ -574,26 +575,13 @@ public class PaymentAttemptService {
         if (attempt == null) {
             return null;
         }
-        return describe(attempt, decisionFor(attempt.getStatus(), attempt, LocalDateTime.now()), null);
+        return describe(attempt, PaymentAttemptDecisionPolicy.forStatus(
+                attempt.getStatus(), attempt, LocalDateTime.now()), null);
     }
 
     @Transactional(readOnly = true)
     public List<UUID> findStaleAttemptIds(List<PaymentAttemptStatus> statuses, LocalDateTime before) {
         return paymentAttemptEntityRepository.findStaleIds(statuses, before);
-    }
-
-    private PaymentClaimDecision decisionFor(PaymentAttemptStatus state,
-                                             PaymentAttemptEntity attempt,
-                                             LocalDateTime now) {
-        return switch (state) {
-            case ORDER_FINALIZED, REFUNDED -> PaymentClaimDecision.FINALIZED;
-            case CHARGE_SUCCEEDED -> PaymentClaimDecision.FINALIZE;
-            case PROCESSING -> hasValidLease(attempt, now)
-                    ? PaymentClaimDecision.PENDING
-                    : PaymentClaimDecision.PROCEED;
-            case CREATED -> PaymentClaimDecision.PROCEED;
-            default -> PaymentClaimDecision.TERMINAL;
-        };
     }
 
     private PaymentAttemptEntity newAttempt(CheckoutEntity checkout,
@@ -681,12 +669,6 @@ public class PaymentAttemptService {
         }
         return paymentAttemptEntityRepository.findByIdForUpdate(attemptId)
                 .orElseThrow(PaymentAttemptNotFoundException::new);
-    }
-
-    private boolean hasValidLease(PaymentAttemptEntity attempt, LocalDateTime now) {
-        return attempt.getLeaseOwner() != null
-                && attempt.getLeaseExpiresAt() != null
-                && attempt.getLeaseExpiresAt().isAfter(now);
     }
 
     private void clearLease(PaymentAttemptEntity attempt) {

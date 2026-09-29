@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -121,6 +122,46 @@ class SupportChatServiceTest {
     }
 
     @Test
+    void addUserMessage_shouldPublishPersistedMessageBeforeBroadcast() {
+        LocalDateTime createdAt = LocalDateTime.of(2025, 3, 4, 5, 6);
+        when(tokenService.validateAndExtractUser(TOKEN)).thenReturn(USER_MAIL);
+        when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(user);
+        when(supportMessageEntityRepository.save(any(SupportMessageEntity.class))).thenAnswer(invocation -> {
+            SupportMessageEntity saved = invocation.getArgument(0);
+            saved.setId(42L);
+            saved.setCreatedAt(createdAt);
+            return saved;
+        });
+
+        supportChatService.addUserMessage(TOKEN, "  hello  ");
+
+        ArgumentCaptor<SupportMessageEntity> savedMessage = ArgumentCaptor.forClass(SupportMessageEntity.class);
+        InOrder sideEffects = inOrder(supportMessageEntityRepository, supportInternalEventService, supportChatWebSocketHandler);
+        sideEffects.verify(supportMessageEntityRepository).save(savedMessage.capture());
+        sideEffects.verify(supportInternalEventService).publishCustomerMessageCreated(savedMessage.getValue());
+        sideEffects.verify(supportChatWebSocketHandler).broadcastSupportUpdate(USER_MAIL);
+        assertEquals(42L, savedMessage.getValue().getId());
+        assertEquals("hello", savedMessage.getValue().getMessage());
+        assertEquals(createdAt, savedMessage.getValue().getCreatedAt());
+    }
+
+    @Test
+    void addUserMessage_shouldNotPublishOrBroadcastWhenPersistenceFails() {
+        when(tokenService.validateAndExtractUser(TOKEN)).thenReturn(USER_MAIL);
+        when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(user);
+        IllegalStateException persistenceFailure = new IllegalStateException("database unavailable");
+        when(supportMessageEntityRepository.save(any(SupportMessageEntity.class))).thenThrow(persistenceFailure);
+
+        IllegalStateException thrown = assertThrows(
+                IllegalStateException.class,
+                () -> supportChatService.addUserMessage(TOKEN, "hello")
+        );
+
+        assertSame(persistenceFailure, thrown);
+        verifyNoInteractions(supportInternalEventService, supportChatWebSocketHandler);
+    }
+
+    @Test
     void addUserMessage_shouldThrowUserNotFound_whenTokenUserMissing() {
         when(tokenService.validateAndExtractUser(TOKEN)).thenReturn(USER_MAIL);
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(null);
@@ -149,10 +190,13 @@ class SupportChatServiceTest {
     @Test
     void addManagementMessage_shouldPersistAndBroadcast() {
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(user);
-        when(supportMessageEntityRepository.save(any(SupportMessageEntity.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(supportMessageEntityRepository.save(any(SupportMessageEntity.class))).thenAnswer(invocation -> {
+            SupportMessageEntity saved = invocation.getArgument(0);
+            saved.setId(43L);
+            return saved;
+        });
 
-        supportChatService.addManagementMessage(USER_MAIL, " hi ");
+        supportChatService.addManagementMessage(USER_MAIL, " hi ", " external-43 ");
 
         ArgumentCaptor<SupportMessageEntity> captor = ArgumentCaptor.forClass(SupportMessageEntity.class);
         verify(supportMessageEntityRepository).save(captor.capture());
@@ -160,7 +204,10 @@ class SupportChatServiceTest {
         assertEquals(USER_MAIL, saved.getUserMail());
         assertEquals("MANAGEMENT", saved.getSender());
         assertEquals("hi", saved.getMessage());
-        verify(supportChatWebSocketHandler).broadcastSupportMessageCreated(USER_MAIL, "MANAGEMENT", null);
+        assertEquals("external-43", saved.getExternalMessageId());
+        InOrder sideEffects = inOrder(supportMessageEntityRepository, supportChatWebSocketHandler);
+        sideEffects.verify(supportMessageEntityRepository).save(saved);
+        sideEffects.verify(supportChatWebSocketHandler).broadcastSupportMessageCreated(USER_MAIL, "MANAGEMENT", 43L);
     }
 
     @Test
@@ -172,7 +219,10 @@ class SupportChatServiceTest {
 
     @Test
     void getMessagesForUserMail_shouldReturnMappedDtos() {
-        SupportMessageEntity message = new SupportMessageEntity(4L, USER_MAIL, "USER", "Hi", LocalDateTime.now());
+        LocalDateTime createdAt = LocalDateTime.of(2025, 3, 4, 5, 6);
+        LocalDateTime editedAt = LocalDateTime.of(2025, 3, 4, 5, 7);
+        SupportMessageEntity message = new SupportMessageEntity(4L, USER_MAIL, "USER", "Hi", createdAt);
+        message.setEditedAt(editedAt);
         when(userEntityRepository.findByUserMail(USER_MAIL)).thenReturn(user);
         when(supportMessageEntityRepository.findByUserMailOrderByCreatedAtAscIdAsc(USER_MAIL))
                 .thenReturn(Collections.singletonList(message));
@@ -182,6 +232,9 @@ class SupportChatServiceTest {
         assertEquals(1, result.size());
         assertEquals("USER", result.get(0).getSender());
         assertEquals("Hi", result.get(0).getMessage());
+        assertEquals(4L, result.get(0).getId());
+        assertEquals(createdAt, result.get(0).getCreatedAt());
+        assertEquals(editedAt, result.get(0).getEditedAt());
     }
 
     @Test

@@ -36,7 +36,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.UUID;
 
 /**
@@ -47,7 +46,6 @@ import java.util.UUID;
 @Service
 public class CheckoutService {
 
-    private static final int MONEY_SCALE = 2;
     private static final String ORDER_PENDING_STATUS = "Pending";
 
     private final TokenService tokenService;
@@ -105,7 +103,8 @@ public class CheckoutService {
             return toResponse(reusable);
         }
 
-        Map<Long, Integer> requestedQuantities = groupCartQuantities(user);
+        Map<Long, Integer> requestedQuantities = CheckoutCalculations.groupCartQuantities(
+                user.getProductsIdsInCart());
         if (requestedQuantities.isEmpty()) {
             throw new GeneralException("Cart is empty");
         }
@@ -137,8 +136,9 @@ public class CheckoutService {
                 throw new GeneralException("Insufficient stock for product: " + product.getProductName());
             }
 
-            BigDecimal unitPrice = effectiveUnitPrice(product);
-            BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(quantity)).setScale(MONEY_SCALE, RoundingMode.HALF_UP);
+            BigDecimal unitPrice = CheckoutCalculations.effectiveUnitPrice(product);
+            BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(quantity))
+                    .setScale(CheckoutCalculations.MONEY_SCALE, RoundingMode.HALF_UP);
 
             CheckoutItemEntity item = new CheckoutItemEntity();
             item.setCheckout(checkout);
@@ -151,7 +151,7 @@ public class CheckoutService {
 
             total = total.add(lineTotal);
         }
-        total = total.setScale(MONEY_SCALE, RoundingMode.HALF_UP);
+        total = total.setScale(CheckoutCalculations.MONEY_SCALE, RoundingMode.HALF_UP);
 
         StripeAmount stripeAmount = paymentAmountConverter.toStripeAmount(total);
         checkout.setTotalAmount(total);
@@ -326,7 +326,7 @@ public class CheckoutService {
         for (CheckoutItemEntity item : items) {
             snapshotTotal = snapshotTotal.add(item.getLineTotal());
         }
-        snapshotTotal = snapshotTotal.setScale(MONEY_SCALE, RoundingMode.HALF_UP);
+        snapshotTotal = snapshotTotal.setScale(CheckoutCalculations.MONEY_SCALE, RoundingMode.HALF_UP);
 
         if (snapshotTotal.compareTo(checkout.getTotalAmount()) != 0) {
             throw new GeneralException("Checkout total does not match its items");
@@ -334,7 +334,7 @@ public class CheckoutService {
 
         long computedMinor;
         try {
-            computedMinor = snapshotTotal.movePointRight(MONEY_SCALE).longValueExact();
+            computedMinor = snapshotTotal.movePointRight(CheckoutCalculations.MONEY_SCALE).longValueExact();
         } catch (ArithmeticException ex) {
             throw new GeneralException("Checkout total is out of range");
         }
@@ -394,42 +394,6 @@ public class CheckoutService {
         for (CheckoutItemEntity item : items) {
             productEntityRepository.incrementStock(item.getProductId(), item.getQuantity());
         }
-    }
-
-    private Map<Long, Integer> groupCartQuantities(UserEntity user) {
-        List<Long> cart = user.getProductsIdsInCart();
-        Map<Long, Integer> counts = new TreeMap<>();
-        if (cart == null) {
-            return counts;
-        }
-        for (Long productId : cart) {
-            if (productId != null) {
-                counts.merge(productId, 1, Integer::sum);
-            }
-        }
-        return counts;
-    }
-
-    private BigDecimal effectiveUnitPrice(ProductEntity product) {
-        BigDecimal price = product.getProductPrice();
-        if (price == null || price.signum() < 0 || price.stripTrailingZeros().scale() > MONEY_SCALE) {
-            throw new GeneralException("Product has an invalid price: " + product.getProductName());
-        }
-        BigDecimal discount = product.getProductDiscount();
-        if (discount == null) {
-            discount = BigDecimal.ZERO;
-        }
-        if (discount.signum() < 0 || discount.compareTo(BigDecimal.valueOf(100)) > 0) {
-            throw new GeneralException("Product has an invalid discount: " + product.getProductName());
-        }
-
-        BigDecimal normalized = price.setScale(MONEY_SCALE, RoundingMode.HALF_UP);
-        if (discount.signum() == 0) {
-            return normalized;
-        }
-        BigDecimal factor = BigDecimal.ONE.subtract(
-                discount.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP));
-        return normalized.multiply(factor).setScale(MONEY_SCALE, RoundingMode.HALF_UP);
     }
 
     private UserEntity lockAuthenticatedUser(String userToken) {

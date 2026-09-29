@@ -20,6 +20,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -111,6 +112,33 @@ class UserSignupServiceTest {
         verify(pendingSignupEntityRepository).deleteByUserMail(signupDto.getUserMail());
         verify(pendingSignupEntityRepository).save(any(PendingSignupEntity.class));
         verify(mailService).sendMimeMessage(eq(signupDto.getUserMail()), anyString(), anyString(), any(Context.class));
+    }
+
+    @Test
+    void signupFallsBackToMemoryAfterDatabaseSaveFailureAndConfirmsPendingSignup() throws Exception {
+        when(userEntityRepository.existsByUserMail(signupDto.getUserMail())).thenReturn(false);
+        when(passwordValidator.isPasswordStrongEnough(signupDto.getUserPassword())).thenReturn(true);
+        when(encryptService.getEncryptedPassword(signupDto.getUserPassword())).thenReturn("hashed_password");
+        doThrow(new IllegalStateException("database unavailable"))
+                .when(pendingSignupEntityRepository).save(any(PendingSignupEntity.class));
+
+        userSignupService.signup(signupDto);
+
+        String confirmationLink = lastConfirmationLink();
+        String token = confirmationLink.substring(confirmationLink.indexOf("token=") + "token=".length());
+
+        userSignupService.confirm(token);
+
+        InOrder signupOrder = inOrder(pendingSignupEntityRepository, mailService);
+        signupOrder.verify(pendingSignupEntityRepository).deleteByUserMail(SIGNUP_EMAIL);
+        signupOrder.verify(pendingSignupEntityRepository).save(any(PendingSignupEntity.class));
+        signupOrder.verify(mailService).sendMimeMessage(eq(SIGNUP_EMAIL), anyString(), anyString(), any(Context.class));
+        verify(userEntityRepository).save(argThat(user -> SIGNUP_EMAIL.equals(user.getUserMail())
+                && "hashed_password".equals(user.getUserPassword())));
+        verify(pendingSignupEntityRepository).deleteByUserMail(SIGNUP_EMAIL);
+        verify(pendingSignupEntityRepository, never()).findById(anyString());
+        verify(pendingSignupEntityRepository, never()).deleteById(anyString());
+        assertThrows(TokenNotFoundException.class, () -> userSignupService.confirm(token));
     }
 
     @Test

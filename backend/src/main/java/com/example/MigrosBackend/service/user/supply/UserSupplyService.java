@@ -1,6 +1,5 @@
 package com.example.MigrosBackend.service.user.supply;
 
-import com.example.MigrosBackend.dto.admin.panel.DescriptionsDto;
 import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionListDto;
 import com.example.MigrosBackend.dto.admin.panel.ProductDto2;
 import com.example.MigrosBackend.dto.user.category.SubCategoryDto;
@@ -8,19 +7,13 @@ import com.example.MigrosBackend.dto.user.order.UserOrderDetailDto;
 import com.example.MigrosBackend.dto.user.order.UserOrderGroupDto;
 import com.example.MigrosBackend.dto.user.product.ProductPreviewDto;
 import com.example.MigrosBackend.dto.user.product.UserCartItemDto;
-import com.example.MigrosBackend.entity.category.CategoryEntity;
-import com.example.MigrosBackend.entity.product.ProductDescriptionEntity;
 import com.example.MigrosBackend.entity.product.ProductEntity;
-import com.example.MigrosBackend.entity.product.ProductImageEntity;
 import com.example.MigrosBackend.entity.user.OrderEntity;
 import com.example.MigrosBackend.entity.user.OrderGroupEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.exception.admin.ProductNotFoundException;
 import com.example.MigrosBackend.exception.admin.UserNotFoundException;
-import com.example.MigrosBackend.exception.shared.FileNotFoundException;
 import com.example.MigrosBackend.exception.shared.GeneralException;
-import com.example.MigrosBackend.exception.user.CategoryHasNoProductException;
-import com.example.MigrosBackend.exception.user.CategoryNotFoundException;
 import com.example.MigrosBackend.repository.category.CategoryEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductDescriptionEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
@@ -32,16 +25,9 @@ import com.example.MigrosBackend.service.global.FileService;
 import com.example.MigrosBackend.service.global.TokenService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -51,15 +37,13 @@ import java.util.stream.Collectors;
 
 @Service
 public class UserSupplyService {
-    private final CategoryEntityRepository categoryEntityRepository;
     private final ProductEntityRepository productEntityRepository;
-    private final ProductImageEntityRepository productImageEntityRepository;
     private final UserEntityRepository userEntityRepository;
     private final TokenService tokenService;
     private final OrderEntityRepository orderEntityRepository;
     private final OrderGroupEntityRepository orderGroupEntityRepository;
-    private final ProductDescriptionEntityRepository productDescriptionEntityRepository;
-    private final FileService fileService;
+    private final UserCatalogReadService catalogReadService;
+    private final UserOrderHistoryReadService orderHistoryReadService;
 
     @Autowired
     public UserSupplyService(
@@ -73,105 +57,65 @@ public class UserSupplyService {
             ProductDescriptionEntityRepository productDescriptionEntityRepository,
             FileService fileService
     ) {
-        this.categoryEntityRepository = categoryEntityRepository;
         this.productEntityRepository = productEntityRepository;
-        this.productImageEntityRepository = productImageEntityRepository;
         this.userEntityRepository = userEntityRepository;
         this.tokenService = tokenService;
         this.orderEntityRepository = orderEntityRepository;
         this.orderGroupEntityRepository = orderGroupEntityRepository;
-        this.productDescriptionEntityRepository = productDescriptionEntityRepository;
-        this.fileService = fileService;
+        this.catalogReadService = new UserCatalogReadService(
+                categoryEntityRepository,
+                productEntityRepository,
+                productImageEntityRepository,
+                productDescriptionEntityRepository,
+                fileService
+        );
+        this.orderHistoryReadService = new UserOrderHistoryReadService(
+                userEntityRepository,
+                tokenService,
+                orderEntityRepository,
+                orderGroupEntityRepository,
+                productEntityRepository
+        );
     }
 
     public List<String> getAllCategoryNames() {
-        return categoryEntityRepository.findAll().stream().map(CategoryEntity::getCategoryName).toList();
+        return catalogReadService.getAllCategoryNames();
     }
 
     public List<ProductPreviewDto> getProductsFromCategory(Long categoryId, int page, int itemRange) {
-        boolean exists = categoryEntityRepository.existsById(categoryId);
-        if (!exists) {
-            throw new CategoryNotFoundException(categoryId.toString());
-        }
-
-        Pageable pageable = PageRequest.of(page, itemRange);
-        Page<ProductEntity> entities = productEntityRepository.findByCategoryEntityIdAndProductCountGreaterThan(categoryId, 0, pageable);
-        if (entities.isEmpty()) {
-            throw new CategoryHasNoProductException(categoryId.toString());
-        }
-
-        return entities.stream().map(this::toProductPreviewDto).collect(Collectors.toList());
+        return catalogReadService.getProductsFromCategory(categoryId, page, itemRange);
     }
 
     public List<ProductPreviewDto> getAllProducts(int page, int itemRange) {
-        Pageable pageable = PageRequest.of(page, itemRange);
-        Page<ProductEntity> entities = productEntityRepository.findByProductCountGreaterThan(0, pageable);
-        return entities.stream().map(this::toProductPreviewDto).collect(Collectors.toList());
+        return catalogReadService.getAllProducts(page, itemRange);
     }
 
     public int getAllProductCounts() {
-        return productEntityRepository.countByProductCountGreaterThan(0);
+        return catalogReadService.getAllProductCounts();
     }
 
     public List<String> getProductImageNames(Long itemId) {
-        List<ProductImageEntity> productImageEntity = productImageEntityRepository.findByProductEntityId(itemId);
-        return productImageEntity.stream().map(ProductImageEntity::getImagePath).toList();
+        return catalogReadService.getProductImageNames(itemId);
     }
 
     public Resource getProductImage(Long itemId) {
-        List<ProductImageEntity> images = productImageEntityRepository.findByProductEntityId(itemId);
-        if (images.isEmpty()) {
-            throw new FileNotFoundException();
-        }
-
-        String storedPath = images.get(0).getImagePath();
-
-        try {
-            Path resolvedPath = fileService.resolveImagePath(storedPath);
-            Resource resource = new UrlResource(resolvedPath.toUri());
-            if (resource.exists() && resource.isReadable()) {
-                return resource;
-            }
-            throw new FileNotFoundException();
-        } catch (Exception e) {
-            throw new GeneralException("Error while loading image");
-        }
+        return catalogReadService.getProductImage(itemId);
     }
 
     public int getProductCountsFromCategory(Long categoryId) {
-        boolean exists = categoryEntityRepository.existsById(categoryId);
-        if (!exists) {
-            throw new CategoryNotFoundException(categoryId.toString());
-        }
-        return productEntityRepository.countByCategoryEntityIdAndProductCountGreaterThan(categoryId, 0);
+        return catalogReadService.getProductCountsFromCategory(categoryId);
     }
 
     public List<SubCategoryDto> getSubCategories(Long categoryId) {
-        CategoryEntity categoryEntity = categoryEntityRepository.findById(categoryId)
-                .orElseThrow(() -> new CategoryNotFoundException(categoryId.toString()));
-
-        return categoryEntity.getItemEntities().stream()
-                .filter(itemEntity -> itemEntity.getProductCount() > 0)
-                .filter(itemEntity -> itemEntity.getSubcategoryName() != null && !itemEntity.getSubcategoryName().isEmpty())
-                .collect(Collectors.groupingBy(ProductEntity::getSubcategoryName, Collectors.counting()))
-                .entrySet().stream()
-                .map(entry -> {
-                    SubCategoryDto dto = new SubCategoryDto();
-                    dto.setSubCategoryId(categoryEntity.getId());
-                    dto.setSubCategoryName(entry.getKey());
-                    dto.setProductCount(entry.getValue().intValue());
-                    return dto;
-                }).collect(Collectors.toList());
+        return catalogReadService.getSubCategories(categoryId);
     }
 
     public List<ProductPreviewDto> getProductsFromSubcategory(String subcategoryName, int page, int productRange) {
-        Pageable pageable = PageRequest.of(page, productRange);
-        Page<ProductEntity> entities = productEntityRepository.findBySubcategoryNameAndProductCountGreaterThan(subcategoryName, 0, pageable);
-        return entities.stream().map(this::toProductPreviewDto).collect(Collectors.toList());
+        return catalogReadService.getProductsFromSubcategory(subcategoryName, page, productRange);
     }
 
     public int getProductCountsFromSubcategory(String subcategoryName) {
-        return productEntityRepository.countBySubcategoryNameAndProductCountGreaterThan(subcategoryName, 0);
+        return catalogReadService.getProductCountsFromSubcategory(subcategoryName);
     }
 
     public void addProductToInventory(Long productId, String token) {
@@ -183,11 +127,9 @@ public class UserSupplyService {
             throw new GeneralException("Product is out of stock.");
         }
 
-        if (user.getProductsIdsInCart() == null) {
-            user.setProductsIdsInCart(new ArrayList<>());
-        }
+        List<Long> productsIdsInCart = getOrInitializeCart(user);
 
-        long currentCountInCart = user.getProductsIdsInCart().stream()
+        long currentCountInCart = productsIdsInCart.stream()
                 .filter(id -> id.equals(productId))
                 .count();
 
@@ -195,7 +137,7 @@ public class UserSupplyService {
             throw new GeneralException("You cannot add more than available stock.");
         }
 
-        user.getProductsIdsInCart().add(productId);
+        productsIdsInCart.add(productId);
         userEntityRepository.save(user);
     }
 
@@ -236,7 +178,7 @@ public class UserSupplyService {
             UserCartItemDto dto = new UserCartItemDto();
             dto.setProductId(productEntity.getId());
             dto.setProductName(productEntity.getProductName());
-            dto.setProductPrice(getEffectivePrice(productEntity));
+            dto.setProductPrice(catalogReadService.getEffectivePrice(productEntity));
             dto.setProductCount(allowedCount);
             dto.setAvailableStock(productEntity.getProductCount());
             cartItems.add(dto);
@@ -251,28 +193,13 @@ public class UserSupplyService {
     }
 
     public ProductDto2 getProductData(Long productId) {
-        ProductEntity productEntity = productEntityRepository.findById(productId)
-                .orElseThrow(() -> new ProductNotFoundException(productId.toString()));
-
-        ProductDto2 productDto2 = new ProductDto2();
-        productDto2.setProductName(productEntity.getProductName());
-        productDto2.setSubCategoryName(productEntity.getSubcategoryName());
-        productDto2.setProductPrice(productEntity.getProductPrice());
-        productDto2.setProductCount(productEntity.getProductCount());
-        productDto2.setProductDiscount(productEntity.getProductDiscount());
-        productDto2.setProductDescription(productEntity.getProductDescription());
-        productDto2.setProductCategoryId(Math.toIntExact(productEntity.getCategoryEntity().getId()));
-        return productDto2;
+        return catalogReadService.getProductData(productId);
     }
 
     public void removeProductFromInventory(Long productId, String token) {
         UserEntity user = getValidatedUserFromToken(token);
 
-        if (user.getProductsIdsInCart() == null) {
-            user.setProductsIdsInCart(new ArrayList<>());
-        }
-
-        user.getProductsIdsInCart().removeAll(Collections.singleton(productId));
+        getOrInitializeCart(user).removeAll(Collections.singleton(productId));
         userEntityRepository.save(user);
     }
 
@@ -293,37 +220,21 @@ public class UserSupplyService {
             throw new GeneralException("You cannot add more than available stock.");
         }
 
-        if (user.getProductsIdsInCart() == null) {
-            user.setProductsIdsInCart(new ArrayList<>());
-        }
+        List<Long> productsIdsInCart = getOrInitializeCart(user);
 
-        user.getProductsIdsInCart().removeAll(Collections.singleton(productId));
+        productsIdsInCart.removeAll(Collections.singleton(productId));
         for (int i = 0; i < count; i++) {
-            user.getProductsIdsInCart().add(productId);
+            productsIdsInCart.add(productId);
         }
         userEntityRepository.save(user);
     }
 
     public List<Long> getAllOrderIds(String token) {
-        UserEntity user = getValidatedUserFromToken(token);
-
-        List<Long> ids = new ArrayList<>();
-        ids.addAll(orderGroupEntityRepository.findByUserId(user.getId()).stream().map(OrderGroupEntity::getId).toList());
-        ids.addAll(orderEntityRepository.findByUserIdAndOrderGroupIsNull(user.getId()).stream().map(OrderEntity::getId).toList());
-        return ids.stream().distinct().toList();
+        return orderHistoryReadService.getAllOrderIds(token);
     }
 
     public String getOrderStatusByOrderId(Long orderId, String token) {
-        UserEntity user = getValidatedUserFromToken(token);
-
-        OrderGroupEntity orderGroup = orderGroupEntityRepository.findByIdAndUserId(orderId, user.getId()).orElse(null);
-        if (orderGroup != null) {
-            return orderGroup.getStatus();
-        }
-
-        OrderEntity legacyOrder = orderEntityRepository.findByIdAndUserId(orderId, user.getId())
-                .orElseThrow(() -> new GeneralException("Order not found"));
-        return legacyOrder.getStatus();
+        return orderHistoryReadService.getOrderStatusByOrderId(orderId, token);
     }
 
     @Transactional
@@ -358,161 +269,16 @@ public class UserSupplyService {
     }
 
     public ProductDescriptionListDto getProductDescription(Long productId) {
-        List<ProductDescriptionEntity> productDescriptionEntities = productDescriptionEntityRepository.findByProductEntityId(productId);
-        if (productDescriptionEntities == null) {
-            throw new ProductNotFoundException(productId.toString());
-        }
-
-        ProductDescriptionListDto productDescriptionDto = new ProductDescriptionListDto();
-        productDescriptionDto.setProductId(productId);
-        productDescriptionDto.setDescriptionList(new ArrayList<>());
-
-        for (ProductDescriptionEntity item : productDescriptionEntities) {
-            DescriptionsDto dto = new DescriptionsDto(item.getId(), item.getDescriptionTabName(), item.getDescriptionTabContent());
-            productDescriptionDto.getDescriptionList().add(dto);
-        }
-
-        return productDescriptionDto;
+        return catalogReadService.getProductDescription(productId);
     }
 
     public List<UserOrderDetailDto> getUserOrderDetails(String token) {
-        UserEntity user = getValidatedUserFromToken(token);
-
-        List<UserOrderDetailDto> result = new ArrayList<>();
-
-        List<OrderGroupEntity> groups = orderGroupEntityRepository.findByUserId(user.getId());
-        List<OrderEntity> legacyOrders = orderEntityRepository.findByUserIdAndOrderGroupIsNull(user.getId());
-
-        List<Long> productIds = new ArrayList<>();
-        productIds.addAll(groups.stream().flatMap(g -> g.getOrderItems().stream()).map(OrderEntity::getItemId).toList());
-        productIds.addAll(legacyOrders.stream().map(OrderEntity::getItemId).toList());
-
-        if (productIds.isEmpty()) {
-            return result;
-        }
-
-        Map<Long, ProductEntity> productMap = productEntityRepository.findAllById(productIds.stream().distinct().toList())
-                .stream()
-                .collect(Collectors.toMap(ProductEntity::getId, Function.identity()));
-
-        for (OrderGroupEntity group : groups) {
-            for (OrderEntity order : group.getOrderItems()) {
-                ProductEntity product = productMap.get(order.getItemId());
-                UserOrderDetailDto dto = new UserOrderDetailDto();
-                dto.setOrderId(order.getId());
-                dto.setProductId(order.getItemId());
-                dto.setProductName(product != null ? product.getProductName() : "");
-                dto.setCount(order.getCount());
-                dto.setPrice(order.getPrice());
-                dto.setTotalPrice(order.getTotalPrice());
-                dto.setStatus(group.getStatus());
-                result.add(dto);
-            }
-        }
-
-        for (OrderEntity legacy : legacyOrders) {
-            ProductEntity product = productMap.get(legacy.getItemId());
-            UserOrderDetailDto dto = new UserOrderDetailDto();
-            dto.setOrderId(legacy.getId());
-            dto.setProductId(legacy.getItemId());
-            dto.setProductName(product != null ? product.getProductName() : "");
-            dto.setCount(legacy.getCount());
-            dto.setPrice(legacy.getPrice());
-            dto.setTotalPrice(legacy.getTotalPrice());
-            dto.setStatus(legacy.getStatus());
-            result.add(dto);
-        }
-
-        return result;
+        return orderHistoryReadService.getUserOrderDetails(token);
     }
 
     public List<UserOrderGroupDto> getUserOrderGroups(String token) {
-        UserEntity user = getValidatedUserFromToken(token);
-
-        List<UserOrderGroupDto> result = new ArrayList<>();
-
-        List<OrderGroupEntity> groups = orderGroupEntityRepository.findByUserId(user.getId());
-        List<OrderEntity> legacyOrders = orderEntityRepository.findByUserIdAndOrderGroupIsNull(user.getId());
-
-        List<Long> productIds = new ArrayList<>();
-        productIds.addAll(groups.stream().flatMap(g -> g.getOrderItems().stream()).map(OrderEntity::getItemId).toList());
-        productIds.addAll(legacyOrders.stream().map(OrderEntity::getItemId).toList());
-
-        if (productIds.isEmpty()) {
-            return result;
-        }
-
-        Map<Long, ProductEntity> productMap = productEntityRepository.findAllById(productIds.stream().distinct().toList())
-                .stream()
-                .collect(Collectors.toMap(ProductEntity::getId, Function.identity()));
-
-        for (OrderGroupEntity group : groups) {
-            UserOrderGroupDto groupDto = new UserOrderGroupDto();
-            groupDto.setOrderGroupId(group.getId());
-            groupDto.setCreatedAt(group.getCreatedAt());
-
-            List<UserOrderDetailDto> items = new ArrayList<>();
-            for (OrderEntity order : group.getOrderItems()) {
-                ProductEntity product = productMap.get(order.getItemId());
-                UserOrderDetailDto dto = new UserOrderDetailDto();
-                dto.setOrderId(order.getId());
-                dto.setProductId(order.getItemId());
-                dto.setProductName(product != null ? product.getProductName() : "");
-                dto.setCount(order.getCount());
-                dto.setPrice(order.getPrice());
-                dto.setTotalPrice(order.getTotalPrice());
-                dto.setStatus(group.getStatus());
-                items.add(dto);
-            }
-            groupDto.setItems(items);
-            result.add(groupDto);
-        }
-
-        for (OrderEntity legacy : legacyOrders) {
-            ProductEntity product = productMap.get(legacy.getItemId());
-            UserOrderGroupDto groupDto = new UserOrderGroupDto();
-            groupDto.setOrderGroupId(legacy.getId());
-            groupDto.setCreatedAt(null);
-
-            UserOrderDetailDto dto = new UserOrderDetailDto();
-            dto.setOrderId(legacy.getId());
-            dto.setProductId(legacy.getItemId());
-            dto.setProductName(product != null ? product.getProductName() : "");
-            dto.setCount(legacy.getCount());
-            dto.setPrice(legacy.getPrice());
-            dto.setTotalPrice(legacy.getTotalPrice());
-            dto.setStatus(legacy.getStatus());
-            groupDto.setItems(List.of(dto));
-
-            result.add(groupDto);
-        }
-
-        result.sort((a, b) -> Long.compare(b.getOrderGroupId(), a.getOrderGroupId()));
-        return result;
+        return orderHistoryReadService.getUserOrderGroups(token);
     }
-
-
-
-    private BigDecimal getEffectivePrice(ProductEntity product) {
-        BigDecimal discount = product.getProductDiscount() == null ? BigDecimal.ZERO : product.getProductDiscount();
-        BigDecimal price = product.getProductPrice() == null ? BigDecimal.ZERO : product.getProductPrice();
-        BigDecimal normalizedPrice = price.setScale(2, RoundingMode.HALF_UP);
-        if (discount.signum() <= 0) {
-            return normalizedPrice;
-        }
-        BigDecimal factor = BigDecimal.ONE.subtract(discount.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP));
-        return normalizedPrice.multiply(factor).setScale(2, RoundingMode.HALF_UP);
-    }
-
-    private ProductPreviewDto toProductPreviewDto(ProductEntity itemEntity) {
-        ProductPreviewDto itemDto = new ProductPreviewDto();
-        itemDto.setProductId(itemEntity.getId());
-        itemDto.setProductName(itemEntity.getProductName());
-        itemDto.setProductPrice(getEffectivePrice(itemEntity));
-        itemDto.setProductCount(itemEntity.getProductCount());
-        return itemDto;
-    }
-
     private void restockProduct(Long productId, int amount) {
         if (amount <= 0) {
             return;
@@ -523,6 +289,14 @@ public class UserSupplyService {
             productEntityRepository.save(product);
         });
     }
+
+    private List<Long> getOrInitializeCart(UserEntity user) {
+        if (user.getProductsIdsInCart() == null) {
+            user.setProductsIdsInCart(new ArrayList<>());
+        }
+        return user.getProductsIdsInCart();
+    }
+
     private UserEntity getValidatedUserFromToken(String token) {
         String userName = tokenService.validateAndExtractUser(token);
 

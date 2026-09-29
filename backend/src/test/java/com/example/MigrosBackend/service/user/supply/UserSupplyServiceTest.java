@@ -25,6 +25,7 @@ import com.example.MigrosBackend.service.global.TokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -40,6 +41,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -126,6 +128,17 @@ class UserSupplyServiceTest {
 
         assertThrows(GeneralException.class, () -> userSupplyService.addProductToInventory(20L, TOKEN));
         verify(userEntityRepository, never()).save(any());
+    }
+
+    @Test
+    void removeProductFromInventory_ShouldInitializeNullCartAndSaveUser() {
+        stubAuthenticatedUser();
+        user.setProductsIdsInCart(null);
+
+        userSupplyService.removeProductFromInventory(20L, TOKEN);
+
+        assertEquals(List.of(), user.getProductsIdsInCart());
+        verify(userEntityRepository).save(user);
     }
 
     @Test
@@ -383,13 +396,27 @@ class UserSupplyServiceTest {
         assertEquals(201L, first.getOrderId());
         assertEquals(5001L, first.getProductId());
         assertEquals("Yogurt", first.getProductName());
+        assertEquals(2, first.getCount());
+        assertEquals(0, new BigDecimal("12.5").compareTo(first.getPrice()));
+        assertEquals(0, new BigDecimal("25").compareTo(first.getTotalPrice()));
         assertEquals("Delivered", first.getStatus());
 
         UserOrderDetailDto second = result.get(1);
         assertEquals(202L, second.getOrderId());
         assertEquals(5002L, second.getProductId());
         assertEquals("", second.getProductName());
+        assertEquals(1, second.getCount());
+        assertEquals(0, new BigDecimal("5").compareTo(second.getPrice()));
+        assertEquals(0, new BigDecimal("5").compareTo(second.getTotalPrice()));
         assertEquals("Pending", second.getStatus());
+
+        InOrder repositoryOrder = inOrder(tokenService, userEntityRepository, orderGroupEntityRepository,
+                orderEntityRepository, productEntityRepository);
+        repositoryOrder.verify(tokenService).validateAndExtractUser(TOKEN);
+        repositoryOrder.verify(userEntityRepository).findByUserMail(USER_MAIL);
+        repositoryOrder.verify(orderGroupEntityRepository).findByUserId(user.getId());
+        repositoryOrder.verify(orderEntityRepository).findByUserIdAndOrderGroupIsNull(user.getId());
+        repositoryOrder.verify(productEntityRepository).findAllById(List.of(5001L, 5002L));
     }
 
     @Test
@@ -447,12 +474,18 @@ class UserSupplyServiceTest {
         assertEquals(null, legacyGroup.getCreatedAt());
         assertEquals(1, legacyGroup.getItems().size());
         assertEquals("", legacyGroup.getItems().get(0).getProductName());
+        assertEquals(3, legacyGroup.getItems().get(0).getCount());
+        assertEquals(0, new BigDecimal("2").compareTo(legacyGroup.getItems().get(0).getPrice()));
+        assertEquals(0, new BigDecimal("6").compareTo(legacyGroup.getItems().get(0).getTotalPrice()));
         assertEquals("Pending", legacyGroup.getItems().get(0).getStatus());
 
         UserOrderGroupDto grouped = result.get(1);
         assertEquals(LocalDateTime.of(2026, 1, 1, 12, 0), grouped.getCreatedAt());
         assertEquals(1, grouped.getItems().size());
         assertEquals("Bread", grouped.getItems().get(0).getProductName());
+        assertEquals(1, grouped.getItems().get(0).getCount());
+        assertEquals(0, new BigDecimal("8").compareTo(grouped.getItems().get(0).getPrice()));
+        assertEquals(0, new BigDecimal("8").compareTo(grouped.getItems().get(0).getTotalPrice()));
         assertEquals("Shipped", grouped.getItems().get(0).getStatus());
     }
     @Test

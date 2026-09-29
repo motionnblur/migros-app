@@ -18,8 +18,6 @@ import com.example.MigrosBackend.service.global.EncryptService;
 import com.example.MigrosBackend.service.global.MailService;
 import com.example.MigrosBackend.service.global.TokenService;
 import jakarta.mail.MessagingException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -30,27 +28,18 @@ import org.thymeleaf.context.Context;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 @Service
 public class UserSignupService {
 
-    private static final Logger log = LoggerFactory.getLogger(UserSignupService.class);
-
     private final UserEntityRepository userEntityRepository;
-    private final PendingSignupEntityRepository pendingSignupEntityRepository;
+    private final PendingSignupStorage pendingSignupStorage;
     private final EncryptService encryptService;
     private final MailService mailService;
     private final TokenService tokenService;
     private final PasswordValidator passwordValidator;
     private final PublicUrlProperties publicUrlProperties;
     private final long confirmationTokenTtlMinutes;
-    private final ConcurrentHashMap<String, PendingSignupEntity> fallbackPendingSignups = new ConcurrentHashMap<>();
-    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-    private volatile boolean pendingSignupStorageAvailable = true;
 
     @Autowired
     public UserSignupService(UserEntityRepository userEntityRepository,
@@ -61,7 +50,7 @@ public class UserSignupService {
             PublicUrlProperties publicUrlProperties,
             @Value("${app.signup.confirmation.ttl-minutes:15}") long confirmationTokenTtlMinutes) {
         this.userEntityRepository = userEntityRepository;
-        this.pendingSignupEntityRepository = pendingSignupEntityRepository;
+        this.pendingSignupStorage = new PendingSignupStorage(pendingSignupEntityRepository, confirmationTokenTtlMinutes);
         this.encryptService = encryptService;
         this.mailService = mailService;
         this.tokenService = tokenService;
@@ -93,7 +82,7 @@ public class UserSignupService {
                 userEntityToCreate.getUserPassword(),
                 LocalDateTime.now().plusMinutes(confirmationTokenTtlMinutes)
         );
-        storePendingSignup(pendingSignup);
+        pendingSignupStorage.store(pendingSignup);
 
         Context context = new Context();
         context.setVariable("confirmationLink", confirmationLink);
@@ -120,13 +109,13 @@ public class UserSignupService {
 
     @Transactional
     public void confirm(String token) {
-        PendingSignupEntity pendingSignup = findPendingSignupByToken(token);
+        PendingSignupEntity pendingSignup = pendingSignupStorage.findByToken(token);
         if (pendingSignup == null) {
             throw new TokenNotFoundException();
         }
 
         if (pendingSignup.getExpiresAt() == null || pendingSignup.getExpiresAt().isBefore(LocalDateTime.now())) {
-            deletePendingSignup(token);
+            pendingSignupStorage.delete(token);
             throw new TokenNotFoundException();
         }
 
@@ -135,72 +124,20 @@ public class UserSignupService {
         userEntity.setUserPassword(pendingSignup.getUserPassword());
 
         userEntityRepository.save(userEntity);
-        deletePendingSignup(token);
+        pendingSignupStorage.delete(token);
     }
 
     @Transactional
     public void confirmUserMail(String token) {
-        PendingSignupEntity pendingSignup = findPendingSignupByToken(token);
+        PendingSignupEntity pendingSignup = pendingSignupStorage.findByToken(token);
         if (pendingSignup == null) {
             throw new TokenNotFoundException();
         }
 
         if (pendingSignup.getExpiresAt() == null || pendingSignup.getExpiresAt().isBefore(LocalDateTime.now())) {
-            deletePendingSignup(token);
+            pendingSignupStorage.delete(token);
             throw new TokenNotFoundException();
         }
-    }
-
-    private void storePendingSignup(PendingSignupEntity pendingSignup) {
-        if (pendingSignupStorageAvailable) {
-            try {
-                pendingSignupEntityRepository.deleteByUserMail(pendingSignup.getUserMail());
-                pendingSignupEntityRepository.save(pendingSignup);
-                return;
-            } catch (RuntimeException ex) {
-                pendingSignupStorageAvailable = false;
-                log.warn("Pending signup DB storage failed. Falling back to in-memory tokens.", ex);
-            }
-        }
-
-        fallbackPendingSignups.entrySet().removeIf(entry
-                -> pendingSignup.getUserMail().equals(entry.getValue().getUserMail()));
-        fallbackPendingSignups.put(pendingSignup.getToken(), pendingSignup);
-        scheduleFallbackTokenExpiry(pendingSignup.getToken());
-    }
-
-    private PendingSignupEntity findPendingSignupByToken(String token) {
-        if (pendingSignupStorageAvailable) {
-            try {
-                PendingSignupEntity fromDatabase = pendingSignupEntityRepository.findById(token).orElse(null);
-                if (fromDatabase != null) {
-                    return fromDatabase;
-                }
-            } catch (RuntimeException ex) {
-                pendingSignupStorageAvailable = false;
-                log.warn("Pending signup DB read failed. Falling back to in-memory tokens.", ex);
-            }
-        }
-
-        return fallbackPendingSignups.get(token);
-    }
-
-    private void deletePendingSignup(String token) {
-        fallbackPendingSignups.remove(token);
-
-        if (pendingSignupStorageAvailable) {
-            try {
-                pendingSignupEntityRepository.deleteById(token);
-            } catch (RuntimeException ex) {
-                pendingSignupStorageAvailable = false;
-                log.warn("Pending signup DB delete failed. Falling back to in-memory tokens.", ex);
-            }
-        }
-    }
-
-    private void scheduleFallbackTokenExpiry(String token) {
-        long ttlSeconds = Math.max(1, confirmationTokenTtlMinutes * 60);
-        scheduler.schedule(() -> fallbackPendingSignups.remove(token), ttlSeconds, TimeUnit.SECONDS);
     }
 
     @Transactional
@@ -212,14 +149,14 @@ public class UserSignupService {
         }
 
         String token = resetPasswordDto.getToken();
-        PendingSignupEntity pendingSignup = findPendingSignupByToken(token);
+        PendingSignupEntity pendingSignup = pendingSignupStorage.findByToken(token);
         if (pendingSignup == null) {
             throw new TokenNotFoundException();
         }
 
         if (pendingSignup.getExpiresAt() == null
                 || pendingSignup.getExpiresAt().isBefore(LocalDateTime.now())) {
-            deletePendingSignup(token);
+            pendingSignupStorage.delete(token);
             throw new TokenNotFoundException();
         }
 
@@ -229,14 +166,14 @@ public class UserSignupService {
 
         UserEntity userEntity = userEntityRepository.findByUserMail(pendingSignup.getUserMail());
         if (userEntity == null) {
-            deletePendingSignup(token);
+            pendingSignupStorage.delete(token);
             throw new UserMailNotFoundException(pendingSignup.getUserMail());
         }
 
         userEntity.setUserPassword(encryptService.getEncryptedPassword(resetPasswordDto.getUserPassword()));
         userEntityRepository.save(userEntity);
 
-        deletePendingSignup(token);
+        pendingSignupStorage.delete(token);
     }
 
     public void verifyUserMail(String userMail) {
@@ -258,7 +195,7 @@ public class UserSignupService {
         pendingSignup.setExpiresAt(LocalDateTime.now().plusMinutes(confirmationTokenTtlMinutes));
 
         // 3. Kaydet
-        storePendingSignup(pendingSignup);
+        pendingSignupStorage.store(pendingSignup);
 
         Context context = new Context();
         context.setVariable("confirmationLink", confirmationLink);

@@ -26,6 +26,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -122,6 +123,24 @@ class AdminSupplyServiceTest {
 
         verify(productEntityRepository).save(any(ProductEntity.class));
         verify(productImageEntityRepository).save(any(ProductImageEntity.class));
+    }
+
+    @Test
+    void uploadProduct_WritesImageBeforeLookingUpCategory() throws IOException {
+        MockMultipartFile file = new MockMultipartFile(
+                "selectedImage", "test.png", "image/png", "some-image-data".getBytes());
+        when(fileService.writeFileToDisk(any(), anyString())).thenReturn(Paths.get("UploadFolder/image_123.png"));
+
+        GeneralException exception = assertThrows(GeneralException.class, () ->
+                adminSupplyService.uploadProduct(1L, "Water", "Still", new BigDecimal("5.00"),
+                        100, new BigDecimal("0.10"), "Fresh water", 10, file));
+
+        assertEquals("Invalid category value: 10", exception.getMessage());
+        InOrder order = inOrder(fileService, categoryEntityRepository);
+        order.verify(fileService).writeFileToDisk(any(), anyString());
+        order.verify(categoryEntityRepository).findByCategoryId(10);
+        verify(adminEntityRepository, never()).findById(anyLong());
+        verify(productEntityRepository, never()).save(any());
     }
 
     @Test
@@ -292,14 +311,25 @@ class AdminSupplyServiceTest {
     void updateProduct_ThrowsFileUploadFailedException_OnIOException() throws IOException {
         MockMultipartFile file = new MockMultipartFile("selectedImage", "test.png", "image/png", "data".getBytes());
 
-        when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(new AdminEntity()));
-        when(categoryEntityRepository.findByCategoryId(1)).thenReturn(new CategoryEntity());
-        when(productEntityRepository.findById(100L)).thenReturn(Optional.of(new ProductEntity()));
+        AdminEntity updatedAdmin = new AdminEntity();
+        CategoryEntity updatedCategory = new CategoryEntity();
+        ProductEntity product = new ProductEntity();
+        product.setId(100L);
+        when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(updatedAdmin));
+        when(categoryEntityRepository.findByCategoryId(1)).thenReturn(updatedCategory);
+        when(productEntityRepository.findById(100L)).thenReturn(Optional.of(product));
         when(fileService.writeFileToDisk(any(), anyString())).thenThrow(new IOException());
 
         assertThrows(FileUploadFailedException.class, () ->
                 adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10"), 5, BigDecimal.ZERO, "Desc", 1, file)
         );
+
+        InOrder order = inOrder(productEntityRepository, fileService);
+        order.verify(productEntityRepository).save(product);
+        order.verify(fileService).writeFileToDisk(any(), anyString());
+        assertEquals("Name", product.getProductName());
+        assertSame(updatedAdmin, product.getAdminEntity());
+        assertSame(updatedCategory, product.getCategoryEntity());
     }
 
     @Test

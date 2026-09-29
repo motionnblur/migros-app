@@ -586,7 +586,7 @@ public class PaymentWebhookService {
             failClosedConflict(claim.attemptId(), chargeId, "provider_checkout_mismatch");
             return new ChargeResolution.Reviewed();
         }
-        if (!economicsMatch(claim, charge)) {
+        if (!PaymentWebhookEconomics.matches(claim, charge)) {
             LOG.error("Stripe event economics do not match attempt {}; moving to manual review",
                     claim.attemptId());
             failClosedConflict(claim.attemptId(), chargeId, "provider_amount_mismatch");
@@ -606,24 +606,6 @@ public class PaymentWebhookService {
             }
         }
         paymentAttemptService.markManualReview(attemptId, reason);
-    }
-
-    /**
-     * Exact economic equality: a missing/null amount or currency on either
-     * side never counts as a match.
-     */
-    private boolean economicsMatch(PaymentClaim claim, Charge charge) {
-        Long chargeAmount = charge.getAmount();
-        String chargeCurrency = charge.getCurrency();
-        if (chargeAmount == null || chargeCurrency == null || chargeCurrency.isBlank()) {
-            return false;
-        }
-        String claimCurrency = claim.currency();
-        if (claimCurrency == null || claimCurrency.isBlank()) {
-            return false;
-        }
-        return chargeAmount.longValue() == claim.amountMinor()
-                && claimCurrency.equalsIgnoreCase(chargeCurrency);
     }
 
     private Charge chargeOf(Event event) {
