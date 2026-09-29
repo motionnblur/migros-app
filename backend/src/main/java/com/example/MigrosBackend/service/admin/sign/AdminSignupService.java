@@ -37,24 +37,26 @@ public class AdminSignupService {
     public String login(AdminSignDto adminSignDto, HttpServletRequest request) {
         AdminEntity adminEntity = adminEntityRepository.findByAdminName(adminSignDto.getAdminName());
         if (adminEntity == null) {
-            String userIpAddress = logService.getClientIp(request);
-            String attemptedPassword = encryptService.getEncryptedPassword(adminSignDto.getAdminPassword());
-
-            loginLogger.warn("Failed login attempt - User: {} | Password Hash: {} | IP: {} | Reason: User not found",
-                    adminSignDto.getAdminName(), attemptedPassword, userIpAddress);
-            
+            logFailedLogin(adminSignDto.getAdminName(), request, "account_not_found");
             throw new AdminNotFoundException(adminSignDto.getAdminName());
         }
         if (!encryptService.checkIfPasswordMatches(adminSignDto.getAdminPassword(), adminEntity.getAdminPassword())) {
-            String userIpAddress = logService.getClientIp(request);
-            String attemptedPassword = encryptService.getEncryptedPassword(adminSignDto.getAdminPassword());
-
-            loginLogger.warn("Failed login attempt - User: {} | Password Hash: {} | IP: {} | Reason: Wrong password",
-                    adminSignDto.getAdminName(), attemptedPassword, userIpAddress);
-
+            logFailedLogin(adminSignDto.getAdminName(), request, "password_mismatch");
             throw new WrongPasswordException();
         }
 
         return tokenService.generateAdminToken(adminEntity.getAdminName());
+    }
+
+    /**
+     * Records a failed admin login for audit. Only the account name, the failure
+     * reason, and the resolved client address are logged: neither the submitted
+     * password nor a hash derived from it (including the BCrypt hash of a
+     * non-existent account) is ever computed for logging, because a
+     * password-derived value in a log file is a credential-equivalent secret.
+     */
+    private void logFailedLogin(String adminName, HttpServletRequest request, String reason) {
+        loginLogger.warn("Failed login attempt | User: {} | IP: {} | Reason: {}",
+                adminName, logService.getClientIp(request), reason);
     }
 }

@@ -84,7 +84,8 @@ class MoneyColumnsMigrationPostgresTest {
     @Test
     void secondMigrateIsSafeAndDoesNotReapply() throws SQLException {
         MigrateResult first = migrate();
-        assertEquals(5, first.migrationsExecuted, "V1, V2, V3, V4 and V5 must run on a first migrate");
+        assertEquals(MigrationTestSupport.versionedMigrationCount(), first.migrationsExecuted,
+                "every versioned script must run on a first migrate");
 
         MigrateResult second = migrate();
 

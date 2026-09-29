@@ -9,13 +9,22 @@ import com.example.MigrosBackend.service.global.EncryptService;
 import com.example.MigrosBackend.service.global.LogService;
 import com.example.MigrosBackend.service.global.TokenService;
 import jakarta.servlet.http.HttpServletRequest;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -44,14 +53,13 @@ class AdminSignupServiceTest {
 
         when(adminEntityRepository.findByAdminName(dto.getAdminName())).thenReturn(null);
         when(logService.getClientIp(request)).thenReturn("127.0.0.1");
-        when(encryptService.getEncryptedPassword(dto.getAdminPassword())).thenReturn("hashedPassword");
 
         assertThrows(AdminNotFoundException.class,
                 () -> adminSignupService.login(dto, request));
 
         verify(adminEntityRepository).findByAdminName(dto.getAdminName());
         verify(logService).getClientIp(request);
-        verify(encryptService).getEncryptedPassword(dto.getAdminPassword());
+        verify(encryptService, never()).getEncryptedPassword(anyString());
     }
 
     @Test
@@ -66,7 +74,6 @@ class AdminSignupServiceTest {
 
         when(adminEntityRepository.findByAdminName(dto.getAdminName())).thenReturn(entity);
         when(logService.getClientIp(request)).thenReturn("127.0.0.1");
-        when(encryptService.getEncryptedPassword(dto.getAdminPassword())).thenReturn("wrongHashedPassword");
         when(encryptService.checkIfPasswordMatches(dto.getAdminPassword(), entity.getAdminPassword()))
                 .thenReturn(false);
 
@@ -74,6 +81,8 @@ class AdminSignupServiceTest {
                 () -> adminSignupService.login(dto, request));
 
         verify(encryptService).checkIfPasswordMatches(dto.getAdminPassword(), entity.getAdminPassword());
+        verify(logService).getClientIp(request);
+        verify(encryptService, never()).getEncryptedPassword(anyString());
     }
 
     @Test
@@ -95,5 +104,41 @@ class AdminSignupServiceTest {
 
         assertEquals("mockToken", token);
         verify(tokenService).generateAdminToken(entity.getAdminName());
+    }
+
+    @Test
+    void failedLoginLog_recordsAccountAndReason_withoutAnyPasswordDerivedValue() {
+        AdminSignDto dto = new AdminSignDto();
+        dto.setAdminName("nonexistentUser");
+        dto.setAdminPassword("SuperSecret123!");
+
+        when(adminEntityRepository.findByAdminName(dto.getAdminName())).thenReturn(null);
+        when(logService.getClientIp(request)).thenReturn("203.0.113.7");
+
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        Logger loginLogger = (Logger) LoggerFactory.getLogger("com.migros.login");
+        Level previousLevel = loginLogger.getLevel();
+        loginLogger.setLevel(Level.WARN);
+        loginLogger.addAppender(appender);
+        try {
+            assertThrows(AdminNotFoundException.class, () -> adminSignupService.login(dto, request));
+        } finally {
+            loginLogger.detachAppender(appender);
+            loginLogger.setLevel(previousLevel);
+            appender.stop();
+        }
+
+        assertEquals(1, appender.list.size());
+        ILoggingEvent event = appender.list.get(0);
+        assertEquals(Level.WARN, event.getLevel());
+        String formatted = String.valueOf(event.getFormattedMessage());
+
+        assertTrue(formatted.contains("nonexistentUser"), "log must name the account: " + formatted);
+        assertTrue(formatted.contains("203.0.113.7"), "log must name the client address: " + formatted);
+        assertTrue(formatted.contains("account_not_found"), "log must name the reason: " + formatted);
+        assertFalse(formatted.contains("SuperSecret123!"), "log must never contain the password: " + formatted);
+        assertNull(event.getThrowableProxy(), "the failure must be logged without a stack trace payload");
+        verify(encryptService, never()).getEncryptedPassword(anyString());
     }
 }

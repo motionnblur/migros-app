@@ -30,6 +30,7 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -44,8 +45,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -126,21 +129,96 @@ class AdminSupplyServiceTest {
     }
 
     @Test
-    void uploadProduct_WritesImageBeforeLookingUpCategory() throws IOException {
+    void uploadProduct_ValidatesReferencesBeforeWritingAnyFile() throws IOException {
         MockMultipartFile file = new MockMultipartFile(
                 "selectedImage", "test.png", "image/png", "some-image-data".getBytes());
-        when(fileService.writeFileToDisk(any(), anyString())).thenReturn(Paths.get("UploadFolder/image_123.png"));
 
         GeneralException exception = assertThrows(GeneralException.class, () ->
                 adminSupplyService.uploadProduct(1L, "Water", "Still", new BigDecimal("5.00"),
                         100, new BigDecimal("0.10"), "Fresh water", 10, file));
 
         assertEquals("Invalid category value: 10", exception.getMessage());
-        InOrder order = inOrder(fileService, categoryEntityRepository);
-        order.verify(fileService).writeFileToDisk(any(), anyString());
-        order.verify(categoryEntityRepository).findByCategoryId(10);
+        // The file is the only part of this operation a database rollback cannot
+        // undo, so nothing may reach disk before every reference is resolved.
+        verify(fileService, never()).writeFileToDisk(any(), anyString());
         verify(adminEntityRepository, never()).findById(anyLong());
         verify(productEntityRepository, never()).save(any());
+    }
+
+    @Test
+    void uploadProduct_ValidatesTheAdminBeforeWritingAnyFile() throws IOException {
+        MockMultipartFile file = new MockMultipartFile(
+                "selectedImage", "test.png", "image/png", "some-image-data".getBytes());
+        when(categoryEntityRepository.findByCategoryId(10)).thenReturn(category);
+        when(adminEntityRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThrows(AdminNotFoundException.class, () ->
+                adminSupplyService.uploadProduct(1L, "Water", "Still", new BigDecimal("5.00"),
+                        100, new BigDecimal("0.10"), "Fresh water", 10, file));
+
+        verify(fileService, never()).writeFileToDisk(any(), anyString());
+        verify(productEntityRepository, never()).save(any());
+    }
+
+    @Test
+    void uploadProduct_DeletesTheWrittenFileWhenTheProductInsertFails() throws IOException {
+        MockMultipartFile file = new MockMultipartFile(
+                "selectedImage", "test.png", "image/png", "some-image-data".getBytes());
+        Path mockPath = Paths.get("UploadFolder/image_uuid.png");
+
+        when(categoryEntityRepository.findByCategoryId(10)).thenReturn(category);
+        when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(fileService.writeFileToDisk(any(), anyString())).thenReturn(mockPath);
+        when(productEntityRepository.save(any(ProductEntity.class)))
+                .thenThrow(new DataIntegrityViolationException("product insert rejected"));
+
+        assertThrows(DataIntegrityViolationException.class, () ->
+                adminSupplyService.uploadProduct(1L, "Water", "Still", new BigDecimal("5.0"),
+                        100, new BigDecimal("0.1"), "Fresh water", 10, file));
+
+        verify(fileService).deleteFileIfExists(mockPath);
+    }
+
+    @Test
+    void uploadProduct_DeletesTheWrittenFileWhenTheImageInsertFails() throws IOException {
+        MockMultipartFile file = new MockMultipartFile(
+                "selectedImage", "test.png", "image/png", "some-image-data".getBytes());
+        Path mockPath = Paths.get("UploadFolder/image_uuid.png");
+
+        when(categoryEntityRepository.findByCategoryId(10)).thenReturn(category);
+        when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(admin));
+        when(fileService.writeFileToDisk(any(), anyString())).thenReturn(mockPath);
+        when(productImageEntityRepository.save(any(ProductImageEntity.class)))
+                .thenThrow(new DataIntegrityViolationException("image insert rejected"));
+
+        assertThrows(DataIntegrityViolationException.class, () ->
+                adminSupplyService.uploadProduct(1L, "Water", "Still", new BigDecimal("5.0"),
+                        100, new BigDecimal("0.1"), "Fresh water", 10, file));
+
+        verify(fileService).deleteFileIfExists(mockPath);
+    }
+
+    @Test
+    void uploadProduct_UsesAUniqueFileNameForEachUpload() throws IOException {
+        MockMultipartFile file = new MockMultipartFile(
+                "selectedImage", "test.png", "image/png", "some-image-data".getBytes());
+        when(fileService.writeFileToDisk(any(), anyString()))
+                .thenReturn(Paths.get("UploadFolder/a.png"));
+        when(categoryEntityRepository.findByCategoryId(10)).thenReturn(category);
+        when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(admin));
+
+        adminSupplyService.uploadProduct(1L, "Water", "Still", new BigDecimal("5.0"),
+                100, new BigDecimal("0.1"), "Fresh water", 10, file);
+
+        ArgumentCaptor<String> nameCaptor = ArgumentCaptor.forClass(String.class);
+        verify(fileService).writeFileToDisk(any(), nameCaptor.capture());
+        String fileName = nameCaptor.getValue();
+
+        assertTrue(fileName.startsWith("image_"), fileName);
+        assertTrue(fileName.endsWith(".png"), fileName);
+        assertDoesNotThrow(() -> UUID.fromString(
+                fileName.substring("image_".length(), fileName.length() - ".png".length())),
+                "file name must embed a UUID so simultaneous uploads cannot collide: " + fileName);
     }
 
     @Test
@@ -220,7 +298,8 @@ class AdminSupplyServiceTest {
     void uploadProduct_ThrowsException_WhenFileUploadFails() throws IOException {
         MockMultipartFile file = new MockMultipartFile(
                 "selectedImage", "test.png", "image/png", "data".getBytes());
-
+        when(categoryEntityRepository.findByCategoryId(10)).thenReturn(category);
+        when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(admin));
         when(fileService.writeFileToDisk(any(), anyString())).thenThrow(new IOException());
 
         assertThrows(FileUploadFailedException.class, () ->
@@ -330,6 +409,31 @@ class AdminSupplyServiceTest {
         assertEquals("Name", product.getProductName());
         assertSame(updatedAdmin, product.getAdminEntity());
         assertSame(updatedCategory, product.getCategoryEntity());
+    }
+
+    @Test
+    void updateProduct_DeletesTheWrittenFileWhenTheImageUpdateFails() throws IOException {
+        MockMultipartFile file = new MockMultipartFile(
+                "selectedImage", "test.png", "image/png", "data".getBytes());
+        Path mockPath = Paths.get("UploadFolder/new_image.png");
+        ProductEntity product = new ProductEntity();
+        product.setId(100L);
+        ProductImageEntity existingImage = new ProductImageEntity();
+        existingImage.setId(500L);
+
+        when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(new AdminEntity()));
+        when(categoryEntityRepository.findByCategoryId(1)).thenReturn(new CategoryEntity());
+        when(productEntityRepository.findById(100L)).thenReturn(Optional.of(product));
+        when(productImageEntityRepository.findByProductEntityId(100L)).thenReturn(List.of(existingImage));
+        when(fileService.writeFileToDisk(any(), anyString())).thenReturn(mockPath);
+        when(productImageEntityRepository.save(any(ProductImageEntity.class)))
+                .thenThrow(new DataIntegrityViolationException("image update rejected"));
+
+        assertThrows(DataIntegrityViolationException.class, () ->
+                adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10"),
+                        5, BigDecimal.ZERO, "Desc", 1, file));
+
+        verify(fileService).deleteFileIfExists(mockPath);
     }
 
     @Test

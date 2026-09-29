@@ -1,0 +1,277 @@
+package com.example.MigrosBackend.service.user.sign;
+
+import com.example.MigrosBackend.dto.user.sign.ResetPasswordDto;
+import com.example.MigrosBackend.dto.user.sign.UserSignDto;
+import com.example.MigrosBackend.entity.user.PendingSignupEntity;
+import com.example.MigrosBackend.entity.user.PendingTokenPurpose;
+import com.example.MigrosBackend.entity.user.UserEntity;
+import com.example.MigrosBackend.exception.shared.TokenNotFoundException;
+import com.example.MigrosBackend.exception.user.MailSendingFailedException;
+import com.example.MigrosBackend.exception.user.UserMailNotFoundException;
+import com.example.MigrosBackend.repository.user.PendingSignupEntityRepository;
+import com.example.MigrosBackend.repository.user.UserEntityRepository;
+import com.example.MigrosBackend.service.global.EncryptService;
+import com.example.MigrosBackend.service.global.MailService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.thymeleaf.context.Context;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+/**
+ * Pending signup/reset tokens must be durable and single-purpose against a real
+ * PostgreSQL schema, not only against mocks.
+ *
+ * <p>{@code PendingSignupEntityRepository} is spied rather than replaced: the
+ * purpose column, the check constraint, and the per-mail replacement all have to
+ * be exercised against the real table, and the outage scenarios need the write
+ * to fail on demand.
+ */
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
+@ActiveProfiles("local")
+@Testcontainers
+class PendingTokenPostgresTest {
+
+    private static final String USER_SECRET = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=";
+    private static final String ADMIN_SECRET = "ZmVkY2JhOTg3NjU0MzIxMGZlZGNiYTk4NzY1NDMyMTA=";
+    private static final String MAIL = "signup@migros.com";
+    private static final String STRONG_PASSWORD = "StrongPass123!";
+
+    @Container
+    static final PostgreSQLContainer<?> POSTGRES =
+            new PostgreSQLContainer<>(DockerImageName.parse("postgres:17-alpine"));
+
+    @DynamicPropertySource
+    static void properties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
+        registry.add("spring.datasource.username", POSTGRES::getUsername);
+        registry.add("spring.datasource.password", POSTGRES::getPassword);
+        registry.add("jwt.user-secret", () -> USER_SECRET);
+        registry.add("jwt.admin-secret", () -> ADMIN_SECRET);
+        registry.add("support.internal.key", () -> "integration-test-internal-key");
+        registry.add("support.service.internal-key", () -> "integration-test-internal-key");
+        registry.add("app.frontend-base-url", () -> "http://localhost:4200");
+        registry.add("app.backend-base-url", () -> "http://localhost:8080");
+    }
+
+    @MockitoSpyBean
+    private PendingSignupEntityRepository pendingSignupEntityRepository;
+    @MockitoBean
+    private MailService mailService;
+    @MockitoBean
+    private EncryptService encryptService;
+
+    @Autowired
+    private UserEntityRepository userEntityRepository;
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private UserSignupService userSignupService;
+
+    @BeforeEach
+    void cleanDatabase() {
+        jdbcTemplate.execute("TRUNCATE TABLE pending_signup_entity, user_entity RESTART IDENTITY CASCADE");
+    }
+
+    @Test
+    void signupPersistsADurableSignupPurposeTokenBeforeMailIsSent() throws Exception {
+        when(encryptService.getEncryptedPassword(STRONG_PASSWORD)).thenReturn("hashed");
+
+        userSignupService.signup(signupDto(MAIL));
+
+        List<PendingSignupEntity> stored = pendingSignupEntityRepository.findAll();
+        assertEquals(1, stored.size());
+        assertEquals(PendingTokenPurpose.SIGNUP, stored.get(0).getTokenPurpose());
+        assertNotNull(stored.get(0).getExpiresAt());
+        assertTrue(stored.get(0).getExpiresAt().isAfter(LocalDateTime.now()));
+        verify(mailService, times(1)).sendMimeMessage(anyString(), anyString(), anyString(), any(Context.class));
+    }
+
+    @Test
+    void aResetTokenCannotConfirmASignup() {
+        seedToken("reset-token", PendingTokenPurpose.PASSWORD_RESET);
+
+        assertThrows(TokenNotFoundException.class, () -> userSignupService.confirm("reset-token"));
+        assertThrows(TokenNotFoundException.class, () -> userSignupService.confirmUserMail("reset-token"));
+
+        assertTrue(userEntityRepository.findByUserMail(MAIL) == null,
+                "a reset token must never create an account");
+        assertTrue(pendingSignupEntityRepository.findById("reset-token").isPresent(),
+                "a rejected cross-purpose attempt must not consume the token");
+    }
+
+    @Test
+    void aSignupTokenCannotResetAPassword() {
+        seedUserWithPassword("original-hash");
+        seedToken("signup-token", PendingTokenPurpose.SIGNUP);
+
+        ResetPasswordDto dto = new ResetPasswordDto();
+        dto.setToken("signup-token");
+        dto.setUserPassword("AnotherStrong123!");
+
+        assertThrows(TokenNotFoundException.class, () -> userSignupService.resetPassword(dto));
+
+        assertEquals("original-hash", storedPassword(),
+                "a signup token must never be usable to choose a new password");
+        assertTrue(pendingSignupEntityRepository.findById("signup-token").isPresent());
+    }
+
+    @Test
+    void aSignupTokenAndAResetTokenForTheSameMailCoexist() {
+        seedUserWithPassword("original-hash");
+        seedToken("signup-token", PendingTokenPurpose.SIGNUP);
+        seedToken("reset-token", PendingTokenPurpose.PASSWORD_RESET);
+
+        assertEquals(2, pendingSignupEntityRepository.count());
+
+        when(encryptService.getEncryptedPassword("AnotherStrong123!")).thenReturn("rotated-hash");
+        ResetPasswordDto dto = new ResetPasswordDto();
+        dto.setToken("reset-token");
+        dto.setUserPassword("AnotherStrong123!");
+
+        userSignupService.resetPassword(dto);
+
+        assertEquals("rotated-hash", storedPassword());
+        assertTrue(pendingSignupEntityRepository.findById("signup-token").isPresent(),
+                "consuming a reset token must not silently invalidate an unrelated signup token");
+    }
+
+    @Test
+    void issuingASecondResetTokenReplacesOnlyThePreviousResetToken() throws Exception {
+        seedToken("signup-token", PendingTokenPurpose.SIGNUP);
+        seedUserWithPassword("original-hash");
+        when(encryptService.getEncryptedPassword(anyString())).thenReturn("original-hash");
+
+        userSignupService.verifyUserMail(MAIL);
+
+        assertTrue(pendingSignupEntityRepository.findById("signup-token").isPresent());
+        assertEquals(2, pendingSignupEntityRepository.count());
+    }
+
+    @Test
+    void aUsedTokenIsDeletedAndCannotBeReplayed() {
+        seedToken("signup-token", PendingTokenPurpose.SIGNUP);
+
+        userSignupService.confirm("signup-token");
+
+        assertFalse(pendingSignupEntityRepository.findById("signup-token").isPresent());
+        assertThrows(TokenNotFoundException.class, () -> userSignupService.confirm("signup-token"));
+    }
+
+    @Test
+    void aStorageFailureFailsTheRequestInsteadOfIssuingAProcessLocalToken() throws Exception {
+        when(encryptService.getEncryptedPassword(STRONG_PASSWORD)).thenReturn("hashed");
+        doThrow(new DataAccessResourceFailureException("simulated storage outage"))
+                .when(pendingSignupEntityRepository).save(any(PendingSignupEntity.class));
+
+        assertThrows(DataAccessResourceFailureException.class,
+                () -> userSignupService.signup(signupDto(MAIL)));
+
+        verify(mailService, never()).sendMimeMessage(anyString(), anyString(), anyString(), any(Context.class));
+        assertTrue(userEntityRepository.findByUserMail(MAIL) == null);
+    }
+
+    @Test
+    void aMailFailureLeavesNoUndeliverableTokenBehind() throws Exception {
+        when(encryptService.getEncryptedPassword(STRONG_PASSWORD)).thenReturn("hashed");
+        doThrow(new jakarta.mail.MessagingException("SMTP down")).when(mailService)
+                .sendMimeMessage(anyString(), anyString(), anyString(), any(Context.class));
+
+        assertThrows(MailSendingFailedException.class, () -> userSignupService.signup(signupDto(MAIL)));
+
+        assertEquals(0, pendingSignupEntityRepository.count(),
+                "a token nobody was ever told about must not be left in the table");
+    }
+
+    @Test
+    void aResetRequestForAnUnknownMailFailsWithoutIssuingAToken() {
+        assertThrows(UserMailNotFoundException.class,
+                () -> userSignupService.verifyUserMail("nobody@migros.com"));
+
+        assertEquals(0, pendingSignupEntityRepository.count());
+    }
+
+    @Test
+    void expiredTokensAreRejectedAndRemoved() {
+        pendingSignupEntityRepository.saveAndFlush(new PendingSignupEntity(
+                "expired-token", MAIL, "hashed", LocalDateTime.now().minusMinutes(1),
+                PendingTokenPurpose.SIGNUP));
+
+        assertThrows(TokenNotFoundException.class, () -> userSignupService.confirm("expired-token"));
+
+        assertFalse(pendingSignupEntityRepository.findById("expired-token").isPresent());
+    }
+
+    @Test
+    void theMigrationRejectsAPurposeOutsideTheAllowedSet() {
+        assertThrows(Exception.class, () -> jdbcTemplate.update(
+                "INSERT INTO pending_signup_entity "
+                        + "(token, user_mail, user_password, expires_at, token_purpose) "
+                        + "VALUES ('bad-purpose', ?, 'hash', now() + interval '1 hour', 'NOT_A_PURPOSE')",
+                MAIL));
+    }
+
+    @Test
+    void thePurposeColumnIsNotNullable() {
+        assertThrows(Exception.class, () -> jdbcTemplate.update(
+                "INSERT INTO pending_signup_entity (token, user_mail, user_password, expires_at) "
+                        + "VALUES ('no-purpose', ?, 'hash', now() + interval '1 hour')",
+                MAIL));
+    }
+
+    @Test
+    void theMigrationLeftNoPurposeLessLegacyRowRedeemable() {
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM pending_signup_entity WHERE token_purpose IS NULL", Integer.class));
+    }
+
+    private UserSignDto signupDto(String mail) {
+        UserSignDto dto = new UserSignDto();
+        dto.setUserMail(mail);
+        dto.setUserPassword(STRONG_PASSWORD);
+        return dto;
+    }
+
+    private void seedToken(String token, PendingTokenPurpose purpose) {
+        pendingSignupEntityRepository.saveAndFlush(new PendingSignupEntity(
+                token, MAIL, "hashed", LocalDateTime.now().plusMinutes(15), purpose));
+    }
+
+    private void seedUserWithPassword(String password) {
+        UserEntity user = new UserEntity();
+        user.setUserMail(MAIL);
+        user.setUserPassword(password);
+        userEntityRepository.saveAndFlush(user);
+    }
+
+    private String storedPassword() {
+        return userEntityRepository.findByUserMail(MAIL).getUserPassword();
+    }
+}

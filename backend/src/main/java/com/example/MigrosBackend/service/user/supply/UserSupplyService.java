@@ -10,6 +10,7 @@ import com.example.MigrosBackend.dto.user.product.UserCartItemDto;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.user.OrderEntity;
 import com.example.MigrosBackend.entity.user.OrderGroupEntity;
+import com.example.MigrosBackend.entity.user.OrderStatus;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.exception.admin.ProductNotFoundException;
 import com.example.MigrosBackend.exception.admin.UserNotFoundException;
@@ -44,6 +45,7 @@ public class UserSupplyService {
     private final OrderGroupEntityRepository orderGroupEntityRepository;
     private final UserCatalogReadService catalogReadService;
     private final UserOrderHistoryReadService orderHistoryReadService;
+    private final OrderStockRestocker orderStockRestocker;
 
     @Autowired
     public UserSupplyService(
@@ -76,6 +78,7 @@ public class UserSupplyService {
                 orderGroupEntityRepository,
                 productEntityRepository
         );
+        this.orderStockRestocker = new OrderStockRestocker(productEntityRepository);
     }
 
     public List<String> getAllCategoryNames() {
@@ -237,34 +240,51 @@ public class UserSupplyService {
         return orderHistoryReadService.getOrderStatusByOrderId(orderId, token);
     }
 
+    /**
+     * Cancels one of the caller's orders and returns its reserved units to
+     * live stock.
+     *
+     * <p>The order row is locked for update <em>before</em> its status is read.
+     * That lock is the whole correctness argument: it serializes this
+     * cancellation against a concurrent administrator status change and against
+     * a second cancellation of the same order, so exactly one of them can
+     * observe {@code Pending} and restock. Without it, a cancellation racing an
+     * admin status change could return stock for an order the admin had already
+     * shipped, or restock the same order twice.
+     *
+     * <p>The ownership check and the lock are one statement, so ownership cannot
+     * change between them. Status strings are unchanged, preserving the existing
+     * API contract.
+     */
     @Transactional
     public void cancelOrder(Long orderId, String token) {
         UserEntity user = getValidatedUserFromToken(token);
 
-        OrderGroupEntity orderGroup = orderGroupEntityRepository.findByIdAndUserId(orderId, user.getId()).orElse(null);
+        OrderGroupEntity orderGroup = orderGroupEntityRepository
+                .findByIdAndUserIdForUpdate(orderId, user.getId())
+                .orElse(null);
         if (orderGroup != null) {
-            if (!"Pending".equalsIgnoreCase(orderGroup.getStatus())) {
+            if (!OrderStatus.isPending(orderGroup.getStatus())) {
                 throw new GeneralException("Only pending orders can be canceled.");
             }
 
             List<OrderEntity> orderItems = new ArrayList<>(orderGroup.getOrderItems());
-            for (OrderEntity orderItem : orderItems) {
-                restockProduct(orderItem.getItemId(), orderItem.getCount());
-            }
+            orderStockRestocker.restore(orderItems);
 
             orderEntityRepository.deleteAll(orderItems);
             orderGroupEntityRepository.delete(orderGroup);
             return;
         }
 
-        OrderEntity legacyOrder = orderEntityRepository.findByIdAndUserId(orderId, user.getId())
+        OrderEntity legacyOrder = orderEntityRepository.findByIdAndUserIdForUpdate(orderId, user.getId())
                 .orElseThrow(() -> new GeneralException("Order not found"));
 
-        if (!"Pending".equalsIgnoreCase(legacyOrder.getStatus())) {
+        if (!OrderStatus.isPending(legacyOrder.getStatus())) {
             throw new GeneralException("Only pending orders can be canceled.");
         }
 
-        restockProduct(legacyOrder.getItemId(), legacyOrder.getCount());
+        orderStockRestocker.restore(legacyOrder.getItemId(),
+                legacyOrder.getCount() == null ? 0 : legacyOrder.getCount());
         orderEntityRepository.delete(legacyOrder);
     }
 
@@ -278,16 +298,6 @@ public class UserSupplyService {
 
     public List<UserOrderGroupDto> getUserOrderGroups(String token) {
         return orderHistoryReadService.getUserOrderGroups(token);
-    }
-    private void restockProduct(Long productId, int amount) {
-        if (amount <= 0) {
-            return;
-        }
-
-        productEntityRepository.findById(productId).ifPresent(product -> {
-            product.setProductCount(product.getProductCount() + amount);
-            productEntityRepository.save(product);
-        });
     }
 
     private List<Long> getOrInitializeCart(UserEntity user) {

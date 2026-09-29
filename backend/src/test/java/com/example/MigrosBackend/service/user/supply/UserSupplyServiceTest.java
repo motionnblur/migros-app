@@ -41,6 +41,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -253,37 +254,31 @@ class UserSupplyServiceTest {
     }
 
     @Test
-    void cancelOrder_ShouldRestockAndDeleteGroup_WhenPending() {
+    void cancelOrder_LocksTheGroupBeforeItsStatusAndRestocksAtomicallyInProductOrder() {
         stubAuthenticatedUser();
-        OrderEntity orderA = new OrderEntity();
-        orderA.setItemId(11L);
-        orderA.setCount(2);
-
         OrderEntity orderB = new OrderEntity();
         orderB.setItemId(12L);
         orderB.setCount(1);
 
+        OrderEntity orderA = new OrderEntity();
+        orderA.setItemId(11L);
+        orderA.setCount(2);
+
         OrderGroupEntity group = new OrderGroupEntity();
         group.setId(90L);
         group.setStatus("Pending");
-        group.setOrderItems(new ArrayList<>(List.of(orderA, orderB)));
+        group.setOrderItems(new ArrayList<>(List.of(orderB, orderA)));
 
-        ProductEntity productA = new ProductEntity();
-        productA.setId(11L);
-        productA.setProductCount(0);
-
-        ProductEntity productB = new ProductEntity();
-        productB.setId(12L);
-        productB.setProductCount(3);
-
-        when(orderGroupEntityRepository.findByIdAndUserId(90L, user.getId())).thenReturn(Optional.of(group));
-        when(productEntityRepository.findById(11L)).thenReturn(Optional.of(productA));
-        when(productEntityRepository.findById(12L)).thenReturn(Optional.of(productB));
+        when(orderGroupEntityRepository.findByIdAndUserIdForUpdate(90L, user.getId()))
+                .thenReturn(Optional.of(group));
 
         userSupplyService.cancelOrder(90L, TOKEN);
 
-        assertEquals(2, productA.getProductCount());
-        assertEquals(4, productB.getProductCount());
+        InOrder restockOrder = inOrder(productEntityRepository);
+        restockOrder.verify(productEntityRepository).incrementStock(11L, 2);
+        restockOrder.verify(productEntityRepository).incrementStock(12L, 1);
+        verify(productEntityRepository, never()).findById(any());
+        verify(productEntityRepository, never()).save(any());
         verify(orderEntityRepository, times(1)).deleteAll(any());
         verify(orderGroupEntityRepository, times(1)).delete(group);
     }
@@ -296,11 +291,46 @@ class UserSupplyServiceTest {
         group.setStatus("Delivered");
         group.setOrderItems(new ArrayList<>());
 
-        when(orderGroupEntityRepository.findByIdAndUserId(91L, user.getId())).thenReturn(Optional.of(group));
+        when(orderGroupEntityRepository.findByIdAndUserIdForUpdate(91L, user.getId()))
+                .thenReturn(Optional.of(group));
 
         assertThrows(GeneralException.class, () -> userSupplyService.cancelOrder(91L, TOKEN));
+        verify(productEntityRepository, never()).incrementStock(any(), anyInt());
         verify(orderEntityRepository, never()).deleteAll(any());
         verify(orderGroupEntityRepository, never()).delete(any());
+    }
+
+    @Test
+    void cancelOrder_LocksAndRestocksALegacyOrder() {
+        stubAuthenticatedUser();
+        OrderEntity legacyOrder = new OrderEntity();
+        legacyOrder.setId(92L);
+        legacyOrder.setItemId(11L);
+        legacyOrder.setCount(2);
+        legacyOrder.setStatus("Pending");
+
+        when(orderGroupEntityRepository.findByIdAndUserIdForUpdate(92L, user.getId()))
+                .thenReturn(Optional.empty());
+        when(orderEntityRepository.findByIdAndUserIdForUpdate(92L, user.getId()))
+                .thenReturn(Optional.of(legacyOrder));
+
+        userSupplyService.cancelOrder(92L, TOKEN);
+
+        verify(productEntityRepository).incrementStock(11L, 2);
+        verify(orderEntityRepository).delete(legacyOrder);
+    }
+
+    @Test
+    void cancelOrder_ThrowsWhenTheCallerDoesNotOwnTheOrder() {
+        stubAuthenticatedUser();
+
+        when(orderGroupEntityRepository.findByIdAndUserIdForUpdate(93L, user.getId()))
+                .thenReturn(Optional.empty());
+        when(orderEntityRepository.findByIdAndUserIdForUpdate(93L, user.getId()))
+                .thenReturn(Optional.empty());
+
+        assertThrows(GeneralException.class, () -> userSupplyService.cancelOrder(93L, TOKEN));
+        verify(productEntityRepository, never()).incrementStock(any(), anyInt());
     }
     @Test
     void getProductDescription_ShouldMapAllDescriptions() {

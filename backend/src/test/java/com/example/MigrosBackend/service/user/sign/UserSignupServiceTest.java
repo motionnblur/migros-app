@@ -1,8 +1,10 @@
 package com.example.MigrosBackend.service.user.sign;
 
 import com.example.MigrosBackend.config.PublicUrlProperties;
+import com.example.MigrosBackend.dto.user.sign.ResetPasswordDto;
 import com.example.MigrosBackend.dto.user.sign.UserSignDto;
 import com.example.MigrosBackend.entity.user.PendingSignupEntity;
+import com.example.MigrosBackend.entity.user.PendingTokenPurpose;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.exception.shared.TokenNotFoundException;
 import com.example.MigrosBackend.exception.shared.WrongPasswordException;
@@ -26,6 +28,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.context.ConfigurationPropertiesAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.thymeleaf.context.Context;
 
 import java.time.LocalDateTime;
@@ -55,6 +59,8 @@ class UserSignupServiceTest {
     private TokenService tokenService;
     @Mock
     private PasswordValidator passwordValidator;
+    @Mock
+    private PlatformTransactionManager transactionManager;
 
     private UserSignupService userSignupService;
 
@@ -80,6 +86,7 @@ class UserSignupServiceTest {
                 tokenService,
                 passwordValidator,
                 publicUrlProperties,
+                transactionManager,
                 15
         );
     }
@@ -91,79 +98,190 @@ class UserSignupServiceTest {
         return (String) contextCaptor.getValue().getVariable("confirmationLink");
     }
 
-    private String savedPendingToken() {
+    private PendingSignupEntity savedPendingSignup() {
         ArgumentCaptor<PendingSignupEntity> pendingCaptor = ArgumentCaptor.forClass(PendingSignupEntity.class);
         verify(pendingSignupEntityRepository, atLeastOnce()).save(pendingCaptor.capture());
-        return pendingCaptor.getValue().getToken();
+        return pendingCaptor.getValue();
+    }
+
+    private String savedPendingToken() {
+        return savedPendingSignup().getToken();
+    }
+
+    private static PendingSignupEntity pendingToken(String token, PendingTokenPurpose purpose, LocalDateTime expiresAt) {
+        return new PendingSignupEntity(token, "test@mail.com", "hashed_password", expiresAt, purpose);
+    }
+
+    private UserEntity existingUser() {
+        UserEntity user = new UserEntity();
+        user.setUserMail(SIGNUP_EMAIL);
+        user.setUserPassword("hashed_password");
+        return user;
     }
 
     @Test
     void signup_Success() throws Exception {
-        // Arrange
         when(userEntityRepository.existsByUserMail(signupDto.getUserMail())).thenReturn(false);
         when(passwordValidator.isPasswordStrongEnough(signupDto.getUserPassword())).thenReturn(true);
         when(encryptService.getEncryptedPassword(anyString())).thenReturn("hashed_password");
 
-        // Act
         userSignupService.signup(signupDto);
 
-        // Assert
         verify(encryptService).getEncryptedPassword(signupDto.getUserPassword());
-        verify(pendingSignupEntityRepository).deleteByUserMail(signupDto.getUserMail());
+        verify(pendingSignupEntityRepository).deleteByUserMailAndTokenPurpose(
+                signupDto.getUserMail(), PendingTokenPurpose.SIGNUP);
         verify(pendingSignupEntityRepository).save(any(PendingSignupEntity.class));
         verify(mailService).sendMimeMessage(eq(signupDto.getUserMail()), anyString(), anyString(), any(Context.class));
     }
 
     @Test
-    void signupFallsBackToMemoryAfterDatabaseSaveFailureAndConfirmsPendingSignup() throws Exception {
+    void signup_StoresTheTokenBeforeSendingTheMail() throws Exception {
         when(userEntityRepository.existsByUserMail(signupDto.getUserMail())).thenReturn(false);
         when(passwordValidator.isPasswordStrongEnough(signupDto.getUserPassword())).thenReturn(true);
-        when(encryptService.getEncryptedPassword(signupDto.getUserPassword())).thenReturn("hashed_password");
-        doThrow(new IllegalStateException("database unavailable"))
-                .when(pendingSignupEntityRepository).save(any(PendingSignupEntity.class));
+        when(encryptService.getEncryptedPassword(anyString())).thenReturn("hashed_password");
 
         userSignupService.signup(signupDto);
 
-        String confirmationLink = lastConfirmationLink();
-        String token = confirmationLink.substring(confirmationLink.indexOf("token=") + "token=".length());
+        InOrder order = inOrder(pendingSignupEntityRepository, mailService);
+        order.verify(pendingSignupEntityRepository).save(any(PendingSignupEntity.class));
+        order.verify(mailService).sendMimeMessage(eq(SIGNUP_EMAIL), anyString(), anyString(), any(Context.class));
+    }
 
-        userSignupService.confirm(token);
+    @Test
+    void signup_PersistsTheTokenWithTheSignupPurpose() {
+        when(userEntityRepository.existsByUserMail(signupDto.getUserMail())).thenReturn(false);
+        when(passwordValidator.isPasswordStrongEnough(signupDto.getUserPassword())).thenReturn(true);
+        when(encryptService.getEncryptedPassword(anyString())).thenReturn("hashed_password");
 
-        InOrder signupOrder = inOrder(pendingSignupEntityRepository, mailService);
-        signupOrder.verify(pendingSignupEntityRepository).deleteByUserMail(SIGNUP_EMAIL);
-        signupOrder.verify(pendingSignupEntityRepository).save(any(PendingSignupEntity.class));
-        signupOrder.verify(mailService).sendMimeMessage(eq(SIGNUP_EMAIL), anyString(), anyString(), any(Context.class));
-        verify(userEntityRepository).save(argThat(user -> SIGNUP_EMAIL.equals(user.getUserMail())
-                && "hashed_password".equals(user.getUserPassword())));
-        verify(pendingSignupEntityRepository).deleteByUserMail(SIGNUP_EMAIL);
-        verify(pendingSignupEntityRepository, never()).findById(anyString());
+        userSignupService.signup(signupDto);
+
+        assertEquals(PendingTokenPurpose.SIGNUP, savedPendingSignup().getTokenPurpose());
+    }
+
+    @Test
+    void signup_PropagatesDatabaseFailureInsteadOfAcceptingAProcessLocalToken() throws MessagingException {
+        when(userEntityRepository.existsByUserMail(signupDto.getUserMail())).thenReturn(false);
+        when(passwordValidator.isPasswordStrongEnough(signupDto.getUserPassword())).thenReturn(true);
+        when(encryptService.getEncryptedPassword(anyString())).thenReturn("hashed_password");
+        doThrow(new DataAccessResourceFailureException("database unavailable"))
+                .when(pendingSignupEntityRepository).save(any(PendingSignupEntity.class));
+
+        assertThrows(DataAccessResourceFailureException.class, () -> userSignupService.signup(signupDto));
+
+        verify(mailService, never()).sendMimeMessage(anyString(), anyString(), anyString(), any(Context.class));
+    }
+
+    @Test
+    void verifyUserMail_PropagatesDatabaseFailureAndSendsNoMail() throws MessagingException {
+        when(userEntityRepository.findByUserMail(SIGNUP_EMAIL)).thenReturn(existingUser());
+        doThrow(new DataAccessResourceFailureException("database unavailable"))
+                .when(pendingSignupEntityRepository).save(any(PendingSignupEntity.class));
+
+        assertThrows(DataAccessResourceFailureException.class, () -> userSignupService.verifyUserMail(SIGNUP_EMAIL));
+
+        verify(mailService, never()).sendMimeMessage(anyString(), anyString(), anyString(), any(Context.class));
+    }
+
+    @Test
+    void confirm_RejectsAPasswordResetToken() {
+        when(pendingSignupEntityRepository.findById("reset-token"))
+                .thenReturn(Optional.of(pendingToken(
+                        "reset-token", PendingTokenPurpose.PASSWORD_RESET, LocalDateTime.now().plusMinutes(10))));
+
+        assertThrows(TokenNotFoundException.class, () -> userSignupService.confirm("reset-token"));
+
+        verify(userEntityRepository, never()).save(any(UserEntity.class));
         verify(pendingSignupEntityRepository, never()).deleteById(anyString());
-        assertThrows(TokenNotFoundException.class, () -> userSignupService.confirm(token));
+    }
+
+    @Test
+    void confirmUserMail_RejectsAPasswordResetToken() {
+        when(pendingSignupEntityRepository.findById("reset-token"))
+                .thenReturn(Optional.of(pendingToken(
+                        "reset-token", PendingTokenPurpose.PASSWORD_RESET, LocalDateTime.now().plusMinutes(10))));
+
+        assertThrows(TokenNotFoundException.class, () -> userSignupService.confirmUserMail("reset-token"));
+    }
+
+    @Test
+    void resetPassword_RejectsASignupTokenAndLeavesTheAccountUntouched() {
+        when(pendingSignupEntityRepository.findById("signup-token"))
+                .thenReturn(Optional.of(pendingToken(
+                        "signup-token", PendingTokenPurpose.SIGNUP, LocalDateTime.now().plusMinutes(10))));
+
+        ResetPasswordDto dto = new ResetPasswordDto();
+        dto.setToken("signup-token");
+        dto.setUserPassword("AnotherStrong123!");
+
+        assertThrows(TokenNotFoundException.class, () -> userSignupService.resetPassword(dto));
+
+        verify(userEntityRepository, never()).save(any(UserEntity.class));
+        verify(pendingSignupEntityRepository, never()).deleteById(anyString());
+    }
+
+    @Test
+    void resetPassword_ReplacesThePasswordForAResetToken() {
+        when(pendingSignupEntityRepository.findById("reset-token"))
+                .thenReturn(Optional.of(pendingToken(
+                        "reset-token", PendingTokenPurpose.PASSWORD_RESET, LocalDateTime.now().plusMinutes(10))));
+        when(userEntityRepository.findByUserMail("test@mail.com")).thenReturn(existingUser());
+        when(passwordValidator.isPasswordStrongEnough("AnotherStrong123!")).thenReturn(true);
+        when(encryptService.getEncryptedPassword("AnotherStrong123!")).thenReturn("new_hash");
+
+        ResetPasswordDto dto = new ResetPasswordDto();
+        dto.setToken("reset-token");
+        dto.setUserPassword("AnotherStrong123!");
+
+        userSignupService.resetPassword(dto);
+
+        verify(userEntityRepository).save(argThat(user -> "new_hash".equals(user.getUserPassword())));
+        verify(pendingSignupEntityRepository).deleteById("reset-token");
+    }
+
+    @Test
+    void resetPassword_DeletesAndRejectsAnExpiredResetToken() {
+        when(pendingSignupEntityRepository.findById("reset-token"))
+                .thenReturn(Optional.of(pendingToken(
+                        "reset-token", PendingTokenPurpose.PASSWORD_RESET, LocalDateTime.now().minusMinutes(1))));
+
+        ResetPasswordDto dto = new ResetPasswordDto();
+        dto.setToken("reset-token");
+        dto.setUserPassword("AnotherStrong123!");
+
+        assertThrows(TokenNotFoundException.class, () -> userSignupService.resetPassword(dto));
+
+        verify(pendingSignupEntityRepository).deleteById("reset-token");
+        verify(userEntityRepository, never()).save(any(UserEntity.class));
+    }
+
+    @Test
+    void resetPassword_RejectsABlankToken() {
+        ResetPasswordDto dto = new ResetPasswordDto();
+        dto.setToken("  ");
+        dto.setUserPassword("AnotherStrong123!");
+
+        assertThrows(TokenNotFoundException.class, () -> userSignupService.resetPassword(dto));
+        verify(pendingSignupEntityRepository, never()).findById(anyString());
     }
 
     @Test
     void signup_ThrowsException_WhenUserAlreadyExists() throws MessagingException {
-        // Arrange
         when(userEntityRepository.existsByUserMail(signupDto.getUserMail())).thenReturn(true);
 
-        // Act & Assert
         assertThrows(UserAlreadyExistsException.class, () -> userSignupService.signup(signupDto));
         verify(mailService, never()).sendMimeMessage(any(), any(), any(), any());
     }
 
     @Test
     void signup_ThrowsException_WhenPasswordIsWeak() {
-        // Arrange
         when(userEntityRepository.existsByUserMail(signupDto.getUserMail())).thenReturn(false);
         when(passwordValidator.isPasswordStrongEnough(signupDto.getUserPassword())).thenReturn(false);
 
-        // Act & Assert
         assertThrows(WeakPasswordException.class, () -> userSignupService.signup(signupDto));
     }
 
     @Test
     void signup_ThrowsException_WhenMailServiceFails() throws MessagingException {
-        // Arrange
         when(userEntityRepository.existsByUserMail(signupDto.getUserMail())).thenReturn(false);
         when(passwordValidator.isPasswordStrongEnough(signupDto.getUserPassword())).thenReturn(true);
         when(encryptService.getEncryptedPassword(anyString())).thenReturn("hashed_password");
@@ -172,7 +290,6 @@ class UserSignupServiceTest {
                 .when(mailService)
                 .sendMimeMessage(anyString(), anyString(), anyString(), any());
 
-        // Act & Assert
         assertThrows(MailSendingFailedException.class, () -> {
             userSignupService.signup(signupDto);
         });
@@ -180,7 +297,6 @@ class UserSignupServiceTest {
 
     @Test
     void login_Success_ReturnsToken() {
-        // Arrange
         UserEntity existingUser = new UserEntity();
         existingUser.setUserMail(signupDto.getUserMail());
         existingUser.setUserPassword("hashed_password");
@@ -189,39 +305,30 @@ class UserSignupServiceTest {
         when(encryptService.checkIfPasswordMatches(signupDto.getUserPassword(), "hashed_password")).thenReturn(true);
         when(tokenService.generateUserToken(signupDto.getUserMail())).thenReturn("jwt_token_xyz");
 
-        // Act
         String token = userSignupService.login(signupDto);
 
-        // Assert
         assertEquals("jwt_token_xyz", token);
     }
 
     @Test
     void login_ThrowsException_WhenPasswordWrong() {
-        // Arrange
         UserEntity existingUser = new UserEntity();
         when(userEntityRepository.findByUserMail(signupDto.getUserMail())).thenReturn(existingUser);
         when(encryptService.checkIfPasswordMatches(anyString(), any())).thenReturn(false);
 
-        // Act & Assert
         assertThrows(WrongPasswordException.class, () -> userSignupService.login(signupDto));
     }
 
     @Test
     void confirm_ThrowsException_WhenTokenInvalid() {
-        // Act & Assert
         assertThrows(TokenNotFoundException.class, () -> userSignupService.confirm("invalid-token-123"));
     }
 
     @Test
     void confirm_Success_Coverage() {
         String testToken = "test-token-123";
-        PendingSignupEntity pendingSignupEntity = new PendingSignupEntity(
-                testToken,
-                "test@mail.com",
-                "hashed_password",
-                LocalDateTime.now().plusMinutes(10)
-        );
+        PendingSignupEntity pendingSignupEntity = pendingToken(
+                testToken, PendingTokenPurpose.SIGNUP, LocalDateTime.now().plusMinutes(10));
 
         when(pendingSignupEntityRepository.findById(testToken)).thenReturn(Optional.of(pendingSignupEntity));
 
@@ -234,12 +341,8 @@ class UserSignupServiceTest {
     @Test
     void confirm_ThrowsException_WhenTokenExpired() {
         String testToken = "expired-token";
-        PendingSignupEntity expiredToken = new PendingSignupEntity(
-                testToken,
-                "test@mail.com",
-                "hashed_password",
-                LocalDateTime.now().minusMinutes(1)
-        );
+        PendingSignupEntity expiredToken = pendingToken(
+                testToken, PendingTokenPurpose.SIGNUP, LocalDateTime.now().minusMinutes(1));
 
         when(pendingSignupEntityRepository.findById(testToken)).thenReturn(Optional.of(expiredToken));
 
@@ -249,10 +352,20 @@ class UserSignupServiceTest {
 
     @Test
     void confirm_TokenNotFound_Coverage() {
-        // Act & Assert (This ensures the 'else' block is covered)
         assertThrows(TokenNotFoundException.class, () -> {
             userSignupService.confirm("wrong-token");
         });
+    }
+
+    @Test
+    void confirmUserMail_SucceedsForAnUnexpiredSignupToken() {
+        when(pendingSignupEntityRepository.findById("signup-token"))
+                .thenReturn(Optional.of(pendingToken(
+                        "signup-token", PendingTokenPurpose.SIGNUP, LocalDateTime.now().plusMinutes(10))));
+
+        userSignupService.confirmUserMail("signup-token");
+
+        verify(pendingSignupEntityRepository, never()).deleteById(anyString());
     }
 
     @Test
@@ -273,10 +386,8 @@ class UserSignupServiceTest {
 
     @Test
     void passwordResetLinkUsesFrontendPublicBaseUrl() throws Exception {
-        UserEntity existingUser = new UserEntity();
-        existingUser.setUserMail(SIGNUP_EMAIL);
-        existingUser.setUserPassword("hashed_password");
-        when(userEntityRepository.findByUserMail(SIGNUP_EMAIL)).thenReturn(existingUser);
+        UserEntity existing = existingUser();
+        when(userEntityRepository.findByUserMail(SIGNUP_EMAIL)).thenReturn(existing);
 
         userSignupService.verifyUserMail(SIGNUP_EMAIL);
 
@@ -289,16 +400,24 @@ class UserSignupServiceTest {
     }
 
     @Test
+    void passwordResetTokenIsPersistedWithTheResetPurpose() {
+        when(userEntityRepository.findByUserMail(SIGNUP_EMAIL)).thenReturn(existingUser());
+
+        userSignupService.verifyUserMail(SIGNUP_EMAIL);
+
+        assertEquals(PendingTokenPurpose.PASSWORD_RESET, savedPendingSignup().getTokenPurpose());
+        verify(pendingSignupEntityRepository).deleteByUserMailAndTokenPurpose(
+                SIGNUP_EMAIL, PendingTokenPurpose.PASSWORD_RESET);
+    }
+
+    @Test
     void linkGenerationNormalizesOneTrailingSlash() throws Exception {
         UserSignupService service = serviceWith(BACKEND_BASE_URL + "/", FRONTEND_BASE_URL + "/");
 
         when(userEntityRepository.existsByUserMail(signupDto.getUserMail())).thenReturn(false);
         when(passwordValidator.isPasswordStrongEnough(signupDto.getUserPassword())).thenReturn(true);
         when(encryptService.getEncryptedPassword(anyString())).thenReturn("hashed_password");
-        UserEntity existingUser = new UserEntity();
-        existingUser.setUserMail(SIGNUP_EMAIL);
-        existingUser.setUserPassword("hashed_password");
-        when(userEntityRepository.findByUserMail(SIGNUP_EMAIL)).thenReturn(existingUser);
+        when(userEntityRepository.findByUserMail(SIGNUP_EMAIL)).thenReturn(existingUser());
 
         service.signup(signupDto);
         String signupToken = savedPendingToken();

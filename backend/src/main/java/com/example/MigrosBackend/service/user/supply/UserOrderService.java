@@ -3,9 +3,9 @@ package com.example.MigrosBackend.service.user.supply;
 import com.example.MigrosBackend.dto.order.OrderDto;
 import com.example.MigrosBackend.dto.order.OrderPageDto;
 import com.example.MigrosBackend.dto.user.UserProfileTableDto;
-import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.user.OrderEntity;
 import com.example.MigrosBackend.entity.user.OrderGroupEntity;
+import com.example.MigrosBackend.entity.user.OrderStatus;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.exception.admin.OrderNotFoundException;
 import com.example.MigrosBackend.exception.admin.UserNotFoundException;
@@ -27,7 +27,7 @@ public class UserOrderService {
     private final UserEntityRepository userEntityRepository;
     private final OrderEntityRepository orderEntityRepository;
     private final OrderGroupEntityRepository orderGroupEntityRepository;
-    private final ProductEntityRepository productEntityRepository;
+    private final OrderStockRestocker orderStockRestocker;
 
     public UserOrderService(TokenService tokenService,
                             UserEntityRepository userEntityRepository,
@@ -38,7 +38,7 @@ public class UserOrderService {
         this.userEntityRepository = userEntityRepository;
         this.orderEntityRepository = orderEntityRepository;
         this.orderGroupEntityRepository = orderGroupEntityRepository;
-        this.productEntityRepository = productEntityRepository;
+        this.orderStockRestocker = new OrderStockRestocker(productEntityRepository);
     }
 
     public void clearUserCart(String userToken) {
@@ -119,8 +119,23 @@ public class UserOrderService {
         return order;
     }
 
+    /**
+     * Applies an administrator status change to a whole order in one
+     * transaction.
+     *
+     * <p>Previously the group status and its line statuses were written by
+     * separate repository calls with no surrounding transaction, so a failure
+     * between them left an order whose header and lines disagreed about their
+     * status. The group row is locked for the whole change so a concurrent user
+     * cancellation cannot interleave between the status check and the line
+     * updates.
+     *
+     * <p>Status values are passed through unchanged, so existing API and status
+     * string compatibility is preserved.
+     */
+    @Transactional
     public void updateOrderStatus(Long orderId, String status) {
-        OrderGroupEntity orderGroup = orderGroupEntityRepository.findById(orderId).orElse(null);
+        OrderGroupEntity orderGroup = orderGroupEntityRepository.findByIdForUpdate(orderId).orElse(null);
         if (orderGroup != null) {
             orderGroup.setStatus(status);
             orderGroupEntityRepository.save(orderGroup);
@@ -133,48 +148,45 @@ public class UserOrderService {
             return;
         }
 
-        OrderEntity legacyOrder = orderEntityRepository.findById(orderId)
+        OrderEntity legacyOrder = orderEntityRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId.toString()));
         legacyOrder.setStatus(status);
         orderEntityRepository.save(legacyOrder);
     }
 
+    /**
+     * Deletes an order, returning its reserved units to live stock when it is
+     * still {@code Pending}.
+     *
+     * <p>The order row is locked before the status is read, so a concurrent
+     * cancellation of the same order cannot both observe {@code Pending} and
+     * both restock. The status read, the restock, and the delete share one
+     * transaction, so a failure anywhere in the sequence leaves the order and
+     * its stock untouched.
+     */
     @Transactional
     public void deleteOrder(Long orderId) {
-        OrderGroupEntity orderGroup = orderGroupEntityRepository.findById(orderId).orElse(null);
+        OrderGroupEntity orderGroup = orderGroupEntityRepository.findByIdForUpdate(orderId).orElse(null);
         if (orderGroup != null) {
             List<OrderEntity> items = orderEntityRepository.findByOrderGroup_Id(orderGroup.getId());
-            if ("Pending".equalsIgnoreCase(orderGroup.getStatus())) {
-                restockOrderItems(items);
+            if (OrderStatus.isPending(orderGroup.getStatus())) {
+                orderStockRestocker.restore(items);
             }
             orderEntityRepository.deleteAll(items);
             orderGroupEntityRepository.delete(orderGroup);
             return;
         }
 
-        OrderEntity legacyOrder = orderEntityRepository.findById(orderId)
+        OrderEntity legacyOrder = orderEntityRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId.toString()));
-        if ("Pending".equalsIgnoreCase(legacyOrder.getStatus())) {
-            ProductEntity product = productEntityRepository.findById(legacyOrder.getItemId()).orElse(null);
-            if (product != null) {
-                product.setProductCount(product.getProductCount() + legacyOrder.getCount());
-                productEntityRepository.save(product);
-            }
+        if (OrderStatus.isPending(legacyOrder.getStatus())) {
+            orderStockRestocker.restore(legacyOrder.getItemId(),
+                    legacyOrder.getCount() == null ? 0 : legacyOrder.getCount());
         }
         orderEntityRepository.delete(legacyOrder);
     }
 
 
-    private void restockOrderItems(List<OrderEntity> orderItems) {
-        for (OrderEntity orderItem : orderItems) {
-            ProductEntity product = productEntityRepository.findById(orderItem.getItemId()).orElse(null);
-            if (product == null) {
-                continue;
-            }
-            product.setProductCount(product.getProductCount() + orderItem.getCount());
-            productEntityRepository.save(product);
-        }
-    }
     private UserEntity getValidatedUser(String userToken) {
         String userName = tokenService.validateAndExtractUser(userToken);
         UserEntity user = userEntityRepository.findByUserMail(userName);

@@ -112,6 +112,23 @@ Legacy `REAL` money columns are converted to `NUMERIC(19, 2)` by Flyway on
 startup. Migrations live in `backend/src/main/resources/db/migration` and are
 applied to both an existing populated schema and a fresh empty database.
 
+Two security-relevant schema changes ship with this release:
+
+* **Pending tokens record their purpose.** Signup-confirmation tokens and
+  password-reset tokens share one table and are both opaque random strings, so
+  without a recorded purpose any token could be redeemed against any pending
+  token endpoint. The new `token_purpose` column is `NOT NULL` with no default:
+  a write that omits the purpose fails rather than silently acquiring one.
+  Pre-existing rows are deleted, because their purpose is unknowable and
+  guessing would re-open the replay this closes. Tokens are short-lived and
+  single-use, so an in-flight signup or reset just fails with the existing
+  "token not found" response and the user repeats the request.
+* **Product images are named from a UUID and never overwritten.** The previous
+  millisecond-resolution timestamp name collided, and the second upload
+  silently replaced the first, leaving two products serving one image. Uploads
+  are now written with `CREATE_NEW`, and a file whose related database insert
+  fails is deleted so no orphan image is left on disk.
+
 * Local development credentials (only created when the active profile set is exactly `local`): admin / admin
 
 > The `admin` / `admin` account is a **local-development-only** convenience. It is
@@ -253,6 +270,20 @@ commit the populated copy. The template is enforced by
   `/internal/support/**`) and the outbound pair (`SUPPORT_SERVICE_BASE_URL`,
   `SUPPORT_SERVICE_INTERNAL_KEY`) consistently with the external support
   service. The two keys must be different values.
+* When `SUPPORT_SERVICE_BASE_URL` is set, outbound support events go through a
+  **transactional outbox**. Every support chat message creation, edit, and
+  deletion writes a durable outbox record in the same database transaction as
+  the message itself, so a notification can never be lost after the message was
+  committed, and a slow support service can never block a chat request. A
+  scheduled worker claims due records with a bounded lease, delivers them
+  outside any transaction, and retries failures with exponential backoff. The
+  optional `SUPPORT_OUTBOX_*` values tune the worker.
+* Delivery is **at least once**: a request that succeeded on the receiver but
+  whose response was lost is retried. The `eventId` in the payload is stable
+  across every retry, so the support service must deduplicate on it. Events for
+  one customer are delivered in commit order and never reordered by a retry.
+  Stored payloads may contain customer message text: they are never logged and
+  never exposed through the API.
 
 ### Verification gate
 
@@ -264,6 +295,23 @@ it against the deployed revision and record sanitized evidence before
 considering a release production-ready.
 
 Nginx now applies per-IP throttling before requests reach Spring Boot (including stricter limits for login, payment, and support send endpoints) and returns HTTP 429 when limits are exceeded.
+
+## Security logging
+
+Failed administrator logins are recorded with the account name, a fixed reason,
+and the client address. Neither the submitted password nor any hash derived
+from it is ever computed for logging: a password-derived value in a log file is
+a credential-equivalent secret, and that includes the hash of a login attempt
+against an account that does not exist.
+
+The client address is the container's `remoteAddr` by default.
+`X-Forwarded-For` is consulted **only** when the immediate peer matches
+`APP_TRUSTED_PROXIES`, a comma-separated list of plain addresses or CIDR blocks
+(for example `172.16.0.0/12,10.0.0.7`). Leave it empty unless a reverse proxy
+you control is guaranteed to overwrite the header; an empty value means a forged
+forwarding header can never spoof the address recorded next to a failure.
+Forwarded values must be IP literals and are length-capped; hostnames are never
+resolved.
 
 ## Administrator provisioning
 

@@ -35,6 +35,7 @@ public class AdminSupplyService {
     private final AdminEntityRepository adminEntityRepository;
     private final AdminProductDescriptionOperations productDescriptionOperations;
     private final AdminProductImageOperations productImageOperations;
+    private final FileService fileService;
 
     @Autowired
     public AdminSupplyService(CategoryEntityRepository categoryEntityRepository, ProductEntityRepository productEntityRepository, ProductImageEntityRepository productImageEntityRepository, AdminEntityRepository adminEntityRepository, ProductDescriptionEntityRepository productDescriptionEntityRepository, FileService fileService) {
@@ -42,6 +43,7 @@ public class AdminSupplyService {
         this.productEntityRepository = productEntityRepository;
         this.productImageEntityRepository = productImageEntityRepository;
         this.adminEntityRepository = adminEntityRepository;
+        this.fileService = fileService;
         this.productDescriptionOperations = new AdminProductDescriptionOperations(
                 productEntityRepository, productDescriptionEntityRepository);
         this.productImageOperations = new AdminProductImageOperations(fileService);
@@ -84,24 +86,37 @@ public class AdminSupplyService {
                               MultipartFile selectedImage) {
         NormalizedProductDetails details = normalizeProductDetails(
                 productName, subCategoryName, productPrice, productCount, productDiscount, productDescription);
+        productImageOperations.validateProductImage(selectedImage);
 
-        Path savedFilePath = productImageOperations.saveRequiredProductImage(selectedImage);
-
+        // Every database reference is resolved before a single byte is written.
+        // The file is the one part of this operation that cannot be undone by a
+        // database rollback, so nothing may be written until the rows it belongs
+        // to are known to be viable; otherwise an invalid category or admin
+        // leaves an orphan image on disk that nothing ever references.
         CategoryEntity categoryEntity = categoryEntityRepository.findByCategoryId(categoryValue);
         if (categoryEntity == null) {
             throw new GeneralException("Invalid category value: " + categoryValue);
         }
-        AdminEntity adminEntity = adminEntityRepository.findById(adminId).orElseThrow(() -> new AdminNotFoundException(adminId.toString()));
+        AdminEntity adminEntity = adminEntityRepository.findById(adminId)
+                .orElseThrow(() -> new AdminNotFoundException(adminId.toString()));
 
-        ProductEntity productEntity = new ProductEntity();
-        applyProductDetails(productEntity, adminEntity, categoryEntity, details,
-                productPrice, productCount, productDiscount);
-        productEntityRepository.save(productEntity);
+        Path savedFilePath = productImageOperations.writeProductImage(selectedImage);
+        try {
+            ProductEntity productEntity = new ProductEntity();
+            applyProductDetails(productEntity, adminEntity, categoryEntity, details,
+                    productPrice, productCount, productDiscount);
+            productEntityRepository.save(productEntity);
 
-        ProductImageEntity productImageEntity = new ProductImageEntity();
-        productImageEntity.setImagePath(savedFilePath.toString());
-        productImageEntity.setProductEntity(productEntity);
-        productImageEntityRepository.save(productImageEntity);
+            ProductImageEntity productImageEntity = new ProductImageEntity();
+            productImageEntity.setImagePath(savedFilePath.toString());
+            productImageEntity.setProductEntity(productEntity);
+            productImageEntityRepository.save(productImageEntity);
+        } catch (RuntimeException ex) {
+            // The product row never became durable, so the image it points at
+            // would be an orphan that no product can ever serve or clean up.
+            fileService.deleteFileIfExists(savedFilePath);
+            throw ex;
+        }
     }
 
     public void updateProduct(Long adminId, Long productId, String productName,
@@ -124,14 +139,18 @@ public class AdminSupplyService {
         productEntityRepository.save(productEntity);
 
         if (selectedImage != null && !selectedImage.isEmpty()) {
-            Path savedFilePath = productImageOperations.saveProductImage(selectedImage);
-
-            // Update the image entity only if a new file was provided
             List<ProductImageEntity> images = productImageEntityRepository.findByProductEntityId(productEntity.getId());
-            if (!images.isEmpty()) {
-                ProductImageEntity productImageEntity = images.get(0);
-                productImageEntity.setImagePath(savedFilePath.toString());
-                productImageEntityRepository.save(productImageEntity);
+            Path savedFilePath = productImageOperations.writeProductImage(selectedImage);
+            try {
+                // Update the image entity only if a new file was provided
+                if (!images.isEmpty()) {
+                    ProductImageEntity productImageEntity = images.get(0);
+                    productImageEntity.setImagePath(savedFilePath.toString());
+                    productImageEntityRepository.save(productImageEntity);
+                }
+            } catch (RuntimeException ex) {
+                fileService.deleteFileIfExists(savedFilePath);
+                throw ex;
             }
         }
     }

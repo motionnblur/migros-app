@@ -55,6 +55,17 @@ public class SupportChatService {
         return getMappedMessagesForUserMail(userMail);
     }
 
+    /**
+     * Stores the message and the support-service event owed for it in one
+     * transaction.
+     *
+     * <p>The outbox record is written by {@link SupportInternalEventService}
+     * from inside this transaction, so the message and the notification can
+     * never disagree: either both commit or neither does. Previously the event
+     * was published inline, so a support-service outage left the message
+     * committed with its notification silently dropped.
+     */
+    @Transactional
     public void addUserMessage(String token, String message) {
         String userMail = getValidUserMailFromToken(token);
         UserEntity user = userEntityRepository.findByUserMail(userMail);
@@ -152,6 +163,8 @@ public class SupportChatService {
     public void addManagementMessage(String userMail, String message) {
         addManagementMessage(userMail, message, null);
     }
+
+    @Transactional
     public void addManagementMessage(String userMail, String message, String externalMessageId) {
         UserEntity user = userEntityRepository.findByUserMail(userMail);
         if (user == null) {

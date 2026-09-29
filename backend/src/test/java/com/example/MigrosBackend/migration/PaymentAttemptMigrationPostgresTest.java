@@ -196,7 +196,8 @@ class PaymentAttemptMigrationPostgresTest {
     void migrationIsIdempotentAndRecordsVersionFour() throws SQLException {
         createBaseSchema();
         MigrateResult first = migrate();
-        assertEquals(5, first.migrationsExecuted, "V1, V2, V3, V4 and V5 must run on a first migrate");
+        assertEquals(MigrationTestSupport.versionedMigrationCount(), first.migrationsExecuted,
+                "every versioned script must run on a first migrate");
 
         MigrateResult second = migrate();
         assertEquals(0, second.migrationsExecuted);
@@ -216,7 +217,7 @@ class PaymentAttemptMigrationPostgresTest {
         // build the base tables plus fully constrained payment tables (no
         // Hibernate runtime DDL required).
         MigrateResult result = migrate();
-        assertEquals(5, result.migrationsExecuted);
+        assertEquals(MigrationTestSupport.versionedMigrationCount(), result.migrationsExecuted);
 
         try (Connection connection = openConnection()) {
             assertColumn(connection, "checkout_entity", "total_amount", "numeric", 19, 2);

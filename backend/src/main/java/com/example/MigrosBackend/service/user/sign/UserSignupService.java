@@ -3,6 +3,7 @@ package com.example.MigrosBackend.service.user.sign;
 import com.example.MigrosBackend.dto.user.sign.ResetPasswordDto;
 import com.example.MigrosBackend.dto.user.sign.UserSignDto;
 import com.example.MigrosBackend.entity.user.PendingSignupEntity;
+import com.example.MigrosBackend.entity.user.PendingTokenPurpose;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.exception.shared.TokenNotFoundException;
 import com.example.MigrosBackend.exception.shared.WrongPasswordException;
@@ -21,6 +22,7 @@ import jakarta.mail.MessagingException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.util.UriUtils;
 import org.thymeleaf.context.Context;
@@ -48,9 +50,10 @@ public class UserSignupService {
             MailService mailService, TokenService tokenService,
             PasswordValidator passwordValidator,
             PublicUrlProperties publicUrlProperties,
+            PlatformTransactionManager transactionManager,
             @Value("${app.signup.confirmation.ttl-minutes:15}") long confirmationTokenTtlMinutes) {
         this.userEntityRepository = userEntityRepository;
-        this.pendingSignupStorage = new PendingSignupStorage(pendingSignupEntityRepository, confirmationTokenTtlMinutes);
+        this.pendingSignupStorage = new PendingSignupStorage(pendingSignupEntityRepository, transactionManager);
         this.encryptService = encryptService;
         this.mailService = mailService;
         this.tokenService = tokenService;
@@ -59,6 +62,15 @@ public class UserSignupService {
         this.confirmationTokenTtlMinutes = confirmationTokenTtlMinutes;
     }
 
+    /**
+     * Registers a pending signup.
+     *
+     * <p>Ordering is load-bearing: the token is committed to the database
+     * before the mail is sent, so a delivered link can never reference a token
+     * that was never stored. If the mail cannot be sent the whole transaction
+     * rolls back, which both preserves the existing failure response and
+     * guarantees no undeliverable token is left behind.
+     */
     @Transactional
     public void signup(UserSignDto userSignDto) {
         if (userEntityRepository.existsByUserMail(userSignDto.getUserMail())) {
@@ -73,25 +85,18 @@ public class UserSignupService {
         userEntityToCreate.setUserMail(userSignDto.getUserMail());
         userEntityToCreate.setUserPassword(encryptService.getEncryptedPassword(userSignDto.getUserPassword()));
 
-        String key = UUID.randomUUID().toString().replace("-", "");
+        String key = newToken();
         String confirmationLink = publicUrlProperties.normalizedBackendBaseUrl()
                 + "/user/signup/confirm?token=" + UriUtils.encodeQueryParam(key, StandardCharsets.UTF_8);
-        PendingSignupEntity pendingSignup = new PendingSignupEntity(
+        pendingSignupStorage.store(new PendingSignupEntity(
                 key,
                 userEntityToCreate.getUserMail(),
                 userEntityToCreate.getUserPassword(),
-                LocalDateTime.now().plusMinutes(confirmationTokenTtlMinutes)
-        );
-        pendingSignupStorage.store(pendingSignup);
+                expiresAt(),
+                PendingTokenPurpose.SIGNUP
+        ));
 
-        Context context = new Context();
-        context.setVariable("confirmationLink", confirmationLink);
-
-        try {
-            mailService.sendMimeMessage(userSignDto.getUserMail(), "Welcome to Migros!", "confirmation-email", context);
-        } catch (MessagingException e) {
-            throw new MailSendingFailedException();
-        }
+        sendLink(userSignDto.getUserMail(), confirmationLink);
     }
 
     public String login(UserSignDto userSignDto) {
@@ -107,17 +112,13 @@ public class UserSignupService {
         return tokenService.generateUserToken(userEntity.getUserMail());
     }
 
+    /**
+     * Consumes a signup token. A token issued for any other purpose (a
+     * password reset, for example) is rejected exactly like an unknown token.
+     */
     @Transactional
     public void confirm(String token) {
-        PendingSignupEntity pendingSignup = pendingSignupStorage.findByToken(token);
-        if (pendingSignup == null) {
-            throw new TokenNotFoundException();
-        }
-
-        if (pendingSignup.getExpiresAt() == null || pendingSignup.getExpiresAt().isBefore(LocalDateTime.now())) {
-            pendingSignupStorage.delete(token);
-            throw new TokenNotFoundException();
-        }
+        PendingSignupEntity pendingSignup = requireToken(token, PendingTokenPurpose.SIGNUP);
 
         UserEntity userEntity = new UserEntity();
         userEntity.setUserMail(pendingSignup.getUserMail());
@@ -129,17 +130,14 @@ public class UserSignupService {
 
     @Transactional
     public void confirmUserMail(String token) {
-        PendingSignupEntity pendingSignup = pendingSignupStorage.findByToken(token);
-        if (pendingSignup == null) {
-            throw new TokenNotFoundException();
-        }
-
-        if (pendingSignup.getExpiresAt() == null || pendingSignup.getExpiresAt().isBefore(LocalDateTime.now())) {
-            pendingSignupStorage.delete(token);
-            throw new TokenNotFoundException();
-        }
+        requireToken(token, PendingTokenPurpose.SIGNUP);
     }
 
+    /**
+     * Consumes a password-reset token. A signup token is rejected exactly like
+     * an unknown token, so a signup link can never be used to choose a
+     * password.
+     */
     @Transactional
     public void resetPassword(ResetPasswordDto resetPasswordDto) {
         if (resetPasswordDto == null
@@ -149,16 +147,7 @@ public class UserSignupService {
         }
 
         String token = resetPasswordDto.getToken();
-        PendingSignupEntity pendingSignup = pendingSignupStorage.findByToken(token);
-        if (pendingSignup == null) {
-            throw new TokenNotFoundException();
-        }
-
-        if (pendingSignup.getExpiresAt() == null
-                || pendingSignup.getExpiresAt().isBefore(LocalDateTime.now())) {
-            pendingSignupStorage.delete(token);
-            throw new TokenNotFoundException();
-        }
+        PendingSignupEntity pendingSignup = requireToken(token, PendingTokenPurpose.PASSWORD_RESET);
 
         if (!passwordValidator.isPasswordStrongEnough(resetPasswordDto.getUserPassword())) {
             throw new WeakPasswordException();
@@ -176,34 +165,56 @@ public class UserSignupService {
         pendingSignupStorage.delete(token);
     }
 
+    /**
+     * Issues a password-reset token. As with signup, the token is stored before
+     * the mail is sent, and a mail failure aborts the whole operation.
+     */
+    @Transactional
     public void verifyUserMail(String userMail) {
         UserEntity userEntity = userEntityRepository.findByUserMail(userMail);
         if (userEntity == null) {
             throw new UserMailNotFoundException(userMail);
         }
 
-        String key = UUID.randomUUID().toString().replace("-", "");
+        String key = newToken();
         String confirmationLink = publicUrlProperties.normalizedFrontendBaseUrl()
                 + "/reset-password/" + UriUtils.encodePathSegment(key, StandardCharsets.UTF_8);
 
-        PendingSignupEntity pendingSignup = new PendingSignupEntity();
-        pendingSignup.setToken(key);
-        pendingSignup.setUserMail(userEntity.getUserMail()); // Burada userEntity kullanıldı
+        pendingSignupStorage.store(new PendingSignupEntity(
+                key,
+                userEntity.getUserMail(),
+                userEntity.getUserPassword(),
+                expiresAt(),
+                PendingTokenPurpose.PASSWORD_RESET
+        ));
 
-        // Şifreyi de veritabanından gelen kullanıcıdan alıyoruz
-        pendingSignup.setUserPassword(userEntity.getUserPassword());
-        pendingSignup.setExpiresAt(LocalDateTime.now().plusMinutes(confirmationTokenTtlMinutes));
+        sendLink(userMail, confirmationLink);
+    }
 
-        // 3. Kaydet
-        pendingSignupStorage.store(pendingSignup);
+    private PendingSignupEntity requireToken(String token, PendingTokenPurpose purpose) {
+        PendingSignupEntity pendingSignup = pendingSignupStorage.findActiveToken(token, purpose);
+        if (pendingSignup == null) {
+            throw new TokenNotFoundException();
+        }
+        return pendingSignup;
+    }
 
+    private void sendLink(String userMail, String link) {
         Context context = new Context();
-        context.setVariable("confirmationLink", confirmationLink);
+        context.setVariable("confirmationLink", link);
 
         try {
             mailService.sendMimeMessage(userMail, "Welcome to Migros!", "confirmation-email", context);
         } catch (MessagingException e) {
             throw new MailSendingFailedException();
         }
+    }
+
+    private String newToken() {
+        return UUID.randomUUID().toString().replace("-", "");
+    }
+
+    private LocalDateTime expiresAt() {
+        return LocalDateTime.now().plusMinutes(confirmationTokenTtlMinutes);
     }
 }

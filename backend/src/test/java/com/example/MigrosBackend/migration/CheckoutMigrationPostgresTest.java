@@ -137,7 +137,7 @@ class CheckoutMigrationPostgresTest {
     void migrationIsIdempotentAndRecordsVersionTwo() throws SQLException {
         createBaseSchema();
         MigrateResult first = migrate();
-        assertEquals(5, first.migrationsExecuted);
+        assertEquals(MigrationTestSupport.versionedMigrationCount(), first.migrationsExecuted);
 
         MigrateResult second = migrate();
         assertEquals(0, second.migrationsExecuted);

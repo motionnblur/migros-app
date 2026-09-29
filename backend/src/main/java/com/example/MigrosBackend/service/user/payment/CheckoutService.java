@@ -11,6 +11,7 @@ import com.example.MigrosBackend.entity.payment.PaymentAttemptStatus;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.user.OrderEntity;
 import com.example.MigrosBackend.entity.user.OrderGroupEntity;
+import com.example.MigrosBackend.entity.user.OrderStatus;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.exception.admin.UserNotFoundException;
 import com.example.MigrosBackend.exception.shared.GeneralException;
@@ -46,7 +47,7 @@ import java.util.UUID;
 @Service
 public class CheckoutService {
 
-    private static final String ORDER_PENDING_STATUS = "Pending";
+    private static final String ORDER_PENDING_STATUS = OrderStatus.PENDING;
 
     private final TokenService tokenService;
     private final UserEntityRepository userEntityRepository;

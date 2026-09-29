@@ -37,6 +37,56 @@ Backend packages follow a mostly standard layered layout:
   - Session check endpoints:
     - `GET /user/session` -> `{ userMail }`
     - `GET /admin/session` -> `{ adminName }`
+  - Admin login failures are logged by `AdminSignupService` with the account
+    name, a fixed reason, and the resolved client address only. Never log the
+    submitted password or any hash derived from it, including the hash of a
+    non-existent account: a password-derived value in a log file is a
+    credential-equivalent secret.
+  - `service/global/LogService` resolves the client address. It trusts
+    `X-Forwarded-For` **only** when the immediate peer matches
+    `app.trusted-proxies` (comma-separated addresses/CIDR blocks, parsed by
+    `helper/TrustedProxyList`). Empty is the default and means trust nothing, so
+    a forged forwarding header cannot spoof the address recorded next to a
+    failure. Forwarded values must also be IP literals, are length-capped, and
+    hostnames are never resolved.
+- Signup and reset tokens
+  - The database is the only store (`PendingSignupStorage`). There is no
+    in-memory fallback and no expiry scheduler: a fallback would let a request
+    report success for a token that only exists in one process's heap.
+  - Storage failures propagate so the request fails instead of reporting success.
+  - The token is committed before the mail is sent; a mail failure aborts the
+    whole transaction, so no undeliverable token is left behind.
+  - `PendingTokenPurpose` binds each token to one flow. `confirm` and
+    `confirmUserMail` accept only `SIGNUP`; `resetPassword` accepts only
+    `PASSWORD_RESET`. A mismatch is reported as "token not found" so a caller
+    cannot distinguish a wrong-purpose token from an unknown one.
+  - V6 added `token_purpose` as `NOT NULL` with **no** column default, and
+    deleted pre-existing rows whose purpose was unknowable. Do not add a default
+    and do not repurpose an existing migration.
+- Support subsystem
+  - User REST endpoints in `controller/user/support`.
+  - Internal support bridge in `controller/internal/InternalSupportController` using `x-internal-key`.
+  - Realtime broadcasts in `websocket/SupportChatWebSocketHandler`.
+  - Outbound events use a **transactional outbox**:
+    - `SupportInternalEventService` is the producer. It only writes a durable
+      row; it must be called from inside the transaction that mutates the chat,
+      so the message and the event it owes commit or roll back together.
+    - `SupportOutboxStore` owns enqueue, claim, and completion as separate
+      commits. Worker transitions are fenced on a lease token; a stale worker
+      gets `STALE_CLAIM` and changes nothing.
+    - `SupportOutboxDispatcher` performs the HTTP call with no transaction and
+      no row lock held, and retries with exponential backoff. `SupportOutboxJob`
+      schedules delivery and retention.
+    - Delivery is **at least once**. The `eventId` is the row's primary key and
+      is never regenerated, so every retry resends a byte-identical payload and
+      the receiver deduplicates on it. Never mint a new id per attempt.
+    - Per-customer ordering: a row is claimable only when no earlier row for the
+      same `user_mail` is still `PENDING`/`PROCESSING`. Do not "optimize" the
+      claim scan by dropping that predicate; it is what keeps a retry from
+      overtaking a conversation's earlier event.
+    - Stored payloads may contain customer message text: never log them and
+      never expose them through the API. Retention deletes `DELIVERED` rows
+      only.
 - Security config
   - `SecurityConfiguration` defines open/authenticated/admin-only routes.
   - CORS and WebSocket allowed origins are driven by `app.allowed-origins` and `app.allowed-origin-patterns`.
@@ -59,6 +109,23 @@ Backend packages follow a mostly standard layered layout:
 - Product/order flows
   - User shopping and order history under `controller/user/supply` and `service/user/supply`.
   - Admin product/order management under `controller/admin/panel` and `service/admin/supply`.
+  - Order status, cancellation, and deletion all decide from a status read, so
+    each takes a `PESSIMISTIC_WRITE` lock on the order group (or the legacy
+    order) first. Without that lock two transactions both observe `Pending` and
+    both restock. Read-only display paths must keep using the non-locking finders.
+  - Restocking goes through `service/user/supply/OrderStockRestocker`, which
+    aggregates per product, applies one atomic `productCount = productCount + n`
+    statement, and always applies products in ascending id order so overlapping
+    orders take the same lock order.
+  - `entity/user/OrderStatus` owns the status strings. Admin-supplied values
+    are stored verbatim, so API compatibility is preserved.
+- Product images
+  - `service/global/FileService` writes with `CREATE_NEW`: a colliding name
+    fails loudly instead of truncating another product's image.
+  - `AdminProductImageOperations` names files from a UUID, never a timestamp.
+  - `AdminSupplyService` resolves every database reference (category, admin,
+    product) before writing any file, and deletes a newly written file when the
+    related insert fails, so an invalid reference cannot leave an orphan image.
 - Persistence and money
   - Flyway migrations live in `backend/src/main/resources/db/migration` and
     run against both existing and fresh databases.
@@ -142,6 +209,8 @@ Backend packages follow a mostly standard layered layout:
   - `APP_MAIL_PROVIDER` (`smtp` locally, `resend` in prod by default)
   - `SUPPORT_SERVICE_BASE_URL`, `SUPPORT_SERVICE_INTERNAL_KEY`, `SUPPORT_INTERNAL_KEY`
   - `APP_UPLOAD_DIR`
+  - `APP_TRUSTED_PROXIES` (empty by default: trust nothing)
+  - `SUPPORT_OUTBOX_*` (optional outbox tuning; see the support subsystem notes)
 - Static client images use `staticImageUrl` in
   `client/src/app/config/supabase-assets.ts`: local assets in development and
   the configured Supabase public base URL in production.
@@ -211,6 +280,8 @@ Backend packages follow a mostly standard layered layout:
   - update `SecurityConfiguration` and session-related frontend behavior together.
 - When touching support chat:
   - verify both websocket event flow and REST polling behavior.
+  - the outbox row is written in the same transaction as the chat write; do not
+    move publishing onto a request thread or an `@Async` boundary.
 - Preserve API path conventions currently used by `RestService`.
 - Keep `RestService` delegating to domain API clients while existing callers
   depend on it; avoid creating a second HTTP path for the same operation.
