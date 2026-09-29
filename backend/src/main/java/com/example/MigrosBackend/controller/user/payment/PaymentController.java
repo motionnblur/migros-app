@@ -9,6 +9,7 @@ import com.example.MigrosBackend.dto.payment.PaymentStatusDto;
 import com.example.MigrosBackend.helper.AuthTokenResolver;
 import com.example.MigrosBackend.service.user.payment.CheckoutService;
 import com.example.MigrosBackend.service.user.payment.UserPaymentService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -61,7 +62,7 @@ public class PaymentController {
     @PostMapping("/checkouts/{checkoutId}/charge")
     public ResponseEntity<PaymentResponseDto> charge(
             @PathVariable UUID checkoutId,
-            @RequestBody(required = false) ChargeRequestDto request,
+            @Valid @RequestBody(required = false) ChargeRequestDto request,
             @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token) {
         String userToken = authTokenResolver.requireToken(token);
         String paymentToken = request == null ? null : request.token();

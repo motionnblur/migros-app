@@ -41,6 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         ManagementContextAutoConfiguration.class
 })
 @TestPropertySource(properties = {
+        "support.internal.key=test-internal-key",
         "management.endpoint.health.probes.enabled=true",
         "management.endpoint.health.group.readiness.include=readinessState",
         "management.endpoint.health.validate-group-membership=false"

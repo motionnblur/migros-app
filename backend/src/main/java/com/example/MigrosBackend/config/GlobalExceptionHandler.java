@@ -3,12 +3,21 @@ package com.example.MigrosBackend.config;
 import com.example.MigrosBackend.exception.admin.*;
 import com.example.MigrosBackend.exception.shared.*;
 import com.example.MigrosBackend.exception.user.*;
+import com.example.MigrosBackend.dto.error.ValidationErrorDto;
 import com.example.MigrosBackend.dto.payment.CheckoutConflictDto;
 import jakarta.mail.MessagingException;
+import jakarta.validation.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+
+import java.util.List;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -157,5 +166,80 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(WebhookSignatureException.class)
     public ResponseEntity<String> handleWebhookSignature(WebhookSignatureException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ValidationErrorDto> handleMethodArgumentNotValid(MethodArgumentNotValidException ex) {
+        List<ValidationErrorDto.FieldViolation> violations = ex.getBindingResult().getFieldErrors().stream()
+                .map(error -> new ValidationErrorDto.FieldViolation(error.getField(), error.getDefaultMessage()))
+                .toList();
+        ValidationErrorDto body = new ValidationErrorDto(
+                "VALIDATION_FAILED",
+                "Request validation failed",
+                HttpStatus.BAD_REQUEST.value(),
+                violations);
+        return ResponseEntity.badRequest().body(body);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ValidationErrorDto> handleMessageNotReadable(HttpMessageNotReadableException ex) {
+        ValidationErrorDto body = new ValidationErrorDto(
+                "MALFORMED_REQUEST",
+                "Malformed request",
+                HttpStatus.BAD_REQUEST.value(),
+                null);
+        return ResponseEntity.badRequest().body(body);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ValidationErrorDto> handleMissingServletRequestParameter(
+            MissingServletRequestParameterException ex) {
+        ValidationErrorDto body = new ValidationErrorDto(
+                "MISSING_PARAMETER",
+                "Missing required parameter: " + ex.getParameterName(),
+                HttpStatus.BAD_REQUEST.value(),
+                null);
+        return ResponseEntity.badRequest().body(body);
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ValidationErrorDto> handleConstraintViolation(ConstraintViolationException ex) {
+        List<ValidationErrorDto.FieldViolation> violations = ex.getConstraintViolations().stream()
+                .map(violation -> new ValidationErrorDto.FieldViolation(
+                        violation.getPropertyPath() == null ? "" : violation.getPropertyPath().toString(),
+                        violation.getMessage()))
+                .toList();
+        ValidationErrorDto body = new ValidationErrorDto(
+                "VALIDATION_FAILED",
+                "Request validation failed",
+                HttpStatus.BAD_REQUEST.value(),
+                violations);
+        return ResponseEntity.badRequest().body(body);
+    }
+
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ResponseEntity<ValidationErrorDto> handleHandlerMethodValidation(HandlerMethodValidationException ex) {
+        List<ValidationErrorDto.FieldViolation> violations = ex.getAllValidationResults().stream()
+                .flatMap(result -> result.getResolvableErrors().stream()
+                        .map(error -> new ValidationErrorDto.FieldViolation(
+                                result.getMethodParameter().getParameterName(),
+                                error.getDefaultMessage())))
+                .toList();
+        ValidationErrorDto body = new ValidationErrorDto(
+                "VALIDATION_FAILED",
+                "Request validation failed",
+                HttpStatus.BAD_REQUEST.value(),
+                violations);
+        return ResponseEntity.badRequest().body(body);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ValidationErrorDto> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+        ValidationErrorDto body = new ValidationErrorDto(
+                "DATA_INTEGRITY_VIOLATION",
+                "Request conflicts with the current state of the resource",
+                HttpStatus.CONFLICT.value(),
+                null);
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
     }
 }

@@ -7,6 +7,7 @@ import com.example.MigrosBackend.helper.AuthTokenResolver;
 import com.example.MigrosBackend.service.admin.sign.AdminSignupService;
 import com.example.MigrosBackend.service.global.TokenService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -39,7 +40,7 @@ public class AdminSignController {
     }
 
     @PostMapping("login")
-    private ResponseEntity<Void> login(@RequestBody AdminSignDto adminSignDto, HttpServletRequest request) {
+    private ResponseEntity<Void> login(@Valid @RequestBody AdminSignDto adminSignDto, HttpServletRequest request) {
         String token = adminSupplyService.login(adminSignDto, request);
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, authCookieService.createAdminSessionCookie(token).toString())

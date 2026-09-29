@@ -17,7 +17,10 @@ It documents architecture, constraints, and safe change patterns so edits stay c
 - API: Spring Boot REST API on `:8080` with stateless JWT auth.
 - DB: PostgreSQL.
 - Edge proxy: Nginx on `:8080` in Docker setup, with endpoint-specific throttling and websocket forwarding.
-- Realtime support: WebSocket endpoint `/ws/support` plus REST polling fallback in UI.
+- Realtime support: WebSocket endpoint `/ws/support` (users) and `/admin/ws/support`
+  (admins, because the `admin_session` cookie is scoped to `/admin`), plus REST
+  polling fallback in UI. The handshake is authenticated by session cookie; the
+  client-supplied `userMail` query parameter is never trusted.
 
 ## Backend Architecture
 Backend packages follow a mostly standard layered layout:
@@ -216,7 +219,9 @@ Backend packages follow a mostly standard layered layout:
   - `AuthService` owns user/admin login state and session refresh logic.
   - Components rely on `refreshUserSession()` / `refreshAdminSession()` and observables.
 - Support UI behavior
-  - `SupportRealtimeService` subscribes to `/ws/support`.
+  - `SupportRealtimeService` subscribes to `/ws/support` (users) or
+    `/admin/ws/support` (admins); broadcasts are scoped to the target customer
+    and admin sessions only.
   - User chat is in `support-chat.component.ts`; admin chat is in
     `admin-support.component.ts`, composed by `admin-panel.component.ts`.
   - Both sides retain REST polling alongside realtime events for robustness.

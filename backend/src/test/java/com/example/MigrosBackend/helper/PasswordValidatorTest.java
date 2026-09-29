@@ -39,4 +39,18 @@ class PasswordValidatorTest {
         // Act & Assert
         assertFalse(validator.isPasswordStrongEnough(""));
     }
+
+    @Test
+    void isPasswordStrongEnough_ShouldHandleNull() {
+        // Act & Assert
+        assertFalse(validator.isPasswordStrongEnough(null));
+    }
+
+    @Test
+    void isPasswordStrongEnough_ShouldRejectPasswordLongerThan72Bytes() {
+        // 72 uppercase bytes plus lower/digit/special pushes it over the BCrypt limit.
+        String tooLong = "A".repeat(72) + "a1!";
+
+        assertFalse(validator.isPasswordStrongEnough(tooLong));
+    }
 }

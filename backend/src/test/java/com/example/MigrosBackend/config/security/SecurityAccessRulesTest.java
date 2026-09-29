@@ -26,6 +26,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
@@ -43,6 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         PaymentController.class})
 @AutoConfigureMockMvc
 @Import({SecurityConfiguration.class, JwtRequestFilter.class})
+@TestPropertySource(properties = "support.internal.key=test-internal-key")
 class SecurityAccessRulesTest {
 
     @Autowired
@@ -161,7 +163,7 @@ class SecurityAccessRulesTest {
         mockMvc.perform(post("/user/login")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
+                        .content("{\"userMail\":\"user@example.com\",\"userPassword\":\"Strong123!\"}"))
                 .andExpect(status().isOk());
     }
 

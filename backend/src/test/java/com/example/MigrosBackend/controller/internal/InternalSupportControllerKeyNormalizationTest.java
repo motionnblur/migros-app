@@ -1,45 +1,33 @@
 package com.example.MigrosBackend.controller.internal;
 
-import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
-import com.example.MigrosBackend.service.global.TokenService;
-import com.example.MigrosBackend.service.support.SupportChatService;
+import com.example.MigrosBackend.filter.InternalApiKeyFilter;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 
-import java.util.List;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
-@WebMvcTest(InternalSupportController.class)
-@AutoConfigureMockMvc(addFilters = false)
-@TestPropertySource(properties = "support.internal.key=  padded-internal-key  ")
+/**
+ * The key is now checked by {@code InternalApiKeyFilter}; this keeps coverage of
+ * the configured-key whitespace normalization that used to live in the
+ * controller.
+ */
 class InternalSupportControllerKeyNormalizationTest {
-
-    @Autowired
-    private MockMvc mockMvc;
-
-    @MockBean
-    private SupportChatService supportChatService;
-
-    @MockBean
-    private AdminEntityRepository adminEntityRepository;
-
-    @MockBean
-    private TokenService tokenService;
 
     @Test
     void customersShouldAuthorizeWhenConfiguredKeyHasSurroundingWhitespace() throws Exception {
-        when(supportChatService.searchSupportCustomers(null, null)).thenReturn(List.of());
+        InternalApiKeyFilter filter = new InternalApiKeyFilter("  padded-internal-key  ", new ObjectMapper());
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/internal/support/customers");
+        request.setServletPath("/internal/support/customers");
+        request.addHeader(InternalApiKeyFilter.HEADER_NAME, "padded-internal-key");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
 
-        mockMvc.perform(get("/internal/support/customers")
-                        .header("x-internal-key", "padded-internal-key"))
-                .andExpect(status().isOk());
+        filter.doFilter(request, response, chain);
+
+        verify(chain).doFilter(request, response);
     }
 }

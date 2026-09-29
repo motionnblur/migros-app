@@ -1,5 +1,6 @@
 package com.example.MigrosBackend.entity.user;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
@@ -20,6 +21,7 @@ public class UserEntity {
     private String userMail;
     private String userName;
     private String userLastName;
+    @JsonIgnore
     private String userPassword;
 
     private String userAddress;
@@ -48,7 +50,6 @@ public class UserEntity {
                 ", userMail='" + userMail + '\'' +
                 ", userName='" + userName + '\'' +
                 ", userLastName='" + userLastName + '\'' +
-                ", userPassword='" + userPassword + '\'' +
                 ", userAddress='" + userAddress + '\'' +
                 ", userAddress2='" + userAddress2 + '\'' +
                 ", userTown='" + userTown + '\'' +

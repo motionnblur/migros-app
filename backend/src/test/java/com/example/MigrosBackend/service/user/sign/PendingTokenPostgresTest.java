@@ -35,6 +35,12 @@ import java.sql.ResultSet;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import javax.sql.DataSource;
 
@@ -343,6 +349,87 @@ class PendingTokenPostgresTest {
     void theMigrationLeftNoPurposeLessLegacyRowRedeemable() {
         assertEquals(0, jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM pending_signup_entity WHERE token_purpose IS NULL", Integer.class));
+    }
+
+    /**
+     * Two callers must not be able to redeem one token into two accounts.
+     *
+     * <p>Both threads are released at the same moment and call the same
+     * endpoint. The conditional DELETE lets exactly one of them remove the row;
+     * the other is reported as "token not found". The unique mailbox constraint
+     * is the second line of defense, but the assertion here is the end state:
+     * one account, token consumed.
+     */
+    @Test
+    void onlyOneConcurrentConfirmationOfTheSameTokenSucceeds() throws Exception {
+        seedToken("race-token", PendingTokenPurpose.SIGNUP);
+
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Callable<Boolean> confirmOnce = () -> {
+                start.await();
+                try {
+                    userSignupService.confirm("race-token");
+                    return true;
+                } catch (TokenNotFoundException ex) {
+                    return false;
+                }
+            };
+            Future<Boolean> first = pool.submit(confirmOnce);
+            Future<Boolean> second = pool.submit(confirmOnce);
+            start.countDown();
+
+            int successes = (first.get(30, TimeUnit.SECONDS) ? 1 : 0)
+                    + (second.get(30, TimeUnit.SECONDS) ? 1 : 0);
+
+            assertEquals(1, successes, "exactly one confirmation may win the token");
+            assertEquals(1, jdbcTemplate.queryForObject(
+                            "SELECT count(*) FROM user_entity WHERE user_mail = ?", Integer.class, MAIL),
+                    "one token must never create two accounts");
+            assertFalse(pendingSignupEntityRepository.findById("race-token").isPresent(),
+                    "the winning redemption must consume the token");
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    /**
+     * Two concurrent signups for the same mailbox must not leave two live
+     * tokens. The database's unique (user_mail, token_purpose) constraint makes
+     * the loser of the race fail loudly instead of silently duplicating the
+     * token.
+     */
+    @Test
+    void onlyOneConcurrentSignupForTheSameMailboxLeavesOneToken() throws Exception {
+        when(encryptService.getEncryptedPassword(anyString())).thenReturn("hashed");
+
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Callable<Boolean> signupOnce = () -> {
+                start.await();
+                try {
+                    userSignupService.signup(signupDto(MAIL));
+                    return true;
+                } catch (RuntimeException ex) {
+                    return false;
+                }
+            };
+            Future<Boolean> first = pool.submit(signupOnce);
+            Future<Boolean> second = pool.submit(signupOnce);
+            start.countDown();
+
+            first.get(30, TimeUnit.SECONDS);
+            second.get(30, TimeUnit.SECONDS);
+
+            assertEquals(1, jdbcTemplate.queryForObject(
+                            "SELECT count(*) FROM pending_signup_entity WHERE user_mail = ? AND token_purpose = ?",
+                            Integer.class, MAIL, PendingTokenPurpose.SIGNUP.name()),
+                    "a mailbox must never hold two live tokens for the same purpose");
+        } finally {
+            pool.shutdownNow();
+        }
     }
 
     private UserSignDto signupDto(String mail) {

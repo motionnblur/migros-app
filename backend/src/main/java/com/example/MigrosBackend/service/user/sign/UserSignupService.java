@@ -123,17 +123,26 @@ public class UserSignupService {
     /**
      * Consumes a signup token. A token issued for any other purpose (a
      * password reset, for example) is rejected exactly like an unknown token.
+     *
+     * <p>The token is redeemed (deleted) first and the account is inserted in
+     * the same transaction. If the insert fails the redemption rolls back with
+     * it and the token stays usable; if two callers race, only the one whose
+     * conditional DELETE matched a row reaches the insert, so a token can never
+     * create two accounts.
      */
     @Transactional
     public void confirm(String token) {
-        PendingSignupEntity pendingSignup = requireToken(token, PendingTokenPurpose.SIGNUP);
+        PendingSignupEntity pendingSignup =
+                pendingSignupStorage.redeem(token, PendingTokenPurpose.SIGNUP);
+        if (pendingSignup == null) {
+            throw new TokenNotFoundException();
+        }
 
         UserEntity userEntity = new UserEntity();
         userEntity.setUserMail(pendingSignup.getUserMail());
         userEntity.setUserPassword(pendingSignup.getUserPassword());
 
         userEntityRepository.save(userEntity);
-        pendingSignupStorage.delete(token);
     }
 
     @Transactional
@@ -145,6 +154,10 @@ public class UserSignupService {
      * Consumes a password-reset token. A signup token is rejected exactly like
      * an unknown token, so a signup link can never be used to choose a
      * password.
+     *
+     * <p>As in {@link #confirm(String)}, the token is redeemed first and the
+     * password change happens in the same transaction, so a weak password or a
+     * missing account rolls the redemption back instead of burning the token.
      */
     @Transactional
     public void resetPassword(ResetPasswordDto resetPasswordDto) {
@@ -155,7 +168,11 @@ public class UserSignupService {
         }
 
         String token = resetPasswordDto.getToken();
-        PendingSignupEntity pendingSignup = requireToken(token, PendingTokenPurpose.PASSWORD_RESET);
+        PendingSignupEntity pendingSignup =
+                pendingSignupStorage.redeem(token, PendingTokenPurpose.PASSWORD_RESET);
+        if (pendingSignup == null) {
+            throw new TokenNotFoundException();
+        }
 
         if (!passwordValidator.isPasswordStrongEnough(resetPasswordDto.getUserPassword())) {
             throw new WeakPasswordException();
@@ -163,14 +180,11 @@ public class UserSignupService {
 
         UserEntity userEntity = userEntityRepository.findByUserMail(pendingSignup.getUserMail());
         if (userEntity == null) {
-            pendingSignupStorage.delete(token);
             throw new UserMailNotFoundException(pendingSignup.getUserMail());
         }
 
         userEntity.setUserPassword(encryptService.getEncryptedPassword(resetPasswordDto.getUserPassword()));
         userEntityRepository.save(userEntity);
-
-        pendingSignupStorage.delete(token);
     }
 
     /**

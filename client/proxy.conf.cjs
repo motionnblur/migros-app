@@ -22,6 +22,12 @@ module.exports = {
     secure: false,
     changeOrigin: true,
   },
+  '/admin/ws/support': {
+    target,
+    secure: false,
+    ws: true,
+    changeOrigin: true,
+  },
   '/admin': {
     target,
     secure: false,

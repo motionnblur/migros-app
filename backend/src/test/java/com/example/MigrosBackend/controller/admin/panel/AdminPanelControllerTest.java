@@ -7,6 +7,7 @@ import com.example.MigrosBackend.dto.admin.panel.ProductDto2;
 import com.example.MigrosBackend.dto.order.OrderDto;
 import com.example.MigrosBackend.dto.order.OrderPageDto;
 import com.example.MigrosBackend.dto.user.UserProfileTableDto;
+import com.example.MigrosBackend.dto.user.product.ProductDto;
 import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.service.admin.supply.AdminSupplyService;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
@@ -125,10 +126,29 @@ class AdminPanelControllerTest {
 
     @Test
     void addProduct_shouldReturnOk() throws Exception {
+        AdminAddItemDto validDto = new AdminAddItemDto();
+        validDto.setAdminId(1L);
+        ProductDto productDto = new ProductDto();
+        productDto.setProductName("Test Product");
+        productDto.setSubCategoryName("SubCat");
+        productDto.setProductPrice(new BigDecimal("10.0"));
+        productDto.setProductCount(5);
+        validDto.setProductDto(productDto);
+
+        mockMvc.perform(post("/admin/panel/addProduct")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(validDto)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void addProduct_shouldReturnBadRequest_whenProductMissing() throws Exception {
         mockMvc.perform(post("/admin/panel/addProduct")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(addItemDto)))
-                .andExpect(status().isOk());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors").isArray());
     }
 
     @Test
@@ -249,6 +269,40 @@ class AdminPanelControllerTest {
     @Test
     void deleteOrder_shouldReturnBadRequest_whenMissingParam() throws Exception {
         mockMvc.perform(delete("/admin/panel/deleteOrder"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("MISSING_PARAMETER"))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("orderId")));
+    }
+
+    @Test
+    void uploadProduct_shouldReturnTypedBadRequest_whenPriceNegative() throws Exception {
+        mockMvc.perform(multipart("/admin/panel/uploadProduct")
+                        .file(mockFile)
+                        .param("adminId", "1")
+                        .param("productName", "Test Product")
+                        .param("subCategoryName", "SubCat")
+                        .param("productPrice", "-1")
+                        .param("productCount", "5")
+                        .param("productDiscount", "2.0")
+                        .param("productDescription", "Desc")
+                        .param("categoryValue", "1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    void uploadProduct_shouldReturnTypedBadRequest_whenCountNegative() throws Exception {
+        mockMvc.perform(multipart("/admin/panel/uploadProduct")
+                        .file(mockFile)
+                        .param("adminId", "1")
+                        .param("productName", "Test Product")
+                        .param("subCategoryName", "SubCat")
+                        .param("productPrice", "10.0")
+                        .param("productCount", "-5")
+                        .param("productDiscount", "2.0")
+                        .param("productDescription", "Desc")
+                        .param("categoryValue", "1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
     }
 }

@@ -78,4 +78,32 @@ class UserSupportControllerTest {
 
         verify(supportChatService).addUserMessage("token", "Need help");
     }
+
+    @Test
+    void sendSupportMessage_shouldReturnTypedBadRequest_whenMessageBlank() throws Exception {
+        SupportSendMessageDto dto = new SupportSendMessageDto();
+        dto.setMessage("   ");
+
+        mockMvc.perform(post("/user/support/send")
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "token"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors[0].field").value("message"));
+    }
+
+    @Test
+    void sendSupportMessage_shouldReturnTypedBadRequest_whenMessageTooLong() throws Exception {
+        SupportSendMessageDto dto = new SupportSendMessageDto();
+        dto.setMessage("x".repeat(2001));
+
+        mockMvc.perform(post("/user/support/send")
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "token"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors[0].field").value("message"));
+    }
 }

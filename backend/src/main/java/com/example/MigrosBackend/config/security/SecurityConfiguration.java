@@ -1,5 +1,6 @@
 package com.example.MigrosBackend.config.security;
 
+import com.example.MigrosBackend.filter.InternalApiKeyFilter;
 import com.example.MigrosBackend.filter.JwtRequestFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,6 +13,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.web.cors.CorsConfiguration;
@@ -80,7 +82,15 @@ public class SecurityConfiguration {
     }
 
     @Bean
+    public InternalApiKeyFilter internalApiKeyFilter(
+            @Value("${support.internal.key:}") String internalKey,
+            ObjectMapper objectMapper) {
+        return new InternalApiKeyFilter(internalKey, objectMapper);
+    }
+
+    @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtRequestFilter jwtRequestFilter,
+            InternalApiKeyFilter internalApiKeyFilter,
             AccessDeniedHandler csrfAccessDeniedHandler) throws Exception {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -97,6 +107,8 @@ public class SecurityConfiguration {
                         .requestMatchers("/csrf").permitAll()
                         .requestMatchers("/admin/login", "/admin/logout").permitAll()
                         .requestMatchers("/user/login", "/user/logout").permitAll()
+                        .requestMatchers("/user/signup", "/user/signup/**").permitAll()
+                        .requestMatchers("/user/verifyUserMail", "/user/resetPassword").permitAll()
                         .requestMatchers("/user/session").hasRole("USER")
                         .requestMatchers("/admin/session").hasRole("ADMIN")
                         .requestMatchers("/admin/panel/**").hasRole("ADMIN")
@@ -114,14 +126,38 @@ public class SecurityConfiguration {
                         .requestMatchers("/user/supply/getProductData").hasRole("USER")
                         .requestMatchers("/user/profile/**").hasRole("USER")
                         .requestMatchers("/user/support/**").hasRole("USER")
+                        // Anonymous catalog reads. These are explicit so the
+                        // deny-by-default catch-all below cannot make them public
+                        // or private by accident.
+                        .requestMatchers(
+                                "/user/supply/getAllCategoryNames",
+                                "/user/supply/getProductsFromCategory",
+                                "/user/supply/getProductsFromSubcategory",
+                                "/user/supply/getProductCountsFromSubcategory",
+                                "/user/supply/getProductCountsFromCategory",
+                                "/user/supply/getProductImageNames",
+                                "/user/supply/getProductImage",
+                                "/user/supply/getSubCategories",
+                                "/user/supply/getProductDataWithProductId",
+                                "/user/supply/getProductDescription"
+                        ).permitAll()
+                        // WebSocket handshakes: authentication happens in the
+                        // handshake interceptor (cookie-validated), not here.
+                        .requestMatchers("/ws/support", "/admin/ws/support").permitAll()
+                        // Internal bridge: the InternalApiKeyFilter enforces the
+                        // x-internal-key header before this chain authorizes.
+                        .requestMatchers("/internal/**").permitAll()
                         // Health probes are public for the hosting platform. Every
                         // other Actuator endpoint is denied outright rather than
-                        // inheriting the catch-all permitAll below.
+                        // inheriting the deny-by-default catch-all below.
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/actuator/**").denyAll()
-                        .anyRequest().permitAll()
+                        // Fail closed: any route not explicitly permitted above is
+                        // denied, so a new endpoint is never public by omission.
+                        .anyRequest().denyAll()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .addFilterBefore(internalApiKeyFilter, AuthorizationFilter.class)
                 .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

@@ -279,4 +279,17 @@ class PaymentControllerTest {
 
         verify(checkoutService, never()).cancelCheckout(any(), any());
     }
+
+    @Test
+    void charge_ReturnsTypedBadRequestForMalformedJson() throws Exception {
+        when(authTokenResolver.requireToken("sample-token")).thenReturn("sample-token");
+
+        mockMvc.perform(post("/payment/checkouts/{checkoutId}/charge", checkoutId)
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, "sample-token"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{not-valid-json"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"))
+                .andExpect(jsonPath("$.errors").doesNotExist());
+    }
 }

@@ -5,6 +5,7 @@ import com.example.MigrosBackend.dto.admin.panel.SupportReplyDto;
 import com.example.MigrosBackend.dto.support.SupportCustomerSummaryDto;
 import com.example.MigrosBackend.dto.user.support.SupportMessageDto;
 import com.example.MigrosBackend.service.support.SupportChatService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -53,7 +54,7 @@ public class AdminSupportController {
     }
 
     @PostMapping("support/reply")
-    public ResponseEntity<Void> sendSupportReply(@RequestBody SupportReplyDto dto) {
+    public ResponseEntity<Void> sendSupportReply(@Valid @RequestBody SupportReplyDto dto) {
         supportChatService.addManagementMessage(dto.getUserMail(), dto.getMessage());
         return ResponseEntity.ok().build();
     }
@@ -61,7 +62,7 @@ public class AdminSupportController {
     @PatchMapping("support/messages/{messageId}")
     public ResponseEntity<Void> editSupportMessage(
             @PathVariable Long messageId,
-            @RequestBody SupportAdminEditMessageDto dto
+            @Valid @RequestBody SupportAdminEditMessageDto dto
     ) {
         supportChatService.editMessageForAdmin(dto.getUserMail(), messageId, dto.getMessage());
         return ResponseEntity.ok().build();

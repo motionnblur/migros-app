@@ -50,7 +50,7 @@ export class AdminSupportComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    this.supportRealtimeService.connect();
+    this.supportRealtimeService.connect(undefined, true);
     this.supportRealtimeSub = this.supportRealtimeService.events$.subscribe(
       (event: ISupportRealtimeEvent) => {
         this.loadSupportUsers();

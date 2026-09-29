@@ -1,4 +1,6 @@
 package com.example.MigrosBackend.dto.payment;
 
-public record ChargeRequestDto(String token) {
+import jakarta.validation.constraints.NotBlank;
+
+public record ChargeRequestDto(@NotBlank String token) {
 }

@@ -102,15 +102,45 @@ final class PendingSignupStorage {
     }
 
     /**
-     * Removes a redeemed token as part of the caller's transaction, so the token
-     * disappears exactly when the work it authorized becomes durable and a
-     * failure in that work leaves the token usable.
+     * Consumes a token atomically, <em>inside the caller's transaction</em>.
+     *
+     * <p>Unlike {@link #store(PendingSignupEntity)}, this method deliberately
+     * does not open a transaction of its own: the redemption must commit or
+     * roll back together with the work it authorizes (inserting the user or
+     * setting the password). Sharing the caller's transaction is what makes a
+     * failed insert leave the token usable again.
+     *
+     * <p>Redemption is a conditional DELETE, not a read followed by a later
+     * delete. The row is read first (a non-locking read, so the expiry check
+     * cannot take a lock it does not need), then deleted with the token and
+     * purpose in the WHERE clause. When two callers race, the database lets
+     * exactly one DELETE remove the row; the other sees {@code 0} affected rows
+     * and is reported as "token not found". A read-then-delete on separate
+     * statements would let both callers pass the read and both create the user.
+     *
+     * @return the entity that was deleted, or {@code null} when the token is
+     *         absent, expired, issued for a different purpose, or was already
+     *         redeemed by a concurrent caller
      */
-    void delete(String token) {
-        if (token == null || token.isBlank()) {
-            return;
+    PendingSignupEntity redeem(String token, PendingTokenPurpose purpose) {
+        if (token == null || token.isBlank() || purpose == null) {
+            return null;
         }
-        repository.deleteById(token);
+
+        PendingSignupEntity stored = repository.findById(token).orElse(null);
+        if (stored == null || stored.getTokenPurpose() != purpose) {
+            return null;
+        }
+        if (stored.getExpiresAt() == null || !stored.getExpiresAt().isAfter(LocalDateTime.now())) {
+            deleteExpired(token);
+            return null;
+        }
+
+        int deleted = repository.deleteByTokenAndPurpose(token, purpose);
+        if (deleted == 0) {
+            return null;
+        }
+        return stored;
     }
 
     /**

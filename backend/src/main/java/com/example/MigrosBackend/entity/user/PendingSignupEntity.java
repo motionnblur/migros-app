@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 import java.time.LocalDateTime;
 
@@ -18,12 +19,14 @@ import java.time.LocalDateTime;
 public class PendingSignupEntity {
     @Id
     @Column(nullable = false, length = 64)
+    @ToString.Exclude
     private String token;
 
     @Column(nullable = false)
     private String userMail;
 
     @Column(nullable = false)
+    @ToString.Exclude
     private String userPassword;
 
     @Column(nullable = false)

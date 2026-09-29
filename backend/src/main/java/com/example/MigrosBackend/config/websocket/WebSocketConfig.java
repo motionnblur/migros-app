@@ -16,15 +16,18 @@ import java.util.stream.Collectors;
 @EnableWebSocket
 public class WebSocketConfig implements WebSocketConfigurer {
     private final SupportChatWebSocketHandler supportChatWebSocketHandler;
+    private final SupportHandshakeInterceptor supportHandshakeInterceptor;
     private final List<String> allowedOriginPatterns;
 
     @Autowired
     public WebSocketConfig(
             SupportChatWebSocketHandler supportChatWebSocketHandler,
+            SupportHandshakeInterceptor supportHandshakeInterceptor,
             @Value("${app.allowed-origins:}") String allowedOriginsValue,
             @Value("${app.allowed-origin-patterns:}") String allowedOriginPatternsValue
     ) {
         this.supportChatWebSocketHandler = supportChatWebSocketHandler;
+        this.supportHandshakeInterceptor = supportHandshakeInterceptor;
         List<String> parsedPatterns = parseCsvList(allowedOriginPatternsValue);
         if (parsedPatterns.isEmpty()) {
             parsedPatterns = parseCsvList(allowedOriginsValue);
@@ -34,7 +37,11 @@ public class WebSocketConfig implements WebSocketConfigurer {
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        registry.addHandler(supportChatWebSocketHandler, "/ws/support")
+        // Users connect under /ws/support (user_session cookie, path /). Admins
+        // connect under /admin/ws/support because the admin_session cookie is
+        // scoped to /admin and is therefore not sent to /ws/support.
+        registry.addHandler(supportChatWebSocketHandler, "/ws/support", "/admin/ws/support")
+                .addInterceptors(supportHandshakeInterceptor)
                 .setAllowedOriginPatterns(allowedOriginPatterns.toArray(String[]::new));
     }
 

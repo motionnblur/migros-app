@@ -165,6 +165,60 @@ class UserSignControllerTest {
         mockMvc.perform(get("/user/session"))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    void signup_shouldReturnTypedBadRequest_whenMailBlank() throws Exception {
+        UserSignDto invalid = new UserSignDto();
+        invalid.setUserMail("   ");
+        invalid.setUserPassword("password123");
+
+        mockMvc.perform(post("/user/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalid)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.errors[0].field").value("userMail"))
+                .andExpect(jsonPath("$.errors[0].message").exists());
+    }
+
+    @Test
+    void signup_shouldReturnTypedBadRequest_whenPasswordMissing() throws Exception {
+        UserSignDto invalid = new UserSignDto();
+        invalid.setUserMail("test@example.com");
+
+        mockMvc.perform(post("/user/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalid)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors[0].field").value("userPassword"));
+    }
+
+    @Test
+    void signup_shouldReturnTypedBadRequest_whenPasswordTooLong() throws Exception {
+        UserSignDto invalid = new UserSignDto();
+        invalid.setUserMail("test@example.com");
+        invalid.setUserPassword("A".repeat(73));
+
+        mockMvc.perform(post("/user/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalid)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors[0].field").value("userPassword"));
+    }
+
+    @Test
+    void signup_shouldReturnTypedBadRequest_whenJsonMalformed() throws Exception {
+        mockMvc.perform(post("/user/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{not-valid-json"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"))
+                .andExpect(jsonPath("$.message").value("Malformed request"))
+                .andExpect(jsonPath("$.errors").doesNotExist());
+    }
 }
 
 

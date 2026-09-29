@@ -225,6 +225,8 @@ class UserSignupServiceTest {
         when(pendingSignupEntityRepository.findById("reset-token"))
                 .thenReturn(Optional.of(pendingToken(
                         "reset-token", PendingTokenPurpose.PASSWORD_RESET, LocalDateTime.now().plusMinutes(10))));
+        when(pendingSignupEntityRepository.deleteByTokenAndPurpose(
+                "reset-token", PendingTokenPurpose.PASSWORD_RESET)).thenReturn(1);
         when(userEntityRepository.findByUserMail("test@mail.com")).thenReturn(existingUser());
         when(passwordValidator.isPasswordStrongEnough("AnotherStrong123!")).thenReturn(true);
         when(encryptService.getEncryptedPassword("AnotherStrong123!")).thenReturn("new_hash");
@@ -236,7 +238,8 @@ class UserSignupServiceTest {
         userSignupService.resetPassword(dto);
 
         verify(userEntityRepository).save(argThat(user -> "new_hash".equals(user.getUserPassword())));
-        verify(pendingSignupEntityRepository).deleteById("reset-token");
+        verify(pendingSignupEntityRepository)
+                .deleteByTokenAndPurpose("reset-token", PendingTokenPurpose.PASSWORD_RESET);
     }
 
     @Test
@@ -386,11 +389,14 @@ class UserSignupServiceTest {
                 testToken, PendingTokenPurpose.SIGNUP, LocalDateTime.now().plusMinutes(10));
 
         when(pendingSignupEntityRepository.findById(testToken)).thenReturn(Optional.of(pendingSignupEntity));
+        when(pendingSignupEntityRepository.deleteByTokenAndPurpose(
+                testToken, PendingTokenPurpose.SIGNUP)).thenReturn(1);
 
         userSignupService.confirm(testToken);
 
         verify(userEntityRepository, times(1)).save(any(UserEntity.class));
-        verify(pendingSignupEntityRepository, times(1)).deleteById(testToken);
+        verify(pendingSignupEntityRepository)
+                .deleteByTokenAndPurpose(testToken, PendingTokenPurpose.SIGNUP);
     }
 
     @Test

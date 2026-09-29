@@ -16,6 +16,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -30,6 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(StripeWebhookController.class)
 @AutoConfigureMockMvc
 @Import({SecurityConfiguration.class, JwtRequestFilter.class, GlobalExceptionHandler.class})
+@TestPropertySource(properties = "support.internal.key=test-internal-key")
 class StripeWebhookControllerTest {
 
     @Autowired

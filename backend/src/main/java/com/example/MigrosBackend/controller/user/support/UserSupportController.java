@@ -5,6 +5,7 @@ import com.example.MigrosBackend.dto.user.support.SupportMessageDto;
 import com.example.MigrosBackend.dto.user.support.SupportSendMessageDto;
 import com.example.MigrosBackend.helper.AuthTokenResolver;
 import com.example.MigrosBackend.service.support.SupportChatService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CookieValue;
@@ -37,7 +38,7 @@ public class UserSupportController {
     @PostMapping("send")
     public ResponseEntity<Void> sendSupportMessage(
             @CookieValue(name = AuthCookies.USER_SESSION_COOKIE_NAME, required = false) String token,
-            @RequestBody SupportSendMessageDto dto) {
+            @Valid @RequestBody SupportSendMessageDto dto) {
         supportChatService.addUserMessage(authTokenResolver.requireToken(token), dto.getMessage());
         return ResponseEntity.ok().build();
     }

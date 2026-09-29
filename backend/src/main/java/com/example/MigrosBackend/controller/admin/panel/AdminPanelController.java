@@ -5,6 +5,9 @@ import com.example.MigrosBackend.dto.order.OrderPageDto;
 import com.example.MigrosBackend.dto.user.UserProfileTableDto;
 import com.example.MigrosBackend.service.admin.supply.AdminSupplyService;
 import com.example.MigrosBackend.service.user.supply.UserOrderService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -53,17 +56,17 @@ public class AdminPanelController {
     }
 
     @PostMapping("addProduct")
-    private ResponseEntity<Void> addProduct(@RequestBody AdminAddItemDto adminAddItemDto) {
+    private ResponseEntity<Void> addProduct(@Valid @RequestBody AdminAddItemDto adminAddItemDto) {
         adminSupplyService.addProduct(adminAddItemDto);
         return ResponseEntity.ok().build();
     }
 
     @PostMapping("uploadProduct")
-    private ResponseEntity<String> uploadProduct(@RequestParam("adminId") Long adminId,
+    public ResponseEntity<String> uploadProduct(@NotNull @RequestParam("adminId") Long adminId,
                                                  @RequestParam("productName") String productName,
                                                  @RequestParam("subCategoryName") String subCategoryName,
-                                                 @RequestParam("productPrice") BigDecimal productPrice,
-                                                 @RequestParam("productCount") int productCount,
+                                                 @NotNull @PositiveOrZero @RequestParam("productPrice") BigDecimal productPrice,
+                                                 @PositiveOrZero @RequestParam("productCount") int productCount,
                                                  @RequestParam("productDiscount") BigDecimal productDiscount,
                                                  @RequestParam("productDescription") String productDescription,
                                                  @RequestParam("selectedImage") MultipartFile selectedImage,
@@ -76,12 +79,12 @@ public class AdminPanelController {
     }
 
     @PostMapping("updateProduct")
-    private ResponseEntity<String> updateProduct(@RequestParam("adminId") Long adminId,
-                                                 @RequestParam("productId") Long productId,
+    public ResponseEntity<String> updateProduct(@NotNull @RequestParam("adminId") Long adminId,
+                                                 @NotNull @RequestParam("productId") Long productId,
                                                  @RequestParam("productName") String productName,
                                                  @RequestParam("subCategoryName") String subCategoryName,
-                                                 @RequestParam("productPrice") BigDecimal productPrice,
-                                                 @RequestParam("productCount") int productCount,
+                                                 @NotNull @PositiveOrZero @RequestParam("productPrice") BigDecimal productPrice,
+                                                 @PositiveOrZero @RequestParam("productCount") int productCount,
                                                  @RequestParam("productDiscount") BigDecimal productDiscount,
                                                  @RequestParam("productDescription") String productDescription,
                                                  @RequestParam(value = "selectedImage", required = false) MultipartFile selectedImage,

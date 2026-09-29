@@ -122,7 +122,8 @@ class SupportSchemaMigrationPostgresTest {
         }
 
         MigrateResult result = migrate();
-        assertEquals(1, result.migrationsExecuted, "only V8 should still be pending here");
+        assertEquals(MigrationTestSupport.versionedMigrationCount() - 7, result.migrationsExecuted,
+                "everything after V7 must still be pending here");
 
         try (Connection connection = openConnection()) {
             try (Statement statement = connection.createStatement();

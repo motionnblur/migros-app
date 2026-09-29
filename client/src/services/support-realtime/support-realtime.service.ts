@@ -10,15 +10,19 @@ export class SupportRealtimeService {
   private socket: WebSocket | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private connectUserMail = '';
+  private connectAsAdmin = false;
   private reconnectEnabled = false;
   private readonly eventsSubject = new Subject<ISupportRealtimeEvent>();
   readonly events$: Observable<ISupportRealtimeEvent> =
     this.eventsSubject.asObservable();
 
-  connect(userMail?: string) {
+  connect(userMail?: string, connectAsAdmin = false) {
     this.reconnectEnabled = true;
     if (typeof userMail === 'string') {
       this.connectUserMail = userMail;
+    }
+    if (connectAsAdmin) {
+      this.connectAsAdmin = true;
     }
     if (
       this.socket &&
@@ -29,10 +33,13 @@ export class SupportRealtimeService {
     }
 
     const normalizedUserMail = (this.connectUserMail || '').trim().toLowerCase();
-    const supportSocketUrl = wsUrl('/ws/support');
-    const socketUrl = normalizedUserMail
-      ? `${supportSocketUrl}?userMail=${encodeURIComponent(normalizedUserMail)}`
-      : supportSocketUrl;
+    const supportSocketUrl = wsUrl(
+      this.connectAsAdmin ? '/admin/ws/support' : '/ws/support'
+    );
+    const socketUrl =
+      !this.connectAsAdmin && normalizedUserMail
+        ? `${supportSocketUrl}?userMail=${encodeURIComponent(normalizedUserMail)}`
+        : supportSocketUrl;
 
     const socket = new WebSocket(socketUrl);
     this.socket = socket;
@@ -79,6 +86,7 @@ export class SupportRealtimeService {
     }
 
     this.connectUserMail = '';
+    this.connectAsAdmin = false;
   }
 
   private scheduleReconnect() {

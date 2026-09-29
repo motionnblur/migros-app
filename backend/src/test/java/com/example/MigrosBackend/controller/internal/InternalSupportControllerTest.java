@@ -19,8 +19,14 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.mockito.Mockito.doNothing;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/**
+ * Controller-layer tests with filters disabled: the {@code x-internal-key} check
+ * lives in {@code InternalApiKeyFilter} and is covered by the filter/security
+ * tests. These tests verify request/response translation only.
+ */
 @WebMvcTest(InternalSupportController.class)
 @AutoConfigureMockMvc(addFilters = false)
 @TestPropertySource(properties = "support.internal.key=test-internal-key")
@@ -60,21 +66,6 @@ class InternalSupportControllerTest {
     }
 
     @Test
-    void receiveAgentMessage_shouldReturnUnauthorized_whenKeyInvalid() throws Exception {
-        InternalSupportAgentMessageDto dto = new InternalSupportAgentMessageDto(
-                "user@test.com",
-                "Hello",
-                "agent-123"
-        );
-
-        mockMvc.perform(post("/internal/support/agent-message")
-                        .header("x-internal-key", "wrong-key")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(dto)))
-                .andExpect(status().isUnauthorized());
-    }
-
-    @Test
     void editAgentMessage_shouldReturnAccepted_whenPayloadValid() throws Exception {
         InternalSupportEditAgentMessageDto dto = new InternalSupportEditAgentMessageDto(
                 "user@test.com",
@@ -110,29 +101,43 @@ class InternalSupportControllerTest {
     }
 
     @Test
-    void deleteAgentMessage_shouldReturnUnauthorized_whenKeyInvalid() throws Exception {
-        InternalSupportDeleteAgentMessageDto dto = new InternalSupportDeleteAgentMessageDto(
-                "user@test.com",
+    void customers_shouldReturnOk_whenServiceResponds() throws Exception {
+        mockMvc.perform(get("/internal/support/customers")
+                        .header("x-internal-key", "test-internal-key"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void receiveAgentMessage_shouldReturnTypedBadRequest_whenMailBlank() throws Exception {
+        InternalSupportAgentMessageDto dto = new InternalSupportAgentMessageDto(
+                "   ",
+                "Hello",
                 "agent-123"
         );
 
-        mockMvc.perform(post("/internal/support/delete-agent-message")
-                        .header("x-internal-key", "wrong-key")
+        mockMvc.perform(post("/internal/support/agent-message")
+                        .header("x-internal-key", "test-internal-key")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(dto)))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors[0].field").value("userMail"));
     }
 
     @Test
-    void customersShouldReturnUnauthorizedWhenKeyMissing() throws Exception {
-        mockMvc.perform(get("/internal/support/customers"))
-                .andExpect(status().isUnauthorized());
-    }
+    void editAgentMessage_shouldReturnTypedBadRequest_whenExternalIdBlank() throws Exception {
+        InternalSupportEditAgentMessageDto dto = new InternalSupportEditAgentMessageDto(
+                "user@test.com",
+                "  ",
+                "Updated message"
+        );
 
-    @Test
-    void customersShouldReturnUnauthorizedWhenKeyBlank() throws Exception {
-        mockMvc.perform(get("/internal/support/customers")
-                        .header("x-internal-key", "   "))
-                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/internal/support/edit-agent-message")
+                        .header("x-internal-key", "test-internal-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors[0].field").value("externalMessageId"));
     }
 }

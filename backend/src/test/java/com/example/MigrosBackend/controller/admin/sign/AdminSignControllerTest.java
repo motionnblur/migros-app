@@ -139,7 +139,8 @@ class AdminSignControllerTest {
     void login_shouldReturnBadRequest_whenRequestBodyMissing() throws Exception {
         mockMvc.perform(post("/admin/login")
                         .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
     }
 
     @Test
@@ -147,7 +148,23 @@ class AdminSignControllerTest {
         mockMvc.perform(post("/admin/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{invalid-json"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"))
+                .andExpect(jsonPath("$.errors").doesNotExist());
+    }
+
+    @Test
+    void login_shouldReturnTypedBadRequest_whenCredentialsBlank() throws Exception {
+        AdminSignDto invalid = new AdminSignDto();
+        invalid.setAdminName("  ");
+        invalid.setAdminPassword("");
+
+        mockMvc.perform(post("/admin/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalid)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors[0].field").value("adminName"));
     }
 }
 

@@ -7,6 +7,7 @@ import com.example.MigrosBackend.dto.user.sign.UserSignDto;
 import com.example.MigrosBackend.helper.AuthTokenResolver;
 import com.example.MigrosBackend.service.global.TokenService;
 import com.example.MigrosBackend.service.user.sign.UserSignupService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -41,7 +42,7 @@ public class UserSignController {
     }
 
     @PostMapping("signup")
-    private ResponseEntity<Void> addItem(@RequestBody UserSignDto userSignDto) {
+    private ResponseEntity<Void> addItem(@Valid @RequestBody UserSignDto userSignDto) {
         userSignupService.signup(userSignDto);
         return ResponseEntity.ok().build();
     }
@@ -59,7 +60,7 @@ public class UserSignController {
     }
 
     @PostMapping("login")
-    private ResponseEntity<Void> login(@RequestBody UserSignDto userSignDto) {
+    private ResponseEntity<Void> login(@Valid @RequestBody UserSignDto userSignDto) {
         String token = userSignupService.login(userSignDto);
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, authCookieService.createUserSessionCookie(token).toString())
@@ -88,7 +89,7 @@ public class UserSignController {
     }
 
     @PostMapping("resetPassword")
-    private ResponseEntity<Void> resetPassword(@RequestBody ResetPasswordDto resetPasswordDto) {
+    private ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordDto resetPasswordDto) {
         userSignupService.resetPassword(resetPasswordDto);
         return ResponseEntity.ok().build();
     }
