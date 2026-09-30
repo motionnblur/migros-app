@@ -102,7 +102,12 @@ export class UserCartComponent implements OnDestroy, CartStagedEditsHost {
    * would leave those writes to land against a view the customer can no longer
    * see or correct, and starting a second batch would race the first over the
    * same rows. Whichever batch is running settles it instead - see
-   * `settleRequestedClose`.
+   * `settleWriteBatch` and `settleFailedWriteBatch`.
+   *
+   * <p>It describes that one batch and nothing else. A request recorded against a
+   * batch is honored when the writes land and void when they do not; it is never
+   * carried forward into a later press, which would turn one customer's failed
+   * save into a dismissal on a checkout they had not asked to abandon.
    */
   private closeRequestedWhileWritePending: boolean = false;
   /**
@@ -344,6 +349,32 @@ export class UserCartComponent implements OnDestroy, CartStagedEditsHost {
   }
 
   /**
+   * Settles the component's own state after a write batch did not save.
+   *
+   * <p>The pending close is withdrawn with the batch, and this is the whole fix:
+   * the flag recorded a request to leave that was made *against* this batch, so
+   * the batch's failure is what makes the request void. The batch carrying the
+   * edits is the customer's cart, not one press's - a close is asked for from the
+   * X button, the overlay, Escape and the route guard alike, and a second ask
+   * while a batch is in flight is only ever recorded for the batch already
+   * running. Leaving it set past a failure turned that request into a dismissal
+   * the customer never got: the next press inherited it, and a press that had
+   * nothing to do with the failed close took the cart away instead of
+   * reconciling it.
+   *
+   * <p>The staged edits are deliberately untouched. They are what the customer
+   * still sees, and the retry resends exactly them; only the departure is
+   * withdrawn, never the change.
+   */
+  private settleFailedWriteBatch(): void {
+    this.isCartWritePending = false;
+    this.closeRequestedWhileWritePending = false;
+    if (!this.destroyed) {
+      this.reportCartWriteFailure();
+    }
+  }
+
+  /**
    * Leaves the cart view.
    *
    * <p>Only ever reached once nothing is unsaved: either nothing was ever staged,
@@ -413,21 +444,22 @@ export class UserCartComponent implements OnDestroy, CartStagedEditsHost {
 
     this.persistStagedEdits().subscribe({
       next: (allSaved) => {
-        this.isCartWritePending = false;
-        if (this.destroyed) {
+        if (!allSaved) {
+          // The close this batch was carrying is void, and so is any close asked
+          // for while it was in flight. Both are the batch's to settle.
+          this.settleFailedWriteBatch();
           return;
         }
-        if (!allSaved) {
-          this.reportCartWriteFailure();
+        this.isCartWritePending = false;
+        if (this.destroyed) {
           return;
         }
         this.navigateAwayFromCart();
       },
       error: () => {
-        this.isCartWritePending = false;
-        if (!this.destroyed) {
-          this.reportCartWriteFailure();
-        }
+        // persistStagedEdits reports a refusal as a result rather than throwing,
+        // so this is a backstop. It fails closed, withdrawal included.
+        this.settleFailedWriteBatch();
       },
     });
   }
@@ -628,15 +660,14 @@ export class UserCartComponent implements OnDestroy, CartStagedEditsHost {
 
     this.persistStagedEdits().subscribe({
       next: (allSaved) => {
-        this.isCartWritePending = false;
         if (!allSaved) {
-          this.closeRequestedWhileWritePending = false;
+          // The close is withdrawn with the batch that was to carry it, so a
+          // later press cannot inherit a dismissal this one never honoured.
+          this.settleFailedWriteBatch();
           this.isReconcilingCart = false;
-          if (!this.destroyed) {
-            this.reportCartWriteFailure();
-          }
           return;
         }
+        this.isCartWritePending = false;
         if (this.closeRequestedWhileWritePending) {
           this.closeRequestedWhileWritePending = false;
           this.isReconcilingCart = false;
@@ -656,12 +687,8 @@ export class UserCartComponent implements OnDestroy, CartStagedEditsHost {
       error: () => {
         // persistStagedEdits reports a refusal as a result rather than throwing,
         // so this is a backstop. It fails closed all the same.
-        this.isCartWritePending = false;
-        this.closeRequestedWhileWritePending = false;
+        this.settleFailedWriteBatch();
         this.isReconcilingCart = false;
-        if (!this.destroyed) {
-          this.reportCartWriteFailure();
-        }
       },
     });
   }

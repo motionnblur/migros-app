@@ -846,6 +846,33 @@ describe('UserCartComponent close with staged edits', () => {
     return fixture.nativeElement.querySelector('#cart-overlay');
   }
 
+  /** The checkout button in the cart footer, pressed the way a customer does. */
+  function buyButton(): HTMLButtonElement {
+    return fixture.nativeElement.querySelector(
+      '#cart-container .card-footer button',
+    );
+  }
+
+  /** The cart as the server holds it, so a reconciliation has nothing to repair. */
+  function storedCart(): IUserCartItemDto[] {
+    return [
+      {
+        productId: 10,
+        productName: 'Tam Sut',
+        productPrice: 20,
+        productCount: 3,
+        availableStock: 4,
+      },
+      {
+        productId: 11,
+        productName: 'Yogurt',
+        productPrice: 15,
+        productCount: 1,
+        availableStock: 4,
+      },
+    ];
+  }
+
   function pressEscape(): void {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
   }
@@ -1030,6 +1057,159 @@ describe('UserCartComponent close with staged edits', () => {
     fixture.detectChanges();
     expect(navigate).not.toHaveBeenCalled();
     expect(component.isCartConfirmed).toBeTrue();
+  });
+
+  /**
+   * A close requested twice, and the batch between the two requests is refused.
+   *
+   * <p>The defect this pins: the second close was recorded against the batch the
+   * first close had started, and the flag outlived that batch. The failure
+   * withdrew the close from the *press* path only, so a request made during a
+   * close's own batch survived its refusal. The next press then inherited it: the
+   * retry succeeded, and instead of the reconciliation the customer was there to
+   * confirm, the cart navigated away. A failed batch had become a dismissal the
+   * customer never actually got, handed to a later press that had nothing to do
+   * with it.
+   *
+   * <p>The refused edit is untouched throughout - it stays on screen and stays
+   * staged, which is what makes the retry resend it - because withdrawing the
+   * close is about the departure, not about the cart.
+   */
+  it('withdraws a close that was requested while a close batch was in flight', () => {
+    // 1. A quantity change from 2 to 3, staged and unsaved.
+    component.increaseProductCount(10);
+    expect(component.items[0].productCount).toBe(3);
+    expect(navigate).not.toHaveBeenCalled();
+
+    // 2. The first X starts the one batch that carries the edit.
+    closeButton().click();
+    const [first] = httpMock.match(isCountUpdateRequest);
+    expect(first.request.params.get('count')).toBe('3');
+    expect(navigate).not.toHaveBeenCalled();
+    expect(component.isCartWritePending).toBeTrue();
+
+    // 3. The second X waits for that batch instead of starting a competing one.
+    // (`match` consumes what it returns, and the batch's own request was already
+    // taken above, so anything here is a second batch over the same row.)
+    closeButton().click();
+    expect(httpMock.match(isWriteRequest).length).toBe(0);
+    expect(navigate).not.toHaveBeenCalled();
+    expect(component.isCartWritePending).toBeTrue();
+
+    // 4. The write is refused. The cart stays, with the reason, and the edit
+    // stays on screen and staged.
+    first.flush('Cart update refused', { status: 409, statusText: 'Conflict' });
+    fixture.detectChanges();
+    expect(navigate).not.toHaveBeenCalled();
+    expect(component.cartMessage).toContain('kaydedilemedi');
+    expect(component.isCartWritePending).toBeFalse();
+    expect(component.items[0].productCount).toBe(3);
+
+    // 5. The customer checks out instead, from the cart that is still there.
+    fixture.detectChanges();
+    expect(buyButton().disabled).toBeFalse();
+    buyButton().click();
+
+    // 6. The retry carries exactly the edit that was refused, and this time it
+    // lands.
+    const retry = httpMock.expectOne(isCountUpdateRequest);
+    expect(retry.request.params.get('count')).toBe('3');
+    retry.flush('');
+
+    // The press follows its normal confirmation flow: the stored cart is
+    // reconciled and the result is shown. Navigating here would be the stale
+    // close being honoured - the customer would be taken away from a cart whose
+    // staged change had just been accepted, and from the reconciliation that was
+    // the whole point of pressing checkout.
+    httpMock.expectOne(isReconcileRequest).flush({
+      cart: storedCart(),
+      removedProductIds: [],
+      reducedProductIds: [],
+    });
+    flushImages();
+    fixture.detectChanges();
+
+    expect(navigate).not.toHaveBeenCalled();
+    expect(component.isCartConfirmed).toBeTrue();
+    expect(component.isReconcilingCart).toBeFalse();
+    expect(fixture.nativeElement.querySelector('#cart-container')).toBeTruthy();
+
+    // And the confirmation stands as the customer's: the next press opens
+    // checkout rather than another round of reconciliation.
+    component.openPaymentComponent();
+    expect(component.isPaymentPhaseActive).toBeTrue();
+  });
+
+  /**
+   * The same race, with the write that fails being one that never answers.
+   *
+   * <p>A timeout is reported through the same path as a refusal, so it has to
+   * withdraw the close for the same reason. Treating it differently would leave
+   * the cart in the worst of both states: pinned on a dismissal the customer
+   * cannot get out of, with their unsaved quantity invisible to them.
+   */
+  it('withdraws a deferred close when the close batch times out', fakeAsync(() => {
+    component.increaseProductCount(10);
+    closeButton().click();
+    const [hanging] = httpMock.match(isCountUpdateRequest);
+    expect(hanging.request.params.get('count')).toBe('3');
+
+    // A second dismissal while that request is hanging.
+    closeButton().click();
+    expect(httpMock.match(isWriteRequest).length).toBe(0);
+    expect(navigate).not.toHaveBeenCalled();
+
+    tick(20_000);
+    fixture.detectChanges();
+
+    expect(navigate).not.toHaveBeenCalled();
+    expect(component.cartMessage).toContain('kaydedilemedi');
+    expect(component.isCartWritePending).toBeFalse();
+    expect(component.items[0].productCount).toBe(3);
+
+    // The next press is a checkout press, and it reconciles rather than
+    // inheriting a close asked for against a batch that never landed.
+    component.openPaymentComponent();
+    const retry = httpMock.match(isCountUpdateRequest);
+    expect(retry.length).toBe(1);
+    expect(retry[0].request.params.get('count')).toBe('3');
+    retry[0].flush('');
+    flushReconciliationAsUnchanged();
+    fixture.detectChanges();
+
+    expect(navigate).not.toHaveBeenCalled();
+    expect(component.isCartConfirmed).toBeTrue();
+    flush();
+  }));
+
+  /**
+   * The behavior the withdrawal must not break: a close asked for during a
+   * checkout press still closes the cart, and still skips the reconciliation.
+   *
+   * <p>Both tests either side of this one share a batch, so a fix that simply
+   * cleared the flag on every settle would pass them and break this one. The
+   * distinction is the batch's own outcome: a request made while writes are in
+   * flight is honored only if those writes actually landed, because then there
+   * is nothing left for the customer to confirm.
+   */
+  it('still closes without reconciling when a close meets a landing write', () => {
+    component.increaseProductCount(10);
+
+    // The checkout press starts the batch, and the close is asked for while it
+    // is in flight.
+    component.openPaymentComponent();
+    const [update] = httpMock.match(isCountUpdateRequest);
+    expect(update).toBeTruthy();
+    closeButton().click();
+    expect(navigate).not.toHaveBeenCalled();
+
+    update.flush('');
+
+    // The write landed, so there is nothing left to confirm: the view goes, and
+    // the reconciliation this press would otherwise have started is not issued.
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(httpMock.match(isReconcileRequest).length).toBe(0);
+    expect(component.isReconcilingCart).toBeFalse();
   });
 
   it('resends only the edit that failed when a two-edit close is refused', () => {
