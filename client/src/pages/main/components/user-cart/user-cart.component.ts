@@ -111,6 +111,25 @@ export class UserCartComponent implements OnDestroy, CartStagedEditsHost {
    */
   private closeRequestedWhileWritePending: boolean = false;
   /**
+   * True while a router navigation outside the cart's own control is being held
+   * by the route's CanDeactivate guard.
+   *
+   * <p>It exists because the guarded navigation and a close are not the same
+   * departure. The router performs an external navigation itself, and only to the
+   * destination the customer asked for; a close is the cart's own decision and
+   * always goes to the page behind the cart. Letting a write's completion
+   * callback navigate while the guard is holding a navigation would replace that
+   * destination with the cart's idea of where to go, and cancelling the very
+   * navigation that was waiting. So the two are recorded separately: while this
+   * is set the write-completion callbacks do not navigate and do not reconcile,
+   * and the guard's own answer lets the router finish its move.
+   *
+   * <p>It is cleared when the batch settles - saved, refused or timed out - and
+   * when the guard itself is cancelled, so a navigation that never happened
+   * cannot suppress a later close.
+   */
+  private externalNavigationPending: boolean = false;
+  /**
    * The batch of staged writes currently in flight, or `null` when none is.
    *
    * <p>Also how a second observer joins a batch that already exists instead of
@@ -454,6 +473,13 @@ export class UserCartComponent implements OnDestroy, CartStagedEditsHost {
         if (this.destroyed) {
           return;
         }
+        if (this.externalNavigationPending) {
+          // A navigation the customer started elsewhere is waiting on this same
+          // write. Navigating here would send them to the page behind the cart
+          // and cancel the move they actually asked for, so the close is satisfied
+          // by the write having landed and the router performs its own navigation.
+          return;
+        }
         this.navigateAwayFromCart();
       },
       error: () => {
@@ -486,9 +512,11 @@ export class UserCartComponent implements OnDestroy, CartStagedEditsHost {
    *   <li>A write already in flight - a checkout press, or an X/Escape/overlay
    *   close that is already carrying these edits. That batch is waited out. It is
    *   the one batch: the writes are the customer's cart, and a second one would
-   *   race the first over the same rows. The wait is also recorded as a close
-   *   request, so a checkout press that is carrying the edits settles the
-   *   departure instead of starting a reconciliation nobody is there to confirm.
+   *   race the first over the same rows. The wait is recorded as an external
+   *   navigation rather than as a close, so a checkout press that is carrying the
+   *   edits settles the departure by answering `true` instead of starting a
+   *   reconciliation nobody is there to confirm - and without navigating itself,
+   *   because the destination belongs to the navigation the customer started.
    * </ul>
    *
    * <p>A refusal - or a write that never answers, which the same timeout reports
@@ -500,14 +528,20 @@ export class UserCartComponent implements OnDestroy, CartStagedEditsHost {
    * the change that failed.
    */
   public canDeactivateCart(): Observable<boolean> {
+    // Recorded before anything else, because the router has already decided where
+    // it is going and this guard only answers whether it may go there. Every
+    // write-completion callback has to know that the destination is not the
+    // cart's to choose.
+    this.externalNavigationPending = true;
+
     const pending = this.activeWriteBatch;
     if (pending) {
-      this.closeRequestedWhileWritePending = true;
       return this.settleWriteBatch(pending);
     }
 
     if (this.stagedEdits().length === 0) {
       this.abandonReconciliationForClose();
+      this.externalNavigationPending = false;
       return of(true);
     }
 
@@ -521,6 +555,13 @@ export class UserCartComponent implements OnDestroy, CartStagedEditsHost {
    * guard press from becoming a second write. `take(1)` because the router wants a
    * decision, not a subscription it has to clean up; the underlying batch is not
    * torn down by it.
+   *
+   * <p>The external-navigation state is cleared on every way out of the wait: a
+   * decision (which the map makes before the router acts on it, so a following
+   * close is not suppressed by a navigation that is already under way) and a
+   * cancellation, which `finalize` covers. A guard that was dropped without ever
+   * deciding - a navigation the router replaced, a superseded transition - must
+   * not leave a phantom departure behind that would silence the next close.
    */
   private settleWriteBatch(batch: Observable<boolean>): Observable<boolean> {
     return batch.pipe(
@@ -528,6 +569,7 @@ export class UserCartComponent implements OnDestroy, CartStagedEditsHost {
       map((allSaved) => {
         this.isCartWritePending = false;
         this.closeRequestedWhileWritePending = false;
+        this.externalNavigationPending = false;
         if (this.destroyed) {
           // There is nothing left to protect and nobody left to tell. Letting the
           // router proceed is the only outcome that does not strand the writes.
@@ -539,6 +581,9 @@ export class UserCartComponent implements OnDestroy, CartStagedEditsHost {
         }
         this.abandonReconciliationForClose();
         return true;
+      }),
+      finalize(() => {
+        this.externalNavigationPending = false;
       }),
     );
   }
@@ -668,6 +713,17 @@ export class UserCartComponent implements OnDestroy, CartStagedEditsHost {
           return;
         }
         this.isCartWritePending = false;
+        if (this.externalNavigationPending) {
+          // The router is holding a navigation of the customer's own making on
+          // this write, and it is going to leave the cart to wherever they asked
+          // to go. Reconciling here would run for a customer who is no longer on
+          // the page to confirm or abandon the result, and navigating would decide
+          // a destination the navigation itself owns. So neither happens: the
+          // write carried the staged edits, and the guard answers `true` so the
+          // router can complete its own move.
+          this.isReconcilingCart = false;
+          return;
+        }
         if (this.closeRequestedWhileWritePending) {
           this.closeRequestedWhileWritePending = false;
           this.isReconcilingCart = false;

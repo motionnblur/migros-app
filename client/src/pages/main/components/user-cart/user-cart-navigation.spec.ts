@@ -1,4 +1,9 @@
-import { provideHttpClient } from '@angular/common/http';
+import {
+  HttpInterceptorFn,
+  HttpRequest,
+  provideHttpClient,
+  withInterceptors,
+} from '@angular/common/http';
 import {
   HttpTestingController,
   provideHttpClientTesting,
@@ -13,6 +18,25 @@ import { Route, Router, RouterOutlet, provideRouter } from '@angular/router';
 import { routes } from '../../../../app/app.routes';
 import { IUserCartItemDto } from '../../../../interfaces/IUserCartItemDto';
 import { UserCartComponent } from './user-cart.component';
+
+/**
+ * Every request that was actually issued, in order, and never consumed.
+ *
+ * <p>`HttpTestingController.match` both filters and *takes* the requests it
+ * returns, so it can answer "is there an outstanding request of this kind?" but
+ * not "how many of these has this component sent?". Counting a request that is
+ * still pending - the exact case these tests are about - means counting it
+ * somewhere that does not hand it over.
+ */
+const sentRequests: HttpRequest<unknown>[] = [];
+
+const requestLogInterceptor: HttpInterceptorFn = (request, next) => {
+  sentRequests.push(request as HttpRequest<unknown>);
+  return next(request);
+};
+
+const sentMatching = (predicate: (request: { url: string }) => boolean): HttpRequest<unknown>[] =>
+  sentRequests.filter(predicate);
 
 /**
  * Leaving the cart route through the router with a staged edit unsaved.
@@ -52,6 +76,8 @@ describe('leaving the cart route with a staged edit', () => {
     isCountUpdateRequest(request) || isRemovalRequest(request);
   const isReconcileRequest = (request: { url: string }): boolean =>
     request.url.includes('/user/supply/reconcileCart');
+  const isCheckoutRequest = (request: { url: string }): boolean =>
+    request.url.includes('/payment/checkouts');
 
   const available: IUserCartItemDto = {
     productId: 10,
@@ -111,6 +137,11 @@ describe('leaving the cart route with a staged edit', () => {
     )[1] as HTMLButtonElement;
   }
 
+  /** The X in the cart header, reached by click rather than by method. */
+  function closeButton(): HTMLButtonElement {
+    return fixture.nativeElement.querySelector('#cart-container .btn-close');
+  }
+
   function cartDialog(): HTMLElement | null {
     return fixture.nativeElement.querySelector('#cart-container');
   }
@@ -165,11 +196,29 @@ describe('leaving the cart route with a staged edit', () => {
     fixture.detectChanges();
   }
 
+  /**
+   * Somewhere else in the application, started from outside the cart entirely.
+   *
+   * <p>The query parameter is what carries the point: a destination that is not
+   * simply "the page behind the cart" cannot be reached by whatever the cart
+   * itself decides to navigate to, so it is the only way to tell an honoured
+   * navigation from one that was quietly replaced by the cart's own idea of
+   * where to go.
+   */
+  function navigateOutsideTheCart(): void {
+    void router.navigateByUrl('/?reviewTarget=next');
+    tick();
+    fixture.detectChanges();
+  }
+
   beforeEach(async () => {
+    sentRequests.length = 0;
     await TestBed.configureTestingModule({
       imports: [TestHostComponent],
       providers: [
-        provideHttpClient(),
+        // The log is installed ahead of the testing backend so it sees the
+        // request as it is issued, whether or not anything ever answers it.
+        provideHttpClient(withInterceptors([requestLogInterceptor])),
         provideHttpClientTesting(),
         provideRouter(testRoutes),
         // A Back button under test. Without this the router drives the browser's
@@ -342,6 +391,91 @@ describe('leaving the cart route with a staged edit', () => {
     expect(component.items[0].productCount).toBe(3);
     expect(component.cartMessage).toContain('kaydedilemedi');
     expect(httpMock.match(isReconcileRequest).length).toBe(0);
+  }));
+
+  it('leaves for the destination the customer asked for, not the one behind the cart', fakeAsync(() => {
+    const component = openCart();
+
+    increaseButton().click();
+    fixture.detectChanges();
+    expect(component.items[0].productCount).toBe(3);
+
+    // A checkout press is already carrying the staged edit, and its own
+    // cart-write request is still outstanding.
+    component.openPaymentComponent();
+    const [update] = httpMock.match(isCountUpdateRequest);
+    expect(update).toBeTruthy();
+    expect(component.isCartWritePending).toBeTrue();
+
+    // The customer navigates somewhere else in the application while that write
+    // is still open - a link, a redirect, a deep link. Nothing about it reaches
+    // the component; only the router sees it.
+    navigateOutsideTheCart();
+
+    // Still on the cart route, and still with the cart they are looking at: the
+    // navigation is held by the one write that already carries their edit, and
+    // the guard must not add a second one to hold it.
+    expect(isOnCartRoute()).toBeTrue();
+    expect(sentMatching(isWriteRequest).length).toBe(1);
+    expect(component.isCartWritePending).toBeTrue();
+    expect(sentMatching(isReconcileRequest).length).toBe(0);
+    expect(sentMatching(isCheckoutRequest).length).toBe(0);
+
+    update.flush('');
+    tick();
+    fixture.detectChanges();
+
+    // The destination the customer asked for. Anything else - and "/", the page
+    // behind the cart, is the obvious one - means the departure was settled by
+    // the cart instead of by the navigation that was already under way.
+    expect(router.url).toBe('/?reviewTarget=next');
+    expect(isOnCartRoute()).toBeFalse();
+    expect(component.isCartWritePending).toBeFalse();
+
+    // And nothing about the way out was invented on the way: a reconciliation or
+    // a reservation issued here would run for a customer who is no longer on
+    // the page to confirm or abandon it.
+    expect(sentMatching(isWriteRequest).length).toBe(1);
+    expect(sentMatching(isReconcileRequest).length).toBe(0);
+    expect(sentMatching(isCheckoutRequest).length).toBe(0);
+  }));
+
+  it('lets the external destination win over a close the X button asked for', fakeAsync(() => {
+    const component = openCart();
+
+    increaseButton().click();
+    fixture.detectChanges();
+
+    // The customer presses X. The close is the cart's own, and it starts the
+    // write that carries the staged edit.
+    closeButton().click();
+    fixture.detectChanges();
+    const [update] = httpMock.match(isCountUpdateRequest);
+    expect(update).toBeTruthy();
+    expect(update.request.params.get('count')).toBe('3');
+    expect(component.isCartWritePending).toBeTrue();
+
+    // Only now does the customer navigate somewhere else, while that write is
+    // still open. Two departures are now in play, and the one that must survive
+    // is the one the customer made.
+    navigateOutsideTheCart();
+
+    expect(isOnCartRoute()).toBeTrue();
+    expect(sentMatching(isWriteRequest).length).toBe(1);
+    expect(component.isCartWritePending).toBeTrue();
+
+    update.flush('');
+    tick();
+    fixture.detectChanges();
+
+    // The close was satisfied by the write, but the destination the customer
+    // actually asked for is where they end up. A close must not be able to
+    // decide the destination of a navigation it did not start.
+    expect(router.url).toBe('/?reviewTarget=next');
+    expect(isOnCartRoute()).toBeFalse();
+    expect(sentMatching(isWriteRequest).length).toBe(1);
+    expect(sentMatching(isReconcileRequest).length).toBe(0);
+    expect(sentMatching(isCheckoutRequest).length).toBe(0);
   }));
 
   it('leaves immediately when there is nothing staged', fakeAsync(() => {
