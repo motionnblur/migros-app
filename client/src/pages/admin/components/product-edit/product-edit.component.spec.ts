@@ -4,6 +4,7 @@ import { HttpTestingController, TestRequest, provideHttpClientTesting } from '@a
 
 import { ProductEditComponent } from './product-edit.component';
 import { IProductData } from '../../../../interfaces/IProductData';
+import { PRODUCT_VERSION_HEADER } from '../../../../services/rest/product-edit-version';
 
 const PRODUCT_URL = '/user/supply/getProductDataWithProductId';
 const DESCRIPTION_URL = '/user/supply/getProductDescription';
@@ -83,8 +84,16 @@ describe('ProductEditComponent', () => {
     });
   }
 
-  function accept(request: TestRequest): void {
-    request.flush('File uploaded successfully', { status: 200, statusText: 'OK' });
+  /**
+   * Accepts the save and supplies the version the write produced, the way the
+   * backend does: on the response, after the change has been flushed.
+   */
+  function accept(request: TestRequest, producedVersion: number): void {
+    request.flush('File uploaded successfully', {
+      status: 200,
+      statusText: 'OK',
+      headers: { [PRODUCT_VERSION_HEADER]: String(producedVersion) },
+    });
   }
 
   it('should create', () => {
@@ -180,19 +189,57 @@ describe('ProductEditComponent', () => {
   });
 
   /**
-   * The modal stays open after a save, so without a refresh the next save from
-   * the same editor would submit the version it just superseded and conflict
-   * with its own successful write.
+   * The modal stays open after a save, so the next save must carry the version
+   * its own write produced.
+   *
+   * <p>It must not come from a re-read. The regression this replaces re-read the
+   * version from the detail endpoint, which is a second and later read: a
+   * checkout reserving stock between the save and that read hands the editor a
+   * version that vouches for a stock count this form never displayed, and the
+   * next absolute-count write resurrects the reserved units. The version
+   * travels back on the save response instead.
    */
-  it('refreshes the captured version after a successful save so the next save can succeed', () => {
+  it('adopts the version the save itself produced so the next save can succeed', () => {
     create(detail({ productVersion: 4 }));
 
-    accept(save());
-    httpMock.expectOne((r) => r.url === PRODUCT_URL).flush(detail({ productVersion: 5 }));
+    accept(save(), 5);
 
     expect(component.productVersion).toBe(5);
+    // The only detail read is the initial load. A post-save refresh is the bug.
+    httpMock.expectNone((r) => r.url === PRODUCT_URL);
 
     expect(bodyOf(save()).get('expectedVersion')).toBe('5');
+  });
+
+  it('lets two consecutive saves succeed without any intervening write', () => {
+    create(detail({ productVersion: 4 }));
+
+    accept(save(), 5);
+
+    // The second request has to be captured and accepted before the third save:
+    // saveProduct() refuses to run again while one is in flight, so issuing a
+    // save without holding its request would silently no-op.
+    const second = save();
+    expect(bodyOf(second).get('expectedVersion')).toBe('5');
+    accept(second, 6);
+
+    expect(component.productVersion).toBe(6);
+  });
+
+  it('refuses the next save rather than guessing when the response carries no version', () => {
+    create(detail({ productVersion: 4 }));
+
+    // A save that succeeded but reported no version: the editor must not keep
+    // the superseded version, and must not invent one.
+    save().flush('File uploaded successfully', { status: 200, statusText: 'OK' });
+    fixture.detectChanges();
+
+    expect(component.productVersion).toBeNull();
+
+    component.saveProduct();
+
+    expect(httpMock.match(isUpdateRequest)).toHaveSize(0);
+    expect(component.validationError).toBeTruthy();
   });
 
   it('surfaces an ordinary failure as a message rather than as a conflict', () => {

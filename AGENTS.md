@@ -170,15 +170,28 @@ Backend packages follow a mostly standard layered layout:
     column and would silently revert whatever a concurrent cart change, password
     reset or moderation did in between.
   - Every cart writer (`addProductToCart`, `removeProductFromCart`,
-    `updateProductCountInCart`, `clearUserCart`, `prepareCheckout`) takes the same
-    `PESSIMISTIC_WRITE` lock on the user row and reads the cart only from that
-    locked state. `prepareCheckout` resolves only the scalar mailbox first and
-    locks by `findByUserMailForUpdate`: loading the entity and then running a
-    locking query by id returns the already-managed instance without refreshing
-    it, so the cart could be read from a pre-lock snapshot.
+    `updateProductCountInCart`, `clearUserCart`, `reconcileCart`,
+    `prepareCheckout`) takes the same `PESSIMISTIC_WRITE` lock on the user row
+    and reads the cart only from that locked state. `prepareCheckout` resolves
+    only the scalar mailbox first and locks by `findByUserMailForUpdate`: loading
+    the entity and then running a locking query by id returns the already-managed
+    instance without refreshing it, so the cart could be read from a pre-lock
+    snapshot.
   - `UserCartService.getCartData` is a pure read. It never saves and never dirties
     the stored list; it only clamps quantities to current stock and omits
     deleted/out-of-stock products. Do not reintroduce a write here.
+  - That read hides what it cannot render, while `prepareCheckout` reserves from
+    the stored list. So `reconcileCart` exists as an explicit, customer-triggered
+    `POST /user/supply/reconcileCart` (not another `GET`): it removes deleted and
+    sold-out entries, reduces over-stock quantities to the remaining stock, and
+    **reports** both as separate lists. The report is the point — silently
+    dropping lines from an order is its own defect. The client reconciles on the
+    first checkout press and requires a fresh confirmation when anything changed,
+    so no quantity is ever charged for that the customer did not review. It
+    reserves nothing, creates no checkout and moves no money.
+  - The client must not leave an *empty* view as an excuse to skip reconciling: a
+    cart whose every entry became unbuyable renders identically to one the
+    customer emptied, and an empty view can never trigger the repair.
   - A missing profile user raises `UserNotFoundException` rather than an NPE.
 - Product edit version
   - `product_entity.version` is a JPA `@Version` column (V11). **Every writer of a
@@ -187,6 +200,22 @@ Backend packages follow a mostly standard layered layout:
     `ProductEntityRepository.incrementStock` advances it explicitly in the same
     statement, because a bulk update bypasses entity version handling. Without
     that, every restock is invisible to an open admin edit form.
+  - An **image-only** edit dirties no product column — the image lives in
+    `product_image_entity` — so dirty checking issues no `UPDATE` and the version
+    would not move. `AdminSupplyService.advanceVersionForImageChange` forces it
+    with `PESSIMISTIC_FORCE_INCREMENT`, inside the same transaction and before
+    the version is read. It must be the *pessimistic* form: the row is already
+    held at `PESSIMISTIC_WRITE` by `findByIdForUpdate`, and Hibernate's lock
+    upgrade is ordinal-ordered, so the lower-ranked `OPTIMISTIC_FORCE_INCREMENT`
+    is skipped as already-satisfied and silently does nothing. A genuine no-op
+    with no image change still leaves the version alone.
+  - `POST /admin/panel/updateProduct` returns the version its own write produced,
+    in the additive `X-Product-Version` response header
+    (`helper/ProductEditVersionHeader`). It is read after the flush, inside the
+    transaction — never by a separate post-commit read, which would be a *later*
+    version and would vouch for a stock count the editor never displayed. The
+    header is listed in CORS `setExposedHeaders`; without that a cross-origin
+    browser discards it and the editor never learns its own version.
   - `POST /admin/panel/updateProduct` **requires** `expectedVersion`. This is an
     intentional tightening of the request contract: backend and frontend ship
     together. Missing/invalid gives 400; stale gives 409 `PRODUCT_EDIT_CONFLICT`

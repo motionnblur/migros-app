@@ -9,6 +9,7 @@ import { IProductDescription } from '../../interfaces/IProductDescription';
 import { IProductUpdater } from '../../interfaces/IProductUpdater';
 import { IProductUploader } from '../../interfaces/IProductUploader';
 import { IUserProfileTable } from '../../interfaces/IUserProfileTable';
+import { IProductUpdateResult, readProductVersion } from './product-edit-version';
 
 @Injectable({ providedIn: 'root' })
 export class AdminApiService {
@@ -48,7 +49,17 @@ export class AdminApiService {
     return this.http.post(`${API_BASE_URL}/admin/panel/uploadProduct`, formData, { responseType: 'text', observe: 'response' }).pipe(map((response) => response.status === 200));
   }
 
-  updateProductData(productData: IProductUpdater): Observable<boolean> {
+  /**
+   * Applies a version-checked product edit.
+   *
+   * <p>The result carries the version the server's write produced, read from the
+   * response header the backend sets. That version - and only that version - may
+   * be paired with the field values just submitted, which is why the editor uses
+   * it instead of re-reading the product: a separate read is a later read, and a
+   * checkout reservation landing in between would hand the editor a version that
+   * vouches for a stock count its form never displayed.
+   */
+  updateProductData(productData: IProductUpdater): Observable<IProductUpdateResult> {
     const formData = new FormData();
     formData.append('adminId', productData.adminId.toString());
     formData.append('productId', productData.productId.toString());
@@ -64,7 +75,12 @@ export class AdminApiService {
     // with 409. There is no "omit when absent" path, because a request without
     // a version is exactly the unguarded absolute-count write this guards.
     formData.append('expectedVersion', productData.expectedVersion.toString());
-    return this.http.post(`${API_BASE_URL}/admin/panel/updateProduct`, formData, { responseType: 'text', observe: 'response' }).pipe(map((response) => response.status === 200));
+    return this.http.post(`${API_BASE_URL}/admin/panel/updateProduct`, formData, { responseType: 'text', observe: 'response' }).pipe(
+      map((response) => ({
+        saved: response.status === 200,
+        productVersion: readProductVersion(response.headers),
+      })),
+    );
   }
 
   updateOrderStatus(orderId: number, status: string): Observable<boolean> {

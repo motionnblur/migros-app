@@ -208,13 +208,18 @@ export class ProductEditComponent extends ProductBuyBase {
     };
 
     this.requests.add(this.restService.updateProductData(productData).subscribe({
-      next: (status: boolean) => {
+      next: (result) => {
         this.isSavingProduct = false;
         this.editConflict = false;
-        if (status) {
+        if (result.saved) {
           this.eventManager.trigger('productAdded');
           this.toastService.success('Ürün kaydedildi.');
-          this.refreshProductVersion();
+          // The version the save itself produced, and nothing else. Re-reading
+          // the product here would pair these just-saved field values with a
+          // version fetched afterwards: if a checkout reserved stock in between,
+          // that newer version vouches for a stock count this form never showed,
+          // and the next save would write the stale count straight back.
+          this.productVersion = result.productVersion;
         }
       },
       error: (error) => {
@@ -254,29 +259,6 @@ export class ProductEditComponent extends ProductBuyBase {
         },
         error: () => {
           this.saveError = 'Ürün yeniden yüklenemedi.';
-        },
-      })
-    );
-  }
-
-  /**
-   * Re-reads only the version after a successful save.
-   *
-   * The modal stays open, so the next save from this editor must not carry the
-   * version it just superseded - otherwise the component would conflict against
-   * its own successful write. Only the version is taken from the response; the
-   * fields keep what the administrator just saved.
-   */
-  private refreshProductVersion(): void {
-    this.requests.add(
-      this.restService.getProductData(this.productId).subscribe({
-        next: (data: IProductData) => {
-          this.productVersion = data.productVersion ?? null;
-        },
-        error: () => {
-          // The save succeeded; an unreadable refresh only means the next save
-          // from this open editor will be rejected and reloaded on purpose.
-          this.productVersion = null;
         },
       })
     );

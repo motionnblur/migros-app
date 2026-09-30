@@ -93,7 +93,7 @@ describe('AdminApiService product updates', () => {
     let status: number | undefined;
     let errored = false;
     service.updateProductData(updater()).subscribe({
-      next: (saved: boolean) => (status = saved ? 200 : 0),
+      next: (result) => (status = result.saved ? 200 : 0),
       error: (error) => {
         errored = true;
         status = error.status;

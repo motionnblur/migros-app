@@ -61,6 +61,10 @@
   </div>
 
   <div class="card-footer bg-light p-3 border-top">
+    <div *ngIf="cartMessage" class="alert alert-warning py-2 small" role="alert" data-testid="cart-reconciliation-message">
+      {{ cartMessage }}
+    </div>
+
     <div class="d-flex justify-content-between align-items-center mb-3">
       <span class="text-muted fw-medium">Toplam Tutar:</span>
       <span class="fs-3 fw-bold text-orange">{{ totalPrice | number:'1.2-2' }} TL</span>
@@ -69,9 +73,9 @@
     <button
       #buyButton
       class="btn btn-orange w-100 py-3 fw-bold shadow-sm"
-      [disabled]="items.length === 0"
+      [disabled]="items.length === 0 || isReconcilingCart"
       (click)="openPaymentComponent()">
-      {{ items.length > 0 ? (isCartConfirmed ? 'Siparisi Tamamla' : 'Sepeti Onayla') : 'Sepet Bos' }}
+      {{ isReconcilingCart ? 'Sepet kontrol ediliyor' : (items.length > 0 ? (isCartConfirmed ? 'Siparisi Tamamla' : 'Sepeti Onayla') : 'Sepet Bos') }}
     </button>
   </div>
 

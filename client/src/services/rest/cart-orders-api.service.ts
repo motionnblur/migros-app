@@ -6,6 +6,7 @@ import { API_BASE_URL } from '../../app/config/backend.config';
 import { IUserCartItemDto } from '../../interfaces/IUserCartItemDto';
 import { IUserOrderDetail } from '../../interfaces/IUserOrderDetail';
 import { IUserOrderGroup } from '../../interfaces/IUserOrderGroup';
+import { ICartReconciliation } from '../../interfaces/ICartReconciliation';
 
 @Injectable({ providedIn: 'root' })
 export class CartOrdersApiService {
@@ -13,6 +14,20 @@ export class CartOrdersApiService {
 
   getAllProductsFromUserCart(): Observable<IUserCartItemDto[]> {
     return this.http.get<IUserCartItemDto[]>(`${API_BASE_URL}/user/supply/getProductData`, { responseType: 'json' });
+  }
+
+  /**
+   * Asks the server to repair the stored cart against what is actually buyable.
+   *
+   * <p>A cart read is a pure read and deliberately hides entries it cannot
+   * render, while checkout reserves from the stored list. Without this, a cart
+   * holding an unbuyable product looks complete, then fails at checkout for a
+   * line the customer cannot see or remove. It is a POST rather than a GET
+   * because it changes stored state, and it reports what it changed so the
+   * customer is not silently dropped from their own order.
+   */
+  reconcileUserCart(): Observable<ICartReconciliation> {
+    return this.http.post<ICartReconciliation>(`${API_BASE_URL}/user/supply/reconcileCart`, null, { responseType: 'json' });
   }
 
   addProductToUserCart(productId: number): Observable<string | null> {

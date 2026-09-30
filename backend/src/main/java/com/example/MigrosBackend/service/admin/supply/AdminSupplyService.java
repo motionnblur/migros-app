@@ -18,6 +18,8 @@ import com.example.MigrosBackend.repository.product.ProductEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductImageEntityRepository;
 import com.example.MigrosBackend.service.global.FileService;
 import com.example.MigrosBackend.service.user.supply.UserCatalogReadService;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -45,9 +47,10 @@ public class AdminSupplyService {
     private final ProductImageCleanupQueue imageCleanupQueue;
     private final FileService fileService;
     private final UserCatalogReadService catalogReadService;
+    private final EntityManager entityManager;
 
     @Autowired
-    public AdminSupplyService(CategoryEntityRepository categoryEntityRepository, ProductEntityRepository productEntityRepository, ProductImageEntityRepository productImageEntityRepository, AdminEntityRepository adminEntityRepository, FileService fileService, AdminProductDescriptionOperations productDescriptionOperations, AdminProductImageOperations productImageOperations, ProductCreationPolicy productCreationPolicy, ProductImageCleanupQueue imageCleanupQueue, UserCatalogReadService catalogReadService) {
+    public AdminSupplyService(CategoryEntityRepository categoryEntityRepository, ProductEntityRepository productEntityRepository, ProductImageEntityRepository productImageEntityRepository, AdminEntityRepository adminEntityRepository, FileService fileService, AdminProductDescriptionOperations productDescriptionOperations, AdminProductImageOperations productImageOperations, ProductCreationPolicy productCreationPolicy, ProductImageCleanupQueue imageCleanupQueue, UserCatalogReadService catalogReadService, EntityManager entityManager) {
         this.categoryEntityRepository = categoryEntityRepository;
         this.productEntityRepository = productEntityRepository;
         this.productImageEntityRepository = productImageEntityRepository;
@@ -58,6 +61,7 @@ public class AdminSupplyService {
         this.productCreationPolicy = productCreationPolicy;
         this.imageCleanupQueue = imageCleanupQueue;
         this.catalogReadService = catalogReadService;
+        this.entityManager = entityManager;
     }
 
     /**
@@ -194,9 +198,23 @@ public class AdminSupplyService {
      * <p>The comparison runs before any field is mutated and before any byte of
      * image is written, so a rejected edit leaves the row, the image reference
      * and the upload directory exactly as they were.
+     *
+     * <p>The version this edit produces is returned, and it is read off the
+     * managed instance <em>after</em> everything this transaction changed has
+     * been flushed. That is deliberate and it is the whole reason the method
+     * returns a value instead of the controller re-reading the product. An
+     * editor that has just written needs the version its own write produced so
+     * its next save is not rejected against itself. Fetching that version in a
+     * separate read after the commit would be a different, later version: a
+     * checkout reservation landing in between would hand the editor a version
+     * that vouches for a stock count its form never saw, and the next absolute
+     * count write would resurrect the reserved units.
+     *
+     * @return the product version this transaction left behind, for the editor's
+     * next {@code expectedVersion}
      */
     @Transactional
-    public void updateProduct(Long adminId, Long productId, String productName,
+    public long updateProduct(Long adminId, Long productId, String productName,
                               String subCategoryName, BigDecimal productPrice,
                               int productCount, BigDecimal productDiscount,
                               String productDescription, int categoryValue,
@@ -220,7 +238,8 @@ public class AdminSupplyService {
         productCreationPolicy.applyTo(productEntity, details, adminEntity, categoryEntity);
         productEntityRepository.save(productEntity);
 
-        if (selectedImage != null && !selectedImage.isEmpty()) {
+        boolean imageReplaced = selectedImage != null && !selectedImage.isEmpty();
+        if (imageReplaced) {
             Path savedFilePath = writeImageForRollbackCleanup(selectedImage);
             try {
                 saveProductImage(productEntity, savedFilePath);
@@ -229,6 +248,59 @@ public class AdminSupplyService {
                 throw ex;
             }
         }
+
+        // Both branches are flushed before the version is read, so the number
+        // returned is the one the row actually carries and not the value the
+        // entity still held when the method was entered.
+        productEntityRepository.flush();
+        if (imageReplaced) {
+            // See advanceVersionForImageChange: the image row is a different
+            // entity, so replacing it dirties nothing here and the version would
+            // otherwise not move at all.
+            advanceVersionForImageChange(productEntity);
+            productEntityRepository.flush();
+        }
+
+        Long resultingVersion = productEntity.getVersion();
+        if (resultingVersion == null) {
+            // Only reachable if a product somehow reached this method without a
+            // version, which the NOT NULL column already forbids. Failing loudly
+            // beats returning a null that the client would have to interpret.
+            throw new GeneralException("Product version could not be determined after the update.");
+        }
+        return resultingVersion;
+    }
+
+    /**
+     * Advances the product's version for an edit that changed only its image.
+     *
+     * <p>{@code product_entity.version} is what every other writer of the row is
+     * detected through, and the image is not on that row: {@link ProductImageEntity}
+     * holds it. An image-only replacement therefore dirties nothing on the
+     * managed product, Hibernate issues no {@code UPDATE}, and the version stays
+     * where it was. Every open edit form for that product still holds the
+     * pre-replacement version and is still believed to be current, so the
+     * replacement is invisible to the guard that is supposed to see it - which
+     * is exactly the state the {@code expectedVersion} check exists to prevent.
+     *
+     * <p>{@link LockModeType#PESSIMISTIC_FORCE_INCREMENT} is the JPA primitive
+     * for this. It issues the increment as its own statement inside the
+     * transaction and updates the in-memory version to match, so the caller can
+     * read the real post-change value straight off the entity.
+     *
+     * <p>The pessimistic variant specifically, and not
+     * {@link LockModeType#OPTIMISTIC_FORCE_INCREMENT}: the row is already held at
+     * {@code PESSIMISTIC_WRITE} by {@code findByIdForUpdate}, and Hibernate's
+     * lock upgrade is ordinal-ordered, so a request for a <em>lower</em> lock
+     * grade than the one already held is treated as already satisfied and its
+     * body is skipped. That makes the optimistic form a silent no-op here - the
+     * increment is simply never issued and the version never moves, which
+     * reproduces the very defect this method exists to fix. The pessimistic form
+     * out-ranks the write lock already held, so it actually runs, and re-locking
+     * a row this transaction already owns costs nothing.
+     */
+    private void advanceVersionForImageChange(ProductEntity productEntity) {
+        entityManager.lock(productEntity, LockModeType.PESSIMISTIC_FORCE_INCREMENT);
     }
 
     private void saveProductImage(ProductEntity productEntity, Path savedFilePath) {

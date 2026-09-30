@@ -104,12 +104,17 @@ export class ProductUpdaterComponent extends ProductAdderBase {
     };
 
     this.requests.add(this.restService.updateProductData(productData).subscribe({
-      next: (status: boolean) => {
+      next: (result) => {
         this.editConflict = false;
-        if (status) {
+        if (result.saved) {
           this.outProductAdded();
           this.eventManager.trigger('productAdded');
-          this.refreshProductVersion();
+          // The version this very save produced. Re-reading the product here
+          // would pair the just-saved values with a later version: a checkout
+          // reserving stock in between would make that version vouch for a
+          // count this form never displayed, and the next save would write the
+          // stale one back.
+          this.productVersion = result.productVersion;
         }
       },
       error: (error) => {
@@ -152,29 +157,6 @@ export class ProductUpdaterComponent extends ProductAdderBase {
         },
         error: () => {
           this.validationError = 'Product could not be reloaded.';
-        },
-      })
-    );
-  }
-
-  /**
-   * Re-reads only the version after a successful save.
-   *
-   * The panel stays open, so the next save from this editor must not carry the
-   * version it just superseded - it would conflict against its own successful
-   * write. Only the version is taken from the response; the fields keep what was
-   * just saved.
-   */
-  private refreshProductVersion(): void {
-    this.requests.add(
-      this.restService.getProductData(this.id).subscribe({
-        next: (data: IProductData) => {
-          this.productVersion = data.productVersion ?? null;
-        },
-        error: () => {
-          // The save succeeded; an unreadable refresh only means the next save
-          // from this open editor will be rejected and reloaded on purpose.
-          this.productVersion = null;
         },
       })
     );

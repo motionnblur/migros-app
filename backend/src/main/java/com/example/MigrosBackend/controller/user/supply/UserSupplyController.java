@@ -4,6 +4,7 @@ import com.example.MigrosBackend.dto.admin.panel.ProductDescriptionListDto;
 import com.example.MigrosBackend.dto.user.category.SubCategoryDto;
 import com.example.MigrosBackend.dto.user.order.UserOrderDetailDto;
 import com.example.MigrosBackend.dto.user.order.UserOrderGroupDto;
+import com.example.MigrosBackend.dto.user.product.CartReconciliationDto;
 import com.example.MigrosBackend.dto.user.product.ProductDetailDto;
 import com.example.MigrosBackend.dto.user.product.ProductPreviewDto;
 import com.example.MigrosBackend.dto.user.product.UserCartItemDto;
@@ -115,6 +116,34 @@ public class UserSupplyController {
     @GetMapping("getProductData")
     public ResponseEntity<List<UserCartItemDto>> getProductData() {
         return ResponseEntity.ok(userCartService.getCartData(authTokenResolver.requireAuthenticatedUserMail()));
+    }
+
+    /**
+     * Repairs the stored cart against what is actually buyable, and reports what
+     * it changed.
+     *
+     * <p>A plain cart read is a pure read and has to stay one: a display request
+     * that persisted what it computed was how a concurrent add got erased. But
+     * checkout reserves from the stored list, so a read that hides an unbuyable
+     * entry while leaving it stored produces a cart that looks complete and then
+     * fails at checkout for a line the customer cannot see or remove. This is the
+     * explicit, customer-triggered repair for that, and it is a mutation because
+     * it changes stored state - which is why it is {@code POST} and not another
+     * {@code GET}.
+     *
+     * <p>The response is the reconciled cart plus the products that were dropped
+     * and the ones whose quantity was lowered, so the client can tell the
+     * customer exactly what happened rather than silently dropping lines from
+     * their order. It reserves nothing, charges nothing and creates no order.
+     */
+    @PostMapping("reconcileCart")
+    public ResponseEntity<CartReconciliationDto> reconcileCart() {
+        UserCartService.CartReconciliation reconciliation =
+                userCartService.reconcileCart(authTokenResolver.requireAuthenticatedUserMail());
+        return ResponseEntity.ok(new CartReconciliationDto(
+                reconciliation.cart(),
+                reconciliation.removedProductIds(),
+                reconciliation.reducedProductIds()));
     }
 
     @GetMapping("getProductDataWithProductId")

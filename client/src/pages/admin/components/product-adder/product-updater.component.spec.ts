@@ -93,7 +93,7 @@ describe('ProductUpdaterComponent', () => {
   });
 
   it('submits the captured version as expectedVersion', () => {
-    restServiceSpy.updateProductData.and.returnValue(of(true));
+    restServiceSpy.updateProductData.and.returnValue(of({ saved: true, productVersion: 5 }));
 
     component.uploadProductData();
 
@@ -152,17 +152,68 @@ describe('ProductUpdaterComponent', () => {
     expect(fixture.nativeElement.querySelector('[data-testid="reload-and-review"]')).toBeTruthy();
   });
 
-  it('refreshes the version after a successful save so the next save can succeed', () => {
-    restServiceSpy.updateProductData.and.returnValue(of(true));
-    restServiceSpy.getProductData.and.returnValue(of(detail({ productVersion: 6 })));
+  /**
+   * The panel stays open after a save, so the next save must carry the version
+   * its own write produced.
+   *
+   * <p>It must not come from a re-read. The regression this replaces read the
+   * version back from the detail endpoint, which is a second and later read: a
+   * checkout reserving stock between the save and that read hands the editor a
+   * version that vouches for a stock count this form never displayed, and the
+   * next absolute-count write then resurrects the reserved units. The version
+   * therefore travels back on the save response itself.
+   */
+  it('adopts the version the save itself produced so the next save can succeed', () => {
+    restServiceSpy.updateProductData.and.returnValue(of({ saved: true, productVersion: 5 }));
 
     component.uploadProductData();
 
-    expect(restServiceSpy.getProductData).toHaveBeenCalledTimes(2);
-    expect(component.productVersion).toBe(6);
+    expect(component.productVersion).toBe(5);
+    // Exactly one read, the initial load. A refresh after saving is the bug.
+    expect(restServiceSpy.getProductData).toHaveBeenCalledTimes(1);
 
     component.uploadProductData();
-    expect(lastUpdate().expectedVersion).toBe(6);
+    expect(lastUpdate().expectedVersion).toBe(5);
+  });
+
+  /**
+   * Two saves in a row with nothing in between must both be accepted, and the
+   * second must carry the version the first produced rather than the version
+   * the first superseded.
+   */
+  it('lets two consecutive saves succeed without any intervening write', () => {
+    restServiceSpy.updateProductData.and.returnValue(of({ saved: true, productVersion: 5 }));
+
+    component.uploadProductData();
+    expect(lastUpdate().expectedVersion).toBe(4);
+
+    restServiceSpy.updateProductData.and.returnValue(of({ saved: true, productVersion: 6 }));
+    component.uploadProductData();
+
+    expect(lastUpdate().expectedVersion).toBe(5);
+    expect(restServiceSpy.updateProductData).toHaveBeenCalledTimes(2);
+  });
+
+  /**
+   * A response that carries no usable version leaves the editor without one, so
+   * the next save is refused until a deliberate reload.
+   *
+   * <p>Keeping the superseded version would make the next save conflict with this
+   * editor's own write; guessing one would be an unguarded absolute-count write.
+   * Reporting "unknown" is the only honest option.
+   */
+  it('refuses the next save rather than guessing when the response carries no version', () => {
+    restServiceSpy.updateProductData.and.returnValue(of({ saved: true, productVersion: null }));
+
+    component.uploadProductData();
+
+    expect(component.productVersion).toBeNull();
+
+    restServiceSpy.updateProductData.calls.reset();
+    component.uploadProductData();
+
+    expect(restServiceSpy.updateProductData).not.toHaveBeenCalled();
+    expect(component.validationError).toContain('version');
   });
 
   it('reports an ordinary failure as a validation error, not as a conflict', () => {

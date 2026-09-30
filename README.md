@@ -159,6 +159,31 @@ Four schema and contract changes ship with this release:
   or file is touched, so it leaves inventory, metadata and the image untouched,
   and the client keeps the administrator's draft and requires a deliberate
   reload-and-review rather than resubmitting it against a fresh version.
+* **A successful edit returns the version it produced.** An open form must learn
+  the version of its *own* write before it can save again. It is returned on the
+  save response itself, in the additive `X-Product-Version` header (exposed
+  through CORS so a cross-origin browser can read it), and is the only version
+  the editor may pair with the values it just submitted. Re-reading the product
+  afterwards is **not** equivalent: that is a later read, and if a checkout
+  reserves stock in between, the newer version vouches for a stock count the form
+  never displayed — so the next absolute-count save resurrects the reserved
+  units. Replacing only the image also advances the version, because the image
+  lives in another table and would otherwise leave every open form over that
+  product silently current. A save that reports no version leaves the editor with
+  none, so its next save is refused until a deliberate reload rather than
+  guessed at.
+* **The cart repairs itself explicitly, and says so.** Reading a cart is a pure
+  read: it never writes, and it hides entries it cannot render (deleted products,
+  sold-out products, quantities above the remaining stock) while checkout
+  reserves from the stored list. That combination used to strand a customer: the
+  cart looked complete, checkout then failed for a line that was never displayed,
+  and there was no row to remove it from. The repair is a separate
+  `POST /user/supply/reconcileCart` — a mutation, because it changes stored
+  state, running under the same user-row lock every other cart writer uses so a
+  concurrent add is never erased. It reports products it *removed* separately
+  from products it *reduced*, and the client requires a fresh confirmation when
+  anything changed, so no quantity is ever charged for that the customer did not
+  see and approve. It reserves nothing, creates no order and moves no money.
 * **Obsolete product images are cleaned up durably.** Replacing an image or
   deleting a product used to leave the old file on disk forever. The transaction
   that stops referencing a file now writes a row to

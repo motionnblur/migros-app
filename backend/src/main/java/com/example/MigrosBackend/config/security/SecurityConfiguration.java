@@ -2,6 +2,7 @@ package com.example.MigrosBackend.config.security;
 
 import com.example.MigrosBackend.filter.InternalApiKeyFilter;
 import com.example.MigrosBackend.filter.JwtRequestFilter;
+import com.example.MigrosBackend.helper.ProductEditVersionHeader;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -118,6 +119,7 @@ public class SecurityConfiguration {
                         .requestMatchers("/user/supply/addProductToUserCart").hasRole("USER")
                         .requestMatchers("/user/supply/removeProductFromUserCart").hasRole("USER")
                         .requestMatchers("/user/supply/updateProductCountInUserCart").hasRole("USER")
+                        .requestMatchers("/user/supply/reconcileCart").hasRole("USER")
                         .requestMatchers("/user/supply/getAllOrderIds").hasRole("USER")
                         .requestMatchers("/user/supply/cancelOrder").hasRole("USER")
                         .requestMatchers("/user/supply/getOrderStatusByOrderId").hasRole("USER")
@@ -163,12 +165,28 @@ public class SecurityConfiguration {
         return http.build();
     }
 
+    /**
+     * Public rather than package-private so a test can assert the real bean's
+     * exposed-headers list directly.
+     *
+     * <p>That assertion is not decorative. A response header that is not listed in
+     * {@code Access-Control-Expose-Headers} is delivered by the server and then
+     * hidden from the browser's JavaScript, so the whole product-version
+     * handshake would work in a same-origin test and silently deliver nothing in
+     * the split-origin deployment it exists for.
+     */
     @Bean
-    CorsConfigurationSource corsConfigurationSource() {
+    public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(allowedOriginPatterns);
         configuration.setAllowedMethods(Arrays.asList("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
+        // Without this the browser hides the header from JavaScript on a
+        // cross-origin request, even though the server sent it. The client is a
+        // separate origin in every real deployment, so an unexposed version
+        // header would reach the server and be discarded in transit, and the
+        // editor would never learn the version its own write produced.
+        configuration.setExposedHeaders(List.of(ProductEditVersionHeader.NAME));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

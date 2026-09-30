@@ -74,6 +74,10 @@ export class RestService {
     return this.cartOrdersApi.getAllProductsFromUserCart();
   }
 
+  reconcileUserCart(): ReturnType<CartOrdersApiService['reconcileUserCart']> {
+    return this.cartOrdersApi.reconcileUserCart();
+  }
+
   getAllAdminProducts(adminId: number, page: number, productRange: number): ReturnType<AdminApiService['getAllAdminProducts']> {
     return this.adminApi.getAllAdminProducts(adminId, page, productRange);
   }

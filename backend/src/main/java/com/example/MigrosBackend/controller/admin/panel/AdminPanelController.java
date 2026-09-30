@@ -7,6 +7,7 @@ import com.example.MigrosBackend.dto.user.product.ProductDetailDto;
 import com.example.MigrosBackend.service.admin.supply.AdminOrderService;
 import com.example.MigrosBackend.service.admin.supply.AdminSupplyService;
 import com.example.MigrosBackend.helper.PageRequestPolicy;
+import com.example.MigrosBackend.helper.ProductEditVersionHeader;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -131,6 +132,13 @@ public class AdminPanelController {
      * {@code VALIDATION_FAILED}, negative gives 400 {@code VALIDATION_FAILED},
      * and stale gives 409 {@code PRODUCT_EDIT_CONFLICT}. The path, the method
      * and the success body are unchanged.
+     *
+     * <p>A success additionally carries {@code X-Product-Version}: the version
+     * this transaction produced. It is additive, and it is the only version the
+     * editor may pair with the values it just submitted. Re-reading the product
+     * afterwards to obtain it would be a second, later read that can observe a
+     * version that a checkout reservation has already moved past, and the stale
+     * form values would then be written back against it.
      */
     @PostMapping("updateProduct")
     public ResponseEntity<String> updateProduct(@NotNull @RequestParam("adminId") Long adminId,
@@ -144,8 +152,10 @@ public class AdminPanelController {
                                                  @RequestParam(value = "selectedImage", required = false) MultipartFile selectedImage,
                                                  @RequestParam("categoryValue") int categoryValue,
                                                  @NotNull @PositiveOrZero @RequestParam("expectedVersion") Long expectedVersion) {
-        adminSupplyService.updateProduct(adminId, productId, productName, subCategoryName, productPrice, productCount, productDiscount, productDescription, categoryValue, selectedImage, expectedVersion);
-        return ResponseEntity.ok("File uploaded successfully");
+        long resultingVersion = adminSupplyService.updateProduct(adminId, productId, productName, subCategoryName, productPrice, productCount, productDiscount, productDescription, categoryValue, selectedImage, expectedVersion);
+        return ResponseEntity.ok()
+                .header(ProductEditVersionHeader.NAME, Long.toString(resultingVersion))
+                .body("File uploaded successfully");
     }
 
     @DeleteMapping("deleteProduct")

@@ -325,6 +325,62 @@ class UserSupplyControllerTest {
         verify(userCartService, times(1)).getCartData(USER_MAIL);
     }
 
+    /**
+     * The reconciliation endpoint has to carry the report, not just the repaired
+     * cart: a client that cannot tell a removal from a reduction cannot tell the
+     * customer what happened to their order, and silently dropping lines from
+     * someone's cart is its own defect.
+     */
+    @Test
+    void reconcileCart_ShouldReturnTheRepairedCartAndWhatItChanged() throws Exception {
+        UserCartItemDto remaining = new UserCartItemDto();
+        remaining.setProductId(101L);
+        remaining.setProductName("Milk");
+        remaining.setProductPrice(new BigDecimal("1.5"));
+        remaining.setProductCount(2);
+        remaining.setAvailableStock(5);
+
+        when(authTokenResolver.requireAuthenticatedUserMail()).thenReturn(USER_MAIL);
+        when(userCartService.reconcileCart(USER_MAIL)).thenReturn(
+                new UserCartService.CartReconciliation(
+                        List.of(remaining), List.of(102L, 103L), List.of(104L)));
+
+        mockMvc.perform(post("/user/supply/reconcileCart")
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, SESSION_TOKEN))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cart.size()").value(1))
+                .andExpect(jsonPath("$.cart[0].productId").value(101))
+                .andExpect(jsonPath("$.cart[0].productName").value("Milk"))
+                .andExpect(jsonPath("$.cart[0].availableStock").value(5))
+                .andExpect(jsonPath("$.removedProductIds.size()").value(2))
+                .andExpect(jsonPath("$.removedProductIds[0]").value(102))
+                .andExpect(jsonPath("$.removedProductIds[1]").value(103))
+                .andExpect(jsonPath("$.reducedProductIds.size()").value(1))
+                .andExpect(jsonPath("$.reducedProductIds[0]").value(104));
+
+        verify(userCartService, times(1)).reconcileCart(USER_MAIL);
+    }
+
+    /**
+     * An empty stored cart is a valid answer, not a failure, and it must still be
+     * a well-formed report the client can act on.
+     */
+    @Test
+    void reconcileCart_ShouldReportAnEmptyCartWhenNothingIsStored() throws Exception {
+        when(authTokenResolver.requireAuthenticatedUserMail()).thenReturn(USER_MAIL);
+        when(userCartService.reconcileCart(USER_MAIL)).thenReturn(
+                new UserCartService.CartReconciliation(List.of(), List.of(), List.of()));
+
+        mockMvc.perform(post("/user/supply/reconcileCart")
+                        .cookie(new Cookie(AuthCookies.USER_SESSION_COOKIE_NAME, SESSION_TOKEN))
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cart.size()").value(0))
+                .andExpect(jsonPath("$.removedProductIds.size()").value(0))
+                .andExpect(jsonPath("$.reducedProductIds.size()").value(0));
+    }
+
     @Test
     void getProductDataWithProductId_ShouldReturnProduct() throws Exception {
         Long productId = 50L;

@@ -569,10 +569,22 @@ class ProductImageTransactionPostgresTest {
     /**
      * An edit that changes nothing on the product row leaves the version alone.
      *
-     * <p>Re-uploading the same picture with the same field values is a common
-     * no-op. Advancing the version for it would invalidate every other
-     * administrator's open form over a change that never happened, turning the
-     * guard into an obstacle rather than a protection.
+     * <p>Submitting the same field values again is a common no-op, and advancing
+     * the version for it would invalidate every other administrator's open form
+     * over a change that never happened, turning the guard into an obstacle
+     * rather than a protection.
+     *
+     * <p>This test previously passed a re-uploaded picture instead of no image,
+     * on the premise that re-sending the same picture was a no-op. It never was,
+     * and finding the truth of that is what the image-version defect was built
+     * on: an upload always draws a fresh UUID name, so the product is genuinely
+     * re-pointed at a different file and the old one becomes durably obsolete.
+     * That is a real change to the product and the version must move for it -
+     * otherwise every open edit form over the product stays current while the
+     * image it displays has silently been replaced underneath it, and either
+     * editor can overwrite the other's work with no conflict at all. The version
+     * not moving is now asserted where the premise holds, with no image
+     * supplied at all, in {@code aGenuineNoOpLeavesTheVersionUnmovedAndStaysSuccessful}.
      */
     @Test
     void anEditThatChangesNothingDoesNotAdvanceTheVersion() throws IOException {
@@ -581,7 +593,7 @@ class ProductImageTransactionPostgresTest {
         Long productId = productEntityRepository.findAll().get(0).getId();
 
         adminSupplyService.updateProduct(admin.getId(), productId, "Water", "Still",
-                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), png(), 0L);
+                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, 0L);
 
         assertEquals(0L, versionOf(productId),
                 "a no-op edit must not invalidate other editors' open forms");

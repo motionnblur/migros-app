@@ -22,6 +22,7 @@ import com.example.MigrosBackend.repository.product.ProductDescriptionEntityRepo
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductImageEntityRepository;
 import com.example.MigrosBackend.service.global.FileService;
+import jakarta.persistence.EntityManager;
 import com.example.MigrosBackend.service.user.supply.UserCatalogReadService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -71,6 +72,8 @@ class AdminSupplyServiceTest {
     private ProductImageCleanupQueue imageCleanupQueue;
     @Mock
     private FileService fileService;
+    @Mock
+    private EntityManager entityManager;
 
     private AdminSupplyService adminSupplyService;
 
@@ -102,7 +105,12 @@ class AdminSupplyServiceTest {
                         productEntityRepository,
                         productImageEntityRepository,
                         productDescriptionEntityRepository,
-                        fileService));
+                        fileService),
+                // Only the image-replacement path calls entityManager.lock, to
+                // force the version advance; a mock is enough for every other
+                // assertion here, and the version behaviour itself is proven
+                // against real PostgreSQL in ProductImageVersionAdvancePostgresTest.
+                entityManager);
     }
 
     /**
