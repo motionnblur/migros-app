@@ -478,6 +478,59 @@ describe('leaving the cart route with a staged edit', () => {
     expect(sentMatching(isCheckoutRequest).length).toBe(0);
   }));
 
+  it('unlocks the cart when a guarded navigation is superseded before its write completes', fakeAsync(() => {
+    const component = openCart();
+    increaseButton().click();
+    fixture.detectChanges();
+
+    void router.navigateByUrl('/?reviewTarget=next');
+    tick();
+    const [update] = httpMock.match(isCountUpdateRequest);
+    expect(update).toBeTruthy();
+    expect(component.isCartWritePending).toBeTrue();
+
+    // A later navigation keeps the customer on the cart and cancels the guard
+    // that started the write. The server request still has to finish normally.
+    void router.navigateByUrl('/(modal:cart)');
+    tick();
+    update.flush('');
+    tick();
+    fixture.detectChanges();
+
+    expect(isOnCartRoute()).toBeTrue();
+    expect(component.isCartWritePending).toBeFalse();
+    expect(component.isCartBusy).toBeFalse();
+    expect(increaseButton().disabled).toBeFalse();
+
+    component.openPaymentComponent();
+    expect(sentMatching(isWriteRequest).length).toBe(1);
+    expect(httpMock.match(isReconcileRequest).length).toBe(1);
+  }));
+
+  it('shows a retryable error when a superseded navigation write fails', fakeAsync(() => {
+    const component = openCart();
+    increaseButton().click();
+    fixture.detectChanges();
+
+    void router.navigateByUrl('/?reviewTarget=next');
+    tick();
+    const [update] = httpMock.match(isCountUpdateRequest);
+    void router.navigateByUrl('/(modal:cart)');
+    tick();
+    update.flush('Cart update refused', { status: 409, statusText: 'Conflict' });
+    tick();
+    fixture.detectChanges();
+
+    expect(isOnCartRoute()).toBeTrue();
+    expect(component.items[0].productCount).toBe(3);
+    expect(component.isCartWritePending).toBeFalse();
+    expect(component.cartMessage).toContain('kaydedilemedi');
+
+    component.openPaymentComponent();
+    const [retry] = httpMock.match(isCountUpdateRequest);
+    expect(retry.request.params.get('count')).toBe('3');
+  }));
+
   it('leaves immediately when there is nothing staged', fakeAsync(() => {
     openCart();
 

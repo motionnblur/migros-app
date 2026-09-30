@@ -305,19 +305,29 @@ export class UserCartComponent implements OnDestroy, CartStagedEditsHost {
       ),
     );
 
-    const batch = forkJoin(attempts).pipe(
+    const batch: Observable<boolean> = forkJoin(attempts).pipe(
       map((results) => {
         results
           .filter((result) => result.saved)
           .forEach((result) => this.discardStagedEdit(result.edit));
-        return results.every((result) => result.saved);
+        const allSaved = results.every((result) => result.saved);
+        // A router guard may have cancelled its subscription while this shared
+        // batch stayed in flight. Report a refusal here so the still-open cart
+        // shows it even when no guard or close callback remains to do so.
+        if (!allSaved && !this.destroyed) {
+          this.reportCartWriteFailure();
+        }
+        return allSaved;
       }),
-      // Upstream of the share, so it runs once per batch rather than once per
-      // observer. `finalize` rather than `tap` so it also runs when the batch
-      // fails or is torn down, and a handle left behind would make the next
-      // departure wait on a batch that had already settled.
+      // Upstream of the share, so it runs once per batch even if the router
+      // cancels its guard subscription. The write continues with refCount false;
+      // its own completion must unlock the cart, since a cancelled guard will
+      // never reach settleWriteBatch's result handler.
       finalize(() => {
-        this.activeWriteBatch = null;
+        if (this.activeWriteBatch === batch) {
+          this.activeWriteBatch = null;
+          this.isCartWritePending = false;
+        }
       }),
       shareReplay({ bufferSize: 1, refCount: false }),
     );
