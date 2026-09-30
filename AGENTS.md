@@ -191,7 +191,27 @@ Backend packages follow a mostly standard layered layout:
     reserves nothing, creates no checkout and moves no money.
   - The client must not leave an *empty* view as an excuse to skip reconciling: a
     cart whose every entry became unbuyable renders identically to one the
-    customer emptied, and an empty view can never trigger the repair.
+    customer emptied, and checkout is unreachable from an empty cart. So the empty
+    view carries its own explicit "check the cart" action, and the reconciliation
+    it issues is the only way to tell the two apart. It must stay reachable from a
+    DOM click — a disabled buy button plus a test that calls the component method
+    directly proves nothing.
+  - On the client, a checkout press **persists the staged cart edits first and
+    awaits them, then reconciles**. Reconciling while a write is in flight answers
+    for a cart the server has not accepted yet, and adopting that response
+    confirms a view that differs from what checkout will reserve. The staged set
+    is the source of truth for what is unsaved: an edit is dropped from it only
+    once its own write succeeded, so a refusal stays staged and the retry resends
+    exactly what is still unsaved. Both backend writers are idempotent, which is
+    what makes that retry safe.
+  - `isSameCartContent` (order-insensitive, compares count, price and stock) is
+    what decides whether a reconciliation still stands as the customer's
+    confirmation. Empty `removedProductIds`/`reducedProductIds` is not proof the
+    displayed and stored carts match; only the cart itself is. A response is also
+    never adopted over an edit the customer made *while* the request was in
+    flight — the cart rows are disabled for the duration of a press and of the
+    payment phase, and the component additionally compares against a press-time
+    snapshot.
   - A missing profile user raises `UserNotFoundException` rather than an NPE.
 - Product edit version
   - `product_entity.version` is a JPA `@Version` column (V11). **Every writer of a

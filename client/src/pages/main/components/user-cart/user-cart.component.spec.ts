@@ -100,7 +100,7 @@ describe('UserCartComponent', () => {
     expect(component.totalPrice).toBe(75);
   });
 
-  it('stages a remove until confirmation and saves it on the first confirm step', () => {
+  it('stages a remove and persists it before the reconciling press reads the server', () => {
     component.removeProductFromUserCart(11);
     component.removeProductFromUserCart(11);
 
@@ -114,8 +114,24 @@ describe('UserCartComponent', () => {
 
     component.openPaymentComponent();
 
-    // The first press reconciles the stored cart first. Nothing needed repair
-    // here, so the staged removal is persisted and the confirmation stands.
+    // The staged removal is written first and awaited. Reconciling before it
+    // landed would answer for a cart that still held the removed product, and
+    // the response would then re-render a row the customer just deleted.
+    const removal = httpMock.expectOne((request) =>
+      request.url.includes('/user/supply/removeProductFromUserCart'),
+    );
+    expect(removal.request.method).toBe('DELETE');
+    expect(removal.request.params.get('productId')).toBe('11');
+    expect(
+      httpMock.match((request) => request.url.includes('/user/supply/reconcileCart'))
+        .length,
+    ).toBe(0);
+    expect(component.isCartConfirmed).toBeFalse();
+    expect(component.isPaymentPhaseActive).toBeFalse();
+    removal.flush('');
+
+    // Only now is the stored cart reconciled, and the confirmation the customer
+    // already gave stands because the reconciled cart is the one on screen.
     const reconciliation = httpMock.expectOne((request) =>
       request.url.includes('/user/supply/reconcileCart'),
     );
@@ -127,13 +143,6 @@ describe('UserCartComponent', () => {
       reducedProductIds: [],
     });
 
-    const removal = httpMock.expectOne((request) =>
-      request.url.includes('/user/supply/removeProductFromUserCart'),
-    );
-    expect(removal.request.method).toBe('DELETE');
-    expect(removal.request.params.get('productId')).toBe('11');
-    removal.flush('');
-
     expect(component.isCartConfirmed).toBeTrue();
     expect(component.isPaymentPhaseActive).toBeFalse();
     expect(
@@ -144,10 +153,22 @@ describe('UserCartComponent', () => {
   it('hands off to checkout only on the second confirmation without sending a client amount', () => {
     component.increaseProductCount(10);
 
-    // The first press reconciles the stored cart before it confirms anything.
-    // The cart needed no repair here, so the confirmation the customer already
-    // gave stands and the staged quantity is persisted on the way through.
+    // The first press persists the staged quantity and only then reconciles.
+    // Nothing needed repair here, so the confirmation the customer already gave
+    // stands and the reconciled cart is the one they are looking at.
     component.openPaymentComponent();
+    const quantityUpdate = httpMock.expectOne((request) =>
+      request.url.includes('/user/supply/updateProductCountInUserCart'),
+    );
+    expect(quantityUpdate.request.params.get('productId')).toBe('10');
+    expect(quantityUpdate.request.params.get('count')).toBe('3');
+    expect(component.isPaymentPhaseActive).toBeFalse();
+    expect(
+      httpMock.match((request) => request.url.includes('/user/supply/reconcileCart'))
+        .length,
+    ).toBe(0);
+    quantityUpdate.flush('');
+
     const reconciliation = httpMock.expectOne((request) =>
       request.url.includes('/user/supply/reconcileCart'),
     );
@@ -162,14 +183,9 @@ describe('UserCartComponent', () => {
       reducedProductIds: [],
     });
 
-    const quantityUpdate = httpMock.expectOne((request) =>
-      request.url.includes('/user/supply/updateProductCountInUserCart'),
-    );
-    expect(quantityUpdate.request.params.get('productId')).toBe('10');
-    expect(quantityUpdate.request.params.get('count')).toBe('3');
-    quantityUpdate.flush('');
     expect(component.isCartConfirmed).toBeTrue();
     expect(component.isPaymentPhaseActive).toBeFalse();
+    expect(component.totalPrice).toBe(75);
 
     component.openPaymentComponent();
     expect(component.isPaymentPhaseActive).toBeTrue();
@@ -180,12 +196,14 @@ describe('UserCartComponent', () => {
       request.url.includes('/payment/checkouts'),
     );
     expect(prepareCheckout.request.method).toBe('POST');
+    // The client never supplies an amount: the server computes the snapshot it
+    // reserves from and returns it.
     expect(prepareCheckout.request.body).toEqual({});
     prepareCheckout.flush({
       checkoutId: 'checkout-1',
       status: 'PREPARED',
-      totalAmount: 60,
-      amountMinor: 6000,
+      totalAmount: 75,
+      amountMinor: 7500,
       currency: 'TRY',
     });
     httpMock
@@ -195,21 +213,38 @@ describe('UserCartComponent', () => {
       .flush([]);
   });
 
-  it('removes the final unit when decrementing and blocks empty-cart confirmation', () => {
+  it('persists a staged removal from an empty view instead of stranding it', () => {
     component.decreaseProductCount(11);
 
     expect(component.items.map((item) => item.productId)).toEqual([10]);
     expect(component.totalPrice).toBe(40);
 
     component.removeProductFromUserCart(10);
+    expect(component.items.length).toBe(0);
     component.openPaymentComponent();
 
+    // The rows are gone from the view but not from the cart, so the press that
+    // cannot be made from the disabled buy button still has to reach the server
+    // before anything is reconciled or offered.
+    const removals = httpMock.match((request) =>
+      request.url.includes('/user/supply/removeProductFromUserCart'),
+    );
+    expect(removals.length).toBe(2);
+    expect(
+      httpMock.match((request) => request.url.includes('/user/supply/reconcileCart'))
+        .length,
+    ).toBe(0);
+    removals.forEach((request) => request.flush(''));
+
+    httpMock
+      .expectOne((request) => request.url.includes('/user/supply/reconcileCart'))
+      .flush({ cart: [], removedProductIds: [], reducedProductIds: [] });
+
     expect(component.items.length).toBe(0);
+    expect(component.isCartConfirmed).toBeFalse();
     expect(component.isPaymentPhaseActive).toBeFalse();
     expect(
-      httpMock.match((request) =>
-        request.url.includes('/user/supply/removeProductFromUserCart'),
-      ).length,
+      httpMock.match((request) => request.url.includes('/payment/checkouts')).length,
     ).toBe(0);
   });
 });

@@ -184,6 +184,11 @@ Four schema and contract changes ship with this release:
   from products it *reduced*, and the client requires a fresh confirmation when
   anything changed, so no quantity is ever charged for that the customer did not
   see and approve. It reserves nothing, creates no order and moves no money.
+  The client persists a customer's locally staged cart edits and *waits* for them
+  before reconciling, so the reconciled cart describes the cart the customer is
+  looking at; the rows are locked for the duration of a press and of the payment
+  phase, and an empty view carries its own "check the cart" action so a cart
+  whose every entry became unbuyable can still be cleaned up.
 * **Obsolete product images are cleaned up durably.** Replacing an image or
   deleting a product used to leave the old file on disk forever. The transaction
   that stops referencing a file now writes a row to

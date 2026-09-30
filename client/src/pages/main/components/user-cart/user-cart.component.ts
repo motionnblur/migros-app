@@ -13,12 +13,24 @@ import { CommonModule } from '@angular/common';
 import { PaymentComponent } from '../payment/payment.component';
 import { data } from '../../../../memory/global-data';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { catchError, forkJoin, map, Observable, of, Subscription } from 'rxjs';
 import { ObjectUrlManager } from '../../helpers/object-url-manager';
 import {
   calculateCartTotal,
+  isSameCartContent,
   resolveCartQuantityChange,
 } from '../../helpers/cart-state';
+
+/** A local cart edit that has not reached the server yet. */
+type StagedCartEdit =
+  | { kind: 'remove'; productId: number }
+  | { kind: 'count'; productId: number; count: number };
+
+/** The outcome of one attempt at persisting every staged edit. */
+interface StagedEditResult {
+  edit: StagedCartEdit;
+  saved: boolean;
+}
 
 @Component({
   selector: 'app-user-cart',
@@ -40,8 +52,47 @@ export class UserCartComponent implements OnDestroy {
   totalPrice = 0;
   isPaymentPhaseActive: boolean = false;
   isCartConfirmed: boolean = false;
+  /**
+   * A checkout press is in progress: the staged edits are being persisted and the
+   * stored cart is then reconciled.
+   *
+   * <p>True for the whole press, not only for the request, because the two are one
+   * operation from the customer's point of view and the button has to stay
+   * disabled across both. Confirming anything in between is the defect: the
+   * reconciliation would be answering for a cart the staged edits have not
+   * reached yet.
+   */
   isReconcilingCart: boolean = false;
+  /** Staged cart edits are in flight and their outcome is not known yet. */
+  isCartWritePending: boolean = false;
   cartMessage = '';
+  private destroyed = false;
+  /**
+   * The cart as it stood when the current checkout press began.
+   *
+   * <p>Needed to tell two things apart when the response arrives: a change the
+   * server made, and a change the customer made while the press was running. The
+   * second must not be overwritten by a response that predates it.
+   */
+  private cartAtPress: IUserCartItemDto[] | null = null;
+
+  /** True while a checkout press may not be repeated. */
+  public get isCartBusy(): boolean {
+    return this.isReconcilingCart || this.isCartWritePending;
+  }
+
+  /**
+   * True while the cart rows must not be edited.
+   *
+   * <p>During a press, because an edit made then is answered by a reconciliation
+   * that predates it - the response would describe a cart the customer had
+   * already moved on from. During the payment phase, because the reservation has
+   * already taken the stored cart, so an edit now would either be discarded or,
+   * worse, be written back over a snapshot that is about to be charged for.
+   */
+  public get isCartLocked(): boolean {
+    return this.isCartBusy || this.isPaymentPhaseActive;
+  }
 
   private readonly escHandler = (event: KeyboardEvent) => {
     if (event.key === 'Escape') {
@@ -62,12 +113,13 @@ export class UserCartComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.destroyed = true;
     document.removeEventListener('keydown', this.escHandler);
     this.cartRequest?.unsubscribe();
     this.reconciliationRequest?.unsubscribe();
     this.cancelImageRequests();
     this.releaseProductImages();
-    this.saveCartItems();
+    this.persistStagedEditsOnClose();
   }
 
   private loadCart() {
@@ -115,34 +167,102 @@ export class UserCartComponent implements OnDestroy {
     this.productImageUrls.clear();
   }
 
-  private saveCartItems() {
-    this.itemsToDelete.forEach((productId) => {
-      this.restService
-        .removeProductFromUserCart(productId)
-        .subscribe({ error: () => this.reportCartWriteFailure() });
-    });
+  /**
+   * Persists every staged edit and completes only once all of them have.
+   *
+   * <p>This used to be fire-and-forget: the confirmation path subscribed to the
+   * writes and went straight on, so the reconciliation answered for a cart the
+   * staged edits had not reached yet and the customer then confirmed a view that
+   * no longer matched what was stored. Nothing may be confirmed on the strength
+   * of a request that was merely issued, so the caller gets an observable that
+   * settles when the server has actually accepted or rejected every edit.
+   *
+   * <p>An edit is dropped from the staged set only once its own write has
+   * succeeded. A rejected one stays staged, so a retry resends exactly what is
+   * still unsaved instead of silently discarding a change the customer made, and
+   * both backend writers are idempotent (a count rewrite replaces the product's
+   * entries, a removal drops them), so resending cannot double anything.
+   *
+   * <p>A single failed edit fails the batch: the whole batch is the customer's
+   * cart, and a partially persisted cart is not a cart anybody confirmed.
+   */
+  private persistStagedEdits(): Observable<boolean> {
+    const edits = this.stagedEdits();
+    this.isCartWritePending = edits.length > 0;
+    if (edits.length === 0) {
+      return of(true);
+    }
 
+    const attempts: Observable<StagedEditResult>[] = edits.map((edit) =>
+      this.sendStagedEdit(edit).pipe(
+        map(() => ({ edit, saved: true })),
+        // One refusal is reported, not thrown: the other edits are already in
+        // flight and their outcome still has to be collected and honoured.
+        catchError(() => of({ edit, saved: false })),
+      ),
+    );
+
+    return forkJoin(attempts).pipe(
+      map((results) => {
+        results
+          .filter((result) => result.saved)
+          .forEach((result) => this.discardStagedEdit(result.edit));
+        return results.every((result) => result.saved);
+      }),
+    );
+  }
+
+  private stagedEdits(): StagedCartEdit[] {
+    const edits: StagedCartEdit[] = [];
+    this.itemsToDelete.forEach((productId) =>
+      edits.push({ kind: 'remove', productId }),
+    );
     this.itemCountMap.forEach((count, productId) => {
       if (count > 0) {
-        this.restService
-          .updateProductCountInUserCart(productId, count)
-          .subscribe({ error: () => this.reportCartWriteFailure() });
+        edits.push({ kind: 'count', productId, count });
       }
     });
+    return edits;
+  }
 
-    this.itemsToDelete.clear();
-    this.itemCountMap.clear();
+  private sendStagedEdit(edit: StagedCartEdit): Observable<unknown> {
+    return edit.kind === 'remove'
+      ? this.restService.removeProductFromUserCart(edit.productId)
+      : this.restService.updateProductCountInUserCart(edit.productId, edit.count);
+  }
+
+  private discardStagedEdit(edit: StagedCartEdit): void {
+    if (edit.kind === 'remove') {
+      this.itemsToDelete.delete(edit.productId);
+    } else {
+      this.itemCountMap.delete(edit.productId);
+    }
+  }
+
+  /**
+   * Flushes whatever is still staged when the cart view goes away.
+   *
+   * <p>Skipped while a write is in flight: that write already carries the staged
+   * edits, and a second batch would race the first over the same rows. The
+   * in-flight batch is deliberately not cancelled either, so closing the dialog
+   * mid-confirmation loses nothing.
+   */
+  private persistStagedEditsOnClose(): void {
+    if (this.isCartWritePending || this.stagedEdits().length === 0) {
+      return;
+    }
+    // Nothing to report it to: the view is gone, and every edit's outcome is
+    // already handled inside the batch.
+    this.persistStagedEdits().subscribe();
   }
 
   /**
    * A staged cart edit the server refused.
    *
-   * <p>Reconciliation is what makes this reachable: a quantity staged before a
-   * reconciling press can exceed the stock the reconciliation just clamped to,
-   * and the server refuses it. The outcome is still consistent - the reconciled
-   * cart is what gets displayed and what gets reserved - but a write that failed
-   * in silence would leave the customer believing a change was saved that was
-   * not, so it is surfaced instead.
+   * <p>Checkout stays blocked and the edits that were refused stay staged, so the
+   * message is not merely a notice: it is the reason the next press repeats the
+   * write. Reporting it and then confirming anyway would leave the customer
+   * believing a change was saved that was not.
    */
   private reportCartWriteFailure(): void {
     this.cartMessage = 'Sepet guncellemesi kaydedilemedi. Lutfen tekrar deneyin.';
@@ -159,6 +279,10 @@ export class UserCartComponent implements OnDestroy {
     // customer starts editing again it no longer describes what they are looking
     // at, so it is cleared rather than left to misinform the next decision.
     this.cartMessage = '';
+    // An edit after a confirmation invalidates it. The cart the customer
+    // approved is no longer the cart on screen, and the staged edit has not
+    // reached the server, so checkout from here would reserve the old one.
+    this.isCartConfirmed = false;
     const itemToRemove = this.items.find(
       (item) => item.productId === productId,
     );
@@ -186,6 +310,7 @@ export class UserCartComponent implements OnDestroy {
       return;
     }
 
+    this.isCartConfirmed = false;
     const updatedItem = { ...item, productCount: change.quantity, deleteState: false };
     this.items = this.items.map((entry) =>
       entry.productId === productId ? updatedItem : entry,
@@ -211,6 +336,7 @@ export class UserCartComponent implements OnDestroy {
       return;
     }
 
+    this.isCartConfirmed = false;
     const updatedItem = { ...item, productCount: change.quantity };
     this.items = this.items.map((entry) =>
       entry.productId === productId ? updatedItem : entry,
@@ -220,7 +346,7 @@ export class UserCartComponent implements OnDestroy {
   }
 
   /**
-   * First press of the checkout button reconciles the stored cart.
+   * First press of the checkout button: persist the staged edits, then reconcile.
    *
    * <p>The cart read is a pure read and hides entries it cannot render, while
    * checkout reserves from the stored list. A cart holding a product that was
@@ -235,56 +361,75 @@ export class UserCartComponent implements OnDestroy {
    * it. If anything changed, the cart is re-rendered and the customer has to
    * confirm the new contents, so no quantity is ever charged for that they did
    * not see and approve.
+   *
+   * <p>The staged edits are persisted <em>first</em>, and the reconciliation only
+   * after they have all succeeded. Reconciling while a write is in flight is the
+   * race this whole path exists to remove: the response would describe a cart the
+   * server had not accepted yet, and adopting it would either resurrect a
+   * removal the customer made or silently discard a quantity they had just set -
+   * while the write it raced went on to change the stored cart afterwards.
+   *
+   * <p>Re-entrant by design: a second press, or a press while the first is still
+   * running, is ignored rather than issued against a cart whose writes are still
+   * in flight.
    */
-  private reconcileCartBeforeCheckout(): void {
-    if (this.isReconcilingCart) {
+  private beginCheckoutReconciliation(): void {
+    if (this.isCartBusy) {
       return;
     }
     this.isReconcilingCart = true;
+    this.isCartConfirmed = false;
     this.cartMessage = '';
+    this.cartAtPress = this.items;
+
+    this.persistStagedEdits().subscribe({
+      next: (allSaved) => {
+        this.isCartWritePending = false;
+        if (this.destroyed) {
+          // The view is gone. The writes have landed, and reconciling now would
+          // only mutate a destroyed component.
+          this.isReconcilingCart = false;
+          return;
+        }
+        if (!allSaved) {
+          this.isReconcilingCart = false;
+          this.reportCartWriteFailure();
+          return;
+        }
+        this.requestReconciliation();
+      },
+      error: () => {
+        // persistStagedEdits reports a refusal as a result rather than throwing,
+        // so this is a backstop. It fails closed all the same.
+        this.isCartWritePending = false;
+        this.isReconcilingCart = false;
+        this.reportCartWriteFailure();
+      },
+    });
+  }
+
+  /**
+   * Reconciles the stored cart and adopts the response as the displayed cart.
+   *
+   * <p>Only ever reached once every staged edit has been persisted, so the
+   * response is answering for the cart the customer is looking at.
+   */
+  private requestReconciliation(): void {
+    this.reconciliationRequest?.unsubscribe();
     this.reconciliationRequest = this.restService.reconcileUserCart().subscribe({
       next: (result) => {
+        this.reconciliationRequest = null;
         this.isReconcilingCart = false;
-        const changed = result.removedProductIds.length > 0 || result.reducedProductIds.length > 0;
-        // Anything the server reports is adopted, not only the case where it
-        // repaired something. A view that has been mutated locally - a row the
-        // customer removed, or a quantity they changed - still has to end up
-        // showing what is actually stored before anything is confirmed, or they
-        // would be asked to approve a cart that no longer exists on the server.
-        // The confirmation below is what persists those local edits.
-        this.releaseProductImages();
-        this.cancelImageRequests();
-        this.items = result.cart;
-        this.totalPrice = calculateCartTotal(result.cart);
-        this.loadProductImages(result.cart);
-        if (changed) {
-          this.cartMessage = describeReconciliation(result);
-        }
-
-        this.isCartConfirmed = false;
-        if (!changed && this.items.length > 0) {
-          // Nothing needed repairing, so the confirmation the customer already
-          // gave stands. The staged local edits are left in place and flushed by
-          // saveCartItems() below, which is what persists them.
-          const button = this.buyButtonRef?.nativeElement as
-            | HTMLButtonElement
-            | undefined;
-          if (button) {
-            button.style.backgroundColor = 'green';
-          }
-          this.isCartConfirmed = true;
-          this.saveCartItems();
-        } else {
-          // The cart changed underneath the view, so a staged quantity is no
-          // longer a delta against anything meaningful and persisting it would
-          // resurrect a value the server has just declared unsellable. The
-          // customer re-confirms from the reconciled cart instead.
-          this.itemsToDelete.clear();
-          this.itemCountMap.clear();
+        if (!this.destroyed) {
+          this.adoptReconciliation(result);
         }
       },
       error: () => {
+        this.reconciliationRequest = null;
         this.isReconcilingCart = false;
+        if (this.destroyed) {
+          return;
+        }
         this.isCartConfirmed = false;
         // A failed reconciliation is not a failed cart: leave the customer's
         // view exactly as it was and let them retry deliberately.
@@ -293,15 +438,108 @@ export class UserCartComponent implements OnDestroy {
     });
   }
 
+  /**
+   * Adopts a reconciled cart, and decides whether the press that triggered it
+   * still stands as a confirmation.
+   *
+   * <p>It does, only when the reconciled cart is what the customer was already
+   * looking at. Two independent reports of that are required, and neither is
+   * enough on its own: an empty `removedProductIds`/`reducedProductIds` pair only
+   * says the server had nothing of its own to repair, and says nothing about
+   * whether the cart it returned is the cart on screen.
+   */
+  private adoptReconciliation(result: ICartReconciliation): void {
+    const displayed = this.items;
+    const atPress = this.cartAtPress;
+    this.cartAtPress = null;
+
+    if (atPress !== null && !isSameCartContent(atPress, displayed)) {
+      // The customer edited the cart while this press was running, so the
+      // response describes a state that is already older than what they are
+      // looking at. Adopting it would drop the edit they just made - a quantity
+      // they set, or a row they deleted - and leave the staged copy of it behind
+      // to be written later, resurrecting what they removed. The view is left
+      // alone instead, and nothing is confirmed: the next press persists the
+      // edit first and reconciles a cart that includes it.
+      this.isCartConfirmed = false;
+      this.cartMessage =
+        'Sepetiniz onay sirasinda degisti. Lutfen tekrar kontrol edip onaylayin.';
+      return;
+    }
+
+    const repaired =
+      result.removedProductIds.length > 0 || result.reducedProductIds.length > 0;
+    const differs = !isSameCartContent(displayed, result.cart);
+
+    // Whatever the server reports is adopted, not only the case where it repaired
+    // something. The view may have been mutated locally, and everything displayed
+    // from here on has to be what is actually stored before anything is confirmed.
+    this.releaseProductImages();
+    this.cancelImageRequests();
+    this.items = result.cart;
+    this.totalPrice = calculateCartTotal(result.cart);
+    this.loadProductImages(result.cart);
+
+    // Nothing is confirmed here, and the staged set is untouched: the edits were
+    // persisted before this response was even requested, so there is nothing left
+    // to flush and nothing to discard.
+    this.isCartConfirmed = false;
+    if (repaired) {
+      this.cartMessage = describeReconciliation(result);
+    } else if (differs) {
+      // The response is not the cart the customer pressed confirm on, for a
+      // reason the server did not classify - a concurrent removal, a changed
+      // price, a clamped quantity. It is still a cart they have not seen, so it
+      // is named and re-confirmed rather than approved on their behalf.
+      this.cartMessage =
+        'Sepetiniz sunucu tarafinda guncellendi. Lutfen sepeti kontrol edip onaylayin.';
+    }
+
+    if (!repaired && !differs && this.items.length > 0) {
+      // Nothing needed repairing and the response is the cart on screen, so the
+      // confirmation the customer already gave stands. Checkout stays one press
+      // away and never degrades into three.
+      this.markCartConfirmed();
+    }
+  }
+
+  private markCartConfirmed(): void {
+    this.isCartConfirmed = true;
+    const button = this.buyButtonRef?.nativeElement as
+      | HTMLButtonElement
+      | undefined;
+    if (button) {
+      button.style.backgroundColor = 'green';
+    }
+  }
+
+  /**
+   * Reconciles from the empty view, where the checkout button is disabled.
+   *
+   * <p>An empty view is not necessarily an empty cart: the read hides what it
+   * cannot render, so a cart whose every entry became unbuyable is drawn exactly
+   * like one the customer emptied. Checkout is unreachable from an empty cart, so
+   * without a reachable action here that residue is never reconciled and the ids
+   * stay stored forever. This is the only way to tell the two apart; the server's
+   * report says whether anything was actually there.
+   */
+  public reconcileEmptyCart(): void {
+    if (this.isCartBusy) {
+      return;
+    }
+    this.beginCheckoutReconciliation();
+  }
+
   public openPaymentComponent() {
+    if (this.isCartBusy) {
+      // A press while the staged writes or the reconciliation are still running
+      // would either confirm a cart nobody has seen the outcome of, or open
+      // checkout against writes that have not landed. Both are the same defect.
+      return;
+    }
+
     if (this.items.length === 0) {
-      // The stored cart is not necessarily empty, only what it can render.
-      // A cart whose every entry became unbuyable looks identical to a cart the
-      // customer emptied, and without this the residue is never reconciled: the
-      // view can never trigger the repair, so the ids stay stored indefinitely.
-      // Reconciling is the only way to tell the two apart, and it reports back
-      // whether anything was actually there to remove.
-      this.reconcileCartBeforeCheckout();
+      this.beginCheckoutReconciliation();
       return;
     }
 
@@ -313,10 +551,12 @@ export class UserCartComponent implements OnDestroy {
     }
 
     if (this.isCartConfirmed) {
+      // Display only. The chargeable amount is the server's own checkout
+      // snapshot, computed under the same locks that reserve the stock.
       data.totalCartPrice = this.totalPrice;
       this.isPaymentPhaseActive = true;
     } else {
-      this.reconcileCartBeforeCheckout();
+      this.beginCheckoutReconciliation();
     }
   }
 

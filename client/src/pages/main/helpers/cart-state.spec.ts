@@ -1,6 +1,7 @@
 import { IUserCartItemDto } from '../../../interfaces/IUserCartItemDto';
 import {
   calculateCartTotal,
+  isSameCartContent,
   resolveCartQuantityChange,
 } from './cart-state';
 
@@ -45,5 +46,43 @@ describe('cart state helpers', () => {
     expect(resolveCartQuantityChange(undefined, 'increase')).toEqual({
       kind: 'missing',
     });
+  });
+
+  it('treats a reordered cart as the same cart', () => {
+    // The cart is an unordered multiset of ids: writing a new count moves its
+    // product to the end of the stored list, so order carries no meaning and
+    // must not cost the customer a confirmation.
+    const other: IUserCartItemDto = {
+      ...item,
+      productId: 6,
+      productName: 'Yoğurt',
+      productPrice: 4,
+      productCount: 1,
+    };
+    expect(isSameCartContent([item, other], [other, item])).toBeTrue();
+  });
+
+  it('detects every difference the customer would see', () => {
+    const other: IUserCartItemDto = {
+      ...item,
+      productId: 6,
+      productName: 'Yoğurt',
+      productPrice: 4,
+      productCount: 1,
+    };
+    expect(isSameCartContent([item, other], [item])).toBeFalse();
+    expect(isSameCartContent([item], [])).toBeFalse();
+    expect(isSameCartContent([], [])).toBeTrue();
+    expect(
+      isSameCartContent([item], [{ ...item, productCount: 3 }]),
+    ).toBeFalse();
+    // A price or stock change is a change to what the line means, not a
+    // rendering detail.
+    expect(
+      isSameCartContent([item], [{ ...item, productPrice: 13 }]),
+    ).toBeFalse();
+    expect(
+      isSameCartContent([item], [{ ...item, availableStock: 2 }]),
+    ).toBeFalse();
   });
 });

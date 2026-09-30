@@ -13,7 +13,19 @@
   <div class="card-body p-0">
     <div *ngIf="items.length === 0" class="text-center py-5 text-muted">
       <i class="bi bi-cart-x fs-1 d-block mb-2"></i>
-      Sepetiniz henuz bos.
+      <p class="mb-3">Sepetiniz henuz bos.</p>
+      <p class="small mb-3">
+        Satista olmayan urunler sepetinizden otomatik olarak cikarilmaz. Sepetinizi
+        kontrol ederek temizleyebilirsiniz.
+      </p>
+      <button
+        type="button"
+        class="btn btn-outline-secondary btn-sm"
+        data-testid="reconcile-empty-cart"
+        [disabled]="isCartBusy"
+        (click)="reconcileEmptyCart()">
+        Sepeti Kontrol Et
+      </button>
     </div>
 
     <div *ngFor="let item of items; let i = index" class="cart-item p-3 border-bottom">
@@ -36,7 +48,9 @@
         </div>
 
         <div class="col-auto">
-          <button class="btn btn-outline-danger btn-sm border-0" (click)="removeProductFromUserCart(item.productId)">
+          <button class="btn btn-outline-danger btn-sm border-0"
+                  [disabled]="isCartLocked"
+                  (click)="removeProductFromUserCart(item.productId)">
             <i class="bi bi-trash3 fs-5"></i>
           </button>
         </div>
@@ -45,13 +59,13 @@
       <div class="row mt-2">
         <div class="col d-flex justify-content-end">
           <div class="input-group input-group-sm" style="width: 140px;">
-            <button class="btn btn-orange" (click)="decreaseProductCount(item.productId)">
+            <button class="btn btn-orange" [disabled]="isCartLocked" (click)="decreaseProductCount(item.productId)">
               <i class="bi bi-dash-lg"></i>
             </button>
             <span class="input-group-text bg-white border-top border-bottom flex-grow-1 justify-content-center fw-bold">
               {{ item.productCount }}
             </span>
-            <button class="btn btn-orange" [disabled]="item.productCount >= item.availableStock" (click)="increaseProductCount(item.productId)">
+            <button class="btn btn-orange" [disabled]="isCartLocked || item.productCount >= item.availableStock" (click)="increaseProductCount(item.productId)">
               <i class="bi bi-plus-lg"></i>
             </button>
           </div>
@@ -73,9 +87,9 @@
     <button
       #buyButton
       class="btn btn-orange w-100 py-3 fw-bold shadow-sm"
-      [disabled]="items.length === 0 || isReconcilingCart"
+      [disabled]="items.length === 0 || isCartBusy"
       (click)="openPaymentComponent()">
-      {{ isReconcilingCart ? 'Sepet kontrol ediliyor' : (items.length > 0 ? (isCartConfirmed ? 'Siparisi Tamamla' : 'Sepeti Onayla') : 'Sepet Bos') }}
+      {{ isCartWritePending ? 'Sepet kaydediliyor' : (isReconcilingCart ? 'Sepet kontrol ediliyor' : (items.length > 0 ? (isCartConfirmed ? 'Siparisi Tamamla' : 'Sepeti Onayla') : 'Sepet Bos')) }}
     </button>
   </div>
 
