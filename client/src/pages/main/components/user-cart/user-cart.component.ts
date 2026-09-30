@@ -15,11 +15,14 @@ import { data } from '../../../../memory/global-data';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
   catchError,
+  finalize,
   forkJoin,
   map,
   Observable,
   of,
+  shareReplay,
   Subscription,
+  take,
   timeout,
 } from 'rxjs';
 import { ObjectUrlManager } from '../../helpers/object-url-manager';
@@ -28,6 +31,7 @@ import {
   isSameCartContent,
   resolveCartQuantityChange,
 } from '../../helpers/cart-state';
+import { CartStagedEditsHost } from '../../../../app/guards/cart-staged-edits.guard';
 
 /** A local cart edit that has not reached the server yet. */
 type StagedCartEdit =
@@ -64,7 +68,7 @@ const CART_WRITE_TIMEOUT_MS = 20_000;
   templateUrl: './user-cart.component.html',
   styleUrl: './user-cart.component.css',
 })
-export class UserCartComponent implements OnDestroy {
+export class UserCartComponent implements OnDestroy, CartStagedEditsHost {
   @ViewChild('buyButton') buyButtonRef!: ElementRef<HTMLButtonElement>;
 
   items: IUserCartItemDto[] = [];
@@ -101,6 +105,17 @@ export class UserCartComponent implements OnDestroy {
    * `settleRequestedClose`.
    */
   private closeRequestedWhileWritePending: boolean = false;
+  /**
+   * The batch of staged writes currently in flight, or `null` when none is.
+   *
+   * <p>Also how a second observer joins a batch that already exists instead of
+   * starting a competing one. Both the component's own close path and the router
+   * guard can want to know the outcome of the same writes, and the writes are the
+   * customer's cart either way - there is one set of them, not one per interested
+   * party. It is set when a batch starts and cleared when that batch settles, so
+   * its presence is the honest answer to "is a write in flight?".
+   */
+  private activeWriteBatch: Observable<boolean> | null = null;
   cartMessage = '';
   private destroyed = false;
   /**
@@ -115,6 +130,19 @@ export class UserCartComponent implements OnDestroy {
   /** True while a checkout press may not be repeated. */
   public get isCartBusy(): boolean {
     return this.isReconcilingCart || this.isCartWritePending;
+  }
+
+  /**
+   * True while a batch of staged writes is in flight.
+   *
+   * <p>The one predicate every way out of the cart asks. The component's own
+   * close and the router guard must agree on it, and they used to answer from two
+   * different states - which is how a guard press could start a second batch over
+   * rows an existing batch was already writing. The batch clears itself when it
+   * settles, so a stale "pending" cannot survive a completed write.
+   */
+  private get hasWriteInFlight(): boolean {
+    return this.activeWriteBatch !== null;
   }
 
   /**
@@ -155,6 +183,15 @@ export class UserCartComponent implements OnDestroy {
     this.reconciliationRequest?.unsubscribe();
     this.cancelImageRequests();
     this.releaseProductImages();
+    // Deliberately no attempt to flush the staged edits here. Teardown is not a
+    // place a write can be *awaited* - by the time it runs the route is already
+    // being left, so a request issued now reports its result to a component
+    // nobody can see, and a request that had not been issued yet is exactly the
+    // one that would never be sent. That is what lost edits in the first place.
+    // The route's CanDeactivate guard asks while the cart is still on screen and
+    // holds the navigation until the server has answered; the batches already in
+    // flight are left to settle, which is why the guard shares them instead of
+    // racing them.
   }
 
   private loadCart() {
@@ -220,11 +257,18 @@ export class UserCartComponent implements OnDestroy {
    *
    * <p>A single failed edit fails the batch: the whole batch is the customer's
    * cart, and a partially persisted cart is not a cart anybody confirmed.
+   *
+   * <p>The batch is shared, and it keeps its result. `forkJoin` over cold HTTP
+   * requests would otherwise re-issue every write for each new subscriber, and a
+   * second observer is a normal thing to have: the router guard waiting out a
+   * write that is already in flight. Two batches over the same rows race each
+   * other, and whichever loses is a change the customer believes was saved.
    */
   private persistStagedEdits(): Observable<boolean> {
     const edits = this.stagedEdits();
     this.isCartWritePending = edits.length > 0;
     if (edits.length === 0) {
+      this.activeWriteBatch = null;
       return of(true);
     }
 
@@ -237,14 +281,24 @@ export class UserCartComponent implements OnDestroy {
       ),
     );
 
-    return forkJoin(attempts).pipe(
+    const batch = forkJoin(attempts).pipe(
       map((results) => {
         results
           .filter((result) => result.saved)
           .forEach((result) => this.discardStagedEdit(result.edit));
         return results.every((result) => result.saved);
       }),
+      // Upstream of the share, so it runs once per batch rather than once per
+      // observer. `finalize` rather than `tap` so it also runs when the batch
+      // fails or is torn down, and a handle left behind would make the next
+      // departure wait on a batch that had already settled.
+      finalize(() => {
+        this.activeWriteBatch = null;
+      }),
+      shareReplay({ bufferSize: 1, refCount: false }),
     );
+    this.activeWriteBatch = batch;
+    return batch;
   }
 
   private stagedEdits(): StagedCartEdit[] {
@@ -304,6 +358,20 @@ export class UserCartComponent implements OnDestroy {
   }
 
   /**
+   * Abandons a reconciliation that is still running, because the view it would
+   * re-render is on its way out.
+   *
+   * <p>Only ever called once every staged write has succeeded. A reconciliation
+   * cannot start before that, so there is nothing left for it to protect: by the
+   * time one is in flight the staged edits have already landed.
+   */
+  private abandonReconciliationForClose(): void {
+    this.reconciliationRequest?.unsubscribe();
+    this.reconciliationRequest = null;
+    this.isReconcilingCart = false;
+  }
+
+  /**
    * The single entry point for every way out of the cart view: the X button, a
    * click on the overlay, and the Escape key. They used to differ in what they
    * did to unsaved edits, which is how a close could lose one silently.
@@ -326,19 +394,19 @@ export class UserCartComponent implements OnDestroy {
    *   still running is abandoned: by the time one starts, every staged write has
    *   already succeeded, so there is nothing left for it to protect.
    * </ul>
+   *
+   * <p>The router guard answers the same question for the ways in that never
+   * reach this method, and it shares both the batch and this reasoning rather than
+   * duplicating either.
    */
   public closeCartComponent(): void {
-    if (this.isCartWritePending) {
+    if (this.hasWriteInFlight) {
       this.closeRequestedWhileWritePending = true;
       return;
     }
 
     if (this.stagedEdits().length === 0) {
-      // Nothing is unsaved, so a reconciliation in flight has nothing left to
-      // lose. Its response would only re-render a view that is on its way out.
-      this.reconciliationRequest?.unsubscribe();
-      this.reconciliationRequest = null;
-      this.isReconcilingCart = false;
+      this.abandonReconciliationForClose();
       this.navigateAwayFromCart();
       return;
     }
@@ -362,6 +430,85 @@ export class UserCartComponent implements OnDestroy {
         }
       },
     });
+  }
+
+  /**
+   * Whether the router may leave this route, and only then.
+   *
+   * <p>Back, a forward navigation and a deep link all deactivate the cart route
+   * without ever calling `closeCartComponent`, and teardown cannot save anything:
+   * by the time `ngOnDestroy` runs the customer is already looking at the page
+   * they navigated to, and a write issued from there reports its result to a
+   * component nobody can see. So the route asks while the cart is still on
+   * screen, and leaves only once the server has accepted every staged edit.
+   *
+   * <p>Three situations, and it never navigates itself - the router does that
+   * once this answer is `true`:
+   *
+   * <ul>
+   *   <li>Nothing staged and no write in flight. Allowed straight away: there is
+   *   nothing to wait for, and a reconciliation still running is abandoned for
+   *   the same reason `closeCartComponent` abandons it.
+   *   <li>Edits staged, nothing in flight. One batch is started and this waits
+   *   for it.
+   *   <li>A write already in flight - a checkout press, or an X/Escape/overlay
+   *   close that is already carrying these edits. That batch is waited out. It is
+   *   the one batch: the writes are the customer's cart, and a second one would
+   *   race the first over the same rows. The wait is also recorded as a close
+   *   request, so a checkout press that is carrying the edits settles the
+   *   departure instead of starting a reconciliation nobody is there to confirm.
+   * </ul>
+   *
+   * <p>A refusal - or a write that never answers, which the same timeout reports
+   * as a failure - answers `false`. Nothing navigates, the cart stays on screen
+   * with the reason, and the refused edits stay staged, so a customer whose change
+   * the server rejected can still see it and still retry it. That is the whole
+   * reason the answer is a decision rather than a redirect: navigating and then
+   * reporting a failure would leave them on the new page, unable to see or retry
+   * the change that failed.
+   */
+  public canDeactivateCart(): Observable<boolean> {
+    const pending = this.activeWriteBatch;
+    if (pending) {
+      this.closeRequestedWhileWritePending = true;
+      return this.settleWriteBatch(pending);
+    }
+
+    if (this.stagedEdits().length === 0) {
+      this.abandonReconciliationForClose();
+      return of(true);
+    }
+
+    return this.settleWriteBatch(this.persistStagedEdits());
+  }
+
+  /**
+   * Turns the outcome of one write batch into the router's answer.
+   *
+   * <p>Subscribing to the shared batch rather than starting one is what keeps a
+   * guard press from becoming a second write. `take(1)` because the router wants a
+   * decision, not a subscription it has to clean up; the underlying batch is not
+   * torn down by it.
+   */
+  private settleWriteBatch(batch: Observable<boolean>): Observable<boolean> {
+    return batch.pipe(
+      take(1),
+      map((allSaved) => {
+        this.isCartWritePending = false;
+        this.closeRequestedWhileWritePending = false;
+        if (this.destroyed) {
+          // There is nothing left to protect and nobody left to tell. Letting the
+          // router proceed is the only outcome that does not strand the writes.
+          return true;
+        }
+        if (!allSaved) {
+          this.reportCartWriteFailure();
+          return false;
+        }
+        this.abandonReconciliationForClose();
+        return true;
+      }),
+    );
   }
 
   public removeProductFromUserCart(productId: number): void {

@@ -8,6 +8,7 @@ import { UserProfileComponent } from '../pages/main/components/user-profile/user
 import { OrderTrackerComponent } from '../pages/main/components/order-tracker/order-tracker.component';
 import { OrderHistoryComponent } from '../pages/main/components/order-history/order-history.component';
 import { SupportChatComponent } from '../pages/main/components/support-chat/support-chat.component';
+import { CartStagedEditsGuard } from './guards/cart-staged-edits.guard';
 
 export const routes: Routes = [
   {
@@ -20,7 +21,16 @@ export const routes: Routes = [
         path: 'category/:categoryId/product/:productId',
         component: ProductPageComponent,
       },
-      { path: 'cart', outlet: 'modal', component: UserCartComponent },
+      {
+        path: 'cart',
+        outlet: 'modal',
+        component: UserCartComponent,
+        // The modal can be left by the browser Back button, a deep link or a
+        // forward navigation, none of which reach the component's own close
+        // handler. Teardown is too late to save a staged edit, so the route asks
+        // first and the router navigates only once the server has taken it.
+        canDeactivate: [CartStagedEditsGuard],
+      },
       { path: 'profile', outlet: 'modal', component: UserProfileComponent },
       { path: 'login', outlet: 'modal', component: SignUserComponent },
       {

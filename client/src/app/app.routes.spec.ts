@@ -1,4 +1,5 @@
 import { routes } from './app.routes';
+import { CartStagedEditsGuard } from './guards/cart-staged-edits.guard';
 
 describe('app routes', () => {
   it('lazy-loads the admin shell and each admin section under /admin', async () => {
@@ -40,5 +41,19 @@ describe('app routes', () => {
       'order-history',
       'support',
     ]);
+  });
+
+  /**
+   * The cart is a route, so it can be left without ever reaching the component's
+   * own close handler - the browser Back button alone is enough. Teardown cannot
+   * save a staged edit from there, so the guard has to be on the route itself and
+   * not merely implemented and unit tested.
+   */
+  it('guards the cart route against losing a staged edit to navigation', () => {
+    const cartRoute = (routes.find((route) => route.path === '')?.children ?? []).find(
+      (route) => route.path === 'cart',
+    );
+
+    expect(cartRoute?.canDeactivate).toEqual([CartStagedEditsGuard]);
   });
 });
