@@ -13,7 +13,15 @@ import { CommonModule } from '@angular/common';
 import { PaymentComponent } from '../payment/payment.component';
 import { data } from '../../../../memory/global-data';
 import { ActivatedRoute, Router } from '@angular/router';
-import { catchError, forkJoin, map, Observable, of, Subscription } from 'rxjs';
+import {
+  catchError,
+  forkJoin,
+  map,
+  Observable,
+  of,
+  Subscription,
+  timeout,
+} from 'rxjs';
 import { ObjectUrlManager } from '../../helpers/object-url-manager';
 import {
   calculateCartTotal,
@@ -31,6 +39,23 @@ interface StagedEditResult {
   edit: StagedCartEdit;
   saved: boolean;
 }
+
+/**
+ * How long a single cart write may take before it is treated as having failed.
+ *
+ * <p>Without a bound, a request that never comes back leaves the cart pinned in
+ * its "saving" state forever: the rows stay locked, checkout stays unreachable
+ * and the customer has no way to tell "still saving" from "lost". Twenty seconds
+ * is far longer than these writes take against the real API, so it fires only for
+ * a connection that is genuinely gone.
+ *
+ * <p>It is safe to resend after one: both backend writers are idempotent - a
+ * count rewrite replaces the product's entries and a removal drops them - so a
+ * retry of an uncertain result converges on the same stored cart rather than
+ * doubling anything. The uncertain case is therefore reported as a failed write
+ * and the edit stays staged, which is the same treatment a definite refusal gets.
+ */
+const CART_WRITE_TIMEOUT_MS = 20_000;
 
 @Component({
   selector: 'app-user-cart',
@@ -65,6 +90,17 @@ export class UserCartComponent implements OnDestroy {
   isReconcilingCart: boolean = false;
   /** Staged cart edits are in flight and their outcome is not known yet. */
   isCartWritePending: boolean = false;
+  /**
+   * True while a close has been asked for but could not be carried out yet
+   * because a batch of staged writes was already in flight.
+   *
+   * <p>The close is deferred rather than dropped or forced: navigating away now
+   * would leave those writes to land against a view the customer can no longer
+   * see or correct, and starting a second batch would race the first over the
+   * same rows. Whichever batch is running settles it instead - see
+   * `settleRequestedClose`.
+   */
+  private closeRequestedWhileWritePending: boolean = false;
   cartMessage = '';
   private destroyed = false;
   /**
@@ -119,7 +155,6 @@ export class UserCartComponent implements OnDestroy {
     this.reconciliationRequest?.unsubscribe();
     this.cancelImageRequests();
     this.releaseProductImages();
-    this.persistStagedEditsOnClose();
   }
 
   private loadCart() {
@@ -226,9 +261,12 @@ export class UserCartComponent implements OnDestroy {
   }
 
   private sendStagedEdit(edit: StagedCartEdit): Observable<unknown> {
-    return edit.kind === 'remove'
-      ? this.restService.removeProductFromUserCart(edit.productId)
-      : this.restService.updateProductCountInUserCart(edit.productId, edit.count);
+    const request =
+      edit.kind === 'remove'
+        ? this.restService.removeProductFromUserCart(edit.productId)
+        : this.restService.updateProductCountInUserCart(edit.productId, edit.count);
+
+    return request.pipe(timeout({ each: CART_WRITE_TIMEOUT_MS }));
   }
 
   private discardStagedEdit(edit: StagedCartEdit): void {
@@ -237,23 +275,6 @@ export class UserCartComponent implements OnDestroy {
     } else {
       this.itemCountMap.delete(edit.productId);
     }
-  }
-
-  /**
-   * Flushes whatever is still staged when the cart view goes away.
-   *
-   * <p>Skipped while a write is in flight: that write already carries the staged
-   * edits, and a second batch would race the first over the same rows. The
-   * in-flight batch is deliberately not cancelled either, so closing the dialog
-   * mid-confirmation loses nothing.
-   */
-  private persistStagedEditsOnClose(): void {
-    if (this.isCartWritePending || this.stagedEdits().length === 0) {
-      return;
-    }
-    // Nothing to report it to: the view is gone, and every edit's outcome is
-    // already handled inside the batch.
-    this.persistStagedEdits().subscribe();
   }
 
   /**
@@ -268,9 +289,78 @@ export class UserCartComponent implements OnDestroy {
     this.cartMessage = 'Sepet guncellemesi kaydedilemedi. Lutfen tekrar deneyin.';
   }
 
-  public closeCartComponent() {
+  /**
+   * Leaves the cart view.
+   *
+   * <p>Only ever reached once nothing is unsaved: either nothing was ever staged,
+   * or every staged edit has been accepted by the server. Navigating earlier
+   * would drop a quantity the customer set or resurrect a row they deleted,
+   * because the cart they are looking at would no longer be the stored one.
+   */
+  private navigateAwayFromCart(): void {
     this.router.navigate([{ outlets: { modal: null } }], {
       relativeTo: this.route.parent ?? this.route,
+    });
+  }
+
+  /**
+   * The single entry point for every way out of the cart view: the X button, a
+   * click on the overlay, and the Escape key. They used to differ in what they
+   * did to unsaved edits, which is how a close could lose one silently.
+   *
+   * <p>It never navigates while a staged write is in flight. Three situations,
+   * and each one waits for the write that already carries the edits rather than
+   * issuing a competing batch over the same rows:
+   *
+   * <ul>
+   *   <li>A checkout press is already persisting edits. The close is recorded and
+   *   the running batch settles it: on success the view goes, and deliberately
+   *   without the reconciliation that press would have started, because the
+   *   customer is no longer here to confirm anything. On failure the close is
+   *   withdrawn, the cart stays open with the reason, and the refused edits stay
+   *   staged - a customer whose change was refused must be able to see it and
+   *   retry it, which is impossible once the view is gone.
+   *   <li>Edits are staged but nothing is in flight. One awaitable batch is
+   *   started here, and the view is left only if every edit lands.
+   *   <li>Nothing is unsaved. The view goes immediately, and a reconciliation
+   *   still running is abandoned: by the time one starts, every staged write has
+   *   already succeeded, so there is nothing left for it to protect.
+   * </ul>
+   */
+  public closeCartComponent(): void {
+    if (this.isCartWritePending) {
+      this.closeRequestedWhileWritePending = true;
+      return;
+    }
+
+    if (this.stagedEdits().length === 0) {
+      // Nothing is unsaved, so a reconciliation in flight has nothing left to
+      // lose. Its response would only re-render a view that is on its way out.
+      this.reconciliationRequest?.unsubscribe();
+      this.reconciliationRequest = null;
+      this.isReconcilingCart = false;
+      this.navigateAwayFromCart();
+      return;
+    }
+
+    this.persistStagedEdits().subscribe({
+      next: (allSaved) => {
+        this.isCartWritePending = false;
+        if (this.destroyed) {
+          return;
+        }
+        if (!allSaved) {
+          this.reportCartWriteFailure();
+          return;
+        }
+        this.navigateAwayFromCart();
+      },
+      error: () => {
+        this.isCartWritePending = false;
+        if (!this.destroyed) {
+          this.reportCartWriteFailure();
+        }
+      },
     });
   }
 
@@ -372,6 +462,13 @@ export class UserCartComponent implements OnDestroy {
    * <p>Re-entrant by design: a second press, or a press while the first is still
    * running, is ignored rather than issued against a cart whose writes are still
    * in flight.
+   *
+   * <p>The batch also settles a close that was requested while it was running.
+   * The writes carry the staged edits either way, so the only open question is
+   * what the customer is still here for, and on success there is nothing left to
+   * confirm - so the view is left without a reconciliation nobody can act on. On
+   * failure the close is withdrawn, because a refused edit has to stay visible
+   * and retryable.
    */
   private beginCheckoutReconciliation(): void {
     if (this.isCartBusy) {
@@ -385,15 +482,26 @@ export class UserCartComponent implements OnDestroy {
     this.persistStagedEdits().subscribe({
       next: (allSaved) => {
         this.isCartWritePending = false;
+        if (!allSaved) {
+          this.closeRequestedWhileWritePending = false;
+          this.isReconcilingCart = false;
+          if (!this.destroyed) {
+            this.reportCartWriteFailure();
+          }
+          return;
+        }
+        if (this.closeRequestedWhileWritePending) {
+          this.closeRequestedWhileWritePending = false;
+          this.isReconcilingCart = false;
+          if (!this.destroyed) {
+            this.navigateAwayFromCart();
+          }
+          return;
+        }
         if (this.destroyed) {
           // The view is gone. The writes have landed, and reconciling now would
           // only mutate a destroyed component.
           this.isReconcilingCart = false;
-          return;
-        }
-        if (!allSaved) {
-          this.isReconcilingCart = false;
-          this.reportCartWriteFailure();
           return;
         }
         this.requestReconciliation();
@@ -402,8 +510,11 @@ export class UserCartComponent implements OnDestroy {
         // persistStagedEdits reports a refusal as a result rather than throwing,
         // so this is a backstop. It fails closed all the same.
         this.isCartWritePending = false;
+        this.closeRequestedWhileWritePending = false;
         this.isReconcilingCart = false;
-        this.reportCartWriteFailure();
+        if (!this.destroyed) {
+          this.reportCartWriteFailure();
+        }
       },
     });
   }

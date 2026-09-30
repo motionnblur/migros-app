@@ -3,8 +3,14 @@ import {
   HttpTestingController,
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
-import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import {
+  ComponentFixture,
+  TestBed,
+  fakeAsync,
+  flush,
+  tick,
+} from '@angular/core/testing';
+import { provideRouter, Router } from '@angular/router';
 
 import { ICartReconciliation } from '../../../../interfaces/ICartReconciliation';
 import { IUserCartItemDto } from '../../../../interfaces/IUserCartItemDto';
@@ -799,24 +805,67 @@ describe('UserCartComponent checkout reconciliation', () => {
 });
 
 /**
- * Tearing the cart view down while edits are still on their way.
+ * Closing the cart view with edits that have not reached the server yet.
  *
- * <p>Closing the dialog is not a reason to lose a change, so the last thing the
- * component does is persist whatever is still staged. It must not do that twice,
- * and it must not do it *again* while a write it already started is in flight:
- * two batches over the same rows race each other, and a reconciliation started
- * after the view is gone would answer for a cart nobody can see.
+ * <p>The defect this pins: closing navigated away immediately, and the only
+ * attempt to save was a fire-and-forget flush in `ngOnDestroy`. A write that had
+ * not been issued when the view was torn down was simply never sent, and one
+ * that was in flight had its result reported to a component nobody could see.
+ * Either way the customer watched a quantity change or a deletion evaporate.
+ *
+ * <p>Every way out now goes through one method, and it leaves only once the
+ * server has accepted every staged edit. A refusal keeps the cart open with the
+ * reason and the edit staged, because an edit the customer cannot see is an edit
+ * they cannot retry.
  */
-describe('UserCartComponent teardown with staged edits', () => {
+describe('UserCartComponent close with staged edits', () => {
   let component: UserCartComponent;
   let fixture: ComponentFixture<UserCartComponent>;
   let httpMock: HttpTestingController;
+  let navigate: jasmine.Spy;
 
   const isWriteRequest = (request: { url: string }): boolean =>
     request.url.includes('/user/supply/updateProductCountInUserCart') ||
     request.url.includes('/user/supply/removeProductFromUserCart');
+  const isCountUpdateRequest = (request: { url: string }): boolean =>
+    request.url.includes('/user/supply/updateProductCountInUserCart');
+  const isRemovalRequest = (request: { url: string }): boolean =>
+    request.url.includes('/user/supply/removeProductFromUserCart');
   const isReconcileRequest = (request: { url: string }): boolean =>
     request.url.includes('/user/supply/reconcileCart');
+  const isImageRequest = (request: { url: string }): boolean =>
+    request.url.includes('/user/supply/getProductImage');
+
+  /** The X in the cart header. */
+  function closeButton(): HTMLButtonElement {
+    return fixture.nativeElement.querySelector('#cart-container .btn-close');
+  }
+
+  /** The backdrop behind the dialog. */
+  function overlay(): HTMLElement {
+    return fixture.nativeElement.querySelector('#cart-overlay');
+  }
+
+  function pressEscape(): void {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+  }
+
+  /** Answers a reconciliation with the cart currently on screen, so nothing is repaired. */
+  function flushReconciliationAsUnchanged(): void {
+    httpMock.match(isReconcileRequest).forEach((request) =>
+      request.flush({
+        cart: component.items.map((entry) => ({ ...entry })),
+        removedProductIds: [],
+        reducedProductIds: [],
+      }),
+    );
+  }
+
+  function flushImages(): void {
+    httpMock
+      .match(isImageRequest)
+      .forEach((request) => request.flush(new Blob(['image'])));
+  }
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -829,6 +878,10 @@ describe('UserCartComponent teardown with staged edits', () => {
     }).compileComponents();
 
     httpMock = TestBed.inject(HttpTestingController);
+    // Spied rather than allowed to run: this suite is about whether the close
+    // happens at all, and a real outlet-less navigation would only add noise.
+    navigate = spyOn(TestBed.inject(Router), 'navigate').and.resolveTo(true);
+
     fixture = TestBed.createComponent(UserCartComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -842,55 +895,226 @@ describe('UserCartComponent teardown with staged edits', () => {
           productCount: 2,
           availableStock: 4,
         },
+        {
+          productId: 11,
+          productName: 'Yogurt',
+          productPrice: 15,
+          productCount: 1,
+          availableStock: 4,
+        },
       ]);
-    httpMock
-      .match((request) => request.url.includes('/user/supply/getProductImage'))
-      .forEach((request) => request.flush(new Blob(['image'])));
+    flushImages();
     fixture.detectChanges();
   });
 
   afterEach(() => {
+    fixture.destroy();
     httpMock.match(() => true).forEach((request) => {
-      if (!request.cancelled) {
-        request.flush(request.request.responseType === 'blob' ? new Blob() : '');
+      if (request.cancelled) {
+        return;
+      }
+      if (isImageRequest(request.request)) {
+        request.flush(new Blob());
+      } else if (isReconcileRequest(request.request)) {
+        request.flush({ cart: [], removedProductIds: [], reducedProductIds: [] });
+      } else {
+        request.flush('');
       }
     });
     httpMock.verify({ ignoreCancelled: true });
   });
 
-  it('persists a staged edit exactly once when the view is destroyed', () => {
+  it('waits for a staged write to land before the X button leaves the view', () => {
     component.increaseProductCount(10);
+    closeButton().click();
 
-    fixture.destroy();
-
-    const writes = httpMock.match(isWriteRequest);
-    expect(writes.length).toBe(1);
-    expect(writes[0].request.params.get('count')).toBe('3');
-    writes[0].flush('');
-
-    // A repeated teardown - a second route event, a re-entrant destroy - must not
-    // resend an edit that is already on its way.
-    component.ngOnDestroy();
-    expect(httpMock.match(isWriteRequest).length).toBe(0);
-  });
-
-  it('neither duplicates nor follows up a confirmation write that outlives the view', () => {
-    component.increaseProductCount(10);
-    component.openPaymentComponent();
-    const [update] = httpMock.match(isWriteRequest);
-    expect(update).toBeTruthy();
-
-    fixture.destroy();
-
-    // The in-flight write is neither cancelled nor duplicated by the teardown.
-    expect(httpMock.match(isWriteRequest).length).toBe(0);
+    // The write is issued, and the customer is still looking at the cart they
+    // just edited. Leaving now is the silent loss: the edit exists only in this
+    // component, and it is about to be destroyed.
+    const [update] = httpMock.match(isCountUpdateRequest);
+    expect(update.request.params.get('count')).toBe('3');
+    expect(navigate).not.toHaveBeenCalled();
     expect(component.isCartWritePending).toBeTrue();
 
     update.flush('');
 
-    // And when it lands, the confirmation it belonged to does not continue into a
-    // reconciliation for a view that no longer exists.
+    // Only once the server has accepted it does the view go.
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(navigate).toHaveBeenCalledWith(
+      [{ outlets: { modal: null } }],
+      jasmine.anything(),
+    );
+    expect(component.isCartWritePending).toBeFalse();
+  });
+
+  it('keeps the cart open and retryable when an overlay close cannot be saved', () => {
+    component.increaseProductCount(10);
+    overlay().click();
+
+    httpMock
+      .expectOne(isCountUpdateRequest)
+      .flush('Cart update refused', { status: 409, statusText: 'Conflict' });
+    fixture.detectChanges();
+
+    // The customer does not lose the edit to a dismissal they did not ask to be
+    // final: the cart stays, the reason is shown, and the change is still there.
+    expect(navigate).not.toHaveBeenCalled();
+    expect(component.cartMessage).toContain('kaydedilemedi');
+    expect(component.isCartWritePending).toBeFalse();
+    expect(component.items[0].productCount).toBe(3);
+    expect(fixture.nativeElement.querySelector('#cart-container')).toBeTruthy();
+
+    const message = fixture.nativeElement.querySelector(
+      '[data-testid="cart-reconciliation-message"]',
+    );
+    expect(message).toBeTruthy();
+    expect(message.textContent).toContain('kaydedilemedi');
+
+    // A second attempt resends exactly the edit that failed, and succeeds.
+    overlay().click();
+    const retry = httpMock.expectOne(isCountUpdateRequest);
+    expect(retry.request.params.get('count')).toBe('3');
+    retry.flush('');
+    expect(navigate).toHaveBeenCalledTimes(1);
+  });
+
+  it('defers an Escape during a checkout press to the batch already in flight', () => {
+    component.increaseProductCount(10);
+    component.openPaymentComponent();
+    const [update] = httpMock.match(isCountUpdateRequest);
+    expect(update).toBeTruthy();
+
+    pressEscape();
+
+    // No second batch: two batches over the same row race each other, and
+    // whichever loses is an edit the customer believes was saved.
+    expect(httpMock.match(isWriteRequest).length).toBe(0);
+    expect(navigate).not.toHaveBeenCalled();
+
+    update.flush('');
+
+    // The write succeeded, so the close happens - and without the reconciliation
+    // that press would have started, since there is nobody left to confirm it.
+    expect(navigate).toHaveBeenCalledTimes(1);
     expect(httpMock.match(isReconcileRequest).length).toBe(0);
     expect(component.isReconcilingCart).toBeFalse();
   });
+
+  it('withdraws the deferred close when the checkout batch fails', () => {
+    component.increaseProductCount(10);
+    component.openPaymentComponent();
+    const [update] = httpMock.match(isCountUpdateRequest);
+    pressEscape();
+
+    update.flush('Cart update refused', { status: 409, statusText: 'Conflict' });
+    fixture.detectChanges();
+
+    // The dismissal is cancelled rather than honoured over a refused change: the
+    // quantity the customer set has to stay on screen and stay staged.
+    expect(navigate).not.toHaveBeenCalled();
+    expect(component.cartMessage).toContain('kaydedilemedi');
+    expect(component.isReconcilingCart).toBeFalse();
+    expect(component.isCartWritePending).toBeFalse();
+    expect(httpMock.match(isReconcileRequest).length).toBe(0);
+    expect(component.items[0].productCount).toBe(3);
+
+    // And it is still the customer's to retry - now through checkout, which is
+    // no longer waiting on a close that was withdrawn.
+    component.openPaymentComponent();
+    const retry = httpMock.expectOne(isCountUpdateRequest);
+    expect(retry.request.params.get('count')).toBe('3');
+    retry.flush('');
+    // Nothing needed repairing, so the confirmation the customer already gave
+    // stands - the withdrawn close did not turn into an extra press.
+    flushReconciliationAsUnchanged();
+    fixture.detectChanges();
+    expect(navigate).not.toHaveBeenCalled();
+    expect(component.isCartConfirmed).toBeTrue();
+  });
+
+  it('resends only the edit that failed when a two-edit close is refused', () => {
+    component.increaseProductCount(10);
+    component.removeProductFromUserCart(11);
+    closeButton().click();
+
+    // Selected by intent rather than by position: the batch holds a count rewrite
+    // and a removal, and the point of the test is which of the two survives.
+    const [count] = httpMock.match(isCountUpdateRequest);
+    const [removal] = httpMock.match(isRemovalRequest);
+    expect(count).toBeTruthy();
+    expect(removal).toBeTruthy();
+
+    // One lands, one is refused. The batch fails as a whole, so the cart stays -
+    // but only the refused edit is still unsaved, and only that one is resent.
+    count.flush('');
+    removal.flush('Removal refused', { status: 409, statusText: 'Conflict' });
+    fixture.detectChanges();
+
+    expect(navigate).not.toHaveBeenCalled();
+    expect(component.cartMessage).toContain('kaydedilemedi');
+
+    closeButton().click();
+    const retried = httpMock.match(isWriteRequest);
+    expect(retried.length).toBe(1);
+    expect(isRemovalRequest(retried[0].request)).toBeTrue();
+    expect(retried[0].request.params.get('productId')).toBe('11');
+
+    retried[0].flush('');
+    expect(navigate).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats a write that never answers as a failed one and frees the close', fakeAsync(() => {
+      expect(true).toBeTrue();
+      component.increaseProductCount(10);
+      closeButton().click();
+
+      const [update] = httpMock.match(isCountUpdateRequest);
+      expect(update).toBeTruthy();
+
+      // The request hangs. Without a bound the cart is pinned in its saving
+      // state for good: rows locked, checkout unreachable, and no way to tell
+      // "still saving" from "lost".
+      tick(20_000);
+
+      // Reported as a refusal, so the customer is let out of the trap and told
+      // what happened. The request is abandoned rather than left in flight.
+      expect(component.isCartWritePending).toBeFalse();
+      expect(component.cartMessage).toContain('kaydedilemedi');
+      expect(navigate).not.toHaveBeenCalled();
+
+      // Retrying is safe precisely because the outcome is unknown and both
+      // writers are idempotent, so a duplicate converges instead of doubling.
+      closeButton().click();
+      const retry = httpMock.match(isCountUpdateRequest);
+      expect(retry.length).toBe(1);
+      expect(retry[0].request.params.get('count')).toBe('3');
+      retry[0].flush('');
+
+      expect(navigate).toHaveBeenCalledTimes(1);
+      flush();
+  }));
+
+  it('leaves immediately when nothing is staged and a reconciliation is running', () => {
+    component.openPaymentComponent();
+    const [reconcile] = httpMock.match(isReconcileRequest);
+    expect(reconcile).toBeTruthy();
+
+    closeButton().click();
+
+    // A reconciliation only ever starts once every staged write has succeeded,
+    // so there is nothing left for it to protect and its response would only
+    // re-render a view on its way out.
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(reconcile.cancelled).toBeTrue();
+    expect(component.isReconcilingCart).toBeFalse();
+  });
+
+  it('leaves immediately when nothing has been edited at all', () => {
+    closeButton().click();
+
+    // Nothing unsaved, so there is nothing to wait for and nothing to report.
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(httpMock.match(isWriteRequest).length).toBe(0);
+  });
 });
+
