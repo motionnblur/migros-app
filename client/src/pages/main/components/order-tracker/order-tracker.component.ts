@@ -18,8 +18,14 @@ export class OrderTrackerComponent {
   public showOrderTrackerComponent = false;
   public currentSelectedOrderId: number = 0;
   public currentStatus: string = 'Ordered';
+  public cancellationError = '';
+  public isCancelling = false;
 
   private statusSteps = ['Ordered', 'Shipped', 'Out for delivery', 'Delivered'];
+
+  public get canCancelOrder(): boolean {
+    return this.currentStatus.trim().toLowerCase() === 'pending';
+  }
 
   constructor(
     private restService: RestService,
@@ -38,7 +44,8 @@ export class OrderTrackerComponent {
   }
 
   public getStatusClass(stepName: string): string {
-    const currentIdx = this.statusSteps.indexOf(this.currentStatus);
+    const currentStatus = this.canCancelOrder ? 'Ordered' : this.currentStatus;
+    const currentIdx = this.statusSteps.indexOf(currentStatus);
     const stepIdx = this.statusSteps.indexOf(stepName);
 
     if (stepIdx < currentIdx) return 'completed';
@@ -51,6 +58,7 @@ export class OrderTrackerComponent {
       next: (status) => {
         this.currentStatus = status;
         this.currentSelectedOrderId = orderId;
+        this.cancellationError = '';
         this.showOrderTrackerComponent = true;
       },
     });
@@ -68,13 +76,26 @@ export class OrderTrackerComponent {
   }
 
   public cancelOrder() {
-    if (this.currentSelectedOrderId === 0) return;
+    if (this.currentSelectedOrderId === 0 || !this.canCancelOrder || this.isCancelling) return;
+    this.isCancelling = true;
+    this.cancellationError = '';
     this.restService.calcelOrder(this.currentSelectedOrderId).subscribe({
       next: (success) => {
+        this.isCancelling = false;
         if (success) {
-          alert('Siparis iptal edildi.');
+          alert('Sipariş iptal edildi.');
           this.closeOrderTrackerComponent();
         }
+      },
+      error: () => {
+        this.isCancelling = false;
+        this.cancellationError = 'Sipariş iptal edilemedi. Sipariş durumunu kontrol edip tekrar deneyin.';
+        this.restService.getOrderStatusByOrderId(this.currentSelectedOrderId).subscribe({
+          next: (status) => {
+            this.currentStatus = status;
+            if (!this.canCancelOrder) this.cancellationError = '';
+          },
+        });
       },
     });
   }
