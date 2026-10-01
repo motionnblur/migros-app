@@ -263,6 +263,63 @@ Backend packages follow a mostly standard layered layout:
     deliberately not appended to.
   - An absent description normalizes to `""` and an absent discount to `0`, since
     both columns are `NOT NULL` with no default.
+  - `ProductCreationPolicy.applyTo` is also the **single writer** of
+    `effective_price`, `package_amount` and `package_unit`. Every create and edit
+    path already funnels through it, so a third hypothetical writer cannot forget
+    the derived columns and leave a row whose sort key or package size is stale.
+- Catalogue search (Prompt 1)
+  - `GET /user/supply/searchProducts` is the one filtered, sorted, paged catalogue
+    query. It is listed in `SecurityConfiguration` with the other anonymous GET
+    catalogue reads, before the `denyAll` catch-all; no mutation is opened by that.
+  - `service/user/supply/ProductSearchService` owns validation and the response.
+    `ProductSearchAvailability` (`ALL` default, `IN_STOCK`, `OUT_OF_STOCK`) and
+    `ProductSearchSort` (`DEFAULT`, `PRICE_ASC`, `PRICE_DESC`) bind from the query
+    string, so an unrecognized value is Spring's own type mismatch → 400.
+  - **Every parameter is optional.** `ALL` availability is the default precisely
+    because it keeps sold-out products visible; filtering them out is a choice, not
+    the answer to a search that did not ask for it.
+  - `subcategory` **without** `categoryId` is a 400 (`GeneralException`). Names
+    repeat across categories, so a subcategory alone would answer with products
+    from categories the customer did not ask about.
+  - `q` is trimmed, bounded at 100 characters, and `LIKE`-escaped by
+    `ProductSearchSpecifications.toLikePattern` (escape char `!`). It is lowered on
+    both sides in SQL, not in Java, so the comparison uses the database's
+    case-folding rather than the JVM's.
+  - `ProductSearchRepositoryImpl` is a Criteria implementation, not three derived
+    finders: the page, `countMatching` and `countMatchingBySubcategory` all build
+    their predicate from one `ProductSearchSpecifications.toPredicate` call, which
+    is what keeps the list, the total and the facet counts describing one set. There
+    is **no in-memory filtering anywhere** in this path — filtering after the page
+    window paginates before it filters.
+  - `countMatchingBySubcategory` deliberately applies `criteria.withoutSubcategory()`,
+    so the counts stay comparable, and returns empty when no category was
+    requested.
+  - Every sort mode ends in the product id. Without that tie-break PostgreSQL is
+    free to return two equal-priced or two sold-out rows in a different order for
+    two consecutive page queries, which duplicates and drops rows in the listing.
+- Product package metadata (Prompt 3)
+  - V14 adds `package_amount NUMERIC(12,3)` and `package_unit VARCHAR(8)`, both
+    nullable with **no backfill and no default**. Nothing is inferred from a product
+    name or description: a guessed quantity is a unit price that looks
+    authoritative and is wrong.
+  - The pair is all-or-nothing, positive, no finer than three decimals, and `ADET`
+    must be whole. V14's three CHECK constraints restate invariants
+    `ProductCreationPolicy` already enforces; the **unit whitelist is deliberately
+    not** a constraint, because it belongs to the policy, which reports it as a 400
+    and is expected to grow.
+  - `ProductDto` carries the two fields for JSON creation and edit; `uploadProduct`
+    and `updateProduct` take them as optional multipart params. All three paths
+    normalize through `ProductCreationPolicy.normalize`.
+  - `helper/ProductUnitPricePolicy` is the only owner of the unit-price division
+    (`G`/`ML` → 1000 first, then divide; `KG`/`L`/`ADET` → divide; `HALF_UP` to 2).
+    It returns `null` — never a guess — for absent metadata, a non-positive amount,
+    or a unit outside the closed set, and `UserCatalogReadService` turns that into
+    absent DTO fields the client hides. `helper/ProductPackageUnit` owns the closed
+    set and `helper/ProductPriceBasis` the `KG | L | ADET` basis it maps to.
+  - Package metadata is written by the same `applyTo` call that writes the price, on
+    the same locked row, after the version comparison — so a metadata-only edit is
+    an ordinary version-checked edit that advances `@Version`, and a stale one
+    mutates nothing.
 - Pagination
   - `helper/PageRequestPolicy` is the single bound for the product and order
     listings: `page >= 0`, size `1..100` inclusive, validated **before**
@@ -332,17 +389,42 @@ Backend packages follow a mostly standard layered layout:
 ## Frontend Architecture
 - Standalone Angular app using router-based composition.
 - Root routes in `client/src/app/app.routes.ts`:
-  - Main shell at `/`, category listing at `/category/:categoryId`, and product
-    detail at `/category/:categoryId/product/:productId`.
+  - Main shell at `/`, search results at `/search`, category listing at
+    `/category/:categoryId`, and product detail at
+    `/category/:categoryId/product/:productId`.
+  - `/product/:productId` is the **category-less** detail, used by a card in a
+    listing that is not scoped to one category (a search result). The filters that
+    produced it stay in the query string, so the breadcrumb and the return link
+    restore the same results.
   - Admin shell at `/admin` with `/admin/products`, `/admin/orders`, and
     `/admin/support` sections selected from route data.
   - User modal flows on named outlet `modal` (cart, profile, login, order
     tracker/history, support); password reset uses `/reset-password/:token`.
 - Browsing state
-  - Category selection and pagination use `subcategory` and `page` query
-    parameters. `pages/main/helpers/category-browse-state.ts` validates and
-    normalizes them; keep deep links, back navigation, and product detail
-    identity in sync when changing browsing code.
+  - `pages/main/helpers/catalog-listing-state.ts` is the **single** bound between a
+    listing URL and the `searchProducts` request: `q`, `subcategory`, `page`,
+    `availability`, `minPrice`, `maxPrice`, `discounted`, `sort`. Both customer
+    listings read and write their state through it, so a second copy of the
+    translation is how two pages start answering different questions for one URL.
+  - The UI page is **one-based** and the endpoint page is zero-based; the
+    conversion happens only inside `toProductSearchQuery`. `page=1` and absent
+    `page` mean the same thing on the wire.
+  - Invalid values are normalized on the way in (an unrecognized `availability` or
+    `sort` collapses to the endpoint's default; an inverted price pair drops the
+    maximum) and the URL is rewritten to that canonical form with `replaceUrl`. A
+    hand-edited link therefore renders a real listing instead of erroring.
+  - `subcategory` is only forwarded together with a category, because the endpoint
+    answers 400 for a subcategory on its own. The client cannot produce that
+    request even from a hand-edited URL.
+  - `pages/main/helpers/category-browse-state.ts` still owns the page-count math,
+  the clamp to the last page, and `PRODUCT_PAGE_SIZE`.
+  - `ProductPageComponent` is **two-mode**: with a `categoryId` it is the category
+    listing/detail, without one it is only the detail and its return link points
+    back at `/search`. Keep the two from drifting apart.
+  - `ProductListingComponent` is the one presentation both listings render
+    (toolbar, chips, grid, paginator, loading/error/empty states). It filters
+    nothing: every count and ordering is the server's answer, so a narrowed result
+    is a genuinely narrowed list rather than a narrowed page of the last broad one.
 - HTTP integration
   - Domain API clients in `client/src/services/rest/`: `account-api`,
     `admin-api`, `cart-orders-api`, `catalog-api`, `payment-api`, and
@@ -373,11 +455,32 @@ Backend packages follow a mostly standard layered layout:
 - Component state and lifecycle
   - Cart quantity/total rules live in `pages/main/helpers/cart-state.ts`;
     product/cart error and browsing helpers are in the same directory.
+  - `pages/main/helpers/product-package-price.ts` is presentation only: the
+    package size, unit price and basis arrive already computed from the server, and
+    this module renders them or hides the line. An absent field must never be
+    formatted as a zero, a dash, or a quantity derived from the product name.
   - `ObjectUrlManager` owns blob image URLs; release them on replacement or
     component teardown. Unsubscribe from streams, clear timers, and disconnect
     sockets when their owners are destroyed.
   - `EventService` listeners must be removed with `off` when components are
     destroyed.
+- Cart and payment dialogs
+  - The hand-rolled modals (no Material dialog) share
+    `pages/main/components/payment/dialog-a11y.ts` for the three jobs nothing does
+    for free: naming the dialog, moving focus in and out, and containing Tab. The
+    payment dialog is nested inside the cart, so the cart ignores Escape and Tab
+    while it is open.
+  - Turkish copy for both surfaces is centralized as `PAYMENT_COPY` and
+    `CART_COPY`; Turkish money formatting is `money-format.ts` (`1.234,56 TL`).
+    The currency still comes from the server — only the label is derived.
+  - The `--dialog-*` tokens in `styles.css` are additive to the existing
+    `--landing-*` palette: the scrim, the two message levels, and a focus ring that
+    stays visible on the orange surface. Keep new dialog surfaces on them rather
+    than introducing a second brand.
+  - `PaymentComponent` must keep recovering the **same** checkout after an
+    ambiguous charge. Closing, cancelling or retrying may never prepare a
+    replacement, and `completePayment` is the only place allowed to say the money
+    was taken.
 
 ## Runtime and Profiles
 - No Spring profile is active by default (`application.properties` no longer sets `spring.profiles.default`). The omitted profile behaves as non-local.

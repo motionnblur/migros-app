@@ -25,10 +25,19 @@ This application provides a basic platform for users to browse products, add the
 
 * **Registering:** User registering using mail protocol (spring-boot-starter-mail)
 * **Admin Dashboard:** For managing orders and products.
-* **Product Listing:** Display a list of available products.
+* **Product Listing:** Display a list of available products, sold-out ones included
+  and marked `Tükendi`.
+* **Product Search:** One filtered, sorted, paged catalogue query (`GET
+  /user/supply/searchProducts`) behind both the header search and the category
+  listing, with availability, price-band, discounted-only and sort controls bound
+  to shareable query parameters.
+* **Package Size and Unit Price:** Optional structured package amount/unit per
+  product (`package_amount`, `package_unit`), editable in every admin product form
+  and rendered as a price per kg/litre/item when it is present.
 * **Product Details:** View detailed information about a specific product.
 * **Add to Cart:** Allow users to add products to their shopping cart.
-* **View Cart:** Display the items in the shopping cart.
+* **View Cart:** Display the items in the shopping cart, with an explicit
+  customer-triggered reconciliation of deleted and over-stock lines.
 * **Payment Processing:** By using Stripe's payment test api.
 * **Basic Security:** User Authentication and Authorization using JWT tokens
 * **Live Support:** Basic live support system using websockets and storing them as a fallback
@@ -203,6 +212,43 @@ Four schema and contract changes ship with this release:
   abandon it silently. Deletion is confined to `APP_UPLOAD_DIR`. This cleans
   newly obsolete references only — no broad filesystem sweep is performed, and
   reconciling pre-existing orphan files remains a separate operational task.
+* **Catalogue search filters and sorts on a stored effective price.** Sorting and
+  filtering a catalogue by "the price the card shows" cannot be done on
+  `product_price` and `product_discount`, because re-deriving the discounted value
+  in SQL is a second, informal copy of `ProductPricingPolicy`'s rounding sequence
+  and the two copies disagree at exactly the boundaries. V13 therefore adds
+  `product_entity.effective_price NUMERIC(19, 2)`, backfilled from that same
+  sequence and `NOT NULL` afterwards, and every create and edit path writes it
+  through the same policy call that writes the price. `GET
+  /user/supply/searchProducts` is the one filtered, sorted, paged catalogue query;
+  every parameter is optional, `ALL` availability is the default so sold-out
+  products stay visible, and a `subcategory` without a `categoryId` is `400`
+  because the name is not unique across categories. Sold-out products are marked
+  and cannot be added to the cart from a card, a listing or the detail page, and the
+  server refuses the add regardless.
+* **Package size is structured data, and absent data stays absent.** V14 adds
+  `package_amount NUMERIC(12, 3)` and `package_unit VARCHAR(8)` (one of `G`, `KG`,
+  `ML`, `L`, `ADET`), both nullable with **no backfill and no default**: nothing is
+  inferred from a product name or description, because a guessed quantity produces a
+  unit price that looks authoritative and is wrong. The pair is all-or-nothing,
+  positive, no finer than three decimals, and `ADET` must be a whole number; it is
+  validated once in `ProductCreationPolicy` for JSON creation, multipart upload
+  and version-checked edits alike, and a metadata-only edit is an ordinary
+  version-checked edit. `helper/ProductUnitPricePolicy` is the only owner of the
+  division and returns nothing — rather than a guess — for a product without usable
+  metadata; the customer card and detail page then hide the package and unit-price
+  lines entirely instead of showing a zero or a placeholder. Existing rows are not
+  backfilled, so this is additive and requires no data migration.
+* **The product detail read carries the payable price.** `GET
+  /user/supply/getProductDataWithProductId` adds `effectivePrice` next to the
+  existing `productPrice` and `productDiscount` columns. Both stored columns are
+  still sent (the client shows the struck-through original and the percentage from
+  them), but a client that recombines them in the browser does not reproduce
+  `ProductPricingPolicy`'s rounding — a stored `10.10` at 5 % off is `9.60` under
+  the policy and `9.59` under `(10.10 - 10.10 * 5 / 100).toFixed(2)` — so the
+  detail page, the catalogue card, the cart line and the charge would quote two
+  different prices for one product. The field is additive; no existing field
+  changed name or meaning.
 
 * Local development credentials (only created when the active profile set is exactly `local`): admin / admin
 
