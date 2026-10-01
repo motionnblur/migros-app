@@ -1,3 +1,5 @@
+import { ProductPackageUnit } from './IProductPackageMetadata';
+
 export interface IProductUpdater {
   adminId: number;
   productId: number;
@@ -21,4 +23,16 @@ export interface IProductUpdater {
    * value must not be refreshed and resubmitted automatically.
    */
   expectedVersion: number;
+  /**
+   * Optional package size, on the same terms as `IProductUploader`: both fields
+   * or neither, and `null` for both means the product keeps no package size.
+   *
+   * Clearing the fields is therefore how metadata is removed. There is no
+   * separate "delete" call, because the two columns live on the product row and
+   * this is already the write that owns the row - a second path for clearing
+   * them would be a second way to skip the version check that every other field
+   * on this row goes through.
+   */
+  packageAmount?: number | null;
+  packageUnit?: ProductPackageUnit | string | null;
 }

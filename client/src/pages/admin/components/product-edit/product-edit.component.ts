@@ -9,6 +9,13 @@ import { IProductData } from '../../../../interfaces/IProductData';
 import { IProductDescription } from '../../../../interfaces/IProductDescription';
 import { IProductUpdater } from '../../../../interfaces/IProductUpdater';
 import { isProductEditConflict } from '../../../../services/rest/product-edit-conflict';
+import { ProductPackageUnit } from '../../../../interfaces/IProductPackageMetadata';
+import {
+  PRODUCT_PACKAGE_UNIT_OPTIONS,
+  packageAmountStepFor,
+  readPackageFields,
+  validatePackageFields,
+} from '../../../../base-components/product-package-fields';
 import { categories } from '../../../../memory/global-data';
 import { ToastService } from '../../services/toast.service';
 
@@ -36,6 +43,31 @@ export class ProductEditComponent extends ProductBuyBase {
   discount = 0;
   description = '';
   categoryValue: number | null = null;
+
+  /**
+   * Optional package size, on the same terms as the creation form and the update
+   * drawer: both fields or neither, and empty meaning "this product has no
+   * package size".
+   *
+   * `null` rather than a zero default, because zero is not an absent size and the
+   * backend refuses it - a default of zero would make every save of a product
+   * without package metadata fail.
+   */
+  packageAmount: number | null = null;
+  packageUnit: ProductPackageUnit | '' = '';
+
+  readonly packageUnits: readonly ProductPackageUnit[] = PRODUCT_PACKAGE_UNIT_OPTIONS;
+
+  /**
+   * The step the amount input offers for the chosen unit.
+   *
+   * `ADET` counts discrete items, so the browser is never offered a fraction for
+   * it. The backend refuses that value too; this only means the control does not
+   * propose it in the first place.
+   */
+  get packageAmountStep(): number {
+    return packageAmountStepFor(this.packageUnit);
+  }
 
   isSavingProduct = false;
   isSavingDescriptions = false;
@@ -93,6 +125,8 @@ export class ProductEditComponent extends ProductBuyBase {
     this.description = data.productDescription ?? '';
     this.categoryValue = data.productCategoryId ?? null;
     this.productVersion = data.productVersion ?? null;
+    this.packageAmount = data.packageAmount ?? null;
+    this.packageUnit = (data.packageUnit ?? '') as ProductPackageUnit | '';
   }
 
   private keyDownEvent(event: KeyboardEvent) {
@@ -182,6 +216,12 @@ export class ProductEditComponent extends ProductBuyBase {
       return;
     }
 
+    const packageError = validatePackageFields(this.packageAmount, this.packageUnit);
+    if (packageError !== null) {
+      this.validationError = packageError;
+      return;
+    }
+
     // Without a known version there is nothing safe to send: a guess would be
     // indistinguishable from an unguarded write.
     if (this.productVersion === null) {
@@ -205,6 +245,10 @@ export class ProductEditComponent extends ProductBuyBase {
       selectedImage: this.selectedImage,
       categoryValue: this.categoryValue,
       expectedVersion: this.productVersion,
+      // Submitted on every save, including when both are null, so clearing the
+      // fields really clears them. The alternative - omitting them when empty -
+      // would make "removed" and "unchanged" the same request.
+      ...readPackageFields(this.packageAmount, this.packageUnit),
     };
 
     this.requests.add(this.restService.updateProductData(productData).subscribe({

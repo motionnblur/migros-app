@@ -226,4 +226,153 @@ describe('ProductUpdaterComponent', () => {
     expect(component.editConflict).toBeFalse();
     expect(component.validationError).toBe('Product name is required');
   });
+
+  /**
+   * The optional package fields on the edit path.
+   *
+   * <p>Two claims are being made here and they are the ones a regression would
+   * quietly undo. The form has to show what is stored, so an administrator editing
+   * a product can see the size they are about to change. And the pair has to be
+   * submitted on every save - including when it is empty - because omitting it
+   * would make "cleared" and "unchanged" the same request, and the size would be
+   * unremovable through this form.
+   */
+  describe('package metadata', () => {
+    function reloadWith(overrides: Partial<IProductData>): void {
+      restServiceSpy.getProductData.and.returnValue(of(detail(overrides)));
+      component.reloadProduct();
+      fixture.detectChanges();
+    }
+
+    it('shows no package size for a product that has none', () => {
+      expect(component.packageAmount).toBeNull();
+      expect(component.packageUnit).toBe('');
+    });
+
+    it('prefills the stored size from the detail read', () => {
+      reloadWith({ packageAmount: 0.75, packageUnit: 'KG' });
+
+      expect(component.packageAmount).toBe(0.75);
+      expect(component.packageUnit).toBe('KG');
+    });
+
+    it('submits the stored size unchanged when the administrator saves it as loaded', () => {
+      restServiceSpy.updateProductData.and.returnValue(of({ saved: true, productVersion: 5 }));
+      reloadWith({ packageAmount: 0.75, packageUnit: 'KG' });
+
+      component.uploadProductData();
+
+      expect(lastUpdate().packageAmount).toBe(0.75);
+      expect(lastUpdate().packageUnit).toBe('KG');
+    });
+
+    /**
+     * Clearing the fields is how metadata is removed, so the empty pair has to
+     * travel with the save rather than being omitted.
+     */
+    it('submits both fields as null when the administrator clears them', () => {
+      restServiceSpy.updateProductData.and.returnValue(of({ saved: true, productVersion: 5 }));
+      reloadWith({ packageAmount: 0.75, packageUnit: 'KG' });
+      component.packageAmount = null;
+      component.packageUnit = '';
+
+      component.uploadProductData();
+
+      expect(lastUpdate().packageAmount).toBeNull();
+      expect(lastUpdate().packageUnit).toBeNull();
+    });
+
+    it('submits both fields as null for a product that never had a size', () => {
+      restServiceSpy.updateProductData.and.returnValue(of({ saved: true, productVersion: 5 }));
+
+      component.uploadProductData();
+
+      expect(lastUpdate().packageAmount).toBeNull();
+      expect(lastUpdate().packageUnit).toBeNull();
+    });
+
+    it('refuses a half-filled pair before sending anything', () => {
+      component.packageAmount = 500;
+      component.packageUnit = '';
+
+      component.uploadProductData();
+
+      expect(restServiceSpy.updateProductData).not.toHaveBeenCalled();
+      expect(component.validationError).toContain('go together');
+    });
+
+    it('refuses an amount with no unit even after the fields were cleared once', () => {
+      component.packageUnit = 'L';
+      component.packageAmount = null;
+
+      component.uploadProductData();
+
+      expect(restServiceSpy.updateProductData).not.toHaveBeenCalled();
+      expect(component.validationError).toContain('go together');
+    });
+
+    it('refuses a fractional item count before sending anything', () => {
+      component.packageAmount = 1.5;
+      component.packageUnit = 'ADET';
+
+      component.uploadProductData();
+
+      expect(restServiceSpy.updateProductData).not.toHaveBeenCalled();
+      expect(component.validationError).toContain('whole number');
+    });
+
+    it('accepts a fractional continuous measure', () => {
+      restServiceSpy.updateProductData.and.returnValue(of({ saved: true, productVersion: 5 }));
+      component.packageAmount = 1.5;
+      component.packageUnit = 'L';
+
+      component.uploadProductData();
+
+      expect(lastUpdate().packageAmount).toBe(1.5);
+      expect(component.validationError).toBe('');
+    });
+
+    it('refuses an amount that is not positive', () => {
+      component.packageAmount = 0;
+      component.packageUnit = 'KG';
+
+      component.uploadProductData();
+
+      expect(restServiceSpy.updateProductData).not.toHaveBeenCalled();
+      expect(component.validationError).toContain('greater than zero');
+    });
+
+    /**
+     * The amount control must not offer a fraction for a unit that counts items.
+     * A step of 1 means the browser rejects `1.5` on the control itself, rather
+     * than accepting it and failing the save.
+     */
+    it('offers whole numbers only for the item unit', () => {
+      expect(component.packageAmountStep).toBe(0.001);
+
+      component.packageUnit = 'ADET';
+      expect(component.packageAmountStep).toBe(1);
+    });
+
+    it('offers every accepted unit and no others', () => {
+      expect(component.packageUnits).toEqual(['G', 'KG', 'ML', 'L', 'ADET']);
+    });
+
+    /**
+     * The conflict path must preserve the draft, package fields included. An
+     * administrator whose size change was rejected has to be able to fix and
+     * resend it, and a reload that quietly dropped the size would lose the edit.
+     */
+    it('keeps the draft package size when the backend reports a conflict', () => {
+      rejectAsConflict();
+      component.packageAmount = 0.75;
+      component.packageUnit = 'KG';
+
+      component.uploadProductData();
+
+      expect(component.editConflict).toBeTrue();
+      expect(component.packageAmount).toBe(0.75);
+      expect(component.packageUnit).toBe('KG');
+    });
+  });
 });

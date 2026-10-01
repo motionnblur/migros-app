@@ -31,6 +31,8 @@ export class ProductAdderComponent extends ProductAdderBase {
       return;
     }
 
+    const packageMetadata = this.readPackageMetadata();
+
     const productData: IProductUploader = {
       adminId: 1,
       productName: this.productName,
@@ -41,6 +43,7 @@ export class ProductAdderComponent extends ProductAdderBase {
       productDescription: this.description,
       selectedImage: this.selectedImage,
       categoryValue: this.selectedFormValue!,
+      ...packageMetadata,
     };
 
     this.restService.uploadProductData(productData).subscribe({

@@ -255,4 +255,125 @@ describe('ProductEditComponent', () => {
     expect(component.saveError).toBe('Product name is required');
     expect(fixture.nativeElement.querySelector('[data-testid="edit-conflict"]')).toBeNull();
   });
+
+  /**
+   * The optional package fields on the modal editor.
+   *
+   * <p>This is the third independent write path to the product row, and it is the
+   * one that would be easiest to forget: it has its own template, its own fields
+   * and its own save. The assertions below are about the wire contract - what
+   * actually travels - because a field that renders but does not submit is a form
+   * that silently discards an administrator's work.
+   */
+  describe('package metadata', () => {
+    it('sends no package parameters for a product that has none', () => {
+      create();
+
+      const body = bodyOf(save());
+
+      expect(body.get('packageAmount')).toBeNull();
+      expect(body.get('packageUnit')).toBeNull();
+    });
+
+    it('prefills the stored size from the detail read', () => {
+      create(detail({ packageAmount: 0.75, packageUnit: 'KG' }));
+
+      expect(component.packageAmount).toBe(0.75);
+      expect(component.packageUnit).toBe('KG');
+    });
+
+    it('sends a metadata-only change through the version-checked body', () => {
+      create(detail({ packageAmount: 0.75, packageUnit: 'KG', productVersion: 12 }));
+      component.packageAmount = 1.5;
+      component.packageUnit = 'L';
+
+      const body = bodyOf(save());
+
+      expect(body.get('packageAmount')).toBe('1.5');
+      expect(body.get('packageUnit')).toBe('L');
+      expect(body.get('expectedVersion')).toBe('12');
+    });
+
+    /**
+     * Clearing the fields is how a size is removed, and the empty pair has to
+     * travel with the save: omitting it would make "cleared" and "unchanged" the
+     * same request.
+     */
+    it('sends both parameters as nothing when the administrator clears them', () => {
+      create(detail({ packageAmount: 0.75, packageUnit: 'KG' }));
+      component.packageAmount = null;
+      component.packageUnit = '';
+
+      const body = bodyOf(save());
+
+      expect(body.get('packageAmount')).toBeNull();
+      expect(body.get('packageUnit')).toBeNull();
+    });
+
+    it('refuses a half-filled pair without issuing a request', () => {
+      create();
+      component.packageAmount = 500;
+
+      component.saveProduct();
+
+      expect(httpMock.match(isUpdateRequest)).toHaveSize(0);
+      expect(component.validationError).toContain('go together');
+    });
+
+    it('refuses a fractional item count without issuing a request', () => {
+      create();
+      component.packageAmount = 1.5;
+      component.packageUnit = 'ADET';
+
+      component.saveProduct();
+
+      expect(httpMock.match(isUpdateRequest)).toHaveSize(0);
+      expect(component.validationError).toContain('whole number');
+    });
+
+    it('offers whole numbers only for the item unit', () => {
+      create();
+
+      expect(component.packageAmountStep).toBe(0.001);
+      component.packageUnit = 'ADET';
+      expect(component.packageAmountStep).toBe(1);
+    });
+
+    it('renders the optional package fields with the accepted units only', () => {
+      create();
+
+      const amount = fixture.nativeElement.querySelector('#packageAmount') as HTMLInputElement;
+      const unit = fixture.nativeElement.querySelector(
+        'select[aria-label="Paket birimi"]',
+      ) as HTMLSelectElement;
+
+      expect(amount).toBeTruthy();
+      expect(amount.value).toBe('');
+      expect(Array.from(unit.options).map((option) => option.value)).toEqual([
+        '',
+        'G',
+        'KG',
+        'ML',
+        'L',
+        'ADET',
+      ]);
+    });
+
+    /**
+     * A conflict must preserve the size the administrator typed. An editor that
+     * dropped it on a 409 would force the change to be re-entered from memory.
+     */
+    it('keeps the draft package size when the save is rejected as a conflict', () => {
+      create(detail({ packageAmount: 0.75, packageUnit: 'KG' }));
+      component.packageAmount = 1.5;
+      component.packageUnit = 'L';
+
+      rejectAsConflict(save());
+      fixture.detectChanges();
+
+      expect(component.editConflict).toBeTrue();
+      expect(component.packageAmount).toBe(1.5);
+      expect(component.packageUnit).toBe('L');
+    });
+  });
 });

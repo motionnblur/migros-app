@@ -82,6 +82,42 @@
           [(ngModel)]="description"
         ></textarea>
       </div>
+
+      <!--
+        Optional package size, same contract as the creation form: both fields
+        empty means no package size, and the pair is submitted on every save so
+        clearing them here actually clears them on the product.
+      -->
+      <div class="col-12">
+        <label class="form-label small fw-bold text-uppercase" for="packageAmount">
+          Paket Miktarı (isteğe bağlı)
+        </label>
+        <div class="row g-2">
+          <div class="col-8">
+            <input
+              id="packageAmount"
+              type="number"
+              class="form-control"
+              placeholder="Örn: 1.5 veya 6"
+              min="0"
+              [step]="packageAmountStep"
+              [(ngModel)]="packageAmount"
+            />
+          </div>
+          <div class="col-4">
+            <select class="form-select" [(ngModel)]="packageUnit" aria-label="Paket birimi">
+              <option value="">Birim yok</option>
+              @for (unit of packageUnits; track unit) {
+                <option [value]="unit">{{ unit }}</option>
+              }
+            </select>
+          </div>
+        </div>
+        <p class="form-text">
+          Miktar ve birimi birlikte girin. Boş bırakırsanız ürün için paket bilgisi
+          gösterilmez.
+        </p>
+      </div>
     </div>
   </div>
 

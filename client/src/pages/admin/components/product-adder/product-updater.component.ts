@@ -3,6 +3,7 @@ import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { IProductData } from '../../../../interfaces/IProductData';
 import { IProductUpdater } from '../../../../interfaces/IProductUpdater';
+import { ProductPackageUnit } from '../../../../interfaces/IProductPackageMetadata';
 import { ProductAdderBase } from '../../../../base-components/product-adder.base';
 import { RestService } from '../../../../services/rest/rest.service';
 import { EventService } from '../../../../services/event/event.service';
@@ -51,16 +52,7 @@ export class ProductUpdaterComponent extends ProductAdderBase {
     }));
 
     this.requests.add(this.restService.getProductData(this.id).subscribe((data: IProductData) => {
-      this.productName = data.productName ?? '';
-      this.subCategoryName = data.subCategoryName ?? '';
-      this.price = data.productPrice ?? 0;
-      this.count = data.productCount ?? 0;
-      this.discount = data.productDiscount ?? 0;
-      this.description = data.productDescription ?? '';
-      this.selectedFormValue = data.productCategoryId ?? null;
-      this.productVersion = data.productVersion ?? null;
-
-      this.categoryControl.setValue(this.selectedFormValue?.toString() ?? '');
+      this.applyProductData(data);
     }));
   }
 
@@ -89,6 +81,8 @@ export class ProductUpdaterComponent extends ProductAdderBase {
       return;
     }
 
+    const packageMetadata = this.readPackageMetadata();
+
     const productData: IProductUpdater = {
       adminId: 1,
       productId: this.id,
@@ -101,6 +95,10 @@ export class ProductUpdaterComponent extends ProductAdderBase {
       selectedImage: this.isImageChanged ? this.selectedImage : undefined,
       categoryValue: this.selectedFormValue!,
       expectedVersion: this.productVersion,
+      // Sent on every save, including when both are null: clearing the fields is
+      // how package metadata is removed, and omitting them here would leave a
+      // cleared field looking unchanged to the server.
+      ...packageMetadata,
     };
 
     this.requests.add(this.restService.updateProductData(productData).subscribe({
@@ -144,15 +142,7 @@ export class ProductUpdaterComponent extends ProductAdderBase {
     this.requests.add(
       this.restService.getProductData(this.id).subscribe({
         next: (data: IProductData) => {
-          this.productName = data.productName ?? '';
-          this.subCategoryName = data.subCategoryName ?? '';
-          this.price = data.productPrice ?? 0;
-          this.count = data.productCount ?? 0;
-          this.discount = data.productDiscount ?? 0;
-          this.description = data.productDescription ?? '';
-          this.selectedFormValue = data.productCategoryId ?? null;
-          this.productVersion = data.productVersion ?? null;
-          this.categoryControl.setValue(this.selectedFormValue?.toString() ?? '');
+          this.applyProductData(data);
           this.editConflict = false;
         },
         error: () => {
@@ -160,5 +150,32 @@ export class ProductUpdaterComponent extends ProductAdderBase {
         },
       })
     );
+  }
+
+  /**
+   * Fills the form from a product read.
+   *
+   * One implementation for the initial load and for the deliberate reload, so
+   * the two cannot drift - a field the reload forgot to restore is a field the
+   * administrator believes they kept and did not.
+   *
+   * The package fields are restored exactly as stored, including the null case,
+   * which is what a product without a package size looks like. An absent amount
+   * becomes an empty input rather than a zero, because zero is a value the
+   * backend refuses and an administrator would have to clear before saving.
+   */
+  private applyProductData(data: IProductData): void {
+    this.productName = data.productName ?? '';
+    this.subCategoryName = data.subCategoryName ?? '';
+    this.price = data.productPrice ?? 0;
+    this.count = data.productCount ?? 0;
+    this.discount = data.productDiscount ?? 0;
+    this.description = data.productDescription ?? '';
+    this.selectedFormValue = data.productCategoryId ?? null;
+    this.productVersion = data.productVersion ?? null;
+    this.packageAmount = data.packageAmount ?? null;
+    this.packageUnit = (data.packageUnit ?? '') as ProductPackageUnit | '';
+
+    this.categoryControl.setValue(this.selectedFormValue?.toString() ?? '');
   }
 }

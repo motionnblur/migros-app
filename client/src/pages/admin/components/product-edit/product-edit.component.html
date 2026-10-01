@@ -61,6 +61,44 @@
             <label class="form-label small fw-bold text-uppercase">Açıklama</label>
             <textarea class="form-control" rows="3" [(ngModel)]="description"></textarea>
           </div>
+
+          <!--
+            Optional package size. Same contract as the creation form and the
+            update drawer: both fields or neither, empty meaning "no package
+            size". Submitted on every save, so clearing them here clears them on
+            the product - and it goes through the same version-checked update as
+            every other field.
+          -->
+          <div class="col-12">
+            <label class="form-label small fw-bold text-uppercase" for="packageAmount">
+              Paket Miktarı (isteğe bağlı)
+            </label>
+            <div class="row g-2">
+              <div class="col-8">
+                <input
+                  id="packageAmount"
+                  type="number"
+                  class="form-control"
+                  placeholder="Örn: 1.5 veya 6"
+                  min="0"
+                  [step]="packageAmountStep"
+                  [(ngModel)]="packageAmount"
+                />
+              </div>
+              <div class="col-4">
+                <select class="form-select" [(ngModel)]="packageUnit" aria-label="Paket birimi">
+                  <option value="">Birim yok</option>
+                  @for (unit of packageUnits; track unit) {
+                    <option [value]="unit">{{ unit }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+            <p class="form-text">
+              Miktar ve birimi birlikte girin. Boş bırakırsanız ürün için paket
+              bilgisi gösterilmez.
+            </p>
+          </div>
         </div>
 
         <div *ngIf="validationError" class="alert alert-danger py-2 mt-3 mb-0" role="alert">
