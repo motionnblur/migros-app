@@ -458,7 +458,18 @@ Backend packages follow a mostly standard layered layout:
   - `pages/main/helpers/product-package-price.ts` is presentation only: the
     package size, unit price and basis arrive already computed from the server, and
     this module renders them or hides the line. An absent field must never be
-    formatted as a zero, a dash, or a quantity derived from the product name.
+    formatted as a zero, a dash, or a quantity derived from the product name. It
+    takes no formatter argument: the notation is `money-format`'s, and a parameter
+    is a second way to render the same money.
+  - `pages/main/helpers/money-format.ts` is the **single** owner of how the
+    storefront writes a number: `tr-TR` is pinned rather than inherited from the
+    browser, so a card, a detail, a cart line and a checkout total cannot render
+    one amount two ways. `formatAmount` is money at two decimals, `formatQuantity`
+    is a package measure at up to three. It is a formatter and nothing more — the
+    amount in is the amount out, the currency is still a label derived from the
+    server's code, and no caller may recompute or rescale a price. `toFixed` and
+    Angular's `number` pipe both follow the browser locale and must not appear in a
+    customer-facing price.
   - `ObjectUrlManager` owns blob image URLs; release them on replacement or
     component teardown. Unsubscribe from streams, clear timers, and disconnect
     sockets when their owners are destroyed.
@@ -471,8 +482,10 @@ Backend packages follow a mostly standard layered layout:
     payment dialog is nested inside the cart, so the cart ignores Escape and Tab
     while it is open.
   - Turkish copy for both surfaces is centralized as `PAYMENT_COPY` and
-    `CART_COPY`; Turkish money formatting is `money-format.ts` (`1.234,56 TL`).
-    The currency still comes from the server — only the label is derived.
+    `CART_COPY`; the amount each of them shows comes from
+    `pages/main/helpers/money-format.ts` (`1.234,56 TL`) like every other
+    customer-facing price. The currency still comes from the server — only the
+    label is derived.
   - The `--dialog-*` tokens in `styles.css` are additive to the existing
     `--landing-*` palette: the scrim, the two message levels, and a focus ring that
     stays visible on the orange surface. Keep new dialog surfaces on them rather
