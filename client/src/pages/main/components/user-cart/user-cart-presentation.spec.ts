@@ -434,6 +434,48 @@ describe('UserCartComponent presentation', () => {
       expect(document.activeElement).toBe(buy);
     });
 
+    /**
+     * The launcher lives outside the dialog, on the page the dialog is covering.
+     *
+     * <p>A floating control out there is the one thing most likely to be reachable
+     * by a stray Tab, and it is the one the customer would act on by accident - it
+     * looks like a button, it is the only orange control on the screen, and on a
+     * phone it sits right on top of the cart's own checkout action. So the
+     * assertion is the whole cycle rather than one hop: focus starts on the
+     * dialog, is driven forwards and backwards past both of its ends, and is
+     * required to be inside the dialog every single time.
+     */
+    it('never lets focus reach a control outside the dialog', () => {
+      const dialog = query('cart-dialog');
+      // A stand-in for the support launcher, and for anything else the shell
+      // renders beside the outlet: a real button, focusable, outside the dialog.
+      const outside = document.createElement('button');
+      outside.textContent = 'Canlı Destek';
+      document.body.appendChild(outside);
+
+      try {
+        const visited: Element[] = [];
+        dialog.focus();
+        for (let step = 0; step < 12; step += 1) {
+          pressKey('Tab');
+          visited.push(document.activeElement as Element);
+        }
+        dialog.focus();
+        for (let step = 0; step < 12; step += 1) {
+          pressKey('Tab', true);
+          visited.push(document.activeElement as Element);
+        }
+
+        expect(visited.every((element) => dialog.contains(element))).toBeTrue();
+        expect(visited).not.toContain(outside);
+        // The cycle really did move: a handler that simply swallowed every Tab
+        // would pass the containment check above without trapping anything.
+        expect(new Set(visited).size).toBeGreaterThan(1);
+      } finally {
+        outside.remove();
+      }
+    });
+
     it('leaves Escape to the payment dialog while that dialog is open', fakeAsync(() => {
       component.openPaymentComponent();
       httpMock.expectOne(isReconcile).flush({

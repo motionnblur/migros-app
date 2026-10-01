@@ -477,6 +477,20 @@ Backend packages follow a mostly standard layered layout:
     `--landing-*` palette: the scrim, the two message levels, and a focus ring that
     stays visible on the orange surface. Keep new dialog surfaces on them rather
     than introducing a second brand.
+  - The `--layer-*` rungs in `styles.css` are the whole stacking order, and a
+    layer names one of them rather than a number. `--layer-floating` is for
+    controls that belong to the *page behind* a modal (the support launcher), and
+    every dialog sits on one of the four rungs above it, paired scrim-then-surface
+    so a nested dialog is raised by moving up a rung. The launcher and the support
+    panel used to declare an unlayered `2100` of their own, which put them above
+    every dialog: on a 390px phone the cart fills all but 8px of the viewport, so
+    the launcher painted over the cart's own checkout button and took the press.
+  - A dialog's `aria-modal="true"` promises the page behind it is out of reach, so
+    a control on that page must not merely sit *under* the scrim — it is
+    **withdrawn** while any modal occupies the `modal` outlet. `MainComponent`
+    drives that from the outlet's own `activate`/`deactivate` events rather than
+    from the URL, so it holds for a deep link and a Back-button open as well, and
+    a navigation the router cancels changes nothing. Do not read the URL for this.
   - `PaymentComponent` must keep recovering the **same** checkout after an
     ambiguous charge. Closing, cancelling or retrying may never prepare a
     replacement, and `completePayment` is the only place allowed to say the money

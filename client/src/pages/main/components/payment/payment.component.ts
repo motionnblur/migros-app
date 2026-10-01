@@ -22,7 +22,7 @@ import {
   focusDialog,
   restoreFocus,
 } from './dialog-a11y';
-import { formatCurrencyLabel, formatMoney } from './money-format';
+import { formatCurrencyLabel, formatMoney } from '../../helpers/money-format';
 
 type CreatedStripeToken = NonNullable<
   Awaited<ReturnType<Stripe['createToken']>>['token']

@@ -1,4 +1,5 @@
 import { ProductUnitPriceBasis } from '../../../interfaces/IProductPackageMetadata';
+import { formatAmount, formatQuantity } from './money-format';
 
 /**
  * How package size and unit price are rendered on customer-facing surfaces.
@@ -8,6 +9,12 @@ import { ProductUnitPriceBasis } from '../../../interfaces/IProductPackageMetada
  * and arrive already rounded, because a unit price recomputed in the browser is a
  * second copy of `ProductUnitPricePolicy` and a second thing that can disagree
  * with the package price printed next to it.
+ *
+ * The *notation* is `money-format`'s, so a card reads `0,75 KG` over `66,65 TL/kg`
+ * over `49,90 TL` rather than mixing separators. It is not passed in as a
+ * formatter argument: a parameter here is a second way to render the same money,
+ * and the two callers that used it both passed `toFixed(2)`, which is how this
+ * module ended up printing `66.65 TL/kg` beside a cart total of `1.234,50 TL`.
  *
  * The one rule every function here follows is that an absent fact renders as
  * nothing. A product without a package size - which is every product that predates
@@ -23,7 +30,7 @@ export function packageSizeLabel(
   if (!hasPackageSize(packageAmount, packageUnit)) {
     return null;
   }
-  return `${packageAmount} ${String(packageUnit).trim().toUpperCase()}`;
+  return `${formatQuantity(packageAmount as number)} ${String(packageUnit).trim().toUpperCase()}`;
 }
 
 /**
@@ -91,31 +98,20 @@ export function hasUnitPrice(
 /**
  * The unit-price line as one string, or `null` when it must not be rendered.
  *
- * The number is passed through a two-decimal formatter rather than being
- * concatenated raw, so a unit price of 12.5 does not appear as "12.5 TL/kg" beside
- * a package price of "12.50 TL".
+ * The number goes through the storefront's own money formatter rather than being
+ * concatenated raw, so a unit price of 12.5 does not appear as "12,5 TL/kg" beside
+ * a package price of "12,50 TL" - and so it cannot appear as "12.50 TL/kg" beside
+ * a cart total of "12,50 TL".
  */
 export function unitPriceLabel(
   unitPrice: number | null | undefined,
   basis: string | null | undefined,
-  formatAmount: (value: number) => string = defaultAmountFormat,
 ): string | null {
   if (!hasUnitPrice(unitPrice, basis)) {
     return null;
   }
 
   return `${formatAmount(unitPrice as number)} TL/${unitPriceBasisLabel(basis)}`;
-}
-
-/**
- * The fallback formatter, used when a caller supplies none.
- *
- * Two decimals, because every price in this application is at the money scale -
- * the backend rounds the unit price to it, and rendering it with fewer decimals
- * would imply a precision it does not have.
- */
-function defaultAmountFormat(value: number): string {
-  return value.toFixed(2);
 }
 
 /** The typed basis union, re-exported so templates do not import the interface. */

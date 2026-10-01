@@ -49,6 +49,29 @@
     --dialog-warning-border: #f3c489;
     --dialog-focus-ring: 0 0 0 3px rgba(255, 127, 0, 0.55);
     --dialog-backdrop-blur: blur(3px);
+
+    /*
+     * The storefront's stacking order, as one ladder.
+     *
+     * Every modal is rendered onto the named `modal` outlet and belongs above
+     * everything on the page behind it. The support launcher belongs *behind* it:
+     * it used to declare a z-index of its own, far above the dialogs, so on a
+     * 390px phone - where the cart fills all but 8px of the viewport - the orange
+     * launcher sat on top of the cart's own checkout button and took the press
+     * meant for it.
+     *
+     * A ladder is only a convention until every layer names its rung, so these
+     * are the single declarations. A control that belongs to the page behind a
+     * modal goes in `--layer-floating`; a dialog goes in one of the four modal
+     * rungs above it, paired scrim-then-surface so a nested dialog can only ever
+     * be raised by moving up a rung. Do not invent a number.
+     */
+    --layer-floating: 1000;
+    --layer-sticky-header: 1030;
+    --layer-modal-scrim: 1040;
+    --layer-modal: 1050;
+    --layer-modal-scrim-raised: 1060;
+    --layer-modal-raised: 1070;
 }
 
 /* Sticky header offset per breakpoint (tablet wraps actions, mobile adds a search row) */

@@ -1,4 +1,4 @@
-import { provideHttpClient } from '@angular/common/http';
+﻿import { provideHttpClient } from '@angular/common/http';
 import {
   HttpTestingController,
   TestRequest,
@@ -183,7 +183,7 @@ describe('ProductBuyComponent', () => {
     expect(classes[2]).toContain('product-detail__stock');
     expect(classes[3]).toContain('product-detail__action');
     expect(summary.textContent).toContain('Tam Süt');
-    expect(summary.textContent).toContain('50.00');
+    expect(summary.textContent).toContain('50,00');
   });
 
   it('labels the stock line as Stok and never mentions Miktar', () => {
@@ -385,10 +385,10 @@ describe('ProductBuyComponent', () => {
   });
 
   it('formats prices with two decimals', () => {
-    expect(component.formatPrice(50)).toBe('50.00');
-    expect(component.formatPrice(50.5)).toBe('50.50');
-    expect(component.formatPrice(undefined)).toBe('0.00');
-    expect(component.formatPrice(null)).toBe('0.00');
+    expect(component.formatPrice(50)).toBe('50,00');
+    expect(component.formatPrice(50.5)).toBe('50,50');
+    expect(component.formatPrice(undefined)).toBe('0,00');
+    expect(component.formatPrice(null)).toBe('0,00');
   });
 
   it('computes the discounted price from the discount percentage', () => {
@@ -426,7 +426,7 @@ describe('ProductBuyComponent', () => {
     const amount = fixture.nativeElement.querySelector(
       '.product-detail__price-amount',
     ) as HTMLElement;
-    expect(amount.textContent?.trim()).toBe('9.60');
+    expect(amount.textContent?.trim()).toBe('9,60');
   });
 
   it('loads the product image after the data arrives', () => {
@@ -658,10 +658,10 @@ describe('ProductBuyComponent', () => {
       flushDescriptions();
 
       expect(detail('.product-detail__package').textContent).toContain(
-        '0.75 KG',
+        '0,75 KG',
       );
       expect(detail('.product-detail__unit-price').textContent).toContain(
-        '66.65 TL/kg',
+        '66,65 TL/kg',
       );
     });
 
@@ -682,7 +682,7 @@ describe('ProductBuyComponent', () => {
       flushDescriptions();
 
       expect(textOf('.product-detail__package-value')).toBe(
-        '0.125 KG',
+        '0,125 KG',
       );
     });
 
@@ -716,7 +716,7 @@ describe('ProductBuyComponent', () => {
       flushDescriptions();
 
       expect(textOf('.product-detail__unit-price-value')).toBe(
-        '16.67 TL/adet',
+        '16,67 TL/adet',
       );
     });
 
@@ -764,7 +764,7 @@ describe('ProductBuyComponent', () => {
       expect(classes[1]).toContain('product-detail__price');
       expect(classes[2]).toContain('product-detail__package');
       expect(classes[3]).toContain('product-detail__unit-price');
-      expect(detail('.product-detail__price-amount').textContent?.trim()).toBe('50.00');
+      expect(detail('.product-detail__price-amount').textContent?.trim()).toBe('50,00');
     });
   });
 });

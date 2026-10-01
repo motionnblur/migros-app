@@ -9,12 +9,12 @@ import {
 describe('product package price presentation', () => {
   describe('packageSizeLabel', () => {
     it('renders the amount and the unit together', () => {
-      expect(packageSizeLabel(1.5, 'L')).toBe('1.5 L');
+      expect(packageSizeLabel(1.5, 'L')).toBe('1,5 L');
       expect(packageSizeLabel(500, 'G')).toBe('500 G');
     });
 
     it('normalizes the unit to its stored casing', () => {
-      expect(packageSizeLabel(0.75, 'kg')).toBe('0.75 KG');
+      expect(packageSizeLabel(0.75, 'kg')).toBe('0,75 KG');
     });
 
     /**
@@ -77,22 +77,28 @@ describe('product package price presentation', () => {
 
   describe('unitPriceLabel', () => {
     it('renders the price and the measure it is per', () => {
-      expect(unitPriceLabel(33.32, 'KG')).toBe('33.32 TL/kg');
-      expect(unitPriceLabel(16.66, 'L')).toBe('16.66 TL/L');
-      expect(unitPriceLabel(9.98, 'ADET')).toBe('9.98 TL/adet');
+      expect(unitPriceLabel(33.32, 'KG')).toBe('33,32 TL/kg');
+      expect(unitPriceLabel(16.66, 'L')).toBe('16,66 TL/L');
+      expect(unitPriceLabel(9.98, 'ADET')).toBe('9,98 TL/adet');
     });
 
     /**
      * The money scale is two decimals on the server, and the rendering has to match
-     * it: `12.5` beside a package price of `12.50 TL` reads as a different price.
+     * it: `12,5` beside a package price of `12,50 TL` reads as a different price.
      */
     it('always shows two decimals', () => {
-      expect(unitPriceLabel(12.5, 'KG')).toBe('12.50 TL/kg');
-      expect(unitPriceLabel(12, 'KG')).toBe('12.00 TL/kg');
+      expect(unitPriceLabel(12.5, 'KG')).toBe('12,50 TL/kg');
+      expect(unitPriceLabel(12, 'KG')).toBe('12,00 TL/kg');
     });
 
-    it('accepts a caller-supplied formatter', () => {
-      expect(unitPriceLabel(12.5, 'KG', (value) => `#${value}`)).toBe('#12.5 TL/kg');
+    /**
+     * The one defect a unit price shared with the cart could not have: the cart
+     * rendered Turkish and this rendered en-US, so the same money was printed two
+     * ways. There is no formatter argument to supply any more - that parameter is
+     * how the second rendering got in - so the line is pinned to the storefront's.
+     */
+    it('writes the amount in the storefront notation, not the browser default', () => {
+      expect(unitPriceLabel(1234.5, 'KG')).toBe('1.234,50 TL/kg');
     });
 
     /**
@@ -101,7 +107,7 @@ describe('product package price presentation', () => {
      * is false.
      */
     it('shows a zero unit price rather than hiding it', () => {
-      expect(unitPriceLabel(0, 'KG')).toBe('0.00 TL/kg');
+      expect(unitPriceLabel(0, 'KG')).toBe('0,00 TL/kg');
       expect(hasUnitPrice(0, 'KG')).toBeTrue();
     });
 

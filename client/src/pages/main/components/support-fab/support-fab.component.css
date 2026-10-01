@@ -2,11 +2,16 @@
   display: block;
 }
 
+/*
+ * The launcher is a control on the page *behind* the modal outlet, so it sits on
+ * the floating rung - below every dialog scrim and surface. It used to declare
+ * 2100, which put it above the cart, the payment dialog and the scrims alike.
+ */
 .support-fab {
   position: fixed;
   right: 16px;
   bottom: 16px;
-  z-index: 2100;
+  z-index: var(--layer-floating);
   display: inline-flex;
   align-items: center;
   justify-content: center;

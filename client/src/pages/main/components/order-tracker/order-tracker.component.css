@@ -7,7 +7,7 @@
   height: 100vh;
   background-color: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(2px);
-  z-index: 1050;
+  z-index: var(--layer-modal-scrim);
 }
 
 #order-tracker-container {
@@ -17,7 +17,7 @@
   transform: translate(-50%, -50%);
   width: 100%;
   max-width: 500px;
-  z-index: 1060;
+  z-index: var(--layer-modal);
   border-radius: 15px;
   overflow: hidden;
 }

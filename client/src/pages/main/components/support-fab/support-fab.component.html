@@ -1,9 +1,18 @@
-<button
-  type="button"
-  class="support-fab"
-  aria-label="Canlı Destek"
-  (click)="openSupport()"
->
-  <i class="bi bi-chat-dots" aria-hidden="true"></i>
-  <span class="support-fab__label">Canlı Destek</span>
-</button>
+<!--
+  Rendered only while no modal dialog is open; see `isSuppressed`.
+
+  The button is removed rather than hidden with CSS, so it leaves the tab order
+  and the accessibility tree along with the screen.
+-->
+@if (!isSuppressed) {
+  <button
+    type="button"
+    class="support-fab"
+    data-testid="support-launcher"
+    aria-label="Canlı Destek"
+    (click)="openSupport()"
+  >
+    <i class="bi bi-chat-dots" aria-hidden="true"></i>
+    <span class="support-fab__label">Canlı Destek</span>
+  </button>
+}

@@ -13,7 +13,21 @@
 
   <app-site-footer (action)="handleFooterAction($event)" />
 
-  <app-support-fab (supportRequested)="openSupportChat()" />
+  <!--
+    The launcher belongs to the page behind the modal outlet, so it is withdrawn
+    while a dialog is open. The outlet's own `activate`/`deactivate` events are the
+    signal: they are emitted by the router as components actually enter and leave
+    it, which is also why a navigation the router cancels - or a close held up by
+    the cart's CanDeactivate guard - leaves the launcher exactly where it was.
+  -->
+  <app-support-fab
+    [isSuppressed]="isModalOpen"
+    (supportRequested)="openSupportChat()"
+  />
 
-  <router-outlet name="modal"></router-outlet>
+  <router-outlet
+    name="modal"
+    (activate)="onModalActivated()"
+    (deactivate)="onModalDeactivated()"
+  ></router-outlet>
 </div>

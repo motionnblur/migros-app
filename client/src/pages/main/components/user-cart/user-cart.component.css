@@ -49,7 +49,7 @@
   height: 100%;
   background-color: var(--dialog-scrim);
   backdrop-filter: var(--dialog-backdrop-blur);
-  z-index: 1040;
+  z-index: var(--layer-modal-scrim);
 }
 
 /* Cart Container Fix */
@@ -66,7 +66,7 @@
      chrome; the `vh` line is the fallback for everything older. */
   max-height: 85vh;
   max-height: 85dvh;
-  z-index: 1050;
+  z-index: var(--layer-modal);
   background-color: var(--landing-surface);
   color: var(--landing-ink);
   border-radius: var(--landing-radius-lg);

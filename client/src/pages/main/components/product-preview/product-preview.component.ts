@@ -8,6 +8,7 @@ import { pickListingQueryParams } from '../../helpers/catalog-listing-state';
 import { AuthService } from '../../../../services/auth/auth.service';
 import { RestService } from '../../../../services/rest/rest.service';
 import { ObjectUrlManager } from '../../helpers/object-url-manager';
+import { formatAmount } from '../../helpers/money-format';
 import { productCartErrorMessage } from '../../helpers/product-cart-error';
 import {
   packageSizeLabel,
@@ -18,30 +19,6 @@ import {
 export type CartFeedbackKind = 'success' | 'error';
 
 const FEEDBACK_DURATION_MS = 4000;
-
-/**
- * How much of a package amount is rendered.
- *
- * Up to three decimals and at least one: three is the scale the amount can carry
- * (a dose in millilitres, a spice in grams), and always showing at least one keeps
- * "1 L" from being read as a different number from "1.000 L". Trailing zeros are
- * still trimmed, so `1.500` renders as `1.5`.
- */
-function formatPackageAmount(value: number): number {
-  return Number(value.toFixed(3));
-}
-
-/**
- * A money amount, always at two decimals.
- *
- * The unit price is a money figure like every other price in the application, and
- * the backend has already rounded it to the money scale - showing it with fewer
- * decimals would imply a precision it does not have, and showing it raw would turn
- * a stored `12.50` into a printed `12.5` beside a package price of `12.50 TL`.
- */
-function formatMoney(value: number): string {
-  return value.toFixed(2);
-}
 
 @Component({
   selector: 'app-product-preview',
@@ -125,6 +102,19 @@ export class ProductPreviewComponent implements OnInit, OnDestroy {
     return (this.productCount ?? 0) <= 0;
   }
 
+  /**
+   * The price as a customer reads a price in this storefront: `49,90`.
+   *
+   * <p>The number is the one the server sent and is untouched; only the notation is
+   * the storefront's. It used to go through Angular's `number` pipe, which follows
+   * whatever locale the browser reports - so the same card showed `49.90` beside a
+   * cart total of `49,90 TL`, and which of the two a customer saw depended on their
+   * device rather than on the product.
+   */
+  get formattedPrice(): string {
+    return formatAmount(this.productPrice);
+  }
+
   get hasCategoryLink(): boolean {
     return (
       this.categoryId !== null &&
@@ -149,22 +139,21 @@ export class ProductPreviewComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * "1.5 L", or `null` for a product with no package size.
+   * "1,5 L", or `null` for a product with no package size.
    *
-   * The amount is rendered at up to three decimals because that is the precision
-   * the amount can carry, and `1.50` would imply a precision the administrator did
-   * not enter while `1` would hide one they did.
+   * Up to three decimals, because that is the precision the amount can carry, and
+   * `1` for a stored `1.5` would misreport the product the customer is about to buy.
    */
   get packageSizeText(): string | null {
     const amount = this.packageAmount;
     if (amount === null || amount === undefined) {
       return null;
     }
-    return packageSizeLabel(formatPackageAmount(amount), this.packageUnit);
+    return packageSizeLabel(amount, this.packageUnit);
   }
 
   /**
-   * "24.99 TL/kg", or `null` when there is no unit price to show.
+   * "24,99 TL/kg", or `null` when there is no unit price to show.
    *
    * Formatted here rather than with a template pipe because the same string is
    * asserted in tests and reused by the accessible label; going through one
@@ -174,7 +163,7 @@ export class ProductPreviewComponent implements OnInit, OnDestroy {
     const price = this.unitPrice;
     return price === null || price === undefined
       ? null
-      : unitPriceLabel(price, this.unitPriceBasis, formatMoney);
+      : unitPriceLabel(price, this.unitPriceBasis);
   }
 
   /**

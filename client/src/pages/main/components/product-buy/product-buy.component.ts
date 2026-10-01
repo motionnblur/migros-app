@@ -21,6 +21,7 @@ import { IDescription } from '../../../../interfaces/IDescription';
 import { IProductData } from '../../../../interfaces/IProductData';
 import { IProductDescription } from '../../../../interfaces/IProductDescription';
 import { ObjectUrlManager } from '../../helpers/object-url-manager';
+import { formatAmount } from '../../helpers/money-format';
 import { productCartErrorMessage } from '../../helpers/product-cart-error';
 import {
   packageSizeLabel,
@@ -131,12 +132,21 @@ export class ProductBuyComponent implements OnChanges, OnDestroy {
     return +(price - (price * discount) / 100).toFixed(2);
   }
 
+  /**
+   * A money amount in the storefront's own notation: `50,00`.
+   *
+   * <p>The number is the server's and is untouched. It used to be `toFixed(2)`,
+   * which has no locale and therefore always printed the en-US decimal point, so
+   * the detail page quoted `9.60` for a product whose card said `9,60` and whose
+   * cart line said `9,60`. The card, the detail and the checkout are the same
+   * amount and now read the same way.
+   */
   public formatPrice(value: number | null | undefined): string {
-    return (value ?? 0).toFixed(2);
+    return formatAmount(value);
   }
 
   /**
-   * "1.5 L", or `null` for a product with no package size.
+   * "1,5 L", or `null` for a product with no package size.
    *
    * Up to three decimals, because that is the precision a package amount can
    * carry - a dose in millilitres or a spice in grams - and showing `1` for a
@@ -147,7 +157,7 @@ export class ProductBuyComponent implements OnChanges, OnDestroy {
     if (amount === null || amount === undefined) {
       return null;
     }
-    return packageSizeLabel(Number(amount.toFixed(3)), this.productData?.packageUnit);
+    return packageSizeLabel(amount, this.productData?.packageUnit);
   }
 
   /**
@@ -162,7 +172,7 @@ export class ProductBuyComponent implements OnChanges, OnDestroy {
   }
 
   /**
-   * "24.99 TL/kg", or `null` when there is nothing honest to show.
+   * "24,99 TL/kg", or `null` when there is nothing honest to show.
    *
    * Null - not zero, not a dash - when the size is missing, when the price is not
    * a number, or when the basis names a measure this client does not know. A
@@ -173,7 +183,6 @@ export class ProductBuyComponent implements OnChanges, OnDestroy {
     return unitPriceLabel(
       this.productData?.unitPrice,
       this.productData?.unitPriceBasis,
-      (value) => value.toFixed(2),
     );
   }
 

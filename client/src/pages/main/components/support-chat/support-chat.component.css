@@ -1,3 +1,9 @@
+/*
+ * The chat panel is itself a modal: it is routed onto the `modal` outlet, so it
+ * belongs on the dialog rung. It used to declare 2100 - the launcher's old,
+ * unlayered number - which put a panel with no scrim above the surfaces it was
+ * meant to be a peer of.
+ */
 .live-support-chat {
   position: fixed;
   right: 20px;
@@ -9,7 +15,7 @@
   border: 1px solid #ececec;
   border-radius: 12px;
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.2);
-  z-index: 2100;
+  z-index: var(--layer-modal);
   display: flex;
   flex-direction: column;
   overflow: hidden;

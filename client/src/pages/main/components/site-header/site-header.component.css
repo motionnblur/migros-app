@@ -4,13 +4,13 @@
   display: block;
   position: sticky;
   top: 0;
-  z-index: 1030;
+  z-index: var(--layer-sticky-header);
 }
 
 .site-header {
   background: var(--landing-surface);
   border-bottom: 1px solid var(--landing-border);
-  z-index: 1030;
+  z-index: var(--layer-sticky-header);
 }
 
 .site-header__bar {
@@ -186,7 +186,7 @@
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  z-index: 1050;
+  z-index: var(--layer-sticky-header);
   min-width: 224px;
   margin: 0;
   padding: var(--landing-space-2);

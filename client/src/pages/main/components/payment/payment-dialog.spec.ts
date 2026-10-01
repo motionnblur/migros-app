@@ -10,7 +10,7 @@ import {
 import { RestService } from '../../../../services/rest/rest.service';
 import { ICheckoutResponse } from '../../../../interfaces/ICheckoutResponse';
 import { IPaymentStatus } from '../../../../interfaces/IPaymentStatus';
-import { formatAmount, formatCurrencyLabel, formatMoney } from './money-format';
+import { formatAmount, formatCurrencyLabel, formatMoney } from '../../helpers/money-format';
 
 /**
  * What the payment dialog says, how it behaves as a dialog, and what it refuses

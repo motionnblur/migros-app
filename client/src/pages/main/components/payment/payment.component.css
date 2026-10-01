@@ -13,7 +13,7 @@
   height: 100%;
   background-color: var(--dialog-scrim);
   backdrop-filter: var(--dialog-backdrop-blur);
-  z-index: 1060;
+  z-index: var(--layer-modal-scrim-raised);
 }
 
 .payment-dialog {
@@ -21,7 +21,7 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  z-index: 1070;
+  z-index: var(--layer-modal-raised);
   width: 100%;
   max-width: 420px;
   /* `dvh` where it is supported so the dialog is sized against the part of the

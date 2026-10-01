@@ -6,7 +6,13 @@
   top: 0;
   left: 0;
   background-color: rgba(0, 0, 0, 0.6);
-  z-index: 1000;
+  /*
+   * A scrim *and* its surface in one element, so it takes the modal rung rather
+   * than a scrim rung with nothing above it. It used to declare 1000, which put
+   * the sticky header (1030) and the support launcher on top of the sign-in
+   * dialog the launcher itself can open.
+   */
+  z-index: var(--layer-modal-scrim);
   display: flex;
   justify-content: center;
   align-items: center;

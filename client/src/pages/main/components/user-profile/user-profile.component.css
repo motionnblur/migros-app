@@ -6,7 +6,7 @@
   height: 100vh;
   background-color: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(3px);
-  z-index: 1050;
+  z-index: var(--layer-modal-scrim);
 }
 
 #user-profile-container {
@@ -16,7 +16,7 @@
   transform: translate(-50%, -50%);
   width: 100%;
   max-width: 650px;
-  z-index: 1060;
+  z-index: var(--layer-modal);
   border-radius: 12px;
 }
 

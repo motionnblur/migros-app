@@ -27,6 +27,16 @@ import { SupportFabComponent } from './components/support-fab/support-fab.compon
 export class MainComponent implements OnInit, OnDestroy {
   isUserSigned = false;
   searchQuery = '';
+  /**
+   * Whether a dialog is currently open on the `modal` outlet.
+   *
+   * <p>Driven by the outlet's own activate/deactivate events rather than by
+   * reading the URL, so it is a fact about what is on screen and not a guess
+   * about a route string. It exists for one decision - withdrawing the support
+   * launcher while a dialog is up, because that launcher is a control on the page
+   * the dialog is covering.
+   */
+  isModalOpen = false;
 
   private authStatusSub: Subscription | null = null;
   private supportRealtimeSub: Subscription | null = null;
@@ -108,6 +118,31 @@ export class MainComponent implements OnInit, OnDestroy {
 
   public isUserLoggedIn() {
     return this.isUserSigned;
+  }
+
+  /**
+   * A dialog has entered the `modal` outlet.
+   *
+   * <p>Fired by the outlet itself, so it covers every modal - cart, login,
+   * profile, order tracker, order history and the support panel - without this
+   * component having to know the list, and therefore without a new modal being
+   * able to arrive with the launcher still floating over it.
+   */
+  public onModalActivated(): void {
+    this.isModalOpen = true;
+  }
+
+  /**
+   * The last dialog has left the `modal` outlet.
+   *
+   * <p>Set unconditionally rather than counted: one modal replaces another on the
+   * same outlet, and a counter that survives a `cart` -> `support` hand-over is a
+   * counter that is one too high forever, which would hide the launcher for the
+   * rest of the session. The outlet emits `deactivate` before it emits the
+   * replacement's `activate`, so the pair still ends on the truth.
+   */
+  public onModalDeactivated(): void {
+    this.isModalOpen = false;
   }
 
   public handleHeaderAction(action: SiteHeaderAction): void {

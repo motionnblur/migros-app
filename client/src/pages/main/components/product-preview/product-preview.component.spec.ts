@@ -1,4 +1,4 @@
-import { provideHttpClient } from '@angular/common/http';
+﻿import { provideHttpClient } from '@angular/common/http';
 import {
   HttpTestingController,
   TestRequest,
@@ -174,7 +174,7 @@ describe('ProductPreviewComponent', () => {
     const price = fixture.nativeElement.querySelector('.product-card__price')
       .textContent as string;
 
-    expect(price).toContain('49.90');
+    expect(price).toContain('49,90');
     expect(fixture.nativeElement.querySelector('.product-card__price').children.length).toBe(2);
   });
 
@@ -350,8 +350,8 @@ describe('ProductPreviewComponent', () => {
       fixture.componentRef.setInput('unitPriceBasis', 'KG');
       fixture.detectChanges();
 
-      expect(textOf('.product-card__package-value')).toBe('0.75 KG');
-      expect(textOf('.product-card__unit-price-value')).toBe('66.65 TL/kg');
+      expect(textOf('.product-card__package-value')).toBe('0,75 KG');
+      expect(textOf('.product-card__unit-price-value')).toBe('66,65 TL/kg');
     });
 
     it('keeps three decimals of package size, which is the precision it can carry', () => {
@@ -361,7 +361,7 @@ describe('ProductPreviewComponent', () => {
       fixture.componentRef.setInput('unitPriceBasis', 'KG');
       fixture.detectChanges();
 
-      expect(textOf('.product-card__package-value')).toBe('0.125 KG');
+      expect(textOf('.product-card__package-value')).toBe('0,125 KG');
     });
 
     /**
@@ -421,7 +421,7 @@ describe('ProductPreviewComponent', () => {
       expect(classes.indexOf('product-card__package')).toBeLessThan(
         classes.indexOf('product-card__price'),
       );
-      expect(textOf('.product-card__amount')).toBe('49.90');
+      expect(textOf('.product-card__amount')).toBe('49,90');
     });
   });
 });

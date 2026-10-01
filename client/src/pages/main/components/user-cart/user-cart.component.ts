@@ -18,7 +18,7 @@ import {
   focusDialog,
   restoreFocus,
 } from '../payment/dialog-a11y';
-import { formatAmount, formatMoney } from '../payment/money-format';
+import { formatAmount, formatMoney } from '../../helpers/money-format';
 import { data } from '../../../../memory/global-data';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
