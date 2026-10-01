@@ -139,4 +139,29 @@ describe('RestService state-changing requests', () => {
 
     expect(received?.productVersion).toBe(9);
   });
+
+  /**
+   * The facade stays a facade: `searchProducts` must reach the catalogue domain
+   * client rather than opening a second HTTP path for the same operation.
+   */
+  it('searchProducts delegates to the catalogue domain client', () => {
+    service
+      .searchProducts({ q: 'süt', availability: 'IN_STOCK', page: 0, size: 10 })
+      .subscribe();
+
+    const request = httpMock.expectOne(
+      (candidate) => candidate.url === '/user/supply/searchProducts',
+    );
+
+    expect(request.request.method).toBe('GET');
+    expect(request.request.params.get('q')).toBe('süt');
+    expect(request.request.params.get('availability')).toBe('IN_STOCK');
+    request.flush({
+      items: [],
+      totalItems: 0,
+      page: 0,
+      size: 10,
+      subcategories: [],
+    });
+  });
 });

@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 import { MainComponent } from '../pages/main/main.component';
 import { DiscoverComponent } from '../pages/main/components/discover-area/parent/discover-area.component';
 import { ProductPageComponent } from '../pages/main/components/product-page/product-page.component';
+import { SearchResultsComponent } from '../pages/main/components/search-results/search-results.component';
 import { SignUserComponent } from '../pages/main/components/sign-user/sign-user.component';
 import { UserCartComponent } from '../pages/main/components/user-cart/user-cart.component';
 import { UserProfileComponent } from '../pages/main/components/user-profile/user-profile.component';
@@ -16,11 +17,17 @@ export const routes: Routes = [
     component: MainComponent,
     children: [
       { path: '', pathMatch: 'full', component: DiscoverComponent },
+      { path: 'search', component: SearchResultsComponent },
       { path: 'category/:categoryId', component: ProductPageComponent },
       {
         path: 'category/:categoryId/product/:productId',
         component: ProductPageComponent,
       },
+      // The category-less product detail: a search result belongs to no single
+      // category, so its card has no `/category/:id/product/:pid` URL to build and
+      // links here instead. The filters that produced it stay in the query string
+      // so the breadcrumb and the return link restore the same results.
+      { path: 'product/:productId', component: ProductPageComponent },
       {
         path: 'cart',
         outlet: 'modal',

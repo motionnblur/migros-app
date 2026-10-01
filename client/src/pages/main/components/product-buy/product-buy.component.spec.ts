@@ -398,6 +398,37 @@ describe('ProductBuyComponent', () => {
     expect(component.discountedPrice).toBe(60);
   });
 
+  it('quotes the server effective price instead of recomputing it in the browser', () => {
+    setProductId(11);
+    // 10.10 at 5 percent off is 9.60 under ProductPricingPolicy and 9.59 under
+    // +(10.10 - 10.10 * 5 / 100).toFixed(2). The card, the cart line and the charge
+    // are all 9.60, so the detail page has to be too.
+    flushProductData({
+      ...product,
+      productPrice: 10.1,
+      productDiscount: 5,
+      effectivePrice: 9.6,
+    });
+
+    expect(component.discountedPrice).toBe(9.6);
+  });
+
+  it('renders the server effective price in the detail template', () => {
+    setProductId(11);
+    flushProductData({
+      ...product,
+      productPrice: 10.1,
+      productDiscount: 5,
+      effectivePrice: 9.6,
+    });
+    fixture.detectChanges();
+
+    const amount = fixture.nativeElement.querySelector(
+      '.product-detail__price-amount',
+    ) as HTMLElement;
+    expect(amount.textContent?.trim()).toBe('9.60');
+  });
+
   it('loads the product image after the data arrives', () => {
     setProductId(11);
     flushProductData();
@@ -566,5 +597,174 @@ describe('ProductBuyComponent', () => {
     expect(cartRequest.cancelled).toBeTrue();
     expect(component.isAddingToCart).toBeFalse();
     expect(fixture.nativeElement.querySelector('.product-detail__feedback')).toBeNull();
+  });
+
+  /**
+   * Package size and unit price, and the rule underneath both of them: an absent
+   * fact renders as nothing at all. There is no placeholder, no dash and no value
+   * inferred from the product name, because a guessed size produces a unit price
+   * that looks authoritative and is wrong - and most of the catalogue has no size
+   * at all, since the columns were added without a backfill.
+   */
+  describe('package size and unit price', () => {
+    /**
+     * Returns the element, or throws when it is absent - so a test that means to
+     * assert on a rendered line fails with "expected this element" rather than on a
+     * null dereference somewhere further down.
+     */
+    function detail(selector: string): HTMLElement {
+      const element = fixture.nativeElement.querySelector(selector);
+      if (!element) {
+        throw new Error(`Expected "${selector}" to be rendered.`);
+      }
+      return element as HTMLElement;
+    }
+
+    function rendered(selector: string): boolean {
+      return fixture.nativeElement.querySelector(selector) !== null;
+    }
+
+    function textOf(selector: string): string {
+      return (detail(selector).textContent ?? '').trim();
+    }
+
+    it('shows nothing for a product with no package metadata', () => {
+      setProductId(11);
+      flushProductData();
+      flushDescriptions();
+
+      expect(rendered('.product-detail__package')).toBeFalse();
+      expect(rendered('.product-detail__unit-price')).toBeFalse();
+      expect(fixture.nativeElement.textContent).not.toContain('Birim fiyat');
+    });
+
+    it('shows nothing when only the amount arrives without a unit', () => {
+      setProductId(11);
+      flushProductData({ ...product, packageAmount: 500 });
+      flushDescriptions();
+
+      expect(rendered('.product-detail__package')).toBeFalse();
+    });
+
+    it('shows the size and the unit price the server computed', () => {
+      setProductId(11);
+      flushProductData({
+        ...product,
+        packageAmount: 0.75,
+        packageUnit: 'KG',
+        unitPrice: 66.65,
+        unitPriceBasis: 'KG',
+      });
+      flushDescriptions();
+
+      expect(detail('.product-detail__package').textContent).toContain(
+        '0.75 KG',
+      );
+      expect(detail('.product-detail__unit-price').textContent).toContain(
+        '66.65 TL/kg',
+      );
+    });
+
+    /**
+     * The whole point of the feature is comparing a 500 g pack with a 1 kg pack, so
+     * a size with three decimals has to survive to the screen. `0.5` for a stored
+     * `0.500` would misreport what the customer is buying.
+     */
+    it('keeps the precision the amount was stored with', () => {
+      setProductId(11);
+      flushProductData({
+        ...product,
+        packageAmount: 0.125,
+        packageUnit: 'KG',
+        unitPrice: 400,
+        unitPriceBasis: 'KG',
+      });
+      flushDescriptions();
+
+      expect(textOf('.product-detail__package-value')).toBe(
+        '0.125 KG',
+      );
+    });
+
+    it('shows the size even when the basis cannot be priced', () => {
+      setProductId(11);
+      flushProductData({
+        ...product,
+        packageAmount: 500,
+        packageUnit: 'GRAM',
+        unitPrice: null,
+        unitPriceBasis: null,
+      });
+      flushDescriptions();
+
+      expect(textOf('.product-detail__package-value')).toBe(
+        '500 GRAM',
+      );
+      // A unit price with no basis reads as a second package price.
+      expect(rendered('.product-detail__unit-price')).toBeFalse();
+    });
+
+    it('never divides on the client', () => {
+      setProductId(11);
+      flushProductData({
+        ...product,
+        packageAmount: 3,
+        packageUnit: 'ADET',
+        unitPrice: 16.67,
+        unitPriceBasis: 'ADET',
+      });
+      flushDescriptions();
+
+      expect(textOf('.product-detail__unit-price-value')).toBe(
+        '16.67 TL/adet',
+      );
+    });
+
+    /**
+     * A price with no measure beside a package price looks like a second package
+     * price, so an unrecognized basis hides the whole line rather than printing the
+     * number alone.
+     */
+    it('hides the unit price when the basis names nothing this client knows', () => {
+      setProductId(11);
+      flushProductData({
+        ...product,
+        packageAmount: 1,
+        packageUnit: 'L',
+        unitPrice: 50,
+        unitPriceBasis: 'PER_SHELF',
+      });
+      flushDescriptions();
+
+      expect(rendered('.product-detail__unit-price')).toBeFalse();
+    });
+
+    /**
+     * The package price is what the customer pays and what the add button buys. The
+     * unit price is the comparison aid beneath it, so the price line has to stay
+     * the first thing in the summary and the unit price has to come after it.
+     */
+    it('keeps the package price the dominant number', () => {
+      setProductId(11);
+      flushProductData({
+        ...product,
+        packageAmount: 0.75,
+        packageUnit: 'KG',
+        unitPrice: 66.65,
+        unitPriceBasis: 'KG',
+      });
+      flushDescriptions();
+
+      const summary = fixture.nativeElement.querySelector(
+        '.product-detail__summary',
+      ) as HTMLElement;
+      const classes = Array.from(summary.children).map((child) => child.className);
+
+      expect(classes[0]).toContain('product-detail__name');
+      expect(classes[1]).toContain('product-detail__price');
+      expect(classes[2]).toContain('product-detail__package');
+      expect(classes[3]).toContain('product-detail__unit-price');
+      expect(detail('.product-detail__price-amount').textContent?.trim()).toBe('50.00');
+    });
   });
 });

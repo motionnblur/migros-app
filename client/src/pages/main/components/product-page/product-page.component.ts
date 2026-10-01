@@ -1,40 +1,62 @@
-import { HttpErrorResponse } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute, ParamMap, Router, RouterLink } from '@angular/router';
-import { combineLatest, forkJoin, Subscription } from 'rxjs';
+import { combineLatest, Subscription } from 'rxjs';
 
 import { IProductPreview } from '../../../../interfaces/IProductPreview';
-import { ISubCategory } from '../../../../interfaces/ISubCategory';
+import { IProductSearchResponse } from '../../../../interfaces/IProductSearchResponse';
+import { ISubCategoryCount } from '../../../../interfaces/ISubCategoryCount';
 import { categories, data } from '../../../../memory/global-data';
 import { RestService } from '../../../../services/rest/rest.service';
 import {
-  PRODUCT_PAGE_SIZE,
-  buildBrowseQueryParams,
-  clampPageToRange,
-  countForSelection,
-  hasSameBrowseQueryParams,
-  pageCountForSelection,
+  LISTING_QUERY_PARAM,
+  ListingFilterState,
+  buildListingQueryParams,
+  defaultListingFilters,
+  hasSameListingQueryParams,
+  listingFiltersFromParams,
+  listingRequestSignature,
   parsePageParam,
-  resolveSubCategoryName,
+  pickListingQueryParams,
+  resolveListingSubCategoryName,
+  toProductSearchQuery,
+} from '../../helpers/catalog-listing-state';
+import {
+  PRODUCT_PAGE_SIZE,
+  clampPageToRange,
+  pageCountForProductCount,
 } from '../../helpers/category-browse-state';
 import { ProductBuyComponent } from '../product-buy/product-buy.component';
-import { ProductPageSwitcherComponent } from '../product-page-switcher/product-page-switcher.component';
-import { ProductPreviewComponent } from '../product-preview/product-preview.component';
+import {
+  ProductListingComponent,
+  ProductListingRequest,
+} from '../product-listing/product-listing.component';
 
 const ALL_PRODUCTS_LABEL = 'Tüm ürünler';
 const DEFAULT_CATEGORY_LABEL = 'Kategori';
 
+/**
+ * `/category/:categoryId` and `/category/:categoryId/product/:productId`, plus
+ * `/product/:productId` for a product reached from a listing that is not scoped
+ * to a category.
+ *
+ * Both listings load through the same `GET /user/supply/searchProducts` call and
+ * render through the same `app-product-listing`. The category page keeps no
+ * listing query of its own: the older catalogue endpoints cannot filter, sort or
+ * count, so a category page with the filter toolbar the search page has would
+ * either have to filter the ten rows it happened to load - paginating before
+ * filtering, so pages would hold products that do not match and the total would
+ * describe another set - or need a second HTTP flow to avoid it.
+ *
+ * That does change something a customer can see: the endpoint's default
+ * availability is `ALL`, so the category listing now shows sold-out products
+ * where the old listing hid them. They are marked `Tükendi`, cannot be added to
+ * the cart, and "Stokta" is one tap away.
+ */
 @Component({
   selector: 'app-product-page',
   standalone: true,
-  imports: [
-    CommonModule,
-    RouterLink,
-    ProductPreviewComponent,
-    ProductBuyComponent,
-    ProductPageSwitcherComponent,
-  ],
+  imports: [CommonModule, RouterLink, ProductListingComponent, ProductBuyComponent],
   templateUrl: './product-page.component.html',
   styleUrl: './product-page.component.css',
 })
@@ -43,7 +65,7 @@ export class ProductPageComponent implements OnInit, OnDestroy {
   readonly allProductsLabel = ALL_PRODUCTS_LABEL;
 
   items: IProductPreview[] = [];
-  subCategories: ISubCategory[] = [];
+  subCategories: ISubCategoryCount[] = [];
   categoryName = DEFAULT_CATEGORY_LABEL;
   currentCategoryId = 0;
   totalProductCount = 0;
@@ -53,17 +75,17 @@ export class ProductPageComponent implements OnInit, OnDestroy {
   productName = '';
   isLoading = false;
   hasLoadError = false;
+  filters: ListingFilterState = defaultListingFilters();
 
   private routeSub: Subscription | null = null;
+  private searchSub: Subscription | null = null;
   private lastRouteSignature = '';
-  private metadataCategoryId = 0;
-  private hasLoadedMetadata = false;
-  private isMetadataInFlight = false;
-  private hasLoadedSelection = false;
+  private hasCategoryRouteParam = false;
   private requestedSubCategoryParam = '';
-  private requestedPageParam: number | null = null;
-  private latestRequestId = 0;
+  private requestedPageParam = 1;
+  private lastRequestSignature = '';
   private isNormalizingUrl = false;
+  private standaloneLinkQueryParams: Record<string, string> = {};
 
   constructor(
     private restService: RestService,
@@ -82,6 +104,7 @@ export class ProductPageComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.routeSub?.unsubscribe();
+    this.searchSub?.unsubscribe();
   }
 
   get isProductDetailView(): boolean {
@@ -92,33 +115,42 @@ export class ProductPageComponent implements OnInit, OnDestroy {
     return this.selectedProductId ?? 0;
   }
 
+  /**
+   * A product detail reached without a category - from a search result, whose
+   * product may live anywhere. There is no listing behind it to restore, so the
+   * breadcrumb and the return link point back at the search results with the
+   * filters that produced them.
+   */
+  get isStandaloneDetailView(): boolean {
+    return this.isProductDetailView && !this.hasCategoryRouteParam;
+  }
+
   get selectionLabel(): string {
     return this.selectedSubCategoryName || ALL_PRODUCTS_LABEL;
   }
 
-  get selectionProductCount(): number {
-    return countForSelection(
-      this.subCategories,
-      this.totalProductCount,
-      this.selectedSubCategoryName,
+  /**
+   * The number behind "All products".
+   *
+   * With nothing selected this is the filtered category total the response
+   * reports. With a subcategory selected that total belongs to the selected
+   * bucket, so the category's own figure is the sum of the bucket counts the
+   * server returned instead - the same numbers shown next to each bucket, so the
+   * sidebar stays internally comparable.
+   */
+  get allProductsCount(): number {
+    if (!this.selectedSubCategoryName) {
+      return this.totalProductCount;
+    }
+
+    return this.subCategories.reduce(
+      (sum, bucket) => sum + Math.max(0, bucket.productCount ?? 0),
+      0,
     );
   }
 
   get pageCount(): number {
-    return pageCountForSelection(
-      this.subCategories,
-      this.totalProductCount,
-      this.selectedSubCategoryName,
-      this.pageSize,
-    );
-  }
-
-  get hasMultiplePages(): boolean {
-    return this.pageCount > 1;
-  }
-
-  get isEmptySelection(): boolean {
-    return !this.isLoading && !this.hasLoadError && this.items.length === 0;
+    return pageCountForProductCount(this.totalProductCount, this.pageSize);
   }
 
   get categoryLink(): unknown[] {
@@ -126,13 +158,43 @@ export class ProductPageComponent implements OnInit, OnDestroy {
   }
 
   get backLinkLabel(): string {
+    if (this.isStandaloneDetailView) {
+      return 'Arama sonuçlarına dön';
+    }
+
     return this.selectedSubCategoryName
       ? `${this.selectedSubCategoryName} listesine dön`
       : `${this.categoryName} listesine dön`;
   }
 
-  get browseQueryParams() {
-    return buildBrowseQueryParams(this.selectedSubCategoryName, this.currentPage);
+  get breadcrumbLabel(): string {
+    return this.isStandaloneDetailView ? 'Arama sonuçları' : this.categoryName;
+  }
+
+  get breadcrumbLink(): unknown[] {
+    return this.isStandaloneDetailView ? ['/search'] : this.categoryLink;
+  }
+
+  get detailLinkQueryParams(): Record<string, string> {
+    return this.isStandaloneDetailView
+      ? this.standaloneLinkQueryParams
+      : buildListingQueryParams({
+          subCategoryName: this.selectedSubCategoryName,
+          page: this.currentPage,
+          filters: this.filters,
+        });
+  }
+
+  get emptyTitle(): string {
+    return 'Bu seçimde ürün bulunamadı';
+  }
+
+  get emptyText(): string {
+    if (this.selectedSubCategoryName) {
+      return `${this.selectedSubCategoryName} için şu anda uygun ürün yok.`;
+    }
+
+    return 'Bu filtrelerle eşleşen ürün yok. Filtreleri temizleyerek tüm ürünleri görebilirsin.';
   }
 
   public isSubCategorySelected(subCategoryName: string): boolean {
@@ -140,39 +202,57 @@ export class ProductPageComponent implements OnInit, OnDestroy {
   }
 
   public selectAllProducts(): void {
-    this.navigateToSelection('', 1);
+    this.navigateTo({ subCategoryName: '', page: 1 });
   }
 
   public selectSubCategory(subCategoryName: string): void {
-    this.navigateToSelection(subCategoryName, 1);
+    this.navigateTo({ subCategoryName, page: 1 });
+  }
+
+  /**
+   * The filter toolbar and the paginator both arrive here. Both go through the
+   * URL, so a filter change is a history entry the Back button undoes and a
+   * shared link reproduces.
+   */
+  public onListingRequestChange(request: ProductListingRequest): void {
+    this.navigateTo({
+      subCategoryName: this.selectedSubCategoryName,
+      page: request.page,
+      filters: request.filters,
+    });
   }
 
   public onPageSelected(page: number): void {
-    this.navigateToSelection(this.selectedSubCategoryName, page);
+    this.navigateTo({
+      subCategoryName: this.selectedSubCategoryName,
+      page,
+      filters: this.filters,
+    });
   }
 
   public retry(): void {
-    this.latestRequestId++;
-
-    if (this.hasLoadedMetadata) {
-      this.hasLoadError = false;
-      this.loadSelection();
-      return;
-    }
-
-    this.loadMetadata();
+    this.lastRequestSignature = '';
+    this.loadSelection();
   }
 
   public onProductNameChange(productName: string): void {
     this.productName = productName;
   }
 
-  private navigateToSelection(subCategoryName: string, page: number): void {
-    // No `queryParamsHandling`: the two browse parameters replace whatever the
+  private navigateTo(state: {
+    subCategoryName: string;
+    page: number;
+    filters?: ListingFilterState;
+  }): void {
+    // No `queryParamsHandling`: the browse parameters replace whatever the
     // current URL carries, so "All products" really produces a clean URL.
     this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: buildBrowseQueryParams(subCategoryName, page),
+      queryParams: buildListingQueryParams({
+        subCategoryName: state.subCategoryName,
+        page: state.page,
+        filters: state.filters ?? this.filters,
+      }),
     });
   }
 
@@ -182,18 +262,37 @@ export class ProductPageComponent implements OnInit, OnDestroy {
     const signature = [
       params.get('categoryId') ?? '',
       params.get('productId') ?? '',
-      queryParams.get('subcategory') ?? '',
-      queryParams.get('page') ?? '',
+      queryParams.get(LISTING_QUERY_PARAM.q) ?? '',
+      queryParams.get(LISTING_QUERY_PARAM.subcategory) ?? '',
+      queryParams.get(LISTING_QUERY_PARAM.page) ?? '',
+      queryParams.get(LISTING_QUERY_PARAM.availability) ?? '',
+      queryParams.get(LISTING_QUERY_PARAM.minPrice) ?? '',
+      queryParams.get(LISTING_QUERY_PARAM.maxPrice) ?? '',
+      queryParams.get(LISTING_QUERY_PARAM.discounted) ?? '',
+      queryParams.get(LISTING_QUERY_PARAM.sort) ?? '',
     ].join('|');
     if (signature === this.lastRouteSignature) {
       return;
     }
     this.lastRouteSignature = signature;
 
-    this.requestedSubCategoryParam = (queryParams.get('subcategory') ?? '').trim();
-    this.requestedPageParam = parsePageParam(queryParams.get('page'));
+    this.requestedSubCategoryParam = (
+      queryParams.get(LISTING_QUERY_PARAM.subcategory) ?? ''
+    ).trim();
+    this.requestedPageParam = parsePageParam(
+      queryParams.get(LISTING_QUERY_PARAM.page),
+    ) ?? 1;
+    this.filters = listingFiltersFromParams(queryParams);
 
-    const categoryId = Number(params.get('categoryId'));
+    const rawCategoryId = (params.get('categoryId') ?? '').trim();
+    this.hasCategoryRouteParam = rawCategoryId !== '';
+
+    if (!this.hasCategoryRouteParam) {
+      this.applyStandaloneDetailState(params, queryParams);
+      return;
+    }
+
+    const categoryId = Number(rawCategoryId);
     if (Number.isFinite(categoryId) && categoryId > 0) {
       this.currentCategoryId = categoryId;
       data.currentSelectedCategoryId = categoryId;
@@ -211,19 +310,56 @@ export class ProductPageComponent implements OnInit, OnDestroy {
       }
     }
 
-    if (this.currentCategoryId !== this.metadataCategoryId) {
-      this.loadMetadata();
+    if (this.isProductDetailView) {
+      // The listing is torn down for the detail view, so returning to this
+      // selection must fetch the page again instead of rendering nothing. The
+      // requested browse state is kept verbatim for the return link: it cannot be
+      // validated here, because only the server knows which subcategories exist.
+      this.standaloneLinkQueryParams = {};
+      this.selectedSubCategoryName = this.requestedSubCategoryParam;
+      this.currentPage = this.requestedPageParam;
+      this.items = [];
+      this.isLoading = false;
+      this.hasLoadError = false;
+      this.lastRequestSignature = '';
+      this.normalizeUrl();
       return;
     }
 
-    if (this.isMetadataInFlight) {
-      // The in-flight metadata load resolves the selection from the requested
-      // parameters once the subcategory list is known.
-      return;
-    }
+    this.selectedSubCategoryName = this.requestedSubCategoryParam;
+    this.currentPage = this.requestedPageParam;
+    data.currentSelectedSubCategoryName = this.selectedSubCategoryName;
+    this.normalizeUrl();
+    this.loadSelection();
+  }
 
-    if (this.hasLoadedMetadata) {
-      this.applySelection();
+  /**
+   * A product detail with no category behind it. There is no listing to load and
+   * no category to resolve, so the only thing that matters is that the return
+   * link can put the customer back on the search results they came from with the
+   * filters that produced them.
+   */
+  private applyStandaloneDetailState(
+    params: ParamMap,
+    queryParams: ParamMap,
+  ): void {
+    this.standaloneLinkQueryParams = pickListingQueryParams(queryParams);
+    this.items = [];
+    this.subCategories = [];
+    this.totalProductCount = 0;
+    this.selectedSubCategoryName = '';
+    this.currentPage = 1;
+    this.isLoading = false;
+    this.hasLoadError = false;
+    this.lastRequestSignature = '';
+
+    const productId = this.parseProductId(params.get('productId'));
+    if (productId !== this.selectedProductId) {
+      this.selectedProductId = productId;
+      this.productName = '';
+      if (productId !== null) {
+        this.scrollToTop();
+      }
     }
   }
 
@@ -236,52 +372,23 @@ export class ProductPageComponent implements OnInit, OnDestroy {
     return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
   }
 
-  private applySelection(): void {
-    const resolvedSubCategory = resolveSubCategoryName(
-      this.subCategories,
-      this.requestedSubCategoryParam,
-    );
-    const resolvedPage = clampPageToRange(
-      this.requestedPageParam,
-      pageCountForSelection(
-        this.subCategories,
-        this.totalProductCount,
-        resolvedSubCategory,
-        this.pageSize,
-      ),
-    );
-
-    const selectionChanged = resolvedSubCategory !== this.selectedSubCategoryName;
-    const pageChanged = resolvedPage !== this.currentPage;
-
-    this.selectedSubCategoryName = resolvedSubCategory;
-    this.currentPage = resolvedPage;
-    data.currentSelectedSubCategoryName = resolvedSubCategory;
-
-    this.normalizeUrl(resolvedSubCategory, resolvedPage);
-
-    if (this.isProductDetailView) {
-      this.items = [];
-      // Invalidate the loaded state and any pending listing response: the
-      // listing is torn down for the detail view, so returning to this
-      // selection must fetch the page again instead of rendering nothing.
-      this.hasLoadedSelection = false;
-      this.latestRequestId++;
-      return;
-    }
-
-    if (selectionChanged || pageChanged || !this.hasLoadedSelection) {
-      this.loadSelection();
-    }
-  }
-
-  private normalizeUrl(subCategoryName: string, page: number): void {
+  /**
+   * Rewrites the URL to the canonical form so a shared link, a reload and the
+   * Back button all describe the same listing. `replaceUrl`, because a hand-typed
+   * `?subcategory=Yok` or `?page=99` is not a history entry the customer should
+   * have to press Back through twice.
+   */
+  private normalizeUrl(): void {
     if (this.isNormalizingUrl) {
       return;
     }
 
-    const desired = buildBrowseQueryParams(subCategoryName, page);
-    if (hasSameBrowseQueryParams(this.route.snapshot.queryParams, desired)) {
+    const desired = buildListingQueryParams({
+      subCategoryName: this.selectedSubCategoryName,
+      page: this.currentPage,
+      filters: this.filters,
+    });
+    if (hasSameListingQueryParams(this.route.snapshot.queryParams, desired)) {
       return;
     }
 
@@ -297,113 +404,114 @@ export class ProductPageComponent implements OnInit, OnDestroy {
       });
   }
 
-  private loadMetadata(): void {
-    const requestId = ++this.latestRequestId;
-    const categoryId = this.currentCategoryId;
-
-    this.metadataCategoryId = categoryId;
-    this.hasLoadedMetadata = false;
-    this.isMetadataInFlight = true;
-    this.hasLoadedSelection = false;
-    this.subCategories = [];
-    this.items = [];
-    this.totalProductCount = 0;
-    this.selectedSubCategoryName = '';
-    this.currentPage = 1;
-    this.isLoading = true;
-    this.hasLoadError = false;
-
-    forkJoin({
-      subCategories: this.restService.getSubCategories(categoryId),
-      totalCount: this.restService.getProductCountsFromCategory(categoryId),
-    }).subscribe({
-      next: ({ subCategories, totalCount }) => {
-        if (requestId !== this.latestRequestId) {
-          return;
-        }
-
-        this.subCategories = subCategories ?? [];
-        this.totalProductCount = totalCount ?? 0;
-        this.hasLoadedMetadata = true;
-        this.isMetadataInFlight = false;
-        this.isLoading = false;
-        this.applySelection();
-      },
-      error: () => {
-        if (requestId !== this.latestRequestId) {
-          return;
-        }
-
-        this.isMetadataInFlight = false;
-        this.isLoading = false;
-        this.hasLoadError = true;
-      },
-    });
-  }
-
+  /**
+   * The one catalogue query. The page of rows, the filtered total and the
+   * subcategory buckets all come out of the same response and are built from the
+   * same predicate server-side, so the number in the sidebar, the number in the
+   * header and the rows on screen cannot describe three different sets.
+   *
+   * The subcategory and the page cannot be validated before the request - only
+   * the server knows which buckets exist and how many rows they hold - so a
+   * requested name that turns out not to exist, or a page past the end, is
+   * repaired from the response and refetched once. A stale shared link therefore
+   * lands on a real listing instead of a permanently empty one.
+   */
   private loadSelection(): void {
-    const requestId = ++this.latestRequestId;
-    const categoryId = this.currentCategoryId;
-    const subCategoryName = this.selectedSubCategoryName;
-    const pageIndex = this.currentPage - 1;
+    const signature = listingRequestSignature({
+      categoryId: this.currentCategoryId,
+      subCategoryName: this.selectedSubCategoryName,
+      page: this.currentPage,
+      size: this.pageSize,
+      filters: this.filters,
+    });
 
-    this.hasLoadError = false;
-
-    if (countForSelection(this.subCategories, this.totalProductCount, subCategoryName) === 0) {
-      this.items = [];
-      this.hasLoadedSelection = true;
-      this.isLoading = false;
+    if (signature === this.lastRequestSignature) {
       return;
     }
 
+    this.lastRequestSignature = signature;
+    this.searchSub?.unsubscribe();
+    this.items = [];
     this.isLoading = true;
+    this.hasLoadError = false;
 
-    const request$ = subCategoryName
-      ? this.restService.getProducstFromSubCategory(
-          subCategoryName,
-          pageIndex,
-          this.pageSize,
-        )
-      : this.restService.getProductPageData(categoryId, pageIndex, this.pageSize);
+    this.searchSub = this.restService
+      .searchProducts(
+        toProductSearchQuery({
+          categoryId: this.currentCategoryId,
+          subCategoryName: this.selectedSubCategoryName,
+          page: this.currentPage,
+          size: this.pageSize,
+          filters: this.filters,
+        }),
+      )
+      .subscribe({
+        next: (response: IProductSearchResponse) => {
+          if (signature !== this.lastRequestSignature) {
+            return;
+          }
 
-    request$.subscribe({
-      next: (items) => {
-        if (requestId !== this.latestRequestId) {
-          return;
-        }
+          this.subCategories = response?.subcategories ?? [];
+          this.totalProductCount = Math.max(0, response?.totalItems ?? 0);
 
-        this.items = items ?? [];
-        this.hasLoadedSelection = true;
-        this.isLoading = false;
-      },
-      error: (error: unknown) => {
-        if (requestId !== this.latestRequestId) {
-          return;
-        }
+          if (this.repairSelection()) {
+            return;
+          }
 
-        this.items = [];
-        this.hasLoadedSelection = true;
-        this.isLoading = false;
-        this.hasLoadError = !this.isEmptyCategoryListing(error);
-      },
-    });
+          this.items = response?.items ?? [];
+          this.isLoading = false;
+        },
+        error: () => {
+          if (signature !== this.lastRequestSignature) {
+            return;
+          }
+
+          this.items = [];
+          this.isLoading = false;
+          this.hasLoadError = true;
+        },
+      });
   }
 
   /**
-   * `getProductsFromCategory` answers with a plain 404 when the category holds
-   * no in-stock product. That is an empty listing, not a failure.
+   * Reconciles the requested selection with what the server reported. Returns
+   * `true` when it refetched, so the caller must not render this response.
    */
-  private isEmptyCategoryListing(error: unknown): boolean {
-    if (this.selectedSubCategoryName) {
+  private repairSelection(): boolean {
+    const resolvedSubCategory = resolveListingSubCategoryName(
+      this.subCategories,
+      this.selectedSubCategoryName,
+    );
+
+    // An unknown name is dropped back to the whole category and refetched, so a
+    // stale shared link lands on a real listing instead of a permanently empty one.
+    if (resolvedSubCategory !== this.selectedSubCategoryName) {
+      this.selectedSubCategoryName = resolvedSubCategory;
+      data.currentSelectedSubCategoryName = resolvedSubCategory;
+      this.normalizeUrl();
+      this.lastRequestSignature = '';
+      this.loadSelection();
+      return true;
+    }
+
+    const resolvedPage = clampPageToRange(this.currentPage, this.pageCount);
+    if (resolvedPage !== this.currentPage) {
+      this.currentPage = resolvedPage;
+      this.normalizeUrl();
+
+      // An empty result has no pages to move between, so there is nothing to
+      // refetch - the rows for the clamped page would be empty as well.
+      if (this.totalProductCount > 0) {
+        this.lastRequestSignature = '';
+        this.loadSelection();
+        return true;
+      }
+
+      this.isLoading = false;
       return false;
     }
 
-    if (!(error instanceof HttpErrorResponse) || error.status !== 404) {
-      return false;
-    }
-
-    const body = typeof error.error === 'string' ? error.error.trim() : '';
-    return body === '' || body === String(this.currentCategoryId);
+    return false;
   }
 
   private resolveCategoryName(categoryId: number): string {

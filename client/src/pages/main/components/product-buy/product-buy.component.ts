@@ -22,6 +22,10 @@ import { IProductData } from '../../../../interfaces/IProductData';
 import { IProductDescription } from '../../../../interfaces/IProductDescription';
 import { ObjectUrlManager } from '../../helpers/object-url-manager';
 import { productCartErrorMessage } from '../../helpers/product-cart-error';
+import {
+  packageSizeLabel,
+  unitPriceLabel,
+} from '../../helpers/product-package-price';
 
 export type BuyFeedbackKind = 'success' | 'error';
 
@@ -90,8 +94,32 @@ export class ProductBuyComponent implements OnChanges, OnDestroy {
     return this.descriptionList.length > 0;
   }
 
+  /**
+   * The price to quote for this product.
+   *
+   * The server sends `effectivePrice` - the same
+   * `ProductPricingPolicy` result the catalogue card, the cart line and the charge
+   * are built from - and that is what is rendered. Recombining `productPrice` and
+   * `productDiscount` here would be a second copy of a rounding sequence: a stored
+   * 10.10 at 5 percent off is 9.60 under the policy and 9.59 under
+   * `+(10.10 - 10.10 * 5 / 100).toFixed(2)`, so the detail page would quote a
+   * cent less than the card it was opened from.
+   *
+   * The arithmetic below is the fallback for a response that does not carry the
+   * field, which is what a client talking to a backend without it would get. It
+   * is not the preferred path and cannot disagree with the charge when the server
+   * supplies the value, which is every request this application makes.
+   */
   public get discountedPrice(): number {
     if (!this.productData) return 0;
+
+    const serverEffectivePrice = this.productData.effectivePrice;
+    if (
+      typeof serverEffectivePrice === 'number' &&
+      Number.isFinite(serverEffectivePrice)
+    ) {
+      return serverEffectivePrice;
+    }
 
     const price = this.productData.productPrice ?? 0;
     const discount = this.productData.productDiscount ?? 0;
@@ -105,6 +133,52 @@ export class ProductBuyComponent implements OnChanges, OnDestroy {
 
   public formatPrice(value: number | null | undefined): string {
     return (value ?? 0).toFixed(2);
+  }
+
+  /**
+   * "1.5 L", or `null` for a product with no package size.
+   *
+   * Up to three decimals, because that is the precision a package amount can
+   * carry - a dose in millilitres or a spice in grams - and showing `1` for a
+   * stored `1.5` would misreport the product the customer is about to buy.
+   */
+  public get packageSizeText(): string | null {
+    const amount = this.productData?.packageAmount;
+    if (amount === null || amount === undefined) {
+      return null;
+    }
+    return packageSizeLabel(Number(amount.toFixed(3)), this.productData?.packageUnit);
+  }
+
+  /**
+   * True when the package size line may be rendered.
+   *
+   * A getter rather than a bare `packageSizeText` test so the template's condition
+   * and the value it prints can never disagree: there is one rule for "the size is
+   * showable", and it is this.
+   */
+  public get hasPackageSize(): boolean {
+    return this.packageSizeText !== null;
+  }
+
+  /**
+   * "24.99 TL/kg", or `null` when there is nothing honest to show.
+   *
+   * Null - not zero, not a dash - when the size is missing, when the price is not
+   * a number, or when the basis names a measure this client does not know. A
+   * price with no unit beside a package price reads as a second package price,
+   * which is the confusion the line exists to remove.
+   */
+  public get unitPriceText(): string | null {
+    return unitPriceLabel(
+      this.productData?.unitPrice,
+      this.productData?.unitPriceBasis,
+      (value) => value.toFixed(2),
+    );
+  }
+
+  public get hasUnitPrice(): boolean {
+    return this.unitPriceText !== null;
   }
 
   public get isOutOfStock(): boolean {

@@ -204,12 +204,12 @@ describe('MainComponent', () => {
     });
   });
 
-  describe('category search', () => {
+  describe('header search', () => {
     beforeEach(() => {
       spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
     });
 
-    it('navigates to the landing query parameter on explicit submit', () => {
+    it('navigates to the product search route on explicit submit', () => {
       const input = query<HTMLInputElement>('#site-header-search');
       input.value = '  çiçek  ';
       input.dispatchEvent(new Event('input'));
@@ -222,65 +222,27 @@ describe('MainComponent', () => {
       );
       fixture.detectChanges();
 
-      expect(router.navigate).toHaveBeenCalledWith(['/'], {
+      expect(router.navigate).toHaveBeenCalledWith(['/search'], {
         queryParams: { q: 'çiçek' },
-        fragment: 'categories',
       });
     });
 
-    it('clears the query when an empty search is submitted', () => {
+    /**
+     * Clearing the box is a request for the catalogue the customer was looking at
+     * before, which is what the home page is - not an unfiltered results page.
+     */
+    it('clears the search and returns home when an empty search is submitted', () => {
+      const input = query<HTMLInputElement>('#site-header-search');
+      input.value = '   ';
+      input.dispatchEvent(new Event('input'));
+      fixture.detectChanges();
+
       query('form').dispatchEvent(
         new Event('submit', { bubbles: true, cancelable: true })
       );
       fixture.detectChanges();
 
-      expect(router.navigate).toHaveBeenCalledWith(['/'], {
-        queryParams: {},
-        fragment: 'categories',
-      });
-    });
-
-    it('brings the category section into view when the router skips the same URL', async () => {
-      (router.navigate as jasmine.Spy).and.returnValue(Promise.resolve(false));
-
-      const rafQueue: FrameRequestCallback[] = [];
-      spyOn(window, 'requestAnimationFrame').and.callFake(
-        (callback: FrameRequestCallback) => {
-          rafQueue.push(callback);
-          return rafQueue.length;
-        }
-      );
-      spyOn(window, 'matchMedia').and.returnValue({
-        matches: false,
-      } as MediaQueryList);
-      const scrollSpy = spyOn(Element.prototype, 'scrollIntoView');
-      const focusSpy = spyOn(HTMLElement.prototype, 'focus');
-
-      const section = document.createElement('div');
-      section.id = 'categories';
-      section.tabIndex = -1;
-      document.body.appendChild(section);
-
-      try {
-        query('form').dispatchEvent(
-          new Event('submit', { bubbles: true, cancelable: true })
-        );
-        fixture.detectChanges();
-        await new Promise((resolve) => setTimeout(resolve, 0));
-
-        expect(rafQueue.length).toBe(1);
-        rafQueue.splice(0).forEach((callback) => callback(0));
-
-        expect(scrollSpy).toHaveBeenCalledWith({
-          behavior: 'smooth',
-          block: 'start',
-        });
-        expect(scrollSpy.calls.mostRecent().object).toBe(section);
-        expect(focusSpy).toHaveBeenCalledWith({ preventScroll: true });
-        expect(focusSpy.calls.mostRecent().object).toBe(section);
-      } finally {
-        section.remove();
-      }
+      expect(router.navigate).toHaveBeenCalledWith(['/']);
     });
 
     it('keeps the header field aligned with the active query parameter', () => {

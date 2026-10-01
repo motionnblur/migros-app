@@ -81,6 +81,40 @@
   color: #b3261e;
 }
 
+/*
+  Package size and unit price.
+
+  Deliberately smaller and lighter than `.product-card__amount`: the price of the
+  package is what the customer pays and what the add button buys, and the unit
+  price is a comparison aid. Giving the two the same visual weight would make the
+  card look like it is quoting two different prices for the same product.
+*/
+.product-card__package,
+.product-card__unit-price {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  color: var(--landing-ink-muted);
+}
+
+.product-card__package-value,
+.product-card__unit-price-value {
+  font-weight: 600;
+  color: var(--landing-ink);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.product-card__package-label {
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
 .product-card__footer {
   display: flex;
   align-items: center;

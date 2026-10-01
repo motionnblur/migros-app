@@ -48,6 +48,31 @@
             }
           </p>
 
+          <!--
+            Package size and the price per kilogram, litre or item.
+
+            Hidden entirely for a product with no package size, which is every
+            product created before package metadata existed: nothing is inferred
+            from the product name or the description, because a guessed size would
+            produce a unit price that looks authoritative and is wrong.
+
+            Both numbers come from the server already rounded. The package price
+            above stays the dominant number; this is the comparison aid beneath it.
+          -->
+          @if (hasPackageSize) {
+            <p class="product-detail__package">
+              <span class="product-detail__meta-label">Paket</span>
+              <span class="product-detail__package-value">{{ packageSizeText }}</span>
+            </p>
+          }
+
+          @if (hasUnitPrice) {
+            <p class="product-detail__unit-price">
+              <span class="product-detail__meta-label">Birim fiyat</span>
+              <span class="product-detail__unit-price-value">{{ unitPriceText }}</span>
+            </p>
+          }
+
           <p class="product-detail__stock">
             <span class="product-detail__stock-label">Stok</span>
             <span

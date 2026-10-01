@@ -16,7 +16,6 @@ import {
   SiteHeaderComponent,
 } from './components/site-header/site-header.component';
 import { SupportFabComponent } from './components/support-fab/support-fab.component';
-import { scrollToFragment } from './helpers/scroll-to-fragment';
 
 @Component({
   selector: 'app-main',
@@ -145,18 +144,25 @@ export class MainComponent implements OnInit, OnDestroy {
     }
   }
 
+  /**
+   * The header's primary search is a product search, so it navigates to
+   * `/search`. `/?q=` stays the landing page's own category filter, so an old
+   * deep link still renders rather than abruptly breaking; the discover page
+   * offers the product search for the same term.
+   *
+   * A blank submission clears the search and returns home rather than opening an
+   * unfiltered results page: clearing the box is a request for the catalogue the
+   * customer was looking at before, which is what the home page is.
+   */
   public handleSearch(term: string): void {
     const trimmedTerm = (term || '').trim();
-    this.router
-      .navigate(['/'], {
-        queryParams: trimmedTerm ? { q: trimmedTerm } : {},
-        fragment: 'categories',
-      })
-      .then((navigated) => {
-        if (navigated === false) {
-          scrollToFragment('categories');
-        }
-      });
+
+    if (!trimmedTerm) {
+      this.router.navigate(['/']);
+      return;
+    }
+
+    this.router.navigate(['/search'], { queryParams: { q: trimmedTerm } });
   }
 
   public openLoginComponent() {

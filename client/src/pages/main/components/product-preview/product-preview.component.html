@@ -27,6 +27,28 @@
       }
     </p>
 
+    <!--
+      Package size and unit price, both optional.
+
+      Each line is hidden entirely when the product has no package metadata, which
+      is every product created before package metadata existed: no placeholder, no
+      "1 adet" derived from the name. The package price below stays the dominant
+      number on the card - the unit price is a comparison aid, not the offer.
+    -->
+    @if (packageSizeText) {
+      <p class="product-card__package" [attr.aria-label]="packageSizeAriaLabel">
+        <span class="product-card__package-label">Paket</span>
+        <span class="product-card__package-value">{{ packageSizeText }}</span>
+      </p>
+    }
+
+    @if (unitPriceText) {
+      <p class="product-card__unit-price">
+        <span class="product-card__package-label">Birim fiyat</span>
+        <span class="product-card__unit-price-value">{{ unitPriceText }}</span>
+      </p>
+    }
+
     <div class="product-card__footer">
       <p class="product-card__price">
         <span class="product-card__amount">{{ productPrice | number: '1.2-2' }}</span>

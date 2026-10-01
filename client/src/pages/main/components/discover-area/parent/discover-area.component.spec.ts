@@ -90,6 +90,11 @@ describe('DiscoverAreaComponent', () => {
     return Array.from(root.querySelectorAll('.discover__grid a'));
   }
 
+  function actionButtons(): HTMLButtonElement[] {
+    const root = fixture.nativeElement as HTMLElement;
+    return Array.from(root.querySelectorAll<HTMLButtonElement>('button.discover__clear'));
+  }
+
   it('should create', () => {
     expect(component).toBeTruthy();
   });
@@ -153,10 +158,8 @@ describe('DiscoverAreaComponent', () => {
     expect(emptyState.textContent).toContain('balon patlamasi');
 
     const navigateSpy = spyOn(router, 'navigate');
-    const clearButton = Array.from(
-      fixture.nativeElement.querySelectorAll('button.discover__clear')
-    ).find((button) =>
-      (button as HTMLElement).textContent?.includes('Tüm kategorileri göster')
+    const clearButton = actionButtons().find((button) =>
+      button.textContent?.includes('Tüm kategorileri göster'),
     ) as HTMLButtonElement;
 
     expect(clearButton).toBeTruthy();
@@ -173,14 +176,34 @@ describe('DiscoverAreaComponent', () => {
     expect(categoryLinks().length).toBe(18);
   });
 
-  it('offers a clear control while a query is active', () => {
+  /**
+   * `/?q=` stays the landing page's own category filter so an old deep link still
+   * renders, but the header's search is a product search now - so the page offers
+   * that too instead of leaving the term with nowhere to go.
+   */
+  it('offers the same term as a product search', () => {
+    const navigateSpy = spyOn(router, 'navigate');
+    setSearchQuery('çiçek');
+
+    const productSearch = actionButtons().find((button) =>
+      button.textContent?.includes('ürün ara'),
+    ) as HTMLButtonElement;
+
+    expect(productSearch).toBeTruthy();
+    productSearch.click();
+
+    expect(navigateSpy).toHaveBeenCalledWith(['/search'], {
+      queryParams: { q: 'çiçek' },
+    });
+  });
+
+  it('offers a clear control and a product search while a query is active', () => {
     setSearchQuery('dondurma');
-    const root = fixture.nativeElement as HTMLElement;
-    const clearButtons = Array.from(
-      root.querySelectorAll('button.discover__clear')
+    const labels = actionButtons().map((button) =>
+      (button.textContent ?? '').replace(/\s+/g, ' ').trim(),
     );
-    expect(clearButtons.length).toBe(1);
-    expect(clearButtons[0].textContent).toContain('Aramayı temizle');
+
+    expect(labels).toEqual(['“dondurma” için ürün ara', 'Aramayı temizle']);
   });
 
   it('smoothly scrolls to the category section for a route fragment', () => {

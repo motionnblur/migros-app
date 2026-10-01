@@ -8,6 +8,7 @@ import { SupportApiService } from './support-api.service';
 import { IProductUploader } from '../../interfaces/IProductUploader';
 import { IProductUpdater } from '../../interfaces/IProductUpdater';
 import { IProductDescription } from '../../interfaces/IProductDescription';
+import { IProductSearchQuery } from '../../interfaces/IProductSearchQuery';
 import { ISignDto } from '../../interfaces/ISignDto';
 import { IUserProfileTable } from '../../interfaces/IUserProfileTable';
 
@@ -124,6 +125,10 @@ export class RestService {
 
   getProducstFromSubCategory(subcategoryName: string, page: number, productRange: number): ReturnType<CatalogApiService['getProducstFromSubCategory']> {
     return this.catalogApi.getProducstFromSubCategory(subcategoryName, page, productRange);
+  }
+
+  searchProducts(query: IProductSearchQuery): ReturnType<CatalogApiService['searchProducts']> {
+    return this.catalogApi.searchProducts(query);
   }
 
   signUser(userSignDto: ISignDto): ReturnType<AccountApiService['signUser']> {

@@ -151,6 +151,39 @@
   color: var(--landing-ink-muted);
 }
 
+/*
+  Package size and unit price.
+
+  Sits directly under the package price, in the same muted-label style as the stock
+  line, and deliberately smaller than the price amount: the customer pays the
+  package price, and the unit price is what makes two packages comparable. Giving
+  them equal weight would read as two offers rather than one offer and its unit
+  comparison.
+*/
+.product-detail__package,
+.product-detail__unit-price {
+  display: flex;
+  align-items: baseline;
+  gap: var(--landing-space-2);
+  margin: 0;
+}
+
+.product-detail__meta-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--landing-ink-muted);
+}
+
+.product-detail__package-value,
+.product-detail__unit-price-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--landing-ink);
+  font-variant-numeric: tabular-nums;
+}
+
 .product-detail__stock-value {
   font-size: 1rem;
   font-weight: 700;

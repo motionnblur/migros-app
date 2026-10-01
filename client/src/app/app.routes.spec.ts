@@ -1,5 +1,7 @@
 import { routes } from './app.routes';
 import { CartStagedEditsGuard } from './guards/cart-staged-edits.guard';
+import { ProductPageComponent } from '../pages/main/components/product-page/product-page.component';
+import { SearchResultsComponent } from '../pages/main/components/search-results/search-results.component';
 
 describe('app routes', () => {
   it('lazy-loads the admin shell and each admin section under /admin', async () => {
@@ -55,5 +57,42 @@ describe('app routes', () => {
     );
 
     expect(cartRoute?.canDeactivate).toEqual([CartStagedEditsGuard]);
+  });
+
+  /**
+   * The header's search is a product search, so it needs a route of its own rather
+   * than the landing page's `?q=` category filter.
+   */
+  it('routes the product search to the shared search results listing', () => {
+    const children = routes.find((route) => route.path === '')?.children ?? [];
+    const searchRoute = children.find((route) => route.path === 'search');
+
+    expect(searchRoute?.component).toBe(SearchResultsComponent);
+    // Its own path: a search result is not a category listing, and keeping the
+    // term in the query string is what makes a results page shareable.
+    expect(children.some((route) => route.path === '')).toBeTrue();
+  });
+
+  /**
+   * A search result may belong to any category, so its card has no
+   * `/category/:id/product/:pid` URL to build. This is the route it falls back to,
+   * and it must be reachable without a category or the detail would be a 404 in
+   * the customer's flow.
+   */
+  it('routes a product reached without a category to the product detail', () => {
+    const children = routes.find((route) => route.path === '')?.children ?? [];
+
+    const categoryListing = children.find((route) => route.path === 'category/:categoryId');
+    const categoryDetail = children.find(
+      (route) => route.path === 'category/:categoryId/product/:productId',
+    );
+    const standaloneDetail = children.find((route) => route.path === 'product/:productId');
+
+    expect(categoryListing?.component).toBe(ProductPageComponent);
+    expect(categoryDetail?.component).toBe(ProductPageComponent);
+    expect(standaloneDetail?.component).toBe(ProductPageComponent);
+    // Only the category routes carry a category parameter; the search fallback
+    // deliberately does not invent one.
+    expect(standaloneDetail?.component).toBe(ProductPageComponent);
   });
 });

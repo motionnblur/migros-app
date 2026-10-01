@@ -1,0 +1,5 @@
+/* The search results page is the shared listing, so it owns no layout of its
+   own beyond this page wrapper. */
+:host {
+  display: block;
+}

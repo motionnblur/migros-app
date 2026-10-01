@@ -119,6 +119,57 @@ describe('ProductPreviewComponent', () => {
     expect(link.getAttribute('href')).toContain('page=3');
   });
 
+  it('carries the whole listing state onto the product link', () => {
+    setQueryParams({
+      q: 'çiçek',
+      subcategory: 'Süt',
+      page: '3',
+      availability: 'IN_STOCK',
+      minPrice: '10',
+      discounted: 'true',
+      sort: 'PRICE_ASC',
+    });
+    fixture.detectChanges();
+
+    const href = (fixture.nativeElement.querySelector(
+      'a.product-card__link',
+    ) as HTMLAnchorElement).getAttribute('href') as string;
+
+    expect(href).toContain('q=%C3%A7i%C3%A7ek');
+    expect(href).toContain('availability=IN_STOCK');
+    expect(href).toContain('minPrice=10');
+    expect(href).toContain('discounted=true');
+    expect(href).toContain('sort=PRICE_ASC');
+  });
+
+  it('leaves parameters that are not part of a listing off the product link', () => {
+    setQueryParams({ subcategory: 'Süt', tracking: 'utm-source' });
+    fixture.detectChanges();
+
+    const href = (fixture.nativeElement.querySelector(
+      'a.product-card__link',
+    ) as HTMLAnchorElement).getAttribute('href') as string;
+
+    expect(href).not.toContain('tracking');
+  });
+
+  /**
+   * A search result belongs to no single category, so there is no category detail
+   * URL to build for it. Guessing one would send the customer to a category they
+   * did not choose.
+   */
+  it('links to the category-less product route when there is no category', () => {
+    fixture.componentRef.setInput('categoryId', null);
+    fixture.detectChanges();
+
+    expect(component.hasCategoryLink).toBeFalse();
+    expect(
+      (fixture.nativeElement.querySelector(
+        'a.product-card__link',
+      ) as HTMLAnchorElement).getAttribute('href'),
+    ).toBe('/product/11');
+  });
+
   it('shows the effective price returned by the API without an original price', () => {
     const price = fixture.nativeElement.querySelector('.product-card__price')
       .textContent as string;
@@ -149,6 +200,33 @@ describe('ProductPreviewComponent', () => {
     expect(
       fixture.nativeElement.querySelector('.product-card__stock').textContent,
     ).toContain('Tükendi');
+  });
+
+  /**
+   * The refusal has to hold at the DOM, not only in the component method.
+   *
+   * A disabled button swallows the click before Angular ever sees it, so a real
+   * `click()` on it is the only proof that a customer pressing the control cannot
+   * start a request - a test that calls `addProductToUserCart()` directly would
+   * pass even if the binding that disables the button were removed, which is
+   * exactly the regression this is here to catch.
+   */
+  it('issues no add-to-cart request from a DOM click on a sold-out card', () => {
+    fixture.componentRef.setInput('productCount', 0);
+    fixture.detectChanges();
+
+    const button = fixture.nativeElement.querySelector(
+      '.product-card__add',
+    ) as HTMLButtonElement;
+    button.click();
+    fixture.detectChanges();
+
+    expect(queryCartRequests().length).toBe(0);
+    expect(button.disabled).toBeTrue();
+    // The detail page stays reachable from a sold-out card.
+    expect(
+      fixture.nativeElement.querySelector('.product-card__link'),
+    ).toBeTruthy();
   });
 
   it('adds one item and reports inline success feedback instead of an alert', () => {
@@ -235,4 +313,115 @@ describe('ProductPreviewComponent', () => {
     fixture.destroy();
 
     expect(revokeSpy).toHaveBeenCalled();
-  });});
+  });
+
+  /**
+   * Package size and unit price on a card.
+   *
+   * The rules being asserted are the ones that make the number trustworthy: an
+   * absent fact renders as nothing at all, and a present one is rendered from the
+   * server's numbers rather than computed here. Most of the catalogue has no
+   * package size - the columns were added nullable and deliberately not
+   * backfilled - so the "renders nothing" case is the common one and the one a
+   * regression would break first.
+   */
+  describe('package size and unit price', () => {
+    function rendered(selector: string): boolean {
+      return fixture.nativeElement.querySelector(selector) !== null;
+    }
+
+    function textOf(selector: string): string {
+      const element = fixture.nativeElement.querySelector(selector) as HTMLElement | null;
+      if (!element) {
+        throw new Error(`Expected "${selector}" to be rendered.`);
+      }
+      return (element.textContent ?? '').trim();
+    }
+
+    it('renders neither line for a product with no package metadata', () => {
+      expect(rendered('.product-card__package')).toBeFalse();
+      expect(rendered('.product-card__unit-price')).toBeFalse();
+    });
+
+    it('renders the size and the unit price the server computed', () => {
+      fixture.componentRef.setInput('packageAmount', 0.75);
+      fixture.componentRef.setInput('packageUnit', 'KG');
+      fixture.componentRef.setInput('unitPrice', 66.65);
+      fixture.componentRef.setInput('unitPriceBasis', 'KG');
+      fixture.detectChanges();
+
+      expect(textOf('.product-card__package-value')).toBe('0.75 KG');
+      expect(textOf('.product-card__unit-price-value')).toBe('66.65 TL/kg');
+    });
+
+    it('keeps three decimals of package size, which is the precision it can carry', () => {
+      fixture.componentRef.setInput('packageAmount', 0.125);
+      fixture.componentRef.setInput('packageUnit', 'KG');
+      fixture.componentRef.setInput('unitPrice', 400);
+      fixture.componentRef.setInput('unitPriceBasis', 'KG');
+      fixture.detectChanges();
+
+      expect(textOf('.product-card__package-value')).toBe('0.125 KG');
+    });
+
+    /**
+     * Half a pair is a state the schema forbids, but a card that rendered "500"
+     * with a missing unit would be quoting a size nobody can interpret.
+     */
+    it('renders no size when only the amount arrives', () => {
+      fixture.componentRef.setInput('packageAmount', 500);
+      fixture.detectChanges();
+
+      expect(rendered('.product-card__package')).toBeFalse();
+    });
+
+    /**
+     * The size is a fact about the package even when its unit cannot be priced
+     * per, so it stays and only the comparison line is withheld.
+     */
+    it('keeps the size and drops the unit price when the basis cannot be priced', () => {
+      fixture.componentRef.setInput('packageAmount', 500);
+      fixture.componentRef.setInput('packageUnit', 'GRAM');
+      fixture.componentRef.setInput('unitPrice', 0.1);
+      fixture.componentRef.setInput('unitPriceBasis', null);
+      fixture.detectChanges();
+
+      expect(textOf('.product-card__package-value')).toBe('500 GRAM');
+      expect(rendered('.product-card__unit-price')).toBeFalse();
+    });
+
+    it('drops the unit price when the price is missing even if a basis is known', () => {
+      fixture.componentRef.setInput('packageAmount', 1);
+      fixture.componentRef.setInput('packageUnit', 'L');
+      fixture.componentRef.setInput('unitPrice', null);
+      fixture.componentRef.setInput('unitPriceBasis', 'L');
+      fixture.detectChanges();
+
+      expect(rendered('.product-card__unit-price')).toBeFalse();
+    });
+
+    /**
+     * The package price is what the customer pays and what the add button buys.
+     * The unit price is a comparison aid, so the price keeps the emphasis and the
+     * two comparison lines sit above it rather than competing with it.
+     */
+    it('keeps the package price visually dominant', () => {
+      fixture.componentRef.setInput('packageAmount', 0.75);
+      fixture.componentRef.setInput('packageUnit', 'KG');
+      fixture.componentRef.setInput('unitPrice', 66.65);
+      fixture.componentRef.setInput('unitPriceBasis', 'KG');
+      fixture.detectChanges();
+
+      const card = fixture.nativeElement.querySelector('.product-card') as HTMLElement;
+      const classes = Array.from(card.querySelectorAll('p')).map(
+        (element) => element.className,
+      );
+      expect(classes).toContain('product-card__package');
+      expect(classes).toContain('product-card__unit-price');
+      expect(classes.indexOf('product-card__package')).toBeLessThan(
+        classes.indexOf('product-card__price'),
+      );
+      expect(textOf('.product-card__amount')).toBe('49.90');
+    });
+  });
+});

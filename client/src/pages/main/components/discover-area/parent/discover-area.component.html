@@ -19,14 +19,24 @@
     </div>
 
     @if (searchQuery) {
-      <button
-        type="button"
-        class="discover__clear"
-        (click)="clearSearch()"
-      >
-        <i class="bi bi-x-circle" aria-hidden="true"></i>
-        Aramayı temizle
-      </button>
+      <div class="discover__actions">
+        <button
+          type="button"
+          class="discover__clear"
+          (click)="searchProducts()"
+        >
+          <i class="bi bi-bag-search" aria-hidden="true"></i>
+          “{{ searchQuery }}” için ürün ara
+        </button>
+        <button
+          type="button"
+          class="discover__clear"
+          (click)="clearSearch()"
+        >
+          <i class="bi bi-x-circle" aria-hidden="true"></i>
+          Aramayı temizle
+        </button>
+      </div>
     }
   </div>
 
@@ -52,6 +62,14 @@
         Farklı bir kategori adı deneyebilir ya da tüm kategorilere göz
         atabilirsin.
       </p>
+      <button
+        type="button"
+        class="discover__clear"
+        (click)="searchProducts()"
+      >
+        <i class="bi bi-bag-search" aria-hidden="true"></i>
+        “{{ searchQuery }}” için ürün ara
+      </button>
       <button
         type="button"
         class="discover__clear"

@@ -3,28 +3,40 @@
     <div class="category-page__detail-header">
       <nav class="breadcrumb-nav" aria-label="Sayfa yolu">
         <ol class="breadcrumb-nav__list">
-          <li class="breadcrumb-nav__item">
-            <a class="breadcrumb-nav__link" routerLink="/">Ana sayfa</a>
-          </li>
-          <li class="breadcrumb-nav__item">
-            <a
-              class="breadcrumb-nav__link"
-              [routerLink]="categoryLink"
-              [queryParams]="browseQueryParams"
-            >
-              {{ categoryName }}
-            </a>
-          </li>
-          @if (selectedSubCategoryName) {
+          @if (isStandaloneDetailView) {
             <li class="breadcrumb-nav__item">
               <a
                 class="breadcrumb-nav__link"
-                [routerLink]="categoryLink"
-                [queryParams]="browseQueryParams"
+                [routerLink]="breadcrumbLink"
+                [queryParams]="detailLinkQueryParams"
               >
-                {{ selectedSubCategoryName }}
+                {{ breadcrumbLabel }}
               </a>
             </li>
+          } @else {
+            <li class="breadcrumb-nav__item">
+              <a class="breadcrumb-nav__link" routerLink="/">Ana sayfa</a>
+            </li>
+            <li class="breadcrumb-nav__item">
+              <a
+                class="breadcrumb-nav__link"
+                [routerLink]="breadcrumbLink"
+                [queryParams]="detailLinkQueryParams"
+              >
+                {{ breadcrumbLabel }}
+              </a>
+            </li>
+            @if (selectedSubCategoryName) {
+              <li class="breadcrumb-nav__item">
+                <a
+                  class="breadcrumb-nav__link"
+                  [routerLink]="breadcrumbLink"
+                  [queryParams]="detailLinkQueryParams"
+                >
+                  {{ selectedSubCategoryName }}
+                </a>
+              </li>
+            }
           }
           @if (productName) {
             <li
@@ -39,8 +51,8 @@
 
       <a
         class="back-link"
-        [routerLink]="categoryLink"
-        [queryParams]="browseQueryParams"
+        [routerLink]="breadcrumbLink"
+        [queryParams]="detailLinkQueryParams"
       >
         <i class="bi bi-arrow-left" aria-hidden="true"></i>
         {{ backLinkLabel }}
@@ -52,16 +64,6 @@
       (productNameChange)="onProductNameChange($event)"
     />
   } @else {
-    <div class="category-page__header">
-      <div>
-        <h1 class="category-page__title">{{ categoryName }}</h1>
-        <p class="category-page__summary">
-          <span class="category-page__selection">{{ selectionLabel }}</span>
-          <span class="category-page__count">{{ selectionProductCount }} ürün</span>
-        </p>
-      </div>
-    </div>
-
     <div class="category-page__body">
       <aside class="category-page__sidebar" aria-label="Alt kategoriler">
         <nav class="subcategory-nav">
@@ -75,7 +77,7 @@
                 (click)="selectAllProducts()"
               >
                 <span class="subcategory-nav__name">{{ allProductsLabel }}</span>
-                <span class="subcategory-nav__count">{{ totalProductCount }}</span>
+                <span class="subcategory-nav__count">{{ allProductsCount }}</span>
               </button>
             </li>
 
@@ -102,71 +104,24 @@
       </aside>
 
       <section class="category-page__content" aria-label="Ürünler">
-        @if (isLoading) {
-          <div class="product-grid" aria-busy="true" aria-live="polite">
-            <span class="visually-hidden">Ürünler yükleniyor…</span>
-            @for (placeholder of [1, 2, 3, 4, 5, 6, 7, 8]; track placeholder) {
-              <div class="product-skeleton" aria-hidden="true">
-                <div class="product-skeleton__media"></div>
-                <div class="product-skeleton__line"></div>
-                <div class="product-skeleton__line product-skeleton__line--short"></div>
-              </div>
-            }
-          </div>
-        } @else if (hasLoadError) {
-          <div class="listing-state listing-state--error" role="alert">
-            <p class="listing-state__title">Ürünler yüklenemedi.</p>
-            <p class="listing-state__text">
-              Bağlantı sorunu yaşanmış olabilir. Tekrar denemek için aşağıdaki
-              düğmeyi kullan.
-            </p>
-            <button type="button" class="listing-state__action" (click)="retry()">
-              <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
-              Tekrar dene
-            </button>
-          </div>
-        } @else if (isEmptySelection) {
-          <div class="listing-state" role="status">
-            <i class="bi bi-basket listing-state__icon" aria-hidden="true"></i>
-            <p class="listing-state__title">Bu seçimde ürün bulunamadı</p>
-            <p class="listing-state__text">
-              {{ selectionLabel }} için stokta ürün şu anda yok. Tüm ürünleri
-              görmek için aşağıdaki seçeneği kullan.
-            </p>
-            @if (selectedSubCategoryName) {
-              <button
-                type="button"
-                class="listing-state__action"
-                (click)="selectAllProducts()"
-              >
-                <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i>
-                {{ allProductsLabel }}
-              </button>
-            }
-          </div>
-        } @else {
-          <div class="product-grid">
-            @for (item of items; track item.productId) {
-              <app-product-preview
-                [productId]="item.productId"
-                [productName]="item.productName"
-                [productPrice]="item.productPrice"
-                [productCount]="item.productCount"
-                [categoryId]="currentCategoryId"
-              />
-            }
-          </div>
-
-          @if (hasMultiplePages) {
-            <div class="category-page__pagination">
-              <app-product-page-switcher
-                [currentPage]="currentPage"
-                [pageCount]="pageCount"
-                (pageChange)="onPageSelected($event)"
-              />
-            </div>
-          }
-        }
+        <app-product-listing
+          [heading]="categoryName"
+          [selectionLabel]="selectionLabel"
+          [items]="items"
+          [totalItems]="totalProductCount"
+          [page]="currentPage"
+          [pageCount]="pageCount"
+          [filters]="filters"
+          [isLoading]="isLoading"
+          [hasLoadError]="hasLoadError"
+          [emptyTitle]="emptyTitle"
+          [emptyText]="emptyText"
+          [linkCategoryId]="currentCategoryId"
+          [subCategoryName]="selectedSubCategoryName"
+          (requestChange)="onListingRequestChange($event)"
+          (subCategoryCleared)="selectAllProducts()"
+          (retryRequested)="retry()"
+        />
       </section>
     </div>
   }

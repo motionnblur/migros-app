@@ -1,0 +1,220 @@
+<section class="listing" aria-labelledby="product-listing-heading">
+  <div class="listing__header">
+    <div class="listing__heading-group">
+      <h1 id="product-listing-heading" class="listing__title">{{ heading }}</h1>
+      <p class="listing__summary">
+        @if (selectionLabel) {
+          <span class="listing__selection">{{ selectionLabel }}</span>
+        }
+        <span class="listing__count">{{ resultSummary }}</span>
+      </p>
+    </div>
+  </div>
+
+  <div class="listing__filters" role="group" aria-labelledby="product-listing-filters-label">
+    <p id="product-listing-filters-label" class="listing__filters-title">Filtreler</p>
+
+    <div class="listing__filter-grid">
+      <div class="listing__filter-field">
+        <span class="listing__filter-label" id="listing-availability-label">Bulunabilirlik</span>
+        <div
+          class="listing__segmented"
+          role="group"
+          aria-labelledby="listing-availability-label"
+        >
+          @for (option of availabilityOptions; track option.value) {
+            <button
+              type="button"
+              class="listing__segment"
+              [class.is-selected]="isAvailabilitySelected(option.value)"
+              [attr.aria-pressed]="isAvailabilitySelected(option.value)"
+              (click)="selectAvailability(option.value)"
+            >
+              {{ option.label }}
+            </button>
+          }
+        </div>
+      </div>
+
+      <form
+        class="listing__filter-field"
+        (submit)="$event.preventDefault(); applyPriceBounds()"
+      >
+        <span class="listing__filter-label" id="listing-price-label">Fiyat aralığı</span>
+        <div class="listing__price" role="group" aria-labelledby="listing-price-label">
+          <label class="listing__price-input">
+            <span class="visually-hidden">En düşük fiyat</span>
+            <input
+              #minPriceInput
+              type="text"
+              inputmode="decimal"
+              class="listing__price-field"
+              placeholder="En düşük"
+              autocomplete="off"
+              [value]="minPriceDraft"
+              (input)="minPriceDraft = minPriceInput.value"
+              (change)="applyPriceBounds()"
+            />
+          </label>
+          <span class="listing__price-separator" aria-hidden="true">–</span>
+          <label class="listing__price-input">
+            <span class="visually-hidden">En yüksek fiyat</span>
+            <input
+              #maxPriceInput
+              type="text"
+              inputmode="decimal"
+              class="listing__price-field"
+              placeholder="En yüksek"
+              autocomplete="off"
+              [value]="maxPriceDraft"
+              (input)="maxPriceDraft = maxPriceInput.value"
+              (change)="applyPriceBounds()"
+            />
+          </label>
+          <button type="submit" class="listing__price-apply">Uygula</button>
+        </div>
+        @if (priceError) {
+          <p class="listing__price-error" role="alert">{{ priceError }}</p>
+        }
+      </form>
+
+      <div class="listing__filter-field">
+        <span class="listing__filter-label">İndirim</span>
+        <button
+          type="button"
+          class="listing__toggle"
+          [class.is-selected]="filters.discountedOnly"
+          [attr.aria-pressed]="filters.discountedOnly"
+          (click)="toggleDiscountedOnly()"
+        >
+          @if (filters.discountedOnly) {
+            <i class="bi bi-check-lg" aria-hidden="true"></i>
+          }
+          Yalnızca indirimliler
+        </button>
+      </div>
+
+      <div class="listing__filter-field">
+        <label class="listing__filter-label" for="listing-sort">Sıralama</label>
+        <select
+          #sortSelect
+          id="listing-sort"
+          class="listing__select"
+          [value]="filters.sort"
+          (change)="selectSort(sortSelect.value)"
+        >
+          @for (option of sortOptions; track option.value) {
+            <option [value]="option.value">{{ option.label }}</option>
+          }
+        </select>
+      </div>
+    </div>
+  </div>
+
+  @if (hasChips || hasSubCategoryChip) {
+    <div class="listing__chips">
+      <span class="listing__chips-label">Uygulanan filtreler</span>
+      <ul class="listing__chip-list">
+        @if (hasSubCategoryChip) {
+          <li class="listing__chip">
+            <span class="listing__chip-text">Alt kategori: {{ subCategoryName }}</span>
+            <button
+              type="button"
+              class="listing__chip-remove"
+              [attr.aria-label]="subCategoryName + ' alt kategori filtresini kaldır'"
+              (click)="clearSubCategory()"
+            >
+              <i class="bi bi-x" aria-hidden="true"></i>
+            </button>
+          </li>
+        }
+        @for (chip of chips; track chip.key) {
+          <li class="listing__chip">
+            <span class="listing__chip-text">{{ chip.label }}</span>
+            <button
+              type="button"
+              class="listing__chip-remove"
+              [attr.aria-label]="chip.label + ' filtresini kaldır'"
+              (click)="removeChip(chip)"
+            >
+              <i class="bi bi-x" aria-hidden="true"></i>
+            </button>
+          </li>
+        }
+      </ul>
+      @if (hasActiveFilters) {
+        <button type="button" class="listing__clear-all" (click)="clearAllFilters()">
+          <i class="bi bi-x-circle" aria-hidden="true"></i>
+          Filtreleri temizle
+        </button>
+      }
+    </div>
+  }
+
+  <div class="listing__content" [attr.aria-busy]="isLoading">
+    @if (isLoading) {
+      <div class="listing__grid">
+        <span class="visually-hidden">Ürünler yükleniyor…</span>
+        @for (placeholder of [1, 2, 3, 4, 5, 6, 7, 8]; track placeholder) {
+          <div class="listing__skeleton" aria-hidden="true">
+            <div class="listing__skeleton-media"></div>
+            <div class="listing__skeleton-line"></div>
+            <div class="listing__skeleton-line listing__skeleton-line--short"></div>
+          </div>
+        }
+      </div>
+    } @else if (hasLoadError) {
+      <div class="listing-state listing-state--error" role="alert">
+        <p class="listing-state__title">Ürünler yüklenemedi.</p>
+        <p class="listing-state__text">
+          Bağlantı sorunu yaşanmış olabilir. Tekrar denemek için aşağıdaki
+          düğmeyi kullan.
+        </p>
+        <button type="button" class="listing-state__action" (click)="retry()">
+          <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
+          Tekrar dene
+        </button>
+      </div>
+    } @else if (items.length === 0) {
+      <div class="listing-state" role="status">
+        <i class="bi bi-basket listing-state__icon" aria-hidden="true"></i>
+        <p class="listing-state__title">{{ emptyTitle }}</p>
+        @if (emptyText) {
+          <p class="listing-state__text">{{ emptyText }}</p>
+        }
+        @if (hasActiveFilters) {
+          <button type="button" class="listing-state__action" (click)="clearAllFilters()">
+            <i class="bi bi-x-circle" aria-hidden="true"></i>
+            Filtreleri temizle
+          </button>
+        }
+      </div>
+    } @else {
+      <div class="listing__grid">
+        @for (item of items; track item.productId) {
+          <app-product-preview
+            [productId]="item.productId"
+            [productName]="item.productName"
+            [productPrice]="item.productPrice"
+            [productCount]="item.productCount"
+            [categoryId]="linkCategoryId"
+            [packageAmount]="item.packageAmount ?? null"
+            [packageUnit]="item.packageUnit ?? null"
+            [unitPrice]="item.unitPrice ?? null"
+            [unitPriceBasis]="item.unitPriceBasis ?? null"
+          />
+        }
+      </div>
+    }
+  </div>
+
+  @if (!isLoading && !hasLoadError && pageCount > 1) {
+    <div class="listing__pagination">
+      <app-product-page-switcher
+        [currentPage]="page"
+        [pageCount]="pageCount"
+        (pageChange)="selectPage($event)"
+      />
+    </div>
+  }
+</section>

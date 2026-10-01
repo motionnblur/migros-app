@@ -1,0 +1,16 @@
+<app-product-listing
+  [heading]="heading"
+  [selectionLabel]="selectionLabel"
+  [items]="items"
+  [totalItems]="totalItems"
+  [page]="currentPage"
+  [pageCount]="pageCount"
+  [filters]="filters"
+  [isLoading]="isLoading"
+  [hasLoadError]="hasLoadError"
+  [emptyTitle]="emptyTitle"
+  [emptyText]="emptyText"
+  [linkCategoryId]="null"
+  (requestChange)="onRequestChange($event)"
+  (retryRequested)="retry()"
+/>

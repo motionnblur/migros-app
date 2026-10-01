@@ -114,6 +114,18 @@ describe('SiteHeaderComponent', () => {
     expect(submitted).toEqual(['çiçek']);
   });
 
+  /**
+   * The field is a product search, so its label and placeholder must not promise a
+   * category search the app no longer performs from here.
+   */
+  it('announces itself as a product search', () => {
+    const input = query<HTMLInputElement>('#site-header-search');
+    const label = query<HTMLLabelElement>('label[for="site-header-search"]');
+
+    expect(label.textContent?.trim()).toBe('Ürünlerde ara');
+    expect(input.getAttribute('placeholder')).toBe('Ürün ara: süt, dondurma, ekmek');
+  });
+
   it('emits an empty term when the search is submitted blank', () => {
     const submitted: string[] = [];
     component.searchSubmitted.subscribe((term) => submitted.push(term));
