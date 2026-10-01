@@ -1,46 +1,92 @@
-<div id="payment-component-bg" (click)="closePaymentComponent()"></div>
-<div class="payment-container">
-  <h3 class="payment-title">Secure Payment</h3>
+<!--
+  The scrim is presentational: it exists to be clicked, carries no information and
+  is not a control, so it is hidden from assistive technology rather than exposed
+  as an unnamed element sitting in the tab order.
+-->
+<div
+  id="payment-component-bg"
+  data-testid="payment-backdrop"
+  aria-hidden="true"
+  (click)="closePaymentComponent()"></div>
 
-  @if (checkout) {
-    <div class="payment-total">
-      <span>Total:</span>
-      <strong>{{ displayTotal }} {{ displayCurrency }}</strong>
-    </div>
-  }
-
-  @if (errorMessage) {
-    <p class="error-message">{{ errorMessage }}</p>
-  }
-
-  @if (pendingMessage) {
-    <p class="pending-message">{{ pendingMessage }}</p>
-  }
-
-  <div class="payment-form">
-    <div id="card-element" class="card-element">
-      <!-- A Stripe Element will be inserted here. -->
-    </div>
-
-    <div id="card-errors" role="alert" class="error-message">
-      <!-- Stripe form errors will be displayed here -->
-    </div>
-
+<div
+  #paymentDialog
+  id="payment-dialog"
+  class="payment-dialog"
+  data-testid="payment-dialog"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="payment-dialog-title"
+  [attr.aria-busy]="isProcessing || isPreparing"
+  tabindex="-1">
+  <div class="payment-dialog__header">
+    <h2 id="payment-dialog-title" class="payment-dialog__title">
+      {{ dialogTitle }}
+    </h2>
     <button
-      (click)="handlePayment()"
-      class="payment-button"
-      [disabled]="isProcessing || isPreparing || !checkout">
-      @if (isProcessing) {
-        Processing...
-      } @else {
-        Pay Now
-      }
+      type="button"
+      class="payment-dialog__close"
+      data-testid="payment-close"
+      [attr.aria-label]="closeLabel"
+      (click)="closePaymentComponent()">
+      <span aria-hidden="true">&times;</span>
     </button>
   </div>
 
-  <p class="payment-info">
-    <span>By completing this transaction, you agree to our</span>
-    <a href="#" class="terms-link">Terms of Service</a> and
-    <a href="#" class="privacy-link">Privacy Policy</a>.
-  </p>
+  @if (checkout) {
+    <p class="payment-dialog__total" data-testid="payment-total">
+      <span class="payment-dialog__total-label">{{ totalLabel }}</span>
+      <strong class="payment-dialog__total-amount">{{ displayAmount }}</strong>
+    </p>
+  } @else {
+    <p
+      class="payment-dialog__total payment-dialog__total--pending"
+      data-testid="payment-total-pending">
+      {{ preparing }}
+    </p>
+  }
+
+  <!--
+    Two separate regions, because the two states are not the same and reading
+    them the same way would be a lie: `alert` interrupts for something the
+    customer must act on, `status` waits its turn for something already in
+    progress.
+  -->
+  @if (errorMessage) {
+    <p class="payment-dialog__message payment-dialog__message--error"
+       data-testid="payment-error"
+       role="alert">{{ errorMessage }}</p>
+  }
+
+  @if (pendingMessage) {
+    <p class="payment-dialog__message payment-dialog__message--pending"
+       data-testid="payment-pending"
+       role="status">{{ pendingMessage }}</p>
+  }
+
+  <div class="payment-dialog__form">
+    <span class="payment-dialog__field-label">{{ cardFieldLabel }}</span>
+    <div
+      #cardMount
+      id="card-element"
+      class="payment-dialog__card"
+      data-testid="payment-card-field"></div>
+
+    @if (cardFieldError) {
+      <p class="payment-dialog__message payment-dialog__message--error"
+         data-testid="payment-card-error"
+         role="alert">{{ cardFieldError }}</p>
+    }
+
+    <button
+      type="button"
+      class="payment-dialog__submit"
+      data-testid="payment-submit"
+      [disabled]="isChargeInFlight || isPreparing || !checkout"
+      (click)="handlePayment()">
+      {{ submitLabel }}
+    </button>
+  </div>
+
+  <p class="payment-dialog__note">{{ providerNote }}</p>
 </div>

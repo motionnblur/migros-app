@@ -33,6 +33,22 @@
 
     --landing-focus-ring: 0 0 0 3px rgba(255, 127, 0, 0.45);
     --landing-header-offset: 88px;
+
+    /* Cart and payment dialogs.
+     *
+     * Additive only: everything above is reused as-is, so a dialog raised over a
+     * storefront page is the same brand rather than a second one. What lands here
+     * is the handful of surfaces the landing page never needed - the scrim behind
+     * a modal, the two message levels the cart and payment dialogs both report,
+     * and a focus ring that has to stay visible on an orange surface. */
+    --dialog-scrim: rgba(24, 26, 29, 0.5);
+    --dialog-danger: #a8261d;
+    --dialog-danger-soft: #fdeceb;
+    --dialog-warning-ink: #7a4a00;
+    --dialog-warning-surface: #fff4e6;
+    --dialog-warning-border: #f3c489;
+    --dialog-focus-ring: 0 0 0 3px rgba(255, 127, 0, 0.55);
+    --dialog-backdrop-blur: blur(3px);
 }
 
 /* Sticky header offset per breakpoint (tablet wraps actions, mobile adds a search row) */

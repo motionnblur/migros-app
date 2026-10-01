@@ -1,4 +1,5 @@
 import {
+  AfterViewInit,
   Component,
   ElementRef,
   EventEmitter,
@@ -11,6 +12,13 @@ import { IUserCartItemDto } from '../../../../interfaces/IUserCartItemDto';
 import { ICartReconciliation } from '../../../../interfaces/ICartReconciliation';
 import { CommonModule } from '@angular/common';
 import { PaymentComponent } from '../payment/payment.component';
+import {
+  capturePreviousFocus,
+  containTabKey,
+  focusDialog,
+  restoreFocus,
+} from '../payment/dialog-a11y';
+import { formatAmount, formatMoney } from '../payment/money-format';
 import { data } from '../../../../memory/global-data';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
@@ -61,6 +69,61 @@ interface StagedEditResult {
  */
 const CART_WRITE_TIMEOUT_MS = 20_000;
 
+/**
+ * Every customer-visible string in the cart dialog, in one place.
+ *
+ * <p>The dialog was written without Turkish diacritics - `guncellendi`,
+ * `cikarildi`, `Lutfen` - so a customer was told their cart had been "guncellendi"
+ * in a storefront whose every other surface spells those words properly. Turkish
+ * is corrected here rather than at each throw site, both so the wording is one
+ * edit rather than several and so a test can pin it without duplicating it.
+ */
+export const CART_COPY = {
+  title: 'Sepetim',
+  close: 'Sepeti kapat',
+  emptyTitle: 'Sepetiniz henüz boş.',
+  emptyHint:
+    'Satışta olmayan ürünler sepetinizden otomatik olarak çıkarılmaz. Sepetinizi kontrol ederek temizleyebilirsiniz.',
+  emptyAction: 'Sepeti Kontrol Et',
+  totalLabel: 'Toplam Tutar',
+  /** The currency the cart's own arithmetic is in; the total is formatted whole. */
+  currencyLabel: 'TL',
+  stockLabel: 'Stok',
+  removeFromCart: (productName: string): string =>
+    `Sepetten çıkar: ${productName}`,
+  decreaseQuantity: (productName: string): string =>
+    `Adedi azalt: ${productName}`,
+  increaseQuantity: (productName: string): string =>
+    `Adedi artır: ${productName}`,
+  quantityGroup: (productName: string): string => `${productName} adedi`,
+  writeFailed: 'Sepet güncellemesi kaydedilemedi. Lütfen tekrar deneyin.',
+  reconcileFailed: 'Sepet doğrulanamadı. Lütfen tekrar deneyin.',
+  changedDuringPress:
+    'Sepetiniz onay sırasında değişti. Lütfen tekrar kontrol edip onaylayın.',
+  serverUpdated:
+    'Sepetiniz sunucu tarafında güncellendi. Lütfen sepeti kontrol edip onaylayın.',
+  insufficientStock:
+    'Sepetteki bir veya daha fazla ürünün stoğu yetersiz. Lütfen sepeti güncelleyin.',
+  saving: 'Sepet kaydediliyor...',
+  reconciling: 'Sepet kontrol ediliyor...',
+  confirm: 'Sepeti Onayla',
+  checkout: 'Siparişi Tamamla',
+  empty: 'Sepet Boş',
+} as const;
+
+/** The only currency the cart's own arithmetic is denominated in. */
+const CART_CURRENCY = 'TRY';
+
+/**
+ * Explains a stock limit in the customer's own terms.
+ *
+ * <p>The number is the available stock, not the count they are holding, so the
+ * sentence names the ceiling the server would enforce anyway.
+ */
+function describeStockLimit(availableStock: number): string {
+  return `Bu üründen en fazla ${availableStock} adet alabilirsiniz.`;
+}
+
 @Component({
   selector: 'app-user-cart',
   standalone: true,
@@ -68,8 +131,12 @@ const CART_WRITE_TIMEOUT_MS = 20_000;
   templateUrl: './user-cart.component.html',
   styleUrl: './user-cart.component.css',
 })
-export class UserCartComponent implements OnDestroy, CartStagedEditsHost {
+export class UserCartComponent
+  implements AfterViewInit, OnDestroy, CartStagedEditsHost
+{
   @ViewChild('buyButton') buyButtonRef!: ElementRef<HTMLButtonElement>;
+  /** The dialog surface itself, the element that owns `role="dialog"`. */
+  @ViewChild('cartDialog') cartDialogRef?: ElementRef<HTMLElement>;
 
   items: IUserCartItemDto[] = [];
   private readonly itemsToDelete = new Set<number>();
@@ -150,10 +217,42 @@ export class UserCartComponent implements OnDestroy, CartStagedEditsHost {
    * second must not be overwritten by a response that predates it.
    */
   private cartAtPress: IUserCartItemDto[] | null = null;
+  /** Where focus came from, so closing the dialog can hand it back. */
+  private readonly previouslyFocused = capturePreviousFocus();
+
+  readonly copy = CART_COPY;
+  /** Exposed so a row renders its price in the same format as the total. */
+  readonly formatAmount = formatAmount;
 
   /** True while a checkout press may not be repeated. */
   public get isCartBusy(): boolean {
     return this.isReconcilingCart || this.isCartWritePending;
+  }
+
+  /** The cart total in the storefront's money format, amount and currency together. */
+  public get formattedTotal(): string {
+    return formatMoney(this.totalPrice, CART_CURRENCY);
+  }
+
+  /**
+   * What the checkout button says.
+   *
+   * <p>One label per state, so a disabled button always also explains why: "Sepeti
+   * Onayla" on a button that will do nothing reads as a broken control, and the
+   * two in-progress states are told apart so a customer waiting on a save can see
+   * that it is the save they are waiting on.
+   */
+  public get checkoutLabel(): string {
+    if (this.isCartWritePending) {
+      return CART_COPY.saving;
+    }
+    if (this.isReconcilingCart) {
+      return CART_COPY.reconciling;
+    }
+    if (this.items.length === 0) {
+      return CART_COPY.empty;
+    }
+    return this.isCartConfirmed ? CART_COPY.checkout : CART_COPY.confirm;
   }
 
   /**
@@ -182,9 +281,26 @@ export class UserCartComponent implements OnDestroy, CartStagedEditsHost {
     return this.isCartBusy || this.isPaymentPhaseActive;
   }
 
+  /**
+   * Escape closes the cart and Tab stays inside it.
+   *
+   * <p>While the payment dialog is open the cart ignores both. Escape belongs to
+   * the dialog on top, whose own handler is the only one that knows whether a
+   * close may cancel; the cart answering it as well would tear the dialog down
+   * behind a charge that may be in flight, which is precisely what that dialog's
+   * close path exists to prevent. Tab follows the same owner, so one key press
+   * never drives two dialogs.
+   */
   private readonly escHandler = (event: KeyboardEvent) => {
+    if (this.isPaymentPhaseActive) {
+      return;
+    }
     if (event.key === 'Escape') {
       this.closeCartComponent();
+      return;
+    }
+    if (event.key === 'Tab') {
+      containTabKey(this.cartDialogRef?.nativeElement, event);
     }
   };
 
@@ -197,6 +313,10 @@ export class UserCartComponent implements OnDestroy, CartStagedEditsHost {
   }
 
   ngAfterViewInit() {
+    // Focus lands on the dialog itself, so the name "Sepetim" is what a screen
+    // reader reads out on arrival rather than whatever control happened to be
+    // first in the tab order.
+    focusDialog(this.cartDialogRef?.nativeElement);
     document.addEventListener('keydown', this.escHandler);
   }
 
@@ -207,6 +327,11 @@ export class UserCartComponent implements OnDestroy, CartStagedEditsHost {
     this.reconciliationRequest?.unsubscribe();
     this.cancelImageRequests();
     this.releaseProductImages();
+    // After teardown, so focus is handed back to a page that is already there
+    // rather than to a node this dialog is about to take with it. Skipped when
+    // the element is gone - closing the cart with the browser Back button also
+    // replaces the header button that opened it.
+    restoreFocus(this.previouslyFocused);
     // Deliberately no attempt to flush the staged edits here. Teardown is not a
     // place a write can be *awaited* - by the time it runs the route is already
     // being left, so a request issued now reports its result to a component
@@ -374,7 +499,7 @@ export class UserCartComponent implements OnDestroy, CartStagedEditsHost {
    * believing a change was saved that was not.
    */
   private reportCartWriteFailure(): void {
-    this.cartMessage = 'Sepet guncellemesi kaydedilemedi. Lutfen tekrar deneyin.';
+    this.cartMessage = CART_COPY.writeFailed;
   }
 
   /**
@@ -627,7 +752,7 @@ export class UserCartComponent implements OnDestroy, CartStagedEditsHost {
     const item = this.items.find((entry) => entry.productId === productId);
     const change = resolveCartQuantityChange(item, 'increase');
     if (change.kind === 'stock-limit') {
-      alert(`Bu urunden en fazla ${change.availableStock} adet alabilirsiniz.`);
+      alert(describeStockLimit(change.availableStock));
       return;
     }
     if (change.kind !== 'update' || !item) {
@@ -784,7 +909,7 @@ export class UserCartComponent implements OnDestroy, CartStagedEditsHost {
         this.isCartConfirmed = false;
         // A failed reconciliation is not a failed cart: leave the customer's
         // view exactly as it was and let them retry deliberately.
-        this.cartMessage = 'Sepet dogrulanamadi. Lutfen tekrar deneyin.';
+        this.cartMessage = CART_COPY.reconcileFailed;
       },
     });
   }
@@ -813,8 +938,7 @@ export class UserCartComponent implements OnDestroy, CartStagedEditsHost {
       // alone instead, and nothing is confirmed: the next press persists the
       // edit first and reconciles a cart that includes it.
       this.isCartConfirmed = false;
-      this.cartMessage =
-        'Sepetiniz onay sirasinda degisti. Lutfen tekrar kontrol edip onaylayin.';
+      this.cartMessage = CART_COPY.changedDuringPress;
       return;
     }
 
@@ -842,8 +966,7 @@ export class UserCartComponent implements OnDestroy, CartStagedEditsHost {
       // reason the server did not classify - a concurrent removal, a changed
       // price, a clamped quantity. It is still a cart they have not seen, so it
       // is named and re-confirmed rather than approved on their behalf.
-      this.cartMessage =
-        'Sepetiniz sunucu tarafinda guncellendi. Lutfen sepeti kontrol edip onaylayin.';
+      this.cartMessage = CART_COPY.serverUpdated;
     }
 
     if (!repaired && !differs && this.items.length > 0) {
@@ -854,14 +977,19 @@ export class UserCartComponent implements OnDestroy, CartStagedEditsHost {
     }
   }
 
+  /**
+   * Records that the reconciliation the customer already asked for stands as
+   * their confirmation.
+   *
+   * <p>Only the flag is set. The confirmed look of the checkout button is a
+   * template binding rather than an inline style, because a hand-written
+   * `backgroundColor = 'green'` is not the storefront's palette: it repainted the
+   * one control a customer is about to press in a colour that appears nowhere
+   * else in the product, and it did so by mutating the DOM outside Angular, which
+   * is why it could not be undone by any state change.
+   */
   private markCartConfirmed(): void {
     this.isCartConfirmed = true;
-    const button = this.buyButtonRef?.nativeElement as
-      | HTMLButtonElement
-      | undefined;
-    if (button) {
-      button.style.backgroundColor = 'green';
-    }
   }
 
   /**
@@ -895,9 +1023,7 @@ export class UserCartComponent implements OnDestroy, CartStagedEditsHost {
     }
 
     if (this.items.some((item) => item.productCount > item.availableStock)) {
-      alert(
-        'Sepetteki bir veya daha fazla urunun stogu yetersiz. Lutfen sepeti guncelleyin.',
-      );
+      alert(CART_COPY.insufficientStock);
       return;
     }
 
@@ -950,13 +1076,13 @@ function describeReconciliation(result: ICartReconciliation): string {
   const parts: string[] = [];
   if (result.removedProductIds.length > 0) {
     parts.push(
-      `${result.removedProductIds.length} urun artik satista olmadigi icin sepetten cikarildi.`,
+      `${result.removedProductIds.length} ürün artık satışta olmadığı için sepetten çıkarıldı.`,
     );
   }
   if (result.reducedProductIds.length > 0) {
     parts.push(
-      `${result.reducedProductIds.length} urunun miktari kalan stoga gore azaltildi.`,
+      `${result.reducedProductIds.length} ürünün miktarı kalan stoğa göre azaltıldı.`,
     );
   }
-  return `${parts.join(' ')} Lutfen sepeti kontrol edip onaylayin.`;
+  return `${parts.join(' ')} Lütfen sepeti kontrol edip onaylayın.`;
 }

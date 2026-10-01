@@ -7,7 +7,7 @@ import {
 } from '@angular/core/testing';
 import { of, Subject, throwError } from 'rxjs';
 
-import { PaymentComponent } from './payment.component';
+import { PAYMENT_COPY, PaymentComponent } from './payment.component';
 import { RestService } from '../../../../services/rest/rest.service';
 import { ICheckoutResponse } from '../../../../interfaces/ICheckoutResponse';
 import { IPaymentStatus } from '../../../../interfaces/IPaymentStatus';
@@ -182,7 +182,7 @@ describe('PaymentComponent', () => {
 
     await component.handlePayment();
 
-    expect(component.errorMessage).toContain('could not be initialized');
+    expect(component.errorMessage).toBe(PAYMENT_COPY.formInitFailed);
     expect(component.isProcessing).toBeFalse();
     expect(restService.chargeCheckout).not.toHaveBeenCalled();
   });
@@ -194,7 +194,10 @@ describe('PaymentComponent', () => {
 
     await component.handlePayment();
 
-    expect(component.errorMessage).toBe('Card declined');
+    // The provider's own reason is kept - it names the problem - but it is led by
+    // our own Turkish explanation, and it never says the payment went through.
+    expect(component.errorMessage).toContain(PAYMENT_COPY.cardRejected);
+    expect(component.errorMessage).toContain('Card declined');
     expect(component.isProcessing).toBeFalse();
     expect(restService.chargeCheckout).not.toHaveBeenCalled();
   });
@@ -207,7 +210,7 @@ describe('PaymentComponent', () => {
 
     await component.handlePayment();
 
-    expect(component.errorMessage).toBe('Payment failed. Please try again.');
+    expect(component.errorMessage).toBe(PAYMENT_COPY.chargeFailed);
     expect(restService.chargeCheckout).toHaveBeenCalledOnceWith('checkout-1', 'tok_visa');
     expect(restService.prepareCheckout).not.toHaveBeenCalled();
     expect(component.checkout?.checkoutId).toBe('checkout-1');
@@ -220,7 +223,7 @@ describe('PaymentComponent', () => {
 
     await component.handlePayment();
 
-    expect(component.errorMessage).toBe('Payment failed. Please try again.');
+    expect(component.errorMessage).toBe(PAYMENT_COPY.tokenFailed);
     expect(component.isProcessing).toBeFalse();
     expect(component.checkout?.checkoutId).toBe('checkout-1');
     expect(restService.chargeCheckout).not.toHaveBeenCalled();
@@ -254,7 +257,7 @@ describe('PaymentComponent', () => {
 
     expect(restService.getPaymentStatus).toHaveBeenCalledWith('checkout-1');
     expect(component.pendingMessage.length).toBeGreaterThanOrEqual(0);
-    expect(component.errorMessage).toContain('still being processed');
+    expect(component.errorMessage).toBe(PAYMENT_COPY.stillProcessing);
   });
 
   it('keeps polling a pending charge against the original checkout only', fakeAsync(() => {
@@ -274,7 +277,7 @@ describe('PaymentComponent', () => {
     expect(restService.getPaymentStatus).toHaveBeenCalledWith('checkout-1');
     expect(restService.prepareCheckout).not.toHaveBeenCalled();
     expect(component.checkout?.checkoutId).toBe('checkout-1');
-    expect(component.pendingMessage).toContain('processed');
+    expect(component.pendingMessage).toBe(PAYMENT_COPY.verifying);
     tick(10000);
     discardPeriodicTasks();
   }));
@@ -293,7 +296,7 @@ describe('PaymentComponent', () => {
     component.isProcessing = true;
     component.pollPaymentStatus('checkout-1', 3);
 
-    expect(component.pendingMessage).toContain('processed');
+    expect(component.pendingMessage).toBe(PAYMENT_COPY.verifying);
     expect(component.isProcessing).toBeTrue();
 
     // Deterministically advance the scheduled re-poll chain instead of leaking
@@ -342,7 +345,7 @@ describe('PaymentComponent', () => {
 
     expect(restService.cancelCheckout).not.toHaveBeenCalled();
     expect(closed).not.toHaveBeenCalled();
-    expect(component.pendingMessage).toContain('still being verified');
+    expect(component.pendingMessage).toBe(PAYMENT_COPY.verifyingOnClose);
   });
 
   it('never cancels when the local status already moved to processing', () => {

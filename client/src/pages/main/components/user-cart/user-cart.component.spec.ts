@@ -90,7 +90,7 @@ describe('UserCartComponent', () => {
 
     component.increaseProductCount(10);
     expect(alertSpy).toHaveBeenCalledWith(
-      'Bu urunden en fazla 4 adet alabilirsiniz.',
+      'Bu üründen en fazla 4 adet alabilirsiniz.',
     );
     expect(component.items[0].productCount).toBe(4);
     expect(component.totalPrice).toBe(95);

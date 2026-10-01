@@ -1,125 +1,238 @@
-/* General container for the payment form */
-.payment-container {
-    width: 100%;
-    max-width: 400px;
-    margin: 0 auto;
-    padding: 20px;
-    background-color: #fff;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    font-family: 'Arial', sans-serif;
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 999;
-  }
+/*
+ * The payment dialog, on the storefront's own tokens.
+ *
+ * It sits on top of the cart dialog, so it repeats the same surfaces, radii and
+ * shadow rather than introducing a second visual language: the cart and the
+ * checkout it opens have to read as two steps of one thing.
+ */
 
-  #payment-component-bg {
-    width: 100vw;
-    height: 100vh;
-    position: fixed;
-    background-color: rgba(0, 0, 0, 0.3);
-    top: 50%; /* Center vertically */
-    left: 50%; /* Center horizontally */
-    transform: translate(-50%, -50%);
-    z-index: 998;
-  }
-  
-  /* Title of the payment form */
-  .payment-title {
-    text-align: center;
-    font-size: 24px;
-    font-weight: bold;
-    margin-bottom: 20px;
-    color: #333;
-  }
-  
-  /* Payment form wrapper */
-  .payment-form {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-  }
-  
-  /* Styling the Stripe card element */
-  .card-element {
-    height: 40px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    padding: 10px;
-    font-size: 16px;
-    background-color: #fafafa;
-  }
-  
-  .card-element input {
-    border: none;
-    outline: none;
-    width: 100%;
-    font-size: 16px;
-  }
-  
-  /* Error message for invalid input */
-  .error-message {
-    color: #ff5c5c;
-    font-size: 14px;
-    margin-top: -10px;
-    margin-bottom: 20px;
-  }
-  
-  /* Styling the payment button */
-  .payment-button {
-    padding: 12px;
-    background-color: #4CAF50;
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    font-size: 16px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-  }
-  
-  .payment-button:hover {
-    background-color: #45a049;
-  }
-  
-  /* Styling for informational text */
-  .payment-info {
-    text-align: center;
-    font-size: 14px;
-    color: #777;
-  }
-  
-  .payment-info a {
-    color: #4CAF50;
-    text-decoration: none;
-  }
-  
-  .payment-info a:hover {
-    text-decoration: underline;
-  }
-  
+#payment-component-bg {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background-color: var(--dialog-scrim);
+  backdrop-filter: var(--dialog-backdrop-blur);
+  z-index: 1060;
+}
+
+.payment-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1070;
+  width: 100%;
+  max-width: 420px;
+  /* `dvh` where it is supported so the dialog is sized against the part of the
+     viewport the mobile browser is actually showing, and falls back to `vh`. */
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--landing-space-4);
+  padding: var(--landing-space-5);
+  background-color: var(--landing-surface);
+  color: var(--landing-ink);
+  border: 1px solid var(--landing-border);
+  border-radius: var(--landing-radius-lg);
+  box-shadow: var(--landing-shadow-lg);
+  font-family: inherit;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.payment-dialog:focus {
+  outline: none;
+}
+
+.payment-dialog:focus-visible {
+  outline: 3px solid var(--landing-orange);
+  outline-offset: 2px;
+}
+
+.payment-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--landing-space-3);
+}
+
+.payment-dialog__title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--landing-ink);
+}
+
+.payment-dialog__close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--landing-ink-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--landing-radius-pill);
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.payment-dialog__close:hover {
+  color: var(--landing-ink);
+  background-color: var(--landing-surface-raised);
+}
+
+.payment-dialog__close:focus-visible {
+  outline: 3px solid var(--landing-orange);
+  outline-offset: 2px;
+}
+
+.payment-dialog__total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--landing-space-3);
+  margin: 0;
+  padding: var(--landing-space-3) var(--landing-space-4);
+  background-color: var(--landing-orange-soft);
+  border-radius: var(--landing-radius-md);
+  font-size: 0.95rem;
+  color: var(--landing-ink-muted);
+}
+
+.payment-dialog__total-label {
+  font-weight: 500;
+}
+
+.payment-dialog__total-amount {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--landing-orange-deep);
+  font-variant-numeric: tabular-nums;
+}
+
+.payment-dialog__total--pending {
+  justify-content: center;
+  color: var(--landing-ink-muted);
+}
+
+.payment-dialog__message {
+  margin: 0;
+  padding: var(--landing-space-3) var(--landing-space-4);
+  border-radius: var(--landing-radius-md);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.payment-dialog__message--error {
+  color: var(--dialog-danger);
+  background-color: var(--dialog-danger-soft);
+  border: 1px solid var(--dialog-danger);
+}
+
+.payment-dialog__message--pending {
+  color: var(--dialog-warning-ink);
+  background-color: var(--dialog-warning-surface);
+  border: 1px solid var(--dialog-warning-border);
+}
+
+.payment-dialog__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--landing-space-3);
+}
+
+.payment-dialog__field-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--landing-ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Stripe renders its own input into this box, so it is the frame rather than the
+   field: it carries the border, the radius and the focus ring the storefront
+   gives every other input, and Stripe's own focus handling stays visible inside. */
+.payment-dialog__card {
+  min-height: 44px;
+  padding: var(--landing-space-3);
+  background-color: var(--landing-surface-muted);
+  border: 1px solid var(--landing-border-strong);
+  border-radius: var(--landing-radius-sm);
+}
+
+.payment-dialog__card:focus-within {
+  border-color: var(--landing-orange);
+  box-shadow: var(--dialog-focus-ring);
+}
+
+.payment-dialog__submit {
+  width: 100%;
+  padding: var(--landing-space-3) var(--landing-space-4);
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+  background-color: var(--landing-orange);
+  border: 1px solid var(--landing-orange);
+  border-radius: var(--landing-radius-md);
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.payment-dialog__submit:hover:not(:disabled) {
+  background-color: var(--landing-orange-strong);
+  border-color: var(--landing-orange-strong);
+}
+
+.payment-dialog__submit:focus-visible {
+  outline: 3px solid var(--landing-orange);
+  outline-offset: 2px;
+}
+
+.payment-dialog__submit:disabled {
+  color: var(--landing-ink-muted);
+  background-color: var(--landing-surface-raised);
+  border-color: var(--landing-border-strong);
+  cursor: not-allowed;
+}
+
+.payment-dialog__note {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  text-align: center;
+  color: var(--landing-ink-muted);
+}
+
 @media (max-width: 767.98px) {
-  .payment-container {
-    width: calc(100vw - 16px);
-    max-width: none;
+  .payment-dialog {
     top: 8px;
     left: 8px;
     transform: none;
+    width: calc(100vw - 16px);
+    max-width: none;
     max-height: calc(100vh - 16px);
-    overflow-y: auto;
-    border-radius: 12px;
-    padding: 14px;
+    max-height: calc(100dvh - 16px);
+    padding: var(--landing-space-4);
+    border-radius: var(--landing-radius-md);
   }
 
-  #payment-component-bg {
-    top: 0;
-    left: 0;
-    transform: none;
+  .payment-dialog__title {
+    font-size: 1.1rem;
   }
+}
 
-  .payment-title {
-    font-size: 20px;
-    margin-bottom: 14px;
+@media (prefers-reduced-motion: reduce) {
+  .payment-dialog__close,
+  .payment-dialog__submit {
+    transition: none;
   }
 }

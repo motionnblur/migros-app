@@ -1,39 +1,56 @@
-<div id="cart-overlay" (click)="closeCartComponent()"></div>
+<!--
+  The scrim is presentational: it exists to be clicked, carries no information
+  and is not a control, so it is hidden from assistive technology rather than
+  exposed as an unnamed element sitting in the tab order.
+-->
+<div id="cart-overlay" aria-hidden="true" (click)="closeCartComponent()"></div>
 
-<div id="cart-container" class="card shadow-lg border-0 animate-fade-in">
+<div
+  #cartDialog
+  id="cart-container"
+  class="card shadow-lg border-0 animate-fade-in cart-dialog"
+  data-testid="cart-dialog"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="cart-dialog-title"
+  [attr.aria-busy]="isCartBusy"
+  tabindex="-1">
 
   <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
     <div class="d-flex align-items-center">
-      <i class="bi bi-cart3 text-orange fs-4 me-2"></i>
-      <h5 class="mb-0 fw-bold">Sepetim</h5>
+      <i class="bi bi-cart3 text-orange fs-4 me-2" aria-hidden="true"></i>
+      <h5 id="cart-dialog-title" class="mb-0 fw-bold">{{ copy.title }}</h5>
     </div>
-    <button type="button" class="btn-close" (click)="closeCartComponent()"></button>
+    <button
+      type="button"
+      class="btn-close"
+      data-testid="cart-close"
+      [attr.aria-label]="copy.close"
+      (click)="closeCartComponent()"></button>
   </div>
 
   <div class="card-body p-0">
-    <div *ngIf="items.length === 0" class="text-center py-5 text-muted">
-      <i class="bi bi-cart-x fs-1 d-block mb-2"></i>
-      <p class="mb-3">Sepetiniz henuz bos.</p>
-      <p class="small mb-3">
-        Satista olmayan urunler sepetinizden otomatik olarak cikarilmaz. Sepetinizi
-        kontrol ederek temizleyebilirsiniz.
-      </p>
+    <div *ngIf="items.length === 0" class="text-center py-5 text-muted cart-dialog__empty">
+      <i class="bi bi-cart-x fs-1 d-block mb-2" aria-hidden="true"></i>
+      <p class="mb-3">{{ copy.emptyTitle }}</p>
+      <p class="small mb-3">{{ copy.emptyHint }}</p>
       <button
         type="button"
         class="btn btn-outline-secondary btn-sm"
         data-testid="reconcile-empty-cart"
         [disabled]="isCartBusy"
         (click)="reconcileEmptyCart()">
-        Sepeti Kontrol Et
+        {{ copy.emptyAction }}
       </button>
     </div>
 
-    <div *ngFor="let item of items; let i = index" class="cart-item p-3 border-bottom">
+    <div *ngFor="let item of items" class="cart-item p-3 border-bottom">
       <div class="row align-items-center g-3">
         <div class="col-auto">
           <img [src]="item.productImageUrl || 'assets/placeholder.png'"
                class="rounded border shadow-sm"
                width="70" height="70"
+               alt=""
                style="object-fit: contain; background: white;">
         </div>
 
@@ -41,32 +58,50 @@
           <div class="fw-bold text-dark text-truncate" style="max-width: 200px;" [title]="item.productName">
             {{ item.productName }}
           </div>
-          <div class="text-orange fw-bold fs-5">{{ item.productPrice | number:'1.2-2' }} TL</div>
+          <div class="text-orange fw-bold fs-5 cart-dialog__price">
+            {{ formatAmount(item.productPrice) }} {{ copy.currencyLabel }}
+          </div>
           <div class="small" [ngClass]="item.availableStock > 0 ? 'text-success' : 'text-danger'">
-            Stok: {{ item.availableStock }}
+            {{ copy.stockLabel }}: {{ item.availableStock }}
           </div>
         </div>
 
         <div class="col-auto">
           <button class="btn btn-outline-danger btn-sm border-0"
                   [disabled]="isCartLocked"
+                  [attr.aria-label]="copy.removeFromCart(item.productName)"
                   (click)="removeProductFromUserCart(item.productId)">
-            <i class="bi bi-trash3 fs-5"></i>
+            <i class="bi bi-trash3 fs-5" aria-hidden="true"></i>
           </button>
         </div>
       </div>
 
       <div class="row mt-2">
         <div class="col d-flex justify-content-end">
-          <div class="input-group input-group-sm" style="width: 140px;">
-            <button class="btn btn-orange" [disabled]="isCartLocked" (click)="decreaseProductCount(item.productId)">
-              <i class="bi bi-dash-lg"></i>
+          <!--
+            The stepper is one control to a customer, so it is one labelled group
+            to a screen reader; naming each button on its own would lose the fact
+            that they operate on the same quantity.
+          -->
+          <div
+            class="input-group input-group-sm"
+            style="width: 140px;"
+            role="group"
+            [attr.aria-label]="copy.quantityGroup(item.productName)">
+            <button class="btn btn-orange"
+                    [disabled]="isCartLocked"
+                    [attr.aria-label]="copy.decreaseQuantity(item.productName)"
+                    (click)="decreaseProductCount(item.productId)">
+              <i class="bi bi-dash-lg" aria-hidden="true"></i>
             </button>
-            <span class="input-group-text bg-white border-top border-bottom flex-grow-1 justify-content-center fw-bold">
-              {{ item.productCount }}
-            </span>
-            <button class="btn btn-orange" [disabled]="isCartLocked || item.productCount >= item.availableStock" (click)="increaseProductCount(item.productId)">
-              <i class="bi bi-plus-lg"></i>
+            <span
+              class="input-group-text bg-white border-top border-bottom flex-grow-1 justify-content-center fw-bold"
+              aria-live="polite">{{ item.productCount }}</span>
+            <button class="btn btn-orange"
+                    [disabled]="isCartLocked || item.productCount >= item.availableStock"
+                    [attr.aria-label]="copy.increaseQuantity(item.productName)"
+                    (click)="increaseProductCount(item.productId)">
+              <i class="bi bi-plus-lg" aria-hidden="true"></i>
             </button>
           </div>
         </div>
@@ -74,22 +109,24 @@
     </div>
   </div>
 
-  <div class="card-footer bg-light p-3 border-top">
+  <div class="card-footer bg-light p-3 border-top cart-dialog__footer">
     <div *ngIf="cartMessage" class="alert alert-warning py-2 small" role="alert" data-testid="cart-reconciliation-message">
       {{ cartMessage }}
     </div>
 
     <div class="d-flex justify-content-between align-items-center mb-3">
-      <span class="text-muted fw-medium">Toplam Tutar:</span>
-      <span class="fs-3 fw-bold text-orange">{{ totalPrice | number:'1.2-2' }} TL</span>
+      <span class="text-muted fw-medium">{{ copy.totalLabel }}:</span>
+      <span class="fs-3 fw-bold text-orange cart-dialog__total" data-testid="cart-total">{{ formattedTotal }}</span>
     </div>
 
     <button
       #buyButton
-      class="btn btn-orange w-100 py-3 fw-bold shadow-sm"
+      class="btn btn-orange w-100 py-3 fw-bold shadow-sm cart-dialog__buy"
+      data-testid="cart-checkout"
+      [class.cart-dialog__buy--confirmed]="isCartConfirmed"
       [disabled]="items.length === 0 || isCartBusy"
       (click)="openPaymentComponent()">
-      {{ isCartWritePending ? 'Sepet kaydediliyor' : (isReconcilingCart ? 'Sepet kontrol ediliyor' : (items.length > 0 ? (isCartConfirmed ? 'Siparisi Tamamla' : 'Sepeti Onayla') : 'Sepet Bos')) }}
+      {{ checkoutLabel }}
     </button>
   </div>
 

@@ -188,7 +188,7 @@ describe('UserCartComponent checkout reconciliation', () => {
     // Recomputed from what survived, not left at the pre-reconcile figure.
     expect(component.totalPrice).toBe(40);
     expect(component.cartMessage).toContain('1');
-    expect(component.cartMessage).toContain('cikarildi');
+    expect(component.cartMessage).toContain('çıkarıldı');
     expect(component.isReconcilingCart).toBeFalse();
     // Still unconfirmed: the customer has just been shown a different cart from
     // the one they pressed confirm on.
@@ -199,7 +199,7 @@ describe('UserCartComponent checkout reconciliation', () => {
       '[data-testid="cart-reconciliation-message"]',
     );
     expect(message).toBeTruthy();
-    expect(message.textContent).toContain('cikarildi');
+    expect(message.textContent).toContain('çıkarıldı');
 
     // Second press: the customer approves the repaired cart. It is reconciled
     // again rather than trusted from the client's own memory, and this time
@@ -236,8 +236,8 @@ describe('UserCartComponent checkout reconciliation', () => {
     expect(component.items.map((entry) => entry.productId)).toEqual([10, 11]);
     expect(component.items[1].productCount).toBe(1);
     expect(component.totalPrice).toBe(55);
-    expect(component.cartMessage).toContain('azaltildi');
-    expect(component.cartMessage).not.toContain('cikarildi');
+    expect(component.cartMessage).toContain('azaltıldı');
+    expect(component.cartMessage).not.toContain('çıkarıldı');
     expect(component.isCartConfirmed).toBeFalse();
 
     component.openPaymentComponent();
@@ -264,8 +264,8 @@ describe('UserCartComponent checkout reconciliation', () => {
     });
 
     expect(component.totalPrice).toBe(20);
-    expect(component.cartMessage).toContain('cikarildi');
-    expect(component.cartMessage).toContain('azaltildi');
+    expect(component.cartMessage).toContain('çıkarıldı');
+    expect(component.cartMessage).toContain('azaltıldı');
     expect(component.isCartConfirmed).toBeFalse();
   });
 
@@ -498,7 +498,7 @@ describe('UserCartComponent checkout reconciliation', () => {
 
     expect(component.items[0].productCount).toBe(2);
     expect(component.totalPrice).toBe(55);
-    expect(component.cartMessage).toContain('guncellendi');
+    expect(component.cartMessage).toContain('güncellendi');
     expect(component.isCartConfirmed).toBeFalse();
     expect(component.isPaymentPhaseActive).toBeFalse();
   });
@@ -557,7 +557,7 @@ describe('UserCartComponent checkout reconciliation', () => {
     expect(component.items.map((entry) => entry.productId)).toEqual([10]);
     expect(component.isCartConfirmed).toBeFalse();
     expect(component.isPaymentPhaseActive).toBeFalse();
-    expect(component.cartMessage).toContain('degisti');
+    expect(component.cartMessage).toContain('değişti');
     expect(component.cartMessage).not.toContain('sunucu');
 
     // The edit is still unsaved, so the next press writes it and only then
@@ -658,7 +658,7 @@ describe('UserCartComponent checkout reconciliation', () => {
     // A failed reconciliation is not a failed cart. Reporting it as a lost item
     // would be a lie about their cart; continuing silently would reserve from a
     // list nobody reconciled. It is neither: the customer retries deliberately.
-    expect(component.cartMessage).toContain('dogrulanamadi');
+    expect(component.cartMessage).toContain('doğrulanamadı');
     expect(component.isPaymentPhaseActive).toBeFalse();
     expect(
       fixture.nativeElement.querySelector(
@@ -740,7 +740,7 @@ describe('UserCartComponent checkout reconciliation', () => {
 
     // The residue is cleared, the customer is told, and no checkout is offered.
     expect(component.items).toEqual([]);
-    expect(component.cartMessage).toContain('cikarildi');
+    expect(component.cartMessage).toContain('çıkarıldı');
     expect(component.isCartConfirmed).toBeFalse();
     expect(component.isPaymentPhaseActive).toBeFalse();
     expect(

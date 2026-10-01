@@ -1,16 +1,43 @@
-/* Custom Brand Color */
+/*
+ * Custom Brand Color.
+ *
+ * The orange is the storefront's, so the cart's chrome is spelled with the shared
+ * landing tokens rather than with the hexes it used to carry. `.text-orange` and
+ * `.btn-orange` stay because the storefront markup and the admin panel both
+ * reference them by name.
+ */
 .text-orange {
-  color: #ff7f00 !important;
+  color: var(--landing-orange) !important;
 }
 
 .btn-orange {
-  background-color: #ff7f00 !important;
-  border-color: #ff7f00 !important;
+  background-color: var(--landing-orange) !important;
+  border-color: var(--landing-orange) !important;
   color: white !important;
 }
 
-.btn-orange:hover {
-  background-color: #e67200 !important;
+.btn-orange:hover:not(:disabled) {
+  background-color: var(--landing-orange-strong) !important;
+  border-color: var(--landing-orange-strong) !important;
+}
+
+.btn-orange:disabled {
+  background-color: var(--landing-surface-raised) !important;
+  border-color: var(--landing-border-strong) !important;
+  color: var(--landing-ink-muted) !important;
+  opacity: 1;
+}
+
+/*
+ * The confirmed state of the checkout button.
+ *
+ * A deeper orange rather than the green the button used to be repainted with by
+ * hand: the confirmation reads as the same brand pressed one step further, and the
+ * storefront has no green to borrow from here.
+ */
+.cart-dialog__buy--confirmed {
+  background-color: var(--landing-orange-deep) !important;
+  border-color: var(--landing-orange-deep) !important;
 }
 
 /* Overlay Background */
@@ -18,10 +45,10 @@
   position: fixed;
   top: 0;
   left: 0;
-  width: 100vw;
-  height: 100vh;
-  background-color: rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(4px);
+  width: 100%;
+  height: 100%;
+  background-color: var(--dialog-scrim);
+  backdrop-filter: var(--dialog-backdrop-blur);
   z-index: 1040;
 }
 
@@ -34,13 +61,37 @@
   width: 450px; /* Slightly wider for better layout */
   max-width: 95vw;
   height: 650px; /* Set a fixed height for the modal */
+  /* `dvh` where supported, so the dialog is sized against the part of the viewport
+     a mobile browser is actually showing rather than one hidden behind its own
+     chrome; the `vh` line is the fallback for everything older. */
   max-height: 85vh;
+  max-height: 85dvh;
   z-index: 1050;
-  background-color: #fff;
-  border-radius: 16px;
+  background-color: var(--landing-surface);
+  color: var(--landing-ink);
+  border-radius: var(--landing-radius-lg);
   display: flex;
   flex-direction: column; /* Vital for footer pinning */
   overflow: hidden;
+}
+
+/*
+ * The dialog takes focus when it opens, so the ring belongs on it - but only when
+ * it was reached deliberately. Painting it on arrival would put an outline around
+ * the dialog for a customer who only ever saw it appear.
+ */
+#cart-container:focus {
+  outline: none;
+}
+
+#cart-container:focus-visible {
+  outline: 3px solid var(--landing-orange);
+  outline-offset: 2px;
+}
+
+#cart-container .btn-close:focus-visible {
+  outline: 3px solid var(--landing-orange);
+  outline-offset: 2px;
 }
 
 /* Card Body Scroll Fix */
@@ -48,6 +99,8 @@
   flex: 1 1 auto; /* Grow to fill space, shrink if needed */
   overflow-y: auto; /* Enable vertical scrolling */
   overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Scrollbar Styling */
@@ -56,16 +109,16 @@
 }
 
 .card-body::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--landing-surface-muted);
 }
 
 .card-body::-webkit-scrollbar-thumb {
-  background: #ccc;
+  background: var(--landing-border-strong);
   border-radius: 10px;
 }
 
 .card-body::-webkit-scrollbar-thumb:hover {
-  background: #ff7f00;
+  background: var(--landing-orange);
 }
 
 .cart-item {
@@ -73,22 +126,60 @@
 }
 
 .cart-item:hover {
-  background-color: #fffaf5;
+  background-color: var(--landing-orange-soft);
+}
+
+.cart-dialog__empty {
+  color: var(--landing-ink-muted);
+}
+
+/* Tabular figures keep a price from shifting sideways as its digits change. */
+.cart-dialog__price,
+.cart-dialog__total {
+  font-variant-numeric: tabular-nums;
+}
+
+.cart-dialog__footer {
+  background-color: var(--landing-surface-muted) !important;
+}
+
+.cart-dialog__footer .alert {
+  background-color: var(--dialog-warning-surface);
+  border-color: var(--dialog-warning-border);
+  color: var(--dialog-warning-ink);
+}
+
+.cart-dialog__footer .btn:focus-visible {
+  outline: 3px solid var(--landing-orange);
+  outline-offset: 2px;
+}
+
+.cart-item .btn:focus-visible {
+  outline: 3px solid var(--landing-orange);
+  outline-offset: 2px;
 }
 
 @media (max-width: 767.98px) {
   #cart-container {
     width: calc(100vw - 16px);
     height: calc(100vh - 16px);
+    height: calc(100dvh - 16px);
     max-height: calc(100vh - 16px);
+    max-height: calc(100dvh - 16px);
     top: 8px;
     left: 8px;
     transform: none;
-    border-radius: 12px;
+    border-radius: var(--landing-radius-md);
   }
 
-  .card-footer .btn {
+  .cart-dialog__footer .btn {
     padding-top: 0.8rem !important;
     padding-bottom: 0.8rem !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cart-item {
+    transition: none;
   }
 }
