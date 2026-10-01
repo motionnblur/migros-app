@@ -7,9 +7,13 @@ import com.example.MigrosBackend.dto.user.order.UserOrderGroupDto;
 import com.example.MigrosBackend.dto.user.product.CartReconciliationDto;
 import com.example.MigrosBackend.dto.user.product.ProductDetailDto;
 import com.example.MigrosBackend.dto.user.product.ProductPreviewDto;
+import com.example.MigrosBackend.dto.user.product.ProductSearchResponseDto;
 import com.example.MigrosBackend.dto.user.product.UserCartItemDto;
 import com.example.MigrosBackend.helper.AuthTokenResolver;
 import com.example.MigrosBackend.helper.PageRequestPolicy;
+import com.example.MigrosBackend.service.user.supply.ProductSearchAvailability;
+import com.example.MigrosBackend.service.user.supply.ProductSearchService;
+import com.example.MigrosBackend.service.user.supply.ProductSearchSort;
 import com.example.MigrosBackend.service.user.supply.UserCartService;
 import com.example.MigrosBackend.service.user.supply.UserSupplyService;
 import jakarta.validation.constraints.Max;
@@ -26,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -45,14 +50,17 @@ import java.util.List;
 public class UserSupplyController {
     private final UserSupplyService userSupplyService;
     private final UserCartService userCartService;
+    private final ProductSearchService productSearchService;
     private final AuthTokenResolver authTokenResolver;
 
     @Autowired
     public UserSupplyController(UserSupplyService userSupplyService,
                                 UserCartService userCartService,
+                                ProductSearchService productSearchService,
                                 AuthTokenResolver authTokenResolver) {
         this.userSupplyService = userSupplyService;
         this.userCartService = userCartService;
+        this.productSearchService = productSearchService;
         this.authTokenResolver = authTokenResolver;
     }
 
@@ -105,6 +113,49 @@ public class UserSupplyController {
     @GetMapping("getSubCategories")
     public ResponseEntity<List<SubCategoryDto>> getSubCategories(@RequestParam Long categoryId) {
         return ResponseEntity.ok(userSupplyService.getSubCategories(categoryId));
+    }
+
+    /**
+     * Searches the catalogue by name, category, subcategory, availability, price
+     * band, discount and sort order.
+     *
+     * <p>Every parameter is optional and an absent one means no filter rather
+     * than a filter for a default value, so the bare request is the whole
+     * catalogue - including sold-out products, because a catalogue that hides
+     * them cannot answer "is this still sold here".
+     *
+     * <p>The {@code page}/{@code size} pair is bounded exactly like every other
+     * paging pair in this controller: {@code PageRequestPolicy} rejects an
+     * out-of-range value before the service runs, and the parameter annotations
+     * express the same bound at the HTTP layer so a bad value arrives as a
+     * structured 400 naming the parameter rather than as a clamp. {@code size}
+     * defaults to 10 and {@code page} to 0.
+     *
+     * <p>{@code subcategory} without {@code categoryId} is a 400 rather than a
+     * filter that is quietly ignored: subcategory names repeat across categories,
+     * so searching one alone would answer with products from categories the
+     * customer did not ask about. The price bounds are validated in the service,
+     * which owns the {@code NUMERIC(19, 2)} rules and reports which parameter was
+     * out of range.
+     */
+    @GetMapping("searchProducts")
+    public ResponseEntity<ProductSearchResponseDto> searchProducts(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) String subcategory,
+            @RequestParam(required = false) ProductSearchAvailability availability,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) Boolean discountedOnly,
+            @RequestParam(required = false) ProductSearchSort sort,
+            @RequestParam(defaultValue = "0") @PositiveOrZero int page,
+            @RequestParam(defaultValue = "10")
+            @Min(PageRequestPolicy.MIN_PAGE_SIZE)
+            @Max(PageRequestPolicy.MAX_PAGE_SIZE)
+            int size) {
+        return ResponseEntity.ok(productSearchService.search(
+                q, categoryId, subcategory, availability, minPrice, maxPrice, discountedOnly,
+                sort, page, size));
     }
 
     @PostMapping("addProductToUserCart")

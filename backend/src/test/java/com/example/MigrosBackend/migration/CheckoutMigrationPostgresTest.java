@@ -109,7 +109,12 @@ class CheckoutMigrationPostgresTest {
 
         try (Connection connection = openConnection(); Statement statement = connection.createStatement()) {
             statement.execute("INSERT INTO user_entity (user_entity_id, user_mail) VALUES (1, 'a@migros.com')");
-            statement.execute("INSERT INTO product_entity (product_entity_id, product_name) VALUES (1, 'Apple')");
+            // effective_price is NOT NULL from V13 and nothing in raw SQL computes
+            // it, so this insert has to carry it. The price and discount columns
+            // were added by V5 as nullable ones, which is what lets a row like this
+            // exist at all.
+            statement.execute("INSERT INTO product_entity (product_entity_id, product_name, effective_price) "
+                    + "VALUES (1, 'Apple', 0.00)");
             statement.execute(checkoutInsert(UUID.randomUUID(), 1, "PREPARED"));
         }
 

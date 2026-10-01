@@ -14,6 +14,7 @@ import com.example.MigrosBackend.exception.shared.TokenNotFoundException;
 import com.example.MigrosBackend.helper.AuthTokenResolver;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.service.global.TokenService;
+import com.example.MigrosBackend.service.user.supply.ProductSearchService;
 import com.example.MigrosBackend.service.user.supply.UserCartService;
 import com.example.MigrosBackend.service.user.supply.UserSupplyService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -54,6 +55,9 @@ class UserSupplyControllerTest {
 
     @MockBean
     private UserCartService userCartService;
+
+    @MockBean
+    private ProductSearchService productSearchService;
 
     @MockBean
     private AuthTokenResolver authTokenResolver;
@@ -531,16 +535,25 @@ class UserSupplyControllerTest {
         product.setProductDiscount(new BigDecimal("10.0"));
         product.setProductDescription("Pure natural honey.");
         product.setProductCategoryId(5);
-        product.setProductVersion(11L);
+product.setProductVersion(11L);
+        product.setEffectivePrice(new BigDecimal("13.95"));
 
         when(userSupplyService.getProductData(productId)).thenReturn(product);
 
         // productVersion is additive for catalog readers; existing fields and
-        // their meaning are unchanged.
+        // their meaning are unchanged. The four package fields are additive in the
+        // same way, and are null here because the product has no package size -
+        // which is the state of every product created before V14 and the reason
+        // they are declared rather than defaulted. effectivePrice is additive too
+        // and is the price the card, the cart line and the charge are all built
+        // from, so a detail reader is sent the payable price rather than only the
+        // two stored columns it would have to recombine.
         String expectedJson = "{\"productName\":\"Organic Honey\",\"subCategoryName\":\"Sweeteners\","
-                + "\"productPrice\":15.50,\"productCount\":100,\"productDiscount\":10.0,"
-                + "\"productDescription\":\"Pure natural honey.\",\"productCategoryId\":5,"
-                + "\"productVersion\":11}";
+            + "\"productPrice\":15.50,\"productCount\":100,\"productDiscount\":10.0,"
+            + "\"productDescription\":\"Pure natural honey.\",\"productCategoryId\":5,"
+            + "\"productVersion\":11,\"effectivePrice\":13.95,"
+            + "\"packageAmount\":null,\"packageUnit\":null,"
+            + "\"unitPrice\":null,\"unitPriceBasis\":null}";
 
         mockMvc.perform(get("/user/supply/getProductDataWithProductId")
                         .param("productId", productId.toString())

@@ -75,8 +75,8 @@ class ProductEditVersionMigrationPostgresTest {
         assertEquals(0, columnCount("product_entity", "version"),
                 "precondition: the column must not exist before V11");
 
-        long first = insertProduct("Legacy Apple", 10);
-        long second = insertProduct("Legacy Pear", 7);
+        long first = insertLegacyProduct("Legacy Apple", 10);
+        long second = insertLegacyProduct("Legacy Pear", 7);
 
         migrate();
 
@@ -94,7 +94,7 @@ class ProductEditVersionMigrationPostgresTest {
     @Test
     void reRunningTheMigrationChangesNothing() throws SQLException {
         migrateTo("10");
-        long productId = insertProduct("Idempotent Apple", 3);
+        long productId = insertLegacyProduct("Idempotent Apple", 3);
 
         migrate();
         migrate();
@@ -111,8 +111,8 @@ class ProductEditVersionMigrationPostgresTest {
     void theVersionColumnRejectsAnExplicitNull() {
         assertThrows(SQLException.class,
                 () -> execute("INSERT INTO product_entity (product_name, subcategory_name, product_count, "
-                        + "product_price, product_discount, product_description, version) "
-                        + "VALUES ('No Version', 'general', 1, 1.00, 0.00, 'desc', NULL)"),
+                        + "product_price, product_discount, effective_price, product_description, version) "
+                        + "VALUES ('No Version', 'general', 1, 1.00, 0.00, 1.00, 'desc', NULL)"),
                 "a null version would make every later comparison fail for that row");
     }
 
@@ -151,13 +151,38 @@ class ProductEditVersionMigrationPostgresTest {
         }
     }
 
-    private long insertProduct(String name, int stock) throws SQLException {
+    /**
+     * A row as it looked before V13, for the tests that migrate <em>to</em> a
+     * version below it. It must not name {@code effective_price}: that column does
+     * not exist yet at those targets, and an insert that mentions it fails with a
+     * confusing "column does not exist" rather than a clear one.
+     */
+    private long insertLegacyProduct(String name, int stock) throws SQLException {
         try (Connection connection = openConnection();
              Statement statement = connection.createStatement();
              ResultSet rs = statement.executeQuery(
                      "INSERT INTO product_entity (product_name, subcategory_name, product_count, "
                              + "product_price, product_discount, product_description) VALUES ('" + name + "', "
                              + "'general', " + stock + ", 5.00, 0.00, 'migration guard') "
+                             + "RETURNING product_entity_id")) {
+            assertTrue(rs.next());
+            return rs.getLong(1);
+        }
+    }
+
+    /**
+     * A row as it has to look once V13 has run. The effective price is NOT NULL by
+     * then and nothing in raw SQL computes it, so the raw insert has to carry it -
+     * which is exactly the constraint the migration adds.
+     */
+    private long insertProduct(String name, int stock) throws SQLException {
+        try (Connection connection = openConnection();
+             Statement statement = connection.createStatement();
+             ResultSet rs = statement.executeQuery(
+                     "INSERT INTO product_entity (product_name, subcategory_name, product_count, "
+                             + "product_price, product_discount, effective_price, product_description) "
+                             + "VALUES ('" + name + "', "
+                             + "'general', " + stock + ", 5.00, 0.00, 5.00, 'migration guard') "
                              + "RETURNING product_entity_id")) {
             assertTrue(rs.next());
             return rs.getLong(1);

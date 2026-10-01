@@ -10,6 +10,7 @@ import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.exception.admin.OrderNotFoundException;
 import com.example.MigrosBackend.exception.admin.ProductEditConflictException;
 import com.example.MigrosBackend.exception.shared.GeneralException;
+import com.example.MigrosBackend.helper.ProductPricingPolicy;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.repository.category.CategoryEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
@@ -513,8 +514,7 @@ class OrderStatusConcurrencyPostgresTest {
 
         assertThrows(ProductEditConflictException.class, () ->
                 adminSupplyService.updateProduct(admin.getId(), product.getId(), "Stale", "general",
-                        new BigDecimal("10.00"), 1, BigDecimal.ZERO, "stale", category.getCategoryId(),
-                        null, versionSeenByTheEditor),
+                        new BigDecimal("10.00"), 1, BigDecimal.ZERO, "stale", category.getCategoryId(), null, null, null, versionSeenByTheEditor),
                 "an edit form that predates the restock must be rejected, not allowed to "
                         + "put the returned unit back under an order that no longer exists");
         assertEquals(2, productEntityRepository.findById(product.getId()).orElseThrow().getProductCount());
@@ -682,6 +682,8 @@ private UserEntity createUser(String mail) {
         product.setProductCount(stock);
         product.setProductPrice(new BigDecimal(price));
         product.setProductDiscount(BigDecimal.ZERO);
+        product.setEffectivePrice(
+                ProductPricingPolicy.effectivePrice(product.getProductPrice(), product.getProductDiscount()));
         product.setProductDescription("test product");
         return productEntityRepository.saveAndFlush(product);
     }

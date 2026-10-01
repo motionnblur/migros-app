@@ -158,8 +158,7 @@ class ProductImageVersionAdvancePostgresTest {
         String firstPath = storedImagePath();
 
         long returned = adminSupplyService.updateProduct(admin.getId(), productId, "Water", "Still",
-                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(),
-                png(), versionBeforeReplacement);
+                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, png(), versionBeforeReplacement);
 
         assertNotEquals(storedImagePath(), firstPath, "precondition: the image really was replaced");
         assertTrue(versionOf(productId) > versionBeforeReplacement,
@@ -179,15 +178,14 @@ class ProductImageVersionAdvancePostgresTest {
         long staleVersion = versionOf(productId);
 
         adminSupplyService.updateProduct(admin.getId(), productId, "Water", "Still",
-                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(),
-                png(), staleVersion);
+                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, png(), staleVersion);
         long versionAfterReplacement = versionOf(productId);
         assertTrue(versionAfterReplacement > staleVersion, "precondition: the replacement moved the version");
 
         assertThrows(ProductEditConflictException.class, () ->
                 adminSupplyService.updateProduct(admin.getId(), productId, "Second Editor", "Still",
                         new BigDecimal("99.00"), 777, new BigDecimal("5.00"), "Late write",
-                        category.getCategoryId(), null, staleVersion));
+                        category.getCategoryId(), null, null, null, staleVersion));
 
         assertEquals("Water", jdbcTemplate.queryForObject(
                 "SELECT product_name FROM product_entity WHERE product_entity_id = ?",
@@ -218,7 +216,7 @@ class ProductImageVersionAdvancePostgresTest {
         assertThrows(ProductEditConflictException.class, () ->
                 adminSupplyService.updateProduct(admin.getId(), productId, "Rejected", "Rejected",
                         new BigDecimal("99.00"), 999, BigDecimal.ZERO, "Rejected",
-                        category.getCategoryId(), png(), staleVersion));
+                        category.getCategoryId(), null, null, png(), staleVersion));
 
         assertEquals(filesBefore, storedFiles().count(),
                 "a rejected edit must not leave the upload it carried on disk");
@@ -245,8 +243,7 @@ class ProductImageVersionAdvancePostgresTest {
         TransactionTemplate transaction = new TransactionTemplate(txManager);
         transaction.execute(status -> {
             adminSupplyService.updateProduct(admin.getId(), productId, "Water", "Still",
-                    new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(),
-                    png(), versionBefore);
+                    new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, png(), versionBefore);
             status.setRollbackOnly();
             return null;
         });
@@ -290,8 +287,7 @@ class ProductImageVersionAdvancePostgresTest {
         long versionAfterCreation = versionOf(productId);
 
         long firstReturned = adminSupplyService.updateProduct(admin.getId(), productId, "Water", "Still",
-                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(),
-                null, versionAfterCreation);
+                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, null, versionAfterCreation);
 
         assertEquals(versionAfterCreation, firstReturned,
                 "a submission that changes nothing must report the version it found");
@@ -299,8 +295,7 @@ class ProductImageVersionAdvancePostgresTest {
                 "no change at all implies the version does not move");
 
         long secondReturned = adminSupplyService.updateProduct(admin.getId(), productId, "Water", "Still",
-                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(),
-                null, firstReturned);
+                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, null, firstReturned);
 
         assertEquals(versionAfterCreation, secondReturned);
         assertEquals(versionAfterCreation, versionOf(productId),
@@ -325,16 +320,14 @@ class ProductImageVersionAdvancePostgresTest {
         long versionBeforeImageEdit = versionOf(productId);
 
         long afterImageEdit = adminSupplyService.updateProduct(admin.getId(), productId, "Water", "Still",
-                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(),
-                png(), versionBeforeImageEdit);
+                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, png(), versionBeforeImageEdit);
 
         assertEquals(versionOf(productId), afterImageEdit,
                 "the value carried by the response header for an image-changing edit");
 
         long versionBeforeFieldEdit = versionOf(productId);
         long afterFieldEdit = adminSupplyService.updateProduct(admin.getId(), productId, "Sparkling", "Fizzy",
-                new BigDecimal("7.25"), 12, new BigDecimal("5.00"), "Fizzy", category.getCategoryId(),
-                null, versionBeforeFieldEdit);
+                new BigDecimal("7.25"), 12, new BigDecimal("5.00"), "Fizzy", category.getCategoryId(), null, null, null, versionBeforeFieldEdit);
 
         assertEquals(versionOf(productId), afterFieldEdit,
                 "the value carried by the response header for a field-changing edit");
@@ -354,12 +347,10 @@ class ProductImageVersionAdvancePostgresTest {
         long startingVersion = versionOf(productId);
 
         long afterFirst = adminSupplyService.updateProduct(admin.getId(), productId, "First Save", "Still",
-                new BigDecimal("5.00"), 11, BigDecimal.ZERO, "Fresh", category.getCategoryId(),
-                null, startingVersion);
+                new BigDecimal("5.00"), 11, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, null, startingVersion);
 
         long afterSecond = adminSupplyService.updateProduct(admin.getId(), productId, "Second Save", "Still",
-                new BigDecimal("5.00"), 12, BigDecimal.ZERO, "Fresh", category.getCategoryId(),
-                null, afterFirst);
+                new BigDecimal("5.00"), 12, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, null, afterFirst);
 
         assertEquals(startingVersion + 1, afterFirst, "one accepted save advances the version by one");
         assertEquals(startingVersion + 2, afterSecond,
@@ -376,7 +367,7 @@ class ProductImageVersionAdvancePostgresTest {
 
     private Long uploadWater() {
         adminSupplyService.uploadProduct(admin.getId(), "Water", "Still",
-                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), png());
+                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, png());
         return productEntityRepository.findAll().get(0).getId();
     }
 

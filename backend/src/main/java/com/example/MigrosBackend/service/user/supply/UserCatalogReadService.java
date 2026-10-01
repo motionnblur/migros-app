@@ -15,6 +15,7 @@ import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.exception.user.CategoryNotFoundException;
 import com.example.MigrosBackend.helper.PageRequestPolicy;
 import com.example.MigrosBackend.helper.ProductPricingPolicy;
+import com.example.MigrosBackend.helper.ProductUnitPricePolicy;
 import com.example.MigrosBackend.repository.category.CategoryEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductDescriptionEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
@@ -34,6 +35,30 @@ import java.util.stream.Collectors;
 
 @Service
 public final class UserCatalogReadService {
+    /**
+     * Everything a customer DTO carries about package size, derived once.
+     *
+     * <p>A record rather than four setters per call site, so the four fields cannot
+     * be filled from four different sources: the amount and unit come off the row
+     * and the unit price comes off {@link ProductUnitPricePolicy}, which reads that
+     * same row. There is exactly one projection here and both catalogue listings
+     * and the detail read use it.
+     *
+     * <p>{@code unitPrice} and {@code unitPriceBasis} are {@code null} together
+     * and only when the product has no usable package size. That is what lets a
+     * client render one line or none: there is no state in which a unit price
+     * appears without a basis to say what it is per.
+     */
+    private record PackageMetadata(BigDecimal amount,
+                                   String unit,
+                                   BigDecimal unitPrice,
+                                   String unitPriceBasis) {
+
+        private static PackageMetadata absent() {
+            return new PackageMetadata(null, null, null, null);
+        }
+    }
+
     private final CategoryEntityRepository categoryEntityRepository;
     private final ProductEntityRepository productEntityRepository;
     private final ProductImageEntityRepository productImageEntityRepository;
@@ -151,6 +176,15 @@ public final class UserCatalogReadService {
         productDto2.setProductDescription(productEntity.getProductDescription());
         productDto2.setProductCategoryId(Math.toIntExact(productEntity.getCategoryEntity().getId()));
         productDto2.setProductVersion(productEntity.getVersion());
+        // The same number the preview rows carry, from the same call, so a card and
+        // the detail page it opens cannot quote two different prices for one
+        // product. The raw columns above stay raw; this is the payable one.
+        productDto2.setEffectivePrice(getEffectivePrice(productEntity));
+        PackageMetadata metadata = packageMetadataOf(productEntity);
+        productDto2.setPackageAmount(metadata.amount());
+        productDto2.setPackageUnit(metadata.unit());
+        productDto2.setUnitPrice(metadata.unitPrice());
+        productDto2.setUnitPriceBasis(metadata.unitPriceBasis());
         return productDto2;
     }
 
@@ -206,13 +240,60 @@ public final class UserCatalogReadService {
         return ProductPricingPolicy.effectivePrice(price, discount);
     }
 
-    private ProductPreviewDto toProductPreviewDto(ProductEntity itemEntity) {
+    /**
+     * The one projection from a product row to the customer listing row.
+     *
+     * <p>Package-private rather than private because
+     * {@link ProductSearchService} builds the same preview and must not build it a
+     * second time: two copies of this projection is how a search result starts
+     * showing a package size the category listing does not, or a unit price derived
+     * from a different price than the one on the card. One projection, called from
+     * every catalogue read.
+     */
+    ProductPreviewDto toProductPreviewDto(ProductEntity itemEntity) {
         ProductPreviewDto itemDto = new ProductPreviewDto();
         itemDto.setProductId(itemEntity.getId());
         itemDto.setProductName(itemEntity.getProductName());
         itemDto.setProductPrice(getEffectivePrice(itemEntity));
         itemDto.setProductCount(itemEntity.getProductCount());
+        PackageMetadata metadata = packageMetadataOf(itemEntity);
+        itemDto.setPackageAmount(metadata.amount());
+        itemDto.setPackageUnit(metadata.unit());
+        itemDto.setUnitPrice(metadata.unitPrice());
+        itemDto.setUnitPriceBasis(metadata.unitPriceBasis());
         return itemDto;
+    }
+
+    /**
+     * The package size and the price per basis unit, derived from the same row.
+     *
+     * <p>Package-level facts pass through untouched, and the unit price is computed
+     * from {@link #getEffectivePrice} rather than from {@code effective_price} or
+     * from {@code product_price}: the card, the detail page and the cart line are
+     * all built from that same number, so a unit price shown next to a package
+     * price is necessarily a ratio of two numbers the customer is also looking at.
+     *
+     * <p>Size with no unit price is a real possibility and is not an error. A row
+     * whose unit is outside the closed set - only reachable by a write that bypassed
+     * the creation policy - keeps its package size and reports no unit price, so
+     * the listing shows the size and hides the comparison rather than inventing a
+     * divisor. Most products report nothing at all.
+     */
+    private PackageMetadata packageMetadataOf(ProductEntity product) {
+        ProductUnitPricePolicy.UnitPrice unitPrice = ProductUnitPricePolicy.unitPrice(
+                getEffectivePrice(product),
+                product.getPackageAmount(),
+                product.getPackageUnit());
+
+        if (product.getPackageAmount() == null || product.getPackageUnit() == null) {
+            return PackageMetadata.absent();
+        }
+
+        return new PackageMetadata(
+                product.getPackageAmount(),
+                product.getPackageUnit(),
+                unitPrice == null ? null : unitPrice.amount(),
+                unitPrice == null ? null : unitPrice.basis().name());
     }
 
     private void ensureCategoryExists(Long categoryId) {

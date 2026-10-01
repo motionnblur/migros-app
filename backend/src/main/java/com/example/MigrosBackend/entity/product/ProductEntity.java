@@ -35,8 +35,63 @@ public class ProductEntity {
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal productDiscount;
 
+    /**
+     * The price a listing shows and a price band filter compares against,
+     * materialized at write time.
+     *
+     * <p>{@link com.example.MigrosBackend.helper.ProductPricingPolicy} owns this
+     * arithmetic and is still the only place that computes it; this column is
+     * its stored result, not a second formula. It exists because filtering and
+     * sorting by "the price the card shows" has to happen in the database - a
+     * filter applied after pagination is not a filter - and re-deriving the
+     * discounted value in SQL would be an informal second copy of a rounding
+     * sequence, which drifts from the first one at exactly the boundaries.
+     *
+     * <p>{@code NOT NULL} after V13, and every writer sets it, so it can never
+     * be missing from the row a filter is compared against. V13 backfills the
+     * pre-existing rows from the same rounding sequence, so an upgraded row and
+     * a freshly written one hold the same number.
+     */
+    @Column(nullable = false, precision = 19, scale = 2)
+    private BigDecimal effectivePrice;
+
     @Column(nullable = false)
     private String productDescription;
+
+    /**
+     * How much is in one package, or {@code null} when the product carries no
+     * package size.
+     *
+     * <p>Nullable with no default, and nullable on purpose. Every row that predates
+     * V14 has no package size, and a quantity inferred from a product name or a
+     * description would be a guess dressed as data: it would yield a unit price
+     * that looks authoritative and is not. An absent size is displayed as nothing
+     * at all rather than as an estimate.
+     *
+     * <p>{@code NUMERIC(12, 3)} because this is a physical quantity and not money:
+     * a dose in millilitres or a spice in grams legitimately needs three decimals.
+     * The scale is the schema's own, which is what lets
+     * {@link com.example.MigrosBackend.service.admin.supply.ProductCreationPolicy}
+     * reject a finer value as a 400 instead of letting the driver round it.
+     *
+     * <p>Always {@code null} together with {@link #packageUnit} or set together
+     * with it. A half-filled pair is a row the unit-price arithmetic has no
+     * denominator for.
+     */
+    @Column(precision = 12, scale = 3)
+    private BigDecimal packageAmount;
+
+    /**
+     * The measure {@link #packageAmount} is counted in: {@code G}, {@code KG},
+     * {@code ML}, {@code L} or {@code ADET}.
+     *
+     * <p>Stored as the canonical upper-case token rather than as free text, because
+     * it decides the unit price: a unit nobody defined has no basis to be priced
+     * per, and {@link com.example.MigrosBackend.helper.ProductUnitPricePolicy}
+     * returns nothing for one rather than guessing.
+     */
+    @Column(length = 8)
+    private String packageUnit;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "admin_entity_id", referencedColumnName = "admin_entity_id")

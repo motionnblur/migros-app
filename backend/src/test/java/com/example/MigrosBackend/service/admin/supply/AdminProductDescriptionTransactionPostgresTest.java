@@ -62,8 +62,8 @@ class AdminProductDescriptionTransactionPostgresTest {
         jdbcTemplate.execute("TRUNCATE TABLE product_description_entity, product_entity RESTART IDENTITY CASCADE");
         jdbcTemplate.update("INSERT INTO product_entity "
                 + "(product_entity_id, product_name, subcategory_name, product_count, product_price, "
-                + "product_discount, product_description) VALUES "
-                + "(1, 'Product', 'Sub', 1, 1.00, 0.00, 'desc')");
+                + "product_discount, effective_price, product_description) VALUES "
+                + "(1, 'Product', 'Sub', 1, 1.00, 0.00, 1.00, 'desc')");
     }
 
     @Test

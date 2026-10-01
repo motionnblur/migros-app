@@ -337,7 +337,7 @@ class AdminSupplyServiceTest {
         when(categoryEntityRepository.findByCategoryId(10)).thenReturn(category);
         when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(admin));
 
-        adminSupplyService.uploadProduct(1L, "Water", "Still", new BigDecimal("5.0"), 100, new BigDecimal("0.1"), "Fresh water", 10, file);
+        adminSupplyService.uploadProduct(1L, "Water", "Still", new BigDecimal("5.0"), 100, new BigDecimal("0.1"), "Fresh water", 10, null, null, file);
 
         verify(productEntityRepository).save(any(ProductEntity.class));
         verify(productImageEntityRepository).save(any(ProductImageEntity.class));
@@ -350,7 +350,7 @@ class AdminSupplyServiceTest {
 
         GeneralException exception = assertThrows(GeneralException.class, () ->
                 adminSupplyService.uploadProduct(1L, "Water", "Still", new BigDecimal("5.00"),
-                        100, new BigDecimal("0.10"), "Fresh water", 10, file));
+                        100, new BigDecimal("0.10"), "Fresh water", 10, null, null, file));
 
         assertEquals("Invalid category value: 10", exception.getMessage());
         // The file is the only part of this operation a database rollback cannot
@@ -369,7 +369,7 @@ class AdminSupplyServiceTest {
 
         assertThrows(AdminNotFoundException.class, () ->
                 adminSupplyService.uploadProduct(1L, "Water", "Still", new BigDecimal("5.00"),
-                        100, new BigDecimal("0.10"), "Fresh water", 10, file));
+                        100, new BigDecimal("0.10"), "Fresh water", 10, null, null, file));
 
         verify(fileService, never()).writeFileToDisk(any(), anyString());
         verify(productEntityRepository, never()).save(any());
@@ -389,7 +389,7 @@ class AdminSupplyServiceTest {
 
         assertThrows(DataIntegrityViolationException.class, () ->
                 adminSupplyService.uploadProduct(1L, "Water", "Still", new BigDecimal("5.0"),
-                        100, new BigDecimal("0.1"), "Fresh water", 10, file));
+                        100, new BigDecimal("0.1"), "Fresh water", 10, null, null, file));
 
         verify(fileService).deleteFileIfExists(mockPath);
     }
@@ -408,7 +408,7 @@ class AdminSupplyServiceTest {
 
         assertThrows(DataIntegrityViolationException.class, () ->
                 adminSupplyService.uploadProduct(1L, "Water", "Still", new BigDecimal("5.0"),
-                        100, new BigDecimal("0.1"), "Fresh water", 10, file));
+                        100, new BigDecimal("0.1"), "Fresh water", 10, null, null, file));
 
         verify(fileService).deleteFileIfExists(mockPath);
     }
@@ -423,7 +423,7 @@ class AdminSupplyServiceTest {
         when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(admin));
 
         adminSupplyService.uploadProduct(1L, "Water", "Still", new BigDecimal("5.0"),
-                100, new BigDecimal("0.1"), "Fresh water", 10, file);
+                100, new BigDecimal("0.1"), "Fresh water", 10, null, null, file);
 
         ArgumentCaptor<String> nameCaptor = ArgumentCaptor.forClass(String.class);
         verify(fileService).writeFileToDisk(any(), nameCaptor.capture());
@@ -446,7 +446,7 @@ class AdminSupplyServiceTest {
         when(categoryEntityRepository.findByCategoryId(10)).thenReturn(category);
         when(adminEntityRepository.findById(1L)).thenReturn(Optional.of(admin));
 
-        adminSupplyService.uploadProduct(1L, "Water", "Still", new BigDecimal("10.000"), 100, new BigDecimal("0.10"), "Fresh water", 10, file);
+        adminSupplyService.uploadProduct(1L, "Water", "Still", new BigDecimal("10.000"), 100, new BigDecimal("0.10"), "Fresh water", 10, null, null, file);
 
         verify(productEntityRepository).save(any(ProductEntity.class));
     }
@@ -457,7 +457,7 @@ class AdminSupplyServiceTest {
                 "selectedImage", "test.png", "image/png", "data".getBytes());
 
         GeneralException ex = assertThrows(GeneralException.class, () ->
-                adminSupplyService.uploadProduct(1L, "Water", "Still", new BigDecimal("10.001"), 100, new BigDecimal("0.10"), "Fresh", 10, file)
+                adminSupplyService.uploadProduct(1L, "Water", "Still", new BigDecimal("10.001"), 100, new BigDecimal("0.10"), "Fresh", 10, null, null, file)
         );
 
         assertEquals("Product price must not exceed two decimal places", ex.getMessage());
@@ -470,7 +470,7 @@ class AdminSupplyServiceTest {
                 "selectedImage", "test.png", "image/png", "data".getBytes());
 
         GeneralException ex = assertThrows(GeneralException.class, () ->
-                adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10.001"), 5, BigDecimal.ZERO, "Desc", 1, file, 0L)
+                adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10.001"), 5, BigDecimal.ZERO, "Desc", 1, null, null, file, 0L)
         );
 
         assertEquals("Product price must not exceed two decimal places", ex.getMessage());
@@ -480,7 +480,7 @@ class AdminSupplyServiceTest {
     @Test
     void uploadProduct_ThrowsException_WhenImageMissing() {
         GeneralException ex = assertThrows(GeneralException.class, () ->
-                adminSupplyService.uploadProduct(1L, "Water", "Still", new BigDecimal("5.0"), 100, new BigDecimal("0.1"), "Fresh", 10, null)
+                adminSupplyService.uploadProduct(1L, "Water", "Still", new BigDecimal("5.0"), 100, new BigDecimal("0.1"), "Fresh", 10, null, null, null)
         );
 
         assertEquals("Product image is required", ex.getMessage());
@@ -492,7 +492,7 @@ class AdminSupplyServiceTest {
                 "selectedImage", "test.png", "image/png", "data".getBytes());
 
         GeneralException ex = assertThrows(GeneralException.class, () ->
-                adminSupplyService.uploadProduct(1L, "   ", "Still", new BigDecimal("5.0"), 100, new BigDecimal("0.1"), "Fresh", 10, file)
+                adminSupplyService.uploadProduct(1L, "   ", "Still", new BigDecimal("5.0"), 100, new BigDecimal("0.1"), "Fresh", 10, null, null, file)
         );
 
         assertEquals("Product name is required", ex.getMessage());
@@ -504,7 +504,7 @@ class AdminSupplyServiceTest {
                 "selectedImage", "test.jpg", "image/jpeg", "data".getBytes());
 
         GeneralException ex = assertThrows(GeneralException.class, () ->
-                adminSupplyService.uploadProduct(1L, "Water", "Still", new BigDecimal("5.0"), 100, new BigDecimal("0.1"), "Fresh", 10, file)
+                adminSupplyService.uploadProduct(1L, "Water", "Still", new BigDecimal("5.0"), 100, new BigDecimal("0.1"), "Fresh", 10, null, null, file)
         );
         assertEquals("Only PNG files are allowed", ex.getMessage());
     }
@@ -518,7 +518,7 @@ class AdminSupplyServiceTest {
         when(fileService.writeFileToDisk(any(), anyString())).thenThrow(new IOException());
 
         assertThrows(FileUploadFailedException.class, () ->
-                adminSupplyService.uploadProduct(1L, "Water", "Still", new BigDecimal("5.0"), 100, new BigDecimal("0.1"), "Fresh", 10, file)
+                adminSupplyService.uploadProduct(1L, "Water", "Still", new BigDecimal("5.0"), 100, new BigDecimal("0.1"), "Fresh", 10, null, null, file)
         );
     }
 
@@ -553,7 +553,7 @@ class AdminSupplyServiceTest {
         when(productImageEntityRepository.findByProductEntityId(productId)).thenReturn(List.of(existingImage));
 
         adminSupplyService.updateProduct(adminId, productId, "Updated Name", "SubCat",
-                new BigDecimal("10.0"), 50, new BigDecimal("0.2"), "New Desc", categoryId, file, 4L);
+                new BigDecimal("10.0"), 50, new BigDecimal("0.2"), "New Desc", categoryId, null, null, file, 4L);
 
         verify(productEntityRepository).save(existingProduct);
         assertEquals("Updated Name", existingProduct.getProductName());
@@ -572,7 +572,7 @@ class AdminSupplyServiceTest {
         product.setVersion(0L);
         when(productEntityRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(product));
 
-        adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10"), 5, BigDecimal.ZERO, "Desc", 1, null, 0L);
+        adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10"), 5, BigDecimal.ZERO, "Desc", 1, null, null, null, 0L);
 
         verify(fileService, never()).writeFileToDisk(any(), anyString());
         verify(productImageEntityRepository, never()).findByProductEntityId(anyLong());
@@ -586,7 +586,7 @@ class AdminSupplyServiceTest {
         when(adminEntityRepository.findById(anyLong())).thenReturn(Optional.empty());
 
         assertThrows(AdminNotFoundException.class, () ->
-                adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10"), 5, BigDecimal.ZERO, "Desc", 1, file, 0L)
+                adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10"), 5, BigDecimal.ZERO, "Desc", 1, null, null, file, 0L)
         );
     }
 
@@ -599,7 +599,7 @@ class AdminSupplyServiceTest {
         when(productEntityRepository.findByIdForUpdate(100L)).thenReturn(Optional.empty());
 
         assertThrows(ProductNotFoundException.class, () ->
-                adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10"), 5, BigDecimal.ZERO, "Desc", 1, file, 0L)
+                adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10"), 5, BigDecimal.ZERO, "Desc", 1, null, null, file, 0L)
         );
     }
 
@@ -618,7 +618,7 @@ class AdminSupplyServiceTest {
         when(fileService.writeFileToDisk(any(), anyString())).thenThrow(new IOException());
 
         assertThrows(FileUploadFailedException.class, () ->
-                adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10"), 5, BigDecimal.ZERO, "Desc", 1, file, 0L)
+                adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10"), 5, BigDecimal.ZERO, "Desc", 1, null, null, file, 0L)
         );
 
         InOrder order = inOrder(productEntityRepository, fileService);
@@ -650,7 +650,7 @@ class AdminSupplyServiceTest {
 
         assertThrows(DataIntegrityViolationException.class, () ->
                 adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10"),
-                        5, BigDecimal.ZERO, "Desc", 1, file, 0L));
+                        5, BigDecimal.ZERO, "Desc", 1, null, null, file, 0L));
 
         verify(fileService).deleteFileIfExists(mockPath);
     }
@@ -684,7 +684,7 @@ class AdminSupplyServiceTest {
                 .thenAnswer(invocation -> Paths.get(invocation.<String>getArgument(0)).getFileName().toString());
 
         adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10"),
-                5, BigDecimal.ZERO, "Desc", 1, file, 0L);
+                5, BigDecimal.ZERO, "Desc", 1, null, null, file, 0L);
 
         verify(imageCleanupQueue).enqueueObsoleteReference(previousStoredPath);
     }
@@ -716,7 +716,7 @@ class AdminSupplyServiceTest {
                 .thenReturn("image_same.png");
 
         adminSupplyService.updateProduct(1L, 100L, "Name", "Sub", new BigDecimal("10"),
-                5, BigDecimal.ZERO, "Desc", 1, file, 0L);
+                5, BigDecimal.ZERO, "Desc", 1, null, null, file, 0L);
 
         verify(imageCleanupQueue, never()).enqueueObsoleteReference(anyString());
     }
@@ -745,7 +745,7 @@ class AdminSupplyServiceTest {
 
         assertThrows(ProductEditConflictException.class, () ->
                 adminSupplyService.updateProduct(1L, 100L, "Stale Edit", "Sub",
-                        new BigDecimal("99.00"), 999, BigDecimal.ZERO, "Desc", 1, null, 6L));
+                        new BigDecimal("99.00"), 999, BigDecimal.ZERO, "Desc", 1, null, null, null, 6L));
 
         assertEquals("Original", product.getProductName());
         assertEquals(10, product.getProductCount());
@@ -773,7 +773,7 @@ class AdminSupplyServiceTest {
 
         assertThrows(ProductEditConflictException.class, () ->
                 adminSupplyService.updateProduct(1L, 100L, "Stale Edit", "Sub",
-                        new BigDecimal("10.00"), 999, BigDecimal.ZERO, "Desc", 1, png(), 6L));
+                        new BigDecimal("10.00"), 999, BigDecimal.ZERO, "Desc", 1, null, null, png(), 6L));
 
         verify(fileService, never()).writeFileToDisk(any(), anyString());
         verify(productEntityRepository, never()).save(any());
@@ -796,7 +796,7 @@ class AdminSupplyServiceTest {
 
         assertThrows(ProductEditConflictException.class, () ->
                 adminSupplyService.updateProduct(1L, 100L, "Name", "Sub",
-                        new BigDecimal("10.00"), 5, BigDecimal.ZERO, "Desc", 1, null, 8L));
+                        new BigDecimal("10.00"), 5, BigDecimal.ZERO, "Desc", 1, null, null, null, 8L));
 
         verify(productEntityRepository, never()).save(any());
     }
@@ -814,7 +814,7 @@ class AdminSupplyServiceTest {
 
         assertThrows(GeneralException.class, () ->
                 adminSupplyService.updateProduct(1L, 100L, "Name", "Sub",
-                        new BigDecimal("10.00"), 5, BigDecimal.ZERO, "Desc", 1, png(), 6L));
+                        new BigDecimal("10.00"), 5, BigDecimal.ZERO, "Desc", 1, null, null, png(), 6L));
 
         verify(fileService, never()).writeFileToDisk(any(), anyString());
         verify(productEntityRepository, never()).findByIdForUpdate(anyLong());

@@ -30,13 +30,22 @@ import java.math.BigDecimal;
  * @param productCount       nonnegative stock
  * @param productDiscount    {@code null} means "no discount" and normalizes to zero
  * @param productDescription optional; {@code null} normalizes to the empty string
+ * @param packageAmount      optional; {@code null}/absent together with
+ *                           {@code packageUnit} normalizes to no package data, and
+ *                           must be positive and no finer than three decimals when
+ *                           present
+ * @param packageUnit        optional; one of {@code G}, {@code KG}, {@code ML},
+ *                           {@code L}, {@code ADET}, and required whenever an
+ *                           amount is present
  */
 record ProductDetails(String productName,
                       String subCategoryName,
                       BigDecimal productPrice,
                       int productCount,
                       BigDecimal productDiscount,
-                      String productDescription) {
+                      String productDescription,
+                      BigDecimal packageAmount,
+                      String packageUnit) {
 
     static ProductDetails of(String productName,
                              String subCategoryName,
@@ -45,6 +54,18 @@ record ProductDetails(String productName,
                              BigDecimal productDiscount,
                              String productDescription) {
         return new ProductDetails(productName, subCategoryName, productPrice, productCount,
-                productDiscount, productDescription);
+                productDiscount, productDescription, null, null);
+    }
+
+    static ProductDetails of(String productName,
+                             String subCategoryName,
+                             BigDecimal productPrice,
+                             int productCount,
+                             BigDecimal productDiscount,
+                             String productDescription,
+                             BigDecimal packageAmount,
+                             String packageUnit) {
+        return new ProductDetails(productName, subCategoryName, productPrice, productCount,
+                productDiscount, productDescription, packageAmount, packageUnit);
     }
 }

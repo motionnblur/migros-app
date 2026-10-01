@@ -23,6 +23,11 @@ import java.util.List;
  * a value this class let through would still have to be rejected further in.
  *
  * <p>Field names are part of the published request contract and are unchanged.
+ * The two package fields are additive and optional: a body that omits them creates
+ * a product with no package size, which is what every product created before V14
+ * looks like. They carry no {@code @Positive} constraint for the same reason the
+ * other bounds are not here - the shared policy is the single owner of the rule
+ * that they must be supplied together, positive, and no finer than three decimals.
  */
 @Getter
 @Setter
@@ -57,4 +62,27 @@ public class ProductDto {
     /** Optional. An absent description is stored as the empty string. */
     private String productDescription;
     private List<String> productImageNames;
+
+    /**
+     * How much is in one package, or {@code null} for a product with no package
+     * size.
+     *
+     * <p>No {@code @Positive} here on purpose: positivity, the three-decimal scale,
+     * and the requirement to arrive together with {@link #packageUnit} are all
+     * applied once by {@code ProductCreationPolicy}, so the JSON creation path,
+     * the multipart creation path and the version-checked edit cannot disagree
+     * about them.
+     */
+    private BigDecimal packageAmount;
+
+    /**
+     * The unit {@link #packageAmount} is counted in: {@code G}, {@code KG},
+     * {@code ML}, {@code L} or {@code ADET}, matched case-insensitively and stored
+     * canonically.
+     *
+     * <p>A closed set rather than free text, because this value is a divisor in
+     * the unit-price calculation: a measure nobody defined has no basis to be
+     * priced per.
+     */
+    private String packageUnit;
 }

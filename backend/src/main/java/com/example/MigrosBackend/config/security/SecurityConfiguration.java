@@ -130,7 +130,8 @@ public class SecurityConfiguration {
                         .requestMatchers("/user/support/**").hasRole("USER")
                         // Anonymous catalog reads. These are explicit so the
                         // deny-by-default catch-all below cannot make them public
-                        // or private by accident.
+                        // or private by accident. Every one of them is a GET that
+                        // only reads; no mutation is opened by adding to this list.
                         .requestMatchers(
                                 "/user/supply/getAllCategoryNames",
                                 "/user/supply/getProductsFromCategory",
@@ -141,7 +142,8 @@ public class SecurityConfiguration {
                                 "/user/supply/getProductImage",
                                 "/user/supply/getSubCategories",
                                 "/user/supply/getProductDataWithProductId",
-                                "/user/supply/getProductDescription"
+                                "/user/supply/getProductDescription",
+                                "/user/supply/searchProducts"
                         ).permitAll()
                         // WebSocket handshakes: authentication happens in the
                         // handshake interceptor (cookie-validated), not here.

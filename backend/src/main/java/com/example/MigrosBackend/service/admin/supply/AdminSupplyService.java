@@ -102,7 +102,9 @@ public class AdminSupplyService {
                 productDto.getProductPrice(),
                 productDto.getProductCount(),
                 productDto.getProductDiscount(),
-                productDto.getProductDescription()));
+                productDto.getProductDescription(),
+                productDto.getPackageAmount(),
+                productDto.getPackageUnit()));
 
         AdminEntity currentAdminEntity = adminEntityRepository.findById(adminAddItemDto.getAdminId())
                 .orElseThrow(() -> new AdminNotFoundException(adminAddItemDto.getAdminId().toString()));
@@ -143,10 +145,11 @@ public class AdminSupplyService {
                               String subCategoryName, BigDecimal productPrice,
                               int productCount, BigDecimal productDiscount,
                               String productDescription, int categoryValue,
+                              BigDecimal packageAmount, String packageUnit,
                               MultipartFile selectedImage) {
         ProductDetails details = productCreationPolicy.normalize(ProductDetails.of(
                 productName, subCategoryName, productPrice, productCount,
-                productDiscount, productDescription));
+                productDiscount, productDescription, packageAmount, packageUnit));
         productImageOperations.validateProductImage(selectedImage);
 
         CategoryEntity categoryEntity = resolveCategoryById(categoryValue);
@@ -199,6 +202,14 @@ public class AdminSupplyService {
      * image is written, so a rejected edit leaves the row, the image reference
      * and the upload directory exactly as they were.
      *
+     * <p>Package metadata is not a side channel around any of this. It is written
+     * by the same {@link ProductCreationPolicy#applyTo} call that writes the price
+     * and the count, on this row, under this lock, after this comparison - so an
+     * edit that changes nothing but the package size is an ordinary version-checked
+     * edit: it advances {@code version}, it is refused by a stale
+     * {@code expectedVersion} like any other edit, and a refused one leaves the
+     * stored size untouched.
+     *
      * <p>The version this edit produces is returned, and it is read off the
      * managed instance <em>after</em> everything this transaction changed has
      * been flushed. That is deliberate and it is the whole reason the method
@@ -218,10 +229,11 @@ public class AdminSupplyService {
                               String subCategoryName, BigDecimal productPrice,
                               int productCount, BigDecimal productDiscount,
                               String productDescription, int categoryValue,
+                              BigDecimal packageAmount, String packageUnit,
                               MultipartFile selectedImage, Long expectedVersion) {
         ProductDetails details = productCreationPolicy.normalize(ProductDetails.of(
                 productName, subCategoryName, productPrice, productCount,
-                productDiscount, productDescription));
+                productDiscount, productDescription, packageAmount, packageUnit));
 
         CategoryEntity categoryEntity = resolveCategoryById(categoryValue);
         AdminEntity adminEntity = adminEntityRepository.findById(adminId).orElseThrow(() -> new AdminNotFoundException(adminId.toString()));

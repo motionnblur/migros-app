@@ -121,7 +121,7 @@ class ProductVersionHeaderTest {
     @Test
     void aSuccessfulEditCarriesTheVersionHeaderAndKeepsItsBody() throws Exception {
         when(adminSupplyService.updateProduct(anyLong(), anyLong(), any(), any(), any(BigDecimal.class),
-                anyInt(), any(BigDecimal.class), any(), anyInt(), any(), any()))
+                anyInt(), any(BigDecimal.class), any(), anyInt(), any(), any(), any(), any()))
                 .thenReturn(42L);
 
         mockMvc.perform(multipart("/admin/panel/updateProduct")
@@ -145,7 +145,7 @@ class ProductVersionHeaderTest {
         // both must be present in the exchange.
         ArgumentCaptor<Long> versionCaptor = ArgumentCaptor.forClass(Long.class);
         verify(adminSupplyService).updateProduct(anyLong(), anyLong(), any(), any(), any(BigDecimal.class),
-                anyInt(), any(BigDecimal.class), any(), anyInt(), any(), versionCaptor.capture());
+                anyInt(), any(BigDecimal.class), any(), anyInt(), any(), any(), any(), versionCaptor.capture());
         assertEquals(41L, versionCaptor.getValue());
     }
 
@@ -161,7 +161,7 @@ class ProductVersionHeaderTest {
     @Test
     void aRejectedEditCarriesNoVersionHeader() throws Exception {
         when(adminSupplyService.updateProduct(anyLong(), anyLong(), any(), any(), any(BigDecimal.class),
-                anyInt(), any(BigDecimal.class), any(), anyInt(), any(), any()))
+                anyInt(), any(BigDecimal.class), any(), anyInt(), any(), any(), any(), any()))
                 .thenThrow(ProductEditConflictException.staleVersion());
 
         mockMvc.perform(multipart("/admin/panel/updateProduct")

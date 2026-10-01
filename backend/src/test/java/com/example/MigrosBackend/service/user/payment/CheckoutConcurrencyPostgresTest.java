@@ -12,6 +12,7 @@ import com.example.MigrosBackend.entity.user.OrderGroupEntity;
 import com.example.MigrosBackend.entity.user.UserEntity;
 import com.example.MigrosBackend.exception.admin.ProductEditConflictException;
 import com.example.MigrosBackend.exception.user.CheckoutStateException;
+import com.example.MigrosBackend.helper.ProductPricingPolicy;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
 import com.example.MigrosBackend.repository.category.CategoryEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
@@ -390,6 +391,8 @@ class CheckoutConcurrencyPostgresTest {
         product.setProductCount(stock);
         product.setProductPrice(new BigDecimal(price));
         product.setProductDiscount(BigDecimal.ZERO);
+        product.setEffectivePrice(
+                ProductPricingPolicy.effectivePrice(product.getProductPrice(), product.getProductDiscount()));
         product.setProductDescription("test product");
         return productEntityRepository.saveAndFlush(product);
     }
@@ -444,8 +447,7 @@ class CheckoutConcurrencyPostgresTest {
 
         assertThrows(ProductEditConflictException.class, () ->
                 adminSupplyService.updateProduct(admin.getId(), product.getId(), "Stale", "general",
-                        new BigDecimal("10.00"), 10, BigDecimal.ZERO, "stale", category.getCategoryId(),
-                        null, versionSeenByTheEditor));
+                        new BigDecimal("10.00"), 10, BigDecimal.ZERO, "stale", category.getCategoryId(), null, null, null, versionSeenByTheEditor));
 
         assertEquals(9, productEntityRepository.findById(product.getId()).orElseThrow().getProductCount(),
                 "a rejected edit must leave the reservation exactly as it reserved it");
@@ -501,7 +503,7 @@ class CheckoutConcurrencyPostgresTest {
         try {
             adminSupplyService.updateProduct(adminId, productId, "Raced", "general",
                     new BigDecimal("10.00"), absoluteCount, BigDecimal.ZERO, "raced", categoryId,
-                    null, expectedVersion);
+                    null, null, null, expectedVersion);
             return true;
         } catch (RuntimeException ex) {
             return false;

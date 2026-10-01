@@ -583,8 +583,9 @@ class PaymentSchemaEquivalencePostgresTest {
              Statement statement = connection.createStatement();
              ResultSet rs = statement.executeQuery(
                      "INSERT INTO product_entity (product_name, subcategory_name, product_count, "
-                             + "product_price, product_discount, product_description) VALUES ('" + name
-                             + "', 'general', 100, 5.00, 0.00, 'matrix product') "
+                             + "product_price, product_discount, effective_price, product_description) "
+                             + "VALUES ('" + name
+                             + "', 'general', 100, 5.00, 0.00, 5.00, 'matrix product') "
                              + "RETURNING product_entity_id")) {
             assertTrue(rs.next());
             return rs.getLong(1);

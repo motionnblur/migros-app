@@ -1,6 +1,7 @@
 package com.example.MigrosBackend.service.user.supply;
 
 import com.example.MigrosBackend.dto.user.category.SubCategoryDto;
+import com.example.MigrosBackend.dto.user.product.ProductDetailDto;
 import com.example.MigrosBackend.dto.user.product.ProductPreviewDto;
 import com.example.MigrosBackend.entity.category.CategoryEntity;
 import com.example.MigrosBackend.entity.product.ProductEntity;
@@ -370,6 +371,38 @@ class UserCatalogReadServiceTest {
         product.setSubcategoryName("Fruits");
         product.setProductCount(1);
         return product;
+    }
+
+    /**
+     * The detail read carries the payable price, not only the two stored columns.
+     *
+     * <p>A client that recombines the stored price and discount in the browser
+     * does not reproduce {@link ProductPricingPolicy}'s rounding at the boundaries:
+     * 10.10 at 5 percent off is 9.60 here and 9.59 by
+     * {@code +(10.10 - 10.10 * 5 / 100).toFixed(2)}. The card, the cart line and
+     * the charge are all built from {@link #getEffectivePrice}, so the detail page
+     * has to be given the same number rather than the ingredients.
+     *
+     * <p>The stored columns keep their meaning and are still sent, because the
+     * client shows the struck-through original and the percentage from them.
+     */
+    @Test
+    void detailReadCarriesThePayablePriceAlongsideTheStoredColumns() {
+        for (String[] valid : VALID_PRODUCTS) {
+            ProductEntity product = pricedProduct(valid[0], valid[1]);
+            product.setProductDescription("seeded");
+            CategoryEntity category = new CategoryEntity();
+            category.setId(3L);
+            product.setCategoryEntity(category);
+            when(productEntityRepository.findById(7L)).thenReturn(Optional.of(product));
+
+            ProductDetailDto detail = service.getProductData(7L);
+
+            assertEquals(service.getEffectivePrice(product), detail.getEffectivePrice(),
+                    "price " + valid[0] + " at " + valid[1] + "% must reach the detail reader as the payable price");
+            assertEquals(new BigDecimal(valid[0]), detail.getProductPrice(),
+                    "the stored price column must keep its existing meaning");
+        }
     }
 
     private ProductEntity product(String subcategoryName, int count) {

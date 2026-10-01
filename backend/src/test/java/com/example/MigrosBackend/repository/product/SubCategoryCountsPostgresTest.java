@@ -2,6 +2,7 @@ package com.example.MigrosBackend.repository.product;
 
 import com.example.MigrosBackend.entity.category.CategoryEntity;
 import com.example.MigrosBackend.entity.product.ProductEntity;
+import com.example.MigrosBackend.helper.ProductPricingPolicy;
 import com.example.MigrosBackend.repository.category.CategoryEntityRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -100,6 +101,8 @@ class SubCategoryCountsPostgresTest {
         product.setProductCount(productCount);
         product.setProductPrice(new BigDecimal("10.00"));
         product.setProductDiscount(BigDecimal.ZERO);
+        product.setEffectivePrice(
+                ProductPricingPolicy.effectivePrice(product.getProductPrice(), product.getProductDiscount()));
         product.setProductDescription("seeded");
         product.setCategoryEntity(category);
         productEntityRepository.saveAndFlush(product);

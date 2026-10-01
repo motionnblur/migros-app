@@ -7,6 +7,7 @@ import com.example.MigrosBackend.controller.security.CsrfController;
 import com.example.MigrosBackend.controller.user.payment.StripeWebhookController;
 import com.example.MigrosBackend.controller.user.sign.UserSignController;
 import com.example.MigrosBackend.controller.user.supply.UserSupplyController;
+import com.example.MigrosBackend.dto.user.product.ProductSearchResponseDto;
 import com.example.MigrosBackend.filter.JwtRequestFilter;
 import com.example.MigrosBackend.helper.AuthTokenResolver;
 import com.example.MigrosBackend.repository.admin.AdminEntityRepository;
@@ -18,6 +19,7 @@ import com.example.MigrosBackend.service.support.SupportModerationService;
 import com.example.MigrosBackend.service.user.payment.PaymentWebhookService;
 import com.example.MigrosBackend.service.user.payment.StripeWebhookVerifier;
 import com.example.MigrosBackend.service.user.sign.UserSignupService;
+import com.example.MigrosBackend.service.user.supply.ProductSearchService;
 import com.example.MigrosBackend.service.user.supply.UserCartService;
 import com.example.MigrosBackend.service.user.supply.UserSupplyService;
 import com.stripe.model.Event;
@@ -33,7 +35,10 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.List;
+
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -77,6 +82,9 @@ class SecurityPublicRoutesTest {
 
     @MockBean
     private UserCartService userCartService;
+
+    @MockBean
+    private ProductSearchService productSearchService;
 
     @MockBean
     private SupportCustomerDirectoryService supportCustomerDirectoryService;
@@ -131,15 +139,65 @@ class SecurityPublicRoutesTest {
                 "/user/supply/getProductImage?productId=1",
                 "/user/supply/getSubCategories?categoryId=1",
                 "/user/supply/getProductDataWithProductId?productId=1",
-                "/user/supply/getProductDescription?productId=1"
+                "/user/supply/getProductDescription?productId=1",
+                "/user/supply/searchProducts"
         };
 
         when(userSupplyService.getProductImage(any())).thenReturn(new ByteArrayResource("img".getBytes()));
+        when(productSearchService.search(any(), any(), any(), any(), any(), any(), any(), any(),
+                anyInt(), anyInt()))
+                .thenReturn(new ProductSearchResponseDto(List.of(), 0L, 0, 10, List.of()));
 
         for (String route : publicGetRoutes) {
             mockMvc.perform(get(route))
                     .andExpect(status().isOk());
         }
+    }
+
+    /**
+     * The catalogue search has to be reachable without a session, in every one of
+     * its forms, because every parameter is optional and the bare request is the
+     * catalogue a customer browses before deciding to log in. A filter that
+     * required a session for only the fully-specified form would be worse than
+     * useless: it would make the shop's own search the one thing a signed-out
+     * visitor cannot use.
+     */
+    @Test
+    void theCatalogueSearchIsPublicInEveryParameterisedForm() throws Exception {
+        when(productSearchService.search(any(), any(), any(), any(), any(), any(), any(), any(),
+                anyInt(), anyInt()))
+                .thenReturn(new ProductSearchResponseDto(List.of(), 0L, 0, 10, List.of()));
+
+        for (String route : List.of(
+                "/user/supply/searchProducts",
+                "/user/supply/searchProducts?q=milk",
+                "/user/supply/searchProducts?categoryId=1",
+                "/user/supply/searchProducts?categoryId=1&subcategory=Dairy",
+                "/user/supply/searchProducts?availability=IN_STOCK",
+                "/user/supply/searchProducts?availability=OUT_OF_STOCK",
+                "/user/supply/searchProducts?minPrice=1.00&maxPrice=20.00",
+                "/user/supply/searchProducts?discountedOnly=true",
+                "/user/supply/searchProducts?sort=PRICE_ASC",
+                "/user/supply/searchProducts?sort=PRICE_DESC",
+                "/user/supply/searchProducts?q=milk&categoryId=1&subcategory=Dairy"
+                        + "&availability=IN_STOCK&minPrice=1.00&maxPrice=20.00"
+                        + "&discountedOnly=true&sort=PRICE_DESC&page=2&size=5")) {
+            mockMvc.perform(get(route))
+                    .andExpect(status().isOk());
+        }
+    }
+
+    /**
+     * The public catalogue read is a read. Opening this route must not have opened
+     * anything that changes state, so the cataloguing mutations stay behind a
+     * session even though a sibling route in the same controller is public.
+     */
+    @Test
+    void makingTheSearchPublicDoesNotOpenAnyMutationOnTheSameRoutePrefix() throws Exception {
+        mockMvc.perform(get("/user/supply/addProductToUserCart").param("productId", "1"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/user/supply/getProductData"))
+                .andExpect(status().isForbidden());
     }
 
     @Test

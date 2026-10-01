@@ -99,6 +99,10 @@ class EmptyDatabaseStartupPostgresTest {
             // by the migrations, not only on an upgraded one, or the entity's
             // @Version mapping fails ddl-auto=validate at startup.
             assertBigIntNotNullDefaultZero(statement, "product_entity", "version");
+            // V13: likewise for the materialized effective price. NOT NULL matters
+            // beyond validation too - a null there is a row no price filter
+            // compares and no ordering can place.
+            assertNumeric19Scale2NotNull(statement, "product_entity", "effective_price");
             assertTrue(versionedMigrationsAllApplied(),
                     "every versioned script must be recorded after a first migrate");
         }
@@ -254,7 +258,7 @@ class EmptyDatabaseStartupPostgresTest {
         }
     }
 
-    @Test
+@Test
     void freshSchemaAppliesWebhookInboxDefaults() throws SQLException {
         try (Connection connection = dataSource.getConnection();
              Statement statement = connection.createStatement()) {
@@ -279,8 +283,73 @@ class EmptyDatabaseStartupPostgresTest {
         }
     }
 
-    private void assertIndexExists(Statement statement, String indexName) throws SQLException {
+    /**
+     * V14's two package columns, on a schema built entirely by the migrations.
+     *
+     * <p>Nullable with no default on purpose, so the assertions are about their
+     * absence rather than their presence: a default would turn "the administrator
+     * did not enter a package size" into "this product contains one unit" for every
+     * product the migrations create. The declared types still have to match the
+     * entity mapping exactly, or {@code ddl-auto=validate} refuses to start.
+     */
+    @Test
+    void freshSchemaExposesTheOptionalPackageColumns() throws SQLException {
+        try (Connection connection = dataSource.getConnection();
+             Statement statement = connection.createStatement()) {
+            assertNullableNumeric(statement, "product_entity", "package_amount", 12, 3);
+            assertNullableVarchar(statement, "product_entity", "package_unit");
+
+            assertConstraint(statement, "product_entity", "chk_product_package_paired");
+            assertConstraint(statement, "product_entity", "chk_product_package_positive");
+            assertConstraint(statement, "product_entity", "chk_product_package_whole_adet");
+
+            // A product created without package metadata - which is what every
+            // row created before V14 looks like - has to be insertable, and has to
+            // report no size afterwards.
+            long productId = createProduct("No Package Size");
+            try (ResultSet rs = statement.executeQuery(
+                    "SELECT package_amount, package_unit FROM product_entity "
+                            + "WHERE product_entity_id = " + productId)) {
+                assertTrue(rs.next());
+                assertEquals(null, rs.getObject("package_amount"),
+                        "a product created without package metadata must not be given one");
+                assertEquals(null, rs.getObject("package_unit"));
+            }
+        }
+    }
+
+    private void assertNullableNumeric(Statement statement, String table, String column,
+                                       int precision, int scale) throws SQLException {
         try (ResultSet rs = statement.executeQuery(
+                "SELECT numeric_precision, numeric_scale, is_nullable, column_default "
+                        + "FROM information_schema.columns WHERE table_schema = 'public' "
+                        + "AND table_name = '" + table + "' AND column_name = '" + column + "'")) {
+            assertTrue(rs.next(), table + "." + column + " must exist on a fresh schema");
+            assertEquals(precision, rs.getInt("numeric_precision"),
+                    table + "." + column + " must match the entity mapping or startup fails");
+            assertEquals(scale, rs.getInt("numeric_scale"));
+            assertEquals("YES", rs.getString("is_nullable"),
+                    "absence is the ordinary state for package metadata");
+            assertEquals(null, rs.getString("column_default"),
+                    "a default would invent a package size for every product that omits one");
+        }
+    }
+
+    private void assertNullableVarchar(Statement statement, String table, String column)
+            throws SQLException {
+        try (ResultSet rs = statement.executeQuery(
+                "SELECT character_maximum_length, is_nullable, column_default "
+                        + "FROM information_schema.columns WHERE table_schema = 'public' "
+                        + "AND table_name = '" + table + "' AND column_name = '" + column + "'")) {
+            assertTrue(rs.next(), table + "." + column + " must exist on a fresh schema");
+            assertTrue(rs.getInt("character_maximum_length") >= 4,
+                    table + "." + column + " must hold the widest accepted unit token");
+            assertEquals("YES", rs.getString("is_nullable"));
+            assertEquals(null, rs.getString("column_default"));
+        }
+    }
+
+    private void assertIndexExists(Statement statement, String indexName) throws SQLException {        try (ResultSet rs = statement.executeQuery(
                 "SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'public' "
                         + "AND indexname = '" + indexName + "'")) {
             assertTrue(rs.next());
@@ -327,8 +396,10 @@ class EmptyDatabaseStartupPostgresTest {
              Statement statement = connection.createStatement();
              ResultSet rs = statement.executeQuery(
                      "INSERT INTO product_entity (product_name, subcategory_name, product_count, "
-                             + "product_price, product_discount, product_description) VALUES ('" + name + "', "
-                             + "'general', 100, 5.00, 0.00, 'guard product') RETURNING product_entity_id")) {
+                             + "product_price, product_discount, effective_price, product_description) "
+                             + "VALUES ('" + name + "', "
+                             + "'general', 100, 5.00, 0.00, 5.00, 'guard product') "
+                             + "RETURNING product_entity_id")) {
             assertTrue(rs.next());
             return rs.getLong(1);
         }
@@ -405,6 +476,30 @@ class EmptyDatabaseStartupPostgresTest {
             assertEquals("NO", rs.getString("is_nullable"));
             assertTrue(String.valueOf(rs.getString("column_default")).contains("0"),
                     "column " + tableName + "." + columnName + " must default to 0");
+        }
+    }
+
+    /**
+     * A {@code NUMERIC(19, 2)} column that also refuses null.
+     *
+     * <p>Separate from {@link #assertNumeric19Scale2} because the nullability is a
+     * different property with a different consequence: the money columns may be
+     * nullable for a legacy database, but a null effective price is a row the
+     * catalogue search cannot compare or order at all, which is the one thing this
+     * column exists to make possible.
+     */
+    private void assertNumeric19Scale2NotNull(Statement statement, String tableName, String columnName)
+            throws SQLException {
+        try (ResultSet rs = statement.executeQuery(
+                "SELECT data_type, numeric_precision, numeric_scale, is_nullable "
+                        + "FROM information_schema.columns "
+                        + "WHERE table_schema = 'public' AND table_name = '" + tableName + "' "
+                        + "AND column_name = '" + columnName + "'")) {
+            assertTrue(rs.next(), "column " + tableName + "." + columnName + " must exist");
+            assertEquals("numeric", rs.getString("data_type"));
+            assertEquals(19, rs.getInt("numeric_precision"));
+            assertEquals(2, rs.getInt("numeric_scale"));
+            assertEquals("NO", rs.getString("is_nullable"));
         }
     }
 }

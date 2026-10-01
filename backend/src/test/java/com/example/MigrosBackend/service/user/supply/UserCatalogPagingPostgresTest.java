@@ -6,6 +6,7 @@ import com.example.MigrosBackend.entity.category.CategoryEntity;
 import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.exception.shared.GeneralException;
 import com.example.MigrosBackend.exception.user.CategoryNotFoundException;
+import com.example.MigrosBackend.helper.ProductPricingPolicy;
 import com.example.MigrosBackend.repository.category.CategoryEntityRepository;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -235,6 +236,8 @@ class UserCatalogPagingPostgresTest {
             product.setProductCount(index < inStock ? 5 : 0);
             product.setProductPrice(new BigDecimal("10.00"));
             product.setProductDiscount(BigDecimal.ZERO);
+            product.setEffectivePrice(
+                    ProductPricingPolicy.effectivePrice(product.getProductPrice(), product.getProductDiscount()));
             product.setProductDescription("seeded");
             product.setCategoryEntity(categoryEntityRepository.getReferenceById(categoryId));
             Long id = productEntityRepository.saveAndFlush(product).getId();

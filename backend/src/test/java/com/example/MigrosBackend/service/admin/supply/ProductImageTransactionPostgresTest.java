@@ -132,7 +132,7 @@ class ProductImageTransactionPostgresTest {
     @Test
     void aSuccessfulUploadPersistsTheProductAndItsImageTogether() throws IOException {
         adminSupplyService.uploadProduct(admin.getId(), "Water", "Still",
-                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), png());
+                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, png());
 
         assertEquals(1, productEntityRepository.count());
         assertEquals(1, productImageEntityRepository.count());
@@ -150,7 +150,7 @@ class ProductImageTransactionPostgresTest {
         TransactionTemplate transaction = new TransactionTemplate(txManager);
         transaction.execute(status -> {
             adminSupplyService.uploadProduct(admin.getId(), "Water", "Still",
-                    new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), png());
+                    new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, png());
             status.setRollbackOnly();
             return null;
         });
@@ -168,7 +168,7 @@ class ProductImageTransactionPostgresTest {
 
         assertThrows(DataIntegrityViolationException.class, () ->
                 adminSupplyService.uploadProduct(admin.getId(), "Water", "Still",
-                        new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), png()));
+                        new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, png()));
 
         assertEquals(0, productEntityRepository.count(),
                 "a half-written product would advertise an image the database has no record of");
@@ -178,14 +178,14 @@ class ProductImageTransactionPostgresTest {
     @Test
     void anUpdateReplacesTheExistingImageRow() throws IOException {
         adminSupplyService.uploadProduct(admin.getId(), "Water", "Still",
-                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), png());
+                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, png());
         Long productId = productEntityRepository.findAll().get(0).getId();
         String firstPath = jdbcTemplate.queryForObject(
                 "SELECT image_path FROM product_image_entity", String.class);
         assertNotNull(firstPath);
 
         adminSupplyService.updateProduct(admin.getId(), productId, "Water", "Still",
-                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), png(), 0L);
+                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, png(), 0L);
 
         assertEquals(1, productImageEntityRepository.count(), "an edit must not add a second image row");
         assertNotNull(jdbcTemplate.queryForObject(
@@ -200,14 +200,14 @@ class ProductImageTransactionPostgresTest {
     @Test
     void anUpdateToAProductWithoutAnImageRowCreatesOne() throws IOException {
         adminSupplyService.uploadProduct(admin.getId(), "Water", "Still",
-                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), png());
+                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, png());
         Long productId = productEntityRepository.findAll().get(0).getId();
 
         jdbcTemplate.update("DELETE FROM product_image_entity WHERE product_entity_id = ?", productId);
         assertEquals(0, productImageEntityRepository.count());
 
         adminSupplyService.updateProduct(admin.getId(), productId, "Water", "Still",
-                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), png(), 0L);
+                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, png(), 0L);
 
         List<String> paths = jdbcTemplate.queryForList("SELECT image_path FROM product_image_entity", String.class);
         assertEquals(1, paths.size(), "the uploaded image has to become reachable, not just exist on disk");
@@ -228,7 +228,7 @@ class ProductImageTransactionPostgresTest {
     @Test
     void aRejectedEditWritesNoFileAndChangesNoImageReference() throws IOException {
         adminSupplyService.uploadProduct(admin.getId(), "Water", "Still",
-                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), png());
+                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, png());
         Long productId = productEntityRepository.findAll().get(0).getId();
         String originalPath = jdbcTemplate.queryForObject(
                 "SELECT image_path FROM product_image_entity", String.class);
@@ -240,8 +240,7 @@ class ProductImageTransactionPostgresTest {
 
         assertThrows(ProductEditConflictException.class, () ->
                 adminSupplyService.updateProduct(admin.getId(), productId, "Stale Edit", "Stale Sub",
-                        new BigDecimal("99.00"), 999, BigDecimal.ZERO, "Rejected", category.getCategoryId(),
-                        png(), 0L));
+                        new BigDecimal("99.00"), 999, BigDecimal.ZERO, "Rejected", category.getCategoryId(), null, null, png(), 0L));
 
         assertEquals(filesBefore, storedFiles().count(),
                 "a rejected edit must not write the upload it carries");
@@ -267,13 +266,12 @@ class ProductImageTransactionPostgresTest {
     @Test
     void aFreshVersionEditSucceedsAndAdvancesTheVersion() throws IOException {
         adminSupplyService.uploadProduct(admin.getId(), "Water", "Still",
-                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), png());
+                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, png());
         Long productId = productEntityRepository.findAll().get(0).getId();
         long versionBefore = versionOf(productId);
 
         adminSupplyService.updateProduct(admin.getId(), productId, "Sparkling Water", "Sparkling",
-                new BigDecimal("7.25"), 42, new BigDecimal("5.00"), "Fizzy", category.getCategoryId(),
-                null, versionBefore);
+                new BigDecimal("7.25"), 42, new BigDecimal("5.00"), "Fizzy", category.getCategoryId(), null, null, null, versionBefore);
 
         assertEquals(versionBefore + 1, versionOf(productId),
                 "the entity's @Version must advance on a managed product write");
@@ -293,18 +291,16 @@ class ProductImageTransactionPostgresTest {
     @Test
     void twoEditorsOfTheSameVersionCannotBothWin() throws IOException {
         adminSupplyService.uploadProduct(admin.getId(), "Water", "Still",
-                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), png());
+                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, png());
         Long productId = productEntityRepository.findAll().get(0).getId();
         long sharedVersion = versionOf(productId);
 
         adminSupplyService.updateProduct(admin.getId(), productId, "First Editor", "Still",
-                new BigDecimal("5.00"), 11, BigDecimal.ZERO, "Fresh", category.getCategoryId(),
-                null, sharedVersion);
+                new BigDecimal("5.00"), 11, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, null, sharedVersion);
 
         assertThrows(ProductEditConflictException.class, () ->
                 adminSupplyService.updateProduct(admin.getId(), productId, "Second Editor", "Still",
-                        new BigDecimal("5.00"), 12, BigDecimal.ZERO, "Fresh", category.getCategoryId(),
-                        null, sharedVersion));
+                        new BigDecimal("5.00"), 12, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, null, sharedVersion));
 
         ProductEntity reloaded = productEntityRepository.findById(productId).orElseThrow();
         assertEquals("First Editor", reloaded.getProductName());
@@ -323,13 +319,13 @@ class ProductImageTransactionPostgresTest {
     @Test
     void aSuccessfulReplacementCommitsTheNewReferenceAndOwesTheOldFile() throws IOException {
         adminSupplyService.uploadProduct(admin.getId(), "Water", "Still",
-                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), png());
+                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, png());
         Long productId = productEntityRepository.findAll().get(0).getId();
         Path firstPath = resolve(jdbcTemplate.queryForObject(
                 "SELECT image_path FROM product_image_entity", String.class));
 
         adminSupplyService.updateProduct(admin.getId(), productId, "Water", "Still",
-                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), png(), 0L);
+                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, png(), 0L);
 
         String secondStoredPath = jdbcTemplate.queryForObject(
                 "SELECT image_path FROM product_image_entity", String.class);
@@ -354,7 +350,7 @@ class ProductImageTransactionPostgresTest {
     @Test
     void aSuccessfulDeletionSchedulesEveryImageFileForCleanup() throws IOException {
         adminSupplyService.uploadProduct(admin.getId(), "Water", "Still",
-                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), png());
+                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, png());
         Long productId = productEntityRepository.findAll().get(0).getId();
         String firstStoredPath = jdbcTemplate.queryForObject(
                 "SELECT image_path FROM product_image_entity", String.class);
@@ -388,7 +384,7 @@ class ProductImageTransactionPostgresTest {
     @Test
     void aFailedDeletionCommitsNoCleanupWork() throws IOException {
         adminSupplyService.uploadProduct(admin.getId(), "Water", "Still",
-                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), png());
+                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, png());
         Long productId = productEntityRepository.findAll().get(0).getId();
         String storedPath = jdbcTemplate.queryForObject(
                 "SELECT image_path FROM product_image_entity", String.class);
@@ -417,7 +413,7 @@ class ProductImageTransactionPostgresTest {
     @Test
     void aRolledBackReplacementKeepsTheOldReferenceAndOwesNothing() throws IOException {
         adminSupplyService.uploadProduct(admin.getId(), "Water", "Still",
-                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), png());
+                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, png());
         Long productId = productEntityRepository.findAll().get(0).getId();
         String firstStoredPath = jdbcTemplate.queryForObject(
                 "SELECT image_path FROM product_image_entity", String.class);
@@ -426,7 +422,7 @@ class ProductImageTransactionPostgresTest {
         TransactionTemplate transaction = new TransactionTemplate(txManager);
         transaction.execute(status -> {
             adminSupplyService.updateProduct(admin.getId(), productId, "Water", "Still",
-                    new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), png(), 0L);
+                    new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, png(), 0L);
             status.setRollbackOnly();
             return null;
         });
@@ -453,7 +449,7 @@ class ProductImageTransactionPostgresTest {
     @Test
     void aReplacementThatCannotRecordItsCleanupDoesNotCommit() throws IOException {
         adminSupplyService.uploadProduct(admin.getId(), "Water", "Still",
-                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), png());
+                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, png());
         Long productId = productEntityRepository.findAll().get(0).getId();
         String firstStoredPath = jdbcTemplate.queryForObject(
                 "SELECT image_path FROM product_image_entity", String.class);
@@ -464,8 +460,7 @@ class ProductImageTransactionPostgresTest {
 
         assertThrows(IllegalStateException.class, () ->
                 adminSupplyService.updateProduct(admin.getId(), productId, "Water", "Still",
-                        new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(),
-                        png(), 0L));
+                        new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, png(), 0L));
 
         assertEquals(firstStoredPath, jdbcTemplate.queryForObject(
                 "SELECT image_path FROM product_image_entity", String.class));
@@ -482,7 +477,7 @@ class ProductImageTransactionPostgresTest {
     @Test
     void aStaleVersionEditCreatesNeitherUploadNorCleanupWork() throws IOException {
         adminSupplyService.uploadProduct(admin.getId(), "Water", "Still",
-                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), png());
+                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, png());
         Long productId = productEntityRepository.findAll().get(0).getId();
         String originalPath = jdbcTemplate.queryForObject(
                 "SELECT image_path FROM product_image_entity", String.class);
@@ -494,7 +489,7 @@ class ProductImageTransactionPostgresTest {
         assertThrows(ProductEditConflictException.class, () ->
                 adminSupplyService.updateProduct(admin.getId(), productId, "Stale Edit", "Stale Sub",
                         new BigDecimal("99.00"), 999, BigDecimal.ZERO, "Rejected",
-                        category.getCategoryId(), png(), 0L));
+                        category.getCategoryId(), null, null, png(), 0L));
 
         assertEquals(0, pendingCleanupIdentities().size(),
                 "a refused edit must not record an obligation for a replacement that never happened");
@@ -556,7 +551,7 @@ class ProductImageTransactionPostgresTest {
     @Test
     void aNewProductStartsAtVersionZero() throws IOException {
         adminSupplyService.uploadProduct(admin.getId(), "Water", "Still",
-                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), png());
+                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, png());
 
         Long productId = productEntityRepository.findAll().get(0).getId();
         Long stored = jdbcTemplate.queryForObject(
@@ -589,11 +584,11 @@ class ProductImageTransactionPostgresTest {
     @Test
     void anEditThatChangesNothingDoesNotAdvanceTheVersion() throws IOException {
         adminSupplyService.uploadProduct(admin.getId(), "Water", "Still",
-                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), png());
+                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, png());
         Long productId = productEntityRepository.findAll().get(0).getId();
 
         adminSupplyService.updateProduct(admin.getId(), productId, "Water", "Still",
-                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, 0L);
+                new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh", category.getCategoryId(), null, null, null, 0L);
 
         assertEquals(0L, versionOf(productId),
                 "a no-op edit must not invalidate other editors' open forms");

@@ -208,6 +208,12 @@ class ProductImageCleanupMigrationPostgresTest {
                 + status + "', 0, now(), now())";
     }
 
+    /**
+     * A row as it looked before V13, which is the state this class sets up: it
+     * migrates to V11 and only then applies the cleanup-queue migration. Naming
+     * {@code effective_price} here would fail with a confusing "column does not
+     * exist" rather than a clear one.
+     */
     private long insertProduct(String name) throws SQLException {
         try (Connection connection = openConnection();
              Statement statement = connection.createStatement();

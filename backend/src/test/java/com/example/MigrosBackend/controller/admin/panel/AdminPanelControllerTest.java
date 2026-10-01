@@ -390,7 +390,7 @@ class AdminPanelControllerTest {
     void uploadProduct_shouldReturnBadRequest_whenValidationFails() throws Exception {
         doThrow(new GeneralException("Product name is required"))
                 .when(adminSupplyService)
-                .uploadProduct(anyLong(), any(), any(), any(BigDecimal.class), anyInt(), any(BigDecimal.class), any(), anyInt(), any());
+                .uploadProduct(anyLong(), any(), any(), any(BigDecimal.class), anyInt(), any(BigDecimal.class), any(), anyInt(), any(), any(), any());
 
         mockMvc.perform(multipart("/admin/panel/uploadProduct")
                         .file(mockFile)
@@ -425,7 +425,7 @@ class AdminPanelControllerTest {
 
         ArgumentCaptor<Long> versionCaptor = ArgumentCaptor.forClass(Long.class);
         verify(adminSupplyService).updateProduct(anyLong(), anyLong(), any(), any(), any(BigDecimal.class),
-                anyInt(), any(BigDecimal.class), any(), anyInt(), any(), versionCaptor.capture());
+                anyInt(), any(BigDecimal.class), any(), anyInt(), any(), any(), any(), versionCaptor.capture());
         assertEquals(5L, versionCaptor.getValue(),
                 "the version the editor loaded must reach the service unchanged");
     }
@@ -453,7 +453,7 @@ class AdminPanelControllerTest {
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("expectedVersion")));
 
         verify(adminSupplyService, never()).updateProduct(anyLong(), anyLong(), any(), any(),
-                any(BigDecimal.class), anyInt(), any(BigDecimal.class), any(), anyInt(), any(), any());
+                any(BigDecimal.class), anyInt(), any(BigDecimal.class), any(), anyInt(), any(), any(), any(), any());
     }
 
     @Test
@@ -476,7 +476,7 @@ class AdminPanelControllerTest {
                 .andExpect(jsonPath("$.errors[0].message").value(not(containsString("seven"))));
 
         verify(adminSupplyService, never()).updateProduct(anyLong(), anyLong(), any(), any(),
-                any(BigDecimal.class), anyInt(), any(BigDecimal.class), any(), anyInt(), any(), any());
+                any(BigDecimal.class), anyInt(), any(BigDecimal.class), any(), anyInt(), any(), any(), any(), any());
     }
 
     @Test
@@ -497,7 +497,7 @@ class AdminPanelControllerTest {
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
 
         verify(adminSupplyService, never()).updateProduct(anyLong(), anyLong(), any(), any(),
-                any(BigDecimal.class), anyInt(), any(BigDecimal.class), any(), anyInt(), any(), any());
+                any(BigDecimal.class), anyInt(), any(BigDecimal.class), any(), anyInt(), any(), any(), any(), any());
     }
 
     @Test
@@ -505,7 +505,7 @@ class AdminPanelControllerTest {
         doThrow(ProductEditConflictException.staleVersion())
                 .when(adminSupplyService)
                 .updateProduct(anyLong(), anyLong(), any(), any(), any(BigDecimal.class), anyInt(),
-                        any(BigDecimal.class), any(), anyInt(), any(), any());
+                        any(BigDecimal.class), any(), anyInt(), any(), any(), any(), any());
 
         mockMvc.perform(multipart("/admin/panel/updateProduct")
                         .file(mockFile)
@@ -535,7 +535,7 @@ class AdminPanelControllerTest {
         doThrow(new ObjectOptimisticLockingFailureException(ProductEntity.class, 2L))
                 .when(adminSupplyService)
                 .updateProduct(anyLong(), anyLong(), any(), any(), any(BigDecimal.class), anyInt(),
-                        any(BigDecimal.class), any(), anyInt(), any(), any());
+                        any(BigDecimal.class), any(), anyInt(), any(), any(), any(), any());
 
         String body = mockMvc.perform(multipart("/admin/panel/updateProduct")
                         .file(mockFile)
@@ -782,16 +782,24 @@ class AdminPanelControllerTest {
         product.setProductDiscount(new BigDecimal("10.0"));
         product.setProductDescription("Pure natural honey.");
         product.setProductCategoryId(5);
-        product.setProductVersion(11L);
+product.setProductVersion(11L);
+        product.setEffectivePrice(new BigDecimal("13.95"));
 
         when(adminSupplyService.getProductData(anyLong())).thenReturn(product);
 
         // productVersion is the one intentional addition to this contract; it is
-        // what an admin editor submits back as expectedVersion.
+        // what an admin editor submits back as expectedVersion. The package
+        // fields are the next additive step: null here because this product has
+        // no package size, which is what the editor then has to show as an empty
+        // optional field rather than as an inferred quantity. effectivePrice is
+        // additive for the same reason and is the number every customer surface
+        // renders as the payable price; the editor ignores it.
         String expectedJson = "{\"productName\":\"Organic Honey\",\"subCategoryName\":\"Sweeteners\","
-                + "\"productPrice\":15.50,\"productCount\":100,\"productDiscount\":10.0,"
-                + "\"productDescription\":\"Pure natural honey.\",\"productCategoryId\":5,"
-                + "\"productVersion\":11}";
+            + "\"productPrice\":15.50,\"productCount\":100,\"productDiscount\":10.0,"
+            + "\"productDescription\":\"Pure natural honey.\",\"productCategoryId\":5,"
+            + "\"productVersion\":11,\"effectivePrice\":13.95,"
+            + "\"packageAmount\":null,\"packageUnit\":null,"
+            + "\"unitPrice\":null,\"unitPriceBasis\":null}";
 
         mockMvc.perform(get("/admin/panel/getProductData")
                         .param("productId", "50"))

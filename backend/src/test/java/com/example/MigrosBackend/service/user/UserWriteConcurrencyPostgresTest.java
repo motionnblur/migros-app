@@ -8,6 +8,7 @@ import com.example.MigrosBackend.entity.product.ProductEntity;
 import com.example.MigrosBackend.entity.user.PendingSignupEntity;
 import com.example.MigrosBackend.entity.user.PendingTokenPurpose;
 import com.example.MigrosBackend.entity.user.UserEntity;
+import com.example.MigrosBackend.helper.ProductPricingPolicy;
 import com.example.MigrosBackend.repository.product.ProductEntityRepository;
 import com.example.MigrosBackend.repository.user.CheckoutEntityRepository;
 import com.example.MigrosBackend.repository.user.CheckoutItemEntityRepository;
@@ -523,6 +524,8 @@ class UserWriteConcurrencyPostgresTest {
         product.setProductCount(stock);
         product.setProductPrice(new BigDecimal("10.00"));
         product.setProductDiscount(BigDecimal.ZERO);
+        product.setEffectivePrice(
+                ProductPricingPolicy.effectivePrice(product.getProductPrice(), product.getProductDiscount()));
         product.setProductDescription("test product");
         return productEntityRepository.saveAndFlush(product);
     }

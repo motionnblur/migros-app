@@ -99,6 +99,13 @@ public class AdminPanelController {
      * the shared creation policy; the scale, capacity and length rules are applied
      * once, in the service, so the two creation endpoints cannot disagree about
      * them.
+     *
+     * <p>{@code packageAmount} and {@code packageUnit} are optional and additive:
+     * a request that omits both creates a product with no package size, exactly as
+     * every product created before V14. They are validated as a pair by the shared
+     * policy - a request naming one of them is a 400, not a half-filled row - and
+     * the unit is matched case-insensitively before being stored canonically, so
+     * {@code "kg"} and {@code " KG "} both mean kilograms.
      */
     @PostMapping("uploadProduct")
     public ResponseEntity<String> uploadProduct(@NotNull @RequestParam("adminId") Long adminId,
@@ -109,11 +116,14 @@ public class AdminPanelController {
                                                  @RequestParam("productDiscount") BigDecimal productDiscount,
                                                  @RequestParam("productDescription") String productDescription,
                                                  @RequestParam("selectedImage") MultipartFile selectedImage,
-                                                 @RequestParam("categoryValue") int categoryValue) {
+                                                 @RequestParam("categoryValue") int categoryValue,
+                                                 @RequestParam(value = "packageAmount", required = false) BigDecimal packageAmount,
+                                                 @RequestParam(value = "packageUnit", required = false) String packageUnit) {
         adminSupplyService.uploadProduct(
                 adminId, productName, subCategoryName,
                 productPrice, productCount, productDiscount,
-                productDescription, categoryValue, selectedImage);
+                productDescription, categoryValue, packageAmount, packageUnit,
+                selectedImage);
         return ResponseEntity.ok("File uploaded successfully");
     }
 
@@ -139,6 +149,12 @@ public class AdminPanelController {
      * afterwards to obtain it would be a second, later read that can observe a
      * version that a checkout reservation has already moved past, and the stale
      * form values would then be written back against it.
+     *
+     * <p>An edit that changes only the package metadata goes through the identical
+     * contract: the same required {@code expectedVersion}, the same 409 for a stale
+     * one, the same {@code X-Product-Version} on success. Package size is stored on
+     * the product row, so an edit that moves it must advance the version - a form
+     * that held a stale size would otherwise be undetectable.
      */
     @PostMapping("updateProduct")
     public ResponseEntity<String> updateProduct(@NotNull @RequestParam("adminId") Long adminId,
@@ -151,8 +167,10 @@ public class AdminPanelController {
                                                  @RequestParam("productDescription") String productDescription,
                                                  @RequestParam(value = "selectedImage", required = false) MultipartFile selectedImage,
                                                  @RequestParam("categoryValue") int categoryValue,
+                                                 @RequestParam(value = "packageAmount", required = false) BigDecimal packageAmount,
+                                                 @RequestParam(value = "packageUnit", required = false) String packageUnit,
                                                  @NotNull @PositiveOrZero @RequestParam("expectedVersion") Long expectedVersion) {
-        long resultingVersion = adminSupplyService.updateProduct(adminId, productId, productName, subCategoryName, productPrice, productCount, productDiscount, productDescription, categoryValue, selectedImage, expectedVersion);
+        long resultingVersion = adminSupplyService.updateProduct(adminId, productId, productName, subCategoryName, productPrice, productCount, productDiscount, productDescription, categoryValue, packageAmount, packageUnit, selectedImage, expectedVersion);
         return ResponseEntity.ok()
                 .header(ProductEditVersionHeader.NAME, Long.toString(resultingVersion))
                 .body("File uploaded successfully");

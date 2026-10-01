@@ -322,7 +322,7 @@ class ProductCreationPostgresTest {
 
         assertThrows(GeneralException.class, () -> adminSupplyService.uploadProduct(
                 admin.getId(), "Water", "Still", new BigDecimal("5.00"), 10, BigDecimal.ZERO,
-                "Fresh", 987654, png()));
+                "Fresh", 987654, null, null, png()));
         assertEquals(0, storedFiles().count(),
                 "the file is the one thing a rollback cannot undo, so it must not be written at all");
         assertEquals(0, productEntityRepository.count());
@@ -342,7 +342,7 @@ class ProductCreationPostgresTest {
 
         assertThrows(DataIntegrityViolationException.class, () -> adminSupplyService.uploadProduct(
                 admin.getId(), "Water", "Still", new BigDecimal("5.00"), 10, BigDecimal.ZERO,
-                "Fresh", category.getCategoryId(), png()));
+                "Fresh", category.getCategoryId(), null, null, png()));
 
         assertEquals(0, productEntityRepository.count(),
                 "a half-written product would advertise an image the database has no record of");
@@ -362,7 +362,7 @@ class ProductCreationPostgresTest {
         transaction.execute(status -> {
             adminSupplyService.uploadProduct(admin.getId(), "Water", "Still",
                     new BigDecimal("5.00"), 10, BigDecimal.ZERO, "Fresh",
-                    category.getCategoryId(), png());
+                    category.getCategoryId(), null, null, png());
             status.setRollbackOnly();
             return null;
         });
@@ -405,7 +405,7 @@ class ProductCreationPostgresTest {
 
         adminSupplyService.updateProduct(admin.getId(), productId, "Sparkling Water", "Sparkling",
                 new BigDecimal("7.25"), 42, new BigDecimal("5.00"), "Fizzy",
-                category.getCategoryId(), png(), versionBefore);
+                category.getCategoryId(), null, null, png(), versionBefore);
 
         assertEquals(1, productImageEntityRepository.count(),
                 "the uploaded image has to become reachable, not just exist on disk");
@@ -432,7 +432,7 @@ class ProductCreationPostgresTest {
         assertThrows(ProductEditConflictException.class, () ->
                 adminSupplyService.updateProduct(admin.getId(), productId, "Stale Edit", "Stale",
                         new BigDecimal("99.00"), 999, BigDecimal.ZERO, "Rejected",
-                        category.getCategoryId(), png(), 5L));
+                        category.getCategoryId(), null, null, png(), 5L));
 
         assertEquals(0, productImageEntityRepository.count());
         assertEquals(filesBefore, storedFiles().count(),
@@ -456,7 +456,7 @@ class ProductCreationPostgresTest {
                                    int count, String discount, String description) throws IOException {
         adminSupplyService.uploadProduct(admin.getId(), productName, subCategoryName,
                 new BigDecimal(price), count, new BigDecimal(discount), description,
-                category.getCategoryId(), png());
+                category.getCategoryId(), null, null, png());
         assertEquals(2, productEntityRepository.count(),
                 "precondition: this is the second product of the pair being compared");
         return jdbcTemplate.queryForObject(
