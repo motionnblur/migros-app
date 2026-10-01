@@ -24,10 +24,25 @@
   height: auto;
 }
 
-/* Eye icon button positioning fix */
-.position-absolute {
-  /* This ensures the toggle button stays inside the input field area */
-  margin-top: 32px !important;
+/* Show/hide password toggle. The wrapper is the containing block, so each eye
+   button stays inside its own field instead of anchoring to the fixed overlay
+   (#login-component). Kept in component CSS on purpose: the Karma setup does
+   not load Bootstrap utilities, so the layout must not depend on them. */
+.password-field {
+  position: relative;
+}
+
+.password-field__input {
+  padding-right: 2.75rem; /* keep typed text clear of the toggle */
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 0.5rem;
+  transform: translateY(-50%);
+  z-index: 1;
+  line-height: 1;
 }
 
 /* Header styling */

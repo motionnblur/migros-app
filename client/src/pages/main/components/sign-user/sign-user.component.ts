@@ -10,6 +10,25 @@ import { MatIconModule } from '@angular/material/icon';
 import { AuthService } from '../../../../services/auth/auth.service';
 import { ActivatedRoute, Router } from '@angular/router';
 
+/**
+ * One key per password input in this component. The keys are independent even
+ * where two inputs share a model field (`userPassword`), because only one
+ * phase is rendered at a time and each eye button owns exactly one input.
+ *
+ * Maps to the template as:
+ *   signUpPassword        -> #loginPassword
+ *   signUpPasswordConfirm -> #loginPasswordConfirm
+ *   loginPassword         -> #loginPassword2 (Giriş Yap phase)
+ *   newPassword           -> #newPassword
+ *   newPasswordConfirm    -> #newPasswordConfirm
+ */
+type PasswordField =
+  | 'signUpPassword'
+  | 'signUpPasswordConfirm'
+  | 'loginPassword'
+  | 'newPassword'
+  | 'newPasswordConfirm';
+
 @Component({
   selector: 'app-sign-user',
   standalone: true,
@@ -33,8 +52,8 @@ export class SignUserComponent implements OnInit {
   userMail!: string;
   userPassword!: string;
   userPasswordConfirm!: string;
-  passwordVisible = false;
   resetToken: string | null = null;
+  private readonly revealedPasswords = new Set<PasswordField>();
 
   constructor(
     private restService: RestService,
@@ -51,6 +70,20 @@ export class SignUserComponent implements OnInit {
       this.isResetPasswordPhaseActive = false;
       this.isNewPasswordPhaseActive = true;
     }
+  }
+
+  public isPasswordVisible(field: PasswordField): boolean {
+    return this.revealedPasswords.has(field);
+  }
+
+  public togglePasswordVisibility(field: PasswordField): void {
+    if (!this.revealedPasswords.delete(field)) {
+      this.revealedPasswords.add(field);
+    }
+  }
+
+  public passwordToggleLabel(field: PasswordField): string {
+    return this.isPasswordVisible(field) ? 'Şifreyi gizle' : 'Şifreyi göster';
   }
 
   public openSign() {
@@ -78,6 +111,8 @@ export class SignUserComponent implements OnInit {
     this.userMail = '';
     this.userPassword = '';
     this.userPasswordConfirm = '';
+    // A revealed password must never stay revealed across a phase switch.
+    this.revealedPasswords.clear();
   }
   public closeComponent(event: any) {
     if (event.target.id === 'login-component') {

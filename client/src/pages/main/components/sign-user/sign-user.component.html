@@ -24,23 +24,32 @@
       <!-- Password -->
       <div class="mb-3">
         <label for="loginPassword" class="form-label">Şifre Oluştur</label>
-        <input
-          [type]="passwordVisible ? 'text' : 'password'"
-          class="form-control"
-          id="loginPassword"
-          [(ngModel)]="userPassword"
-          name="password"
-        />
-        <button
-          type="button"
-          class="btn btn-sm btn-outline-secondary position-absolute top-0 end-0 mt-4 me-2"
-          (click)="passwordVisible = !passwordVisible"
-        >
-          <i
-            class="bi"
-            [ngClass]="passwordVisible ? 'bi-eye-slash' : 'bi-eye'"
-          ></i>
-        </button>
+        <div class="password-field">
+          <input
+            [type]="isPasswordVisible('signUpPassword') ? 'text' : 'password'"
+            class="form-control password-field__input"
+            id="loginPassword"
+            [(ngModel)]="userPassword"
+            name="password"
+            autocomplete="new-password"
+          />
+          <button
+            type="button"
+            class="password-toggle btn btn-sm btn-outline-secondary"
+            [attr.aria-label]="passwordToggleLabel('signUpPassword')"
+            [attr.aria-pressed]="isPasswordVisible('signUpPassword')"
+            (click)="togglePasswordVisibility('signUpPassword')"
+            data-testid="toggle-signup-password"
+          >
+            <i
+              class="bi"
+              [ngClass]="
+                isPasswordVisible('signUpPassword') ? 'bi-eye-slash' : 'bi-eye'
+              "
+              aria-hidden="true"
+            ></i>
+          </button>
+        </div>
       </div>
 
       <!-- Confirm Password -->
@@ -48,23 +57,36 @@
         <label for="loginPasswordConfirm" class="form-label"
           >Şifreyi Onayla</label
         >
-        <input
-          [type]="passwordVisible ? 'text' : 'password'"
-          class="form-control"
-          id="loginPasswordConfirm"
-          [(ngModel)]="userPasswordConfirm"
-          name="passwordConfirm"
-        />
-        <button
-          type="button"
-          class="btn btn-sm btn-outline-secondary position-absolute top-0 end-0 mt-4 me-2"
-          (click)="passwordVisible = !passwordVisible"
-        >
-          <i
-            class="bi"
-            [ngClass]="passwordVisible ? 'bi-eye-slash' : 'bi-eye'"
-          ></i>
-        </button>
+        <div class="password-field">
+          <input
+            [type]="
+              isPasswordVisible('signUpPasswordConfirm') ? 'text' : 'password'
+            "
+            class="form-control password-field__input"
+            id="loginPasswordConfirm"
+            [(ngModel)]="userPasswordConfirm"
+            name="passwordConfirm"
+            autocomplete="new-password"
+          />
+          <button
+            type="button"
+            class="password-toggle btn btn-sm btn-outline-secondary"
+            [attr.aria-label]="passwordToggleLabel('signUpPasswordConfirm')"
+            [attr.aria-pressed]="isPasswordVisible('signUpPasswordConfirm')"
+            (click)="togglePasswordVisibility('signUpPasswordConfirm')"
+            data-testid="toggle-signup-password-confirm"
+          >
+            <i
+              class="bi"
+              [ngClass]="
+                isPasswordVisible('signUpPasswordConfirm')
+                  ? 'bi-eye-slash'
+                  : 'bi-eye'
+              "
+              aria-hidden="true"
+            ></i>
+          </button>
+        </div>
       </div>
 
       <!-- Submit -->
@@ -112,23 +134,32 @@
       <!-- Password -->
       <div class="mb-3">
         <label for="loginPassword2" class="form-label">Şifre</label>
-        <input
-          [type]="passwordVisible ? 'text' : 'password'"
-          class="form-control"
-          id="loginPassword2"
-          [(ngModel)]="userPassword"
-          name="passwordLogin"
-        />
-        <button
-          type="button"
-          class="btn btn-sm btn-outline-secondary position-absolute top-0 end-0 mt-4 me-2"
-          (click)="passwordVisible = !passwordVisible"
-        >
-          <i
-            class="bi"
-            [ngClass]="passwordVisible ? 'bi-eye-slash' : 'bi-eye'"
-          ></i>
-        </button>
+        <div class="password-field">
+          <input
+            [type]="isPasswordVisible('loginPassword') ? 'text' : 'password'"
+            class="form-control password-field__input"
+            id="loginPassword2"
+            [(ngModel)]="userPassword"
+            name="passwordLogin"
+            autocomplete="current-password"
+          />
+          <button
+            type="button"
+            class="password-toggle btn btn-sm btn-outline-secondary"
+            [attr.aria-label]="passwordToggleLabel('loginPassword')"
+            [attr.aria-pressed]="isPasswordVisible('loginPassword')"
+            (click)="togglePasswordVisibility('loginPassword')"
+            data-testid="toggle-login-password"
+          >
+            <i
+              class="bi"
+              [ngClass]="
+                isPasswordVisible('loginPassword') ? 'bi-eye-slash' : 'bi-eye'
+              "
+              aria-hidden="true"
+            ></i>
+          </button>
+        </div>
       </div>
 
       <!-- Submit -->
@@ -215,23 +246,32 @@
       <!-- New Password -->
       <div class="mb-3">
         <label for="newPassword" class="form-label">Yeni Şifre</label>
-        <input
-          [type]="passwordVisible ? 'text' : 'password'"
-          class="form-control"
-          id="newPassword"
-          [(ngModel)]="userPassword"
-          name="newPassword"
-        />
-        <button
-          type="button"
-          class="btn btn-sm btn-outline-secondary position-absolute top-0 end-0 mt-4 me-2"
-          (click)="passwordVisible = !passwordVisible"
-        >
-          <i
-            class="bi"
-            [ngClass]="passwordVisible ? 'bi-eye-slash' : 'bi-eye'"
-          ></i>
-        </button>
+        <div class="password-field">
+          <input
+            [type]="isPasswordVisible('newPassword') ? 'text' : 'password'"
+            class="form-control password-field__input"
+            id="newPassword"
+            [(ngModel)]="userPassword"
+            name="newPassword"
+            autocomplete="new-password"
+          />
+          <button
+            type="button"
+            class="password-toggle btn btn-sm btn-outline-secondary"
+            [attr.aria-label]="passwordToggleLabel('newPassword')"
+            [attr.aria-pressed]="isPasswordVisible('newPassword')"
+            (click)="togglePasswordVisibility('newPassword')"
+            data-testid="toggle-new-password"
+          >
+            <i
+              class="bi"
+              [ngClass]="
+                isPasswordVisible('newPassword') ? 'bi-eye-slash' : 'bi-eye'
+              "
+              aria-hidden="true"
+            ></i>
+          </button>
+        </div>
       </div>
 
       <!-- Confirm New Password -->
@@ -239,23 +279,36 @@
         <label for="newPasswordConfirm" class="form-label"
           >Yeni Şifreyi Onayla</label
         >
-        <input
-          [type]="passwordVisible ? 'text' : 'password'"
-          class="form-control"
-          id="newPasswordConfirm"
-          [(ngModel)]="userPasswordConfirm"
-          name="newPasswordConfirm"
-        />
-        <button
-          type="button"
-          class="btn btn-sm btn-outline-secondary position-absolute top-0 end-0 mt-4 me-2"
-          (click)="passwordVisible = !passwordVisible"
-        >
-          <i
-            class="bi"
-            [ngClass]="passwordVisible ? 'bi-eye-slash' : 'bi-eye'"
-          ></i>
-        </button>
+        <div class="password-field">
+          <input
+            [type]="
+              isPasswordVisible('newPasswordConfirm') ? 'text' : 'password'
+            "
+            class="form-control password-field__input"
+            id="newPasswordConfirm"
+            [(ngModel)]="userPasswordConfirm"
+            name="newPasswordConfirm"
+            autocomplete="new-password"
+          />
+          <button
+            type="button"
+            class="password-toggle btn btn-sm btn-outline-secondary"
+            [attr.aria-label]="passwordToggleLabel('newPasswordConfirm')"
+            [attr.aria-pressed]="isPasswordVisible('newPasswordConfirm')"
+            (click)="togglePasswordVisibility('newPasswordConfirm')"
+            data-testid="toggle-new-password-confirm"
+          >
+            <i
+              class="bi"
+              [ngClass]="
+                isPasswordVisible('newPasswordConfirm')
+                  ? 'bi-eye-slash'
+                  : 'bi-eye'
+              "
+              aria-hidden="true"
+            ></i>
+          </button>
+        </div>
       </div>
 
       <!-- Submit -->
